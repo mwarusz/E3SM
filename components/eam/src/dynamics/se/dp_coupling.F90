@@ -542,7 +542,7 @@ CONTAINS
     !---------------------------------------------------------------------------
 
     ! Evaluate derived quantities
-    !$omp parallel do private (lchnk, ncol, k, i, zvirv, pbuf_chnk)
+    !$omp parallel do private (lchnk, ncol, k, i, zvirv, pbuf_chnk, nbrhd_rairv, nbrhd_zvirv, ierr)
     do lchnk = begchunk,endchunk+nbrhdchunk
       ncol = get_ncols_p(lchnk)
       do k = 1,nlev
