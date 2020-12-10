@@ -520,6 +520,7 @@ CONTAINS
     use hycoef,         only: hyam, hybm, hyai, hybi, ps0
     use shr_vmath_mod,  only: shr_vmath_log
     use phys_gmean,     only: gmean
+    use cam_abortutils, only: endrun
     !---------------------------------------------------------------------------
     implicit none
     type(physics_state), intent(inout), dimension(begchunk:endchunk+nbrhdchunk) :: phys_state
@@ -535,7 +536,7 @@ CONTAINS
     real(r8) :: se(pcols,begchunk:endchunk)   
     real(r8) :: ke_glob(1),se_glob(1)
     real(r8) :: zvirv(pcols,pver)    ! Local zvir array pointer
-    integer  :: m, i, k, ncol
+    integer  :: m, i, k, ncol, ierr
     type(physics_buffer_desc), pointer :: pbuf_chnk(:)
     real(r8), allocatable :: nbrhd_rairv(:,:), nbrhd_zvirv(:,:)
     !---------------------------------------------------------------------------
@@ -586,7 +587,10 @@ CONTAINS
                              phys_state(lchnk)%zi    , phys_state(lchnk)%zm      ,&
                              ncol)
       else
-         allocate(nbrhd_rairv(ncol,pver), nbrhd_zvirv(ncol,pver))
+         allocate(nbrhd_rairv(ncol,pver), nbrhd_zvirv(ncol,pver), stat=ierr)
+         if (ierr /= 0) then
+            call endrun("dp_coupling::derived_phys: alloc nbrhd_rairv,zvirv failed")
+         end if
          nbrhd_rairv(:,:) = rair
          nbrhd_zvirv(:,:) = zvir
          call geopotential_t(phys_state(lchnk)%lnpint, phys_state(lchnk)%lnpmid  ,&

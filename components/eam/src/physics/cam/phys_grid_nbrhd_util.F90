@@ -8,6 +8,7 @@ module phys_grid_nbrhd_util
   use spmd_utils, only: iam, masterproc, npes
   use shr_kind_mod, only: r8 => shr_kind_r8
   use cam_logfile, only: iulog
+  use cam_abortutils, only: endrun
   use dimensions_mod, only: nelemd, npsq
   use ppgrid, only: begchunk, endchunk, nbrhdchunk, pcols, pver
   use kinds, only: real_kind, int_kind
@@ -42,7 +43,7 @@ contains
     real(r8), allocatable :: bbuf(:), cbuf(:)
     integer, allocatable :: bptr(:,:), cptr(:)
     integer :: nbrhd_pcnst, rcdsz, bnrecs, cnrecs, max_numlev, max_numrep, num_recv_col, &
-         numlev, numrep, ie, bid, ncol, j, k, p, lchnk, icol, ptr
+         numlev, numrep, ie, bid, ncol, j, k, p, lchnk, icol, ptr, ierr
 
     call t_startf('dpcopy_nbrhd')
 
@@ -50,10 +51,16 @@ contains
     rcdsz = 4 + nbrhd_pcnst
     call nbrhd_block_to_chunk_sizes(bnrecs, cnrecs, max_numlev, max_numrep, num_recv_col)
 
-    allocate(bbuf(rcdsz*bnrecs), cbuf(rcdsz*cnrecs))
+    allocate(bbuf(rcdsz*bnrecs), cbuf(rcdsz*cnrecs), stat=ierr)
+    if (ierr /= 0) then
+       call endrun('phys_grid_nbrhd_util::nbrhd_d_p_coupling: alloc b,cbuf failed')
+    end if
 
     if (par%dynproc) then
-       allocate(bptr(0:max_numlev-1,max_numrep))
+       allocate(bptr(0:max_numlev-1,max_numrep), stat=ierr)
+       if (ierr /= 0) then
+          call endrun('phys_grid_nbrhd_util::nbrhd_d_p_coupling: alloc bptr failed')
+       end if
        do ie = 1, nelemd
           bid = nbrhd_get_ie2bid(ie)
           ncol = get_block_gcol_cnt_d(bid)
@@ -87,7 +94,10 @@ contains
     call nbrhd_transpose_block_to_chunk(rcdsz, bbuf, cbuf)
     call t_stopf ('nbrhd_block_to_chunk')
 
-    allocate(cptr(0:max_numlev-1))
+    allocate(cptr(0:max_numlev-1), stat=ierr)
+    if (ierr /= 0) then
+       call endrun('phys_grid_nbrhd_util::nbrhd_d_p_coupling: alloc cptr failed')
+    end if
     lchnk = endchunk+nbrhdchunk
     do icol = 1, num_recv_col
        call nbrhd_block_to_chunk_recv_pters(icol, rcdsz, numlev, cptr)
@@ -124,15 +134,21 @@ contains
     real(r8), allocatable :: sbuf(:), rbuf(:)
     integer, allocatable :: sptr(:,:), rptr(:)
     integer :: nbrhd_pcnst, rcdsz, snrecs, rnrecs, max_numlev, max_numrep, num_recv_col, &
-         numlev, numrep, lid, ncol, icol, j, k, p, lchnk, ptr
+         numlev, numrep, lid, ncol, icol, j, k, p, lchnk, ptr, ierr
 
     call t_startf('ppcopy_nbrhd')
     nbrhd_pcnst = nbrhd_get_option_pcnst()
     rcdsz = 4 + nbrhd_pcnst
     call nbrhd_chunk_to_chunk_sizes(snrecs, rnrecs, max_numlev, max_numrep, num_recv_col)
-    allocate(sbuf(rcdsz*snrecs), rbuf(rcdsz*rnrecs))
+    allocate(sbuf(rcdsz*snrecs), rbuf(rcdsz*rnrecs), stat=ierr)
+    if (ierr /= 0) then
+       call endrun('phys_grid_nbrhd_util::nbrhd_p_p_coupling: alloc s,rbuf failed')
+    end if
 
-    allocate(sptr(0:max_numlev-1,max_numrep))
+    allocate(sptr(0:max_numlev-1,max_numrep), stat=ierr)
+    if (ierr /= 0) then
+       call endrun('phys_grid_nbrhd_util::nbrhd_p_p_coupling: alloc sptr failed')
+    end if
     do lid = begchunk, endchunk
        ncol = get_ncols_p(lid)
        do icol = 1, ncol
@@ -161,7 +177,10 @@ contains
     call nbrhd_transpose_chunk_to_chunk(rcdsz, sbuf, rbuf)
     call t_stopf('nbrhd_chunk_to_chunk')
 
-    allocate(rptr(0:max_numlev-1))
+    allocate(rptr(0:max_numlev-1), stat=ierr)
+    if (ierr /= 0) then
+       call endrun('phys_grid_nbrhd_util::nbrhd_p_p_coupling: alloc rptr failed')
+    end if
     lchnk = endchunk+nbrhdchunk
     do icol = 1, num_recv_col
        call nbrhd_chunk_to_chunk_recv_pters(icol, rcdsz, numlev, rptr)
