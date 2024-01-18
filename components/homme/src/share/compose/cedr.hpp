@@ -4,6 +4,7 @@
 #ifndef INCLUDE_CEDR_HPP
 #define INCLUDE_CEDR_HPP
 
+#include <iostream>
 #include "cedr_kokkos.hpp"
 
 // Communication-Efficient Constrained Density Reconstructors
