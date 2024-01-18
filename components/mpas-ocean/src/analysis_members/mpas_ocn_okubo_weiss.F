@@ -70,7 +70,8 @@ module ocn_okubo_weiss
 
    interface
       subroutine qsort(array, elem_count, elem_size, compare) bind(C, name="qsort")!{{{
-         import
+         !import
+         use iso_c_binding
          type(c_ptr), value       :: array
          integer(c_size_t), value :: elem_count
          integer(c_size_t), value :: elem_size
