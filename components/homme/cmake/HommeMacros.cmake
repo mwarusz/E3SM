@@ -113,6 +113,14 @@ macro(createTestExec execName execType macroNP macroNC
 
   ADD_EXECUTABLE(${execName} ${EXEC_SOURCES})
   SET_TARGET_PROPERTIES(${execName} PROPERTIES LINKER_LANGUAGE Fortran)
+  IF(BUILD_HOMME_WITHOUT_PIOLIBRARY)
+    TARGET_COMPILE_DEFINITIONS(${execName} PUBLIC HOMME_WITHOUT_PIOLIBRARY)
+  ENDIF()
+  IF(BUILD_HOMMEXX_BENCHMARK_NOFORCING)
+    TARGET_COMPILE_DEFINITIONS(${execName} PUBLIC HOMMEXX_BENCHMARK_NOFORCING)
+  ENDIF()
+
+  target_link_libraries(${execName} csm_share)
 
   IF (CXXLIB_SUPPORTED_CACHE)
     MESSAGE(STATUS "   Linking Fortran with -cxxlib")
@@ -127,7 +135,18 @@ macro(createTestExec execName execType macroNP macroNC
   # Add this executable to a list
   SET(EXEC_LIST ${EXEC_LIST} ${execName} CACHE INTERNAL "List of configured executables")
 
-  TARGET_LINK_LIBRARIES(${execName} timing ${COMPOSE_LIBRARY} ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+  # If this is a Kokkos executable, e.g. theta-l_kokkos, then link to the C++
+  # Compose library; if not, then link to the F90 one.
+  #   If Compose is not enabled, then COMPOSE_LIBRARY_F90 and
+  # COMPOSE_LIBRARY_CPP are empty, so then COMPOSE_LIBRARY_TYPE will be, too.
+  string(FIND ${execType} "kokkos" KOKKOS_SUFFIX_LOC)
+  if (KOKKOS_SUFFIX_LOC EQUAL -1)
+    set (COMPOSE_LIBRARY_TYPE ${COMPOSE_LIBRARY_F90})
+  else ()
+    set (COMPOSE_LIBRARY_TYPE ${COMPOSE_LIBRARY_CPP})
+  endif ()
+
+  TARGET_LINK_LIBRARIES(${execName} timing ${COMPOSE_LIBRARY_TYPE} ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
   IF(NOT BUILD_HOMME_WITHOUT_PIOLIBRARY)
     IF(HOMME_USE_SCORPIO)
       TARGET_LINK_LIBRARIES(${execName} piof pioc)
@@ -137,7 +156,7 @@ macro(createTestExec execName execType macroNP macroNC
   ENDIF ()
 
   IF (HOMME_USE_KOKKOS)
-    TARGET_LINK_LIBRARIES(${execName} kokkos)
+    target_link_libraries(${execName} kokkos)
   ENDIF ()
 
   # Move the module files out of the way so the parallel build
@@ -146,7 +165,8 @@ macro(createTestExec execName execType macroNP macroNC
                         PROPERTIES Fortran_MODULE_DIRECTORY ${EXEC_MODULE_DIR})
 
   IF (HOMME_USE_MKL)
-    TARGET_LINK_LIBRARIES(${execName})
+    TARGET_COMPILE_OPTIONS(${execName} PUBLIC -mkl)
+    TARGET_LINK_LIBRARIES(${execName} -mkl)
   ELSE()
     IF (NOT HOMME_FIND_BLASLAPACK)
       TARGET_LINK_LIBRARIES(${execName} lapack blas)
@@ -171,6 +191,103 @@ macro(createTestExec execName execType macroNP macroNC
   INSTALL(TARGETS ${execName} RUNTIME DESTINATION tests)
 
 endmacro(createTestExec)
+
+# Create a library instead of an executable, so Homme can be used by
+# another cmake project as a dycore library
+macro(createExecLib libName execType libSrcs inclDirs macroNP
+                    macroPLEV macroWITH_ENERGY macroQSIZE_D)
+
+  # Set the include directories
+  SET(modulesDir "${CMAKE_CURRENT_BINARY_DIR}/${libName}_modules")
+
+  MESSAGE(STATUS "Building ${libName} library derived from ${execType} with:")
+  MESSAGE(STATUS "  NP = ${macroNP}")
+  MESSAGE(STATUS "  PLEV = ${macroPLEV}")
+  MESSAGE(STATUS "  QSIZE_D = ${macroQSIZE_D}")
+  MESSAGE(STATUS "  ENERGY = ${macroWITH_ENERGY}")
+
+  # Set the variable to the macro variables
+  SET(NUM_POINTS ${macroNP})
+  SET(NUM_PLEV ${macroPLEV})
+
+  IF (${macroWITH_ENERGY})
+    SET(ENERGY_DIAGNOSTICS TRUE)
+  ELSE()
+    SET(ENERGY_DIAGNOSTICS)
+  ENDIF ()
+
+  IF (${macroQSIZE_D})
+    SET(QSIZE_D ${macroQSIZE_D})
+  ELSE()
+    SET(QSIZE_D)
+  ENDIF ()
+
+  # This is needed to compile the test executables with the correct options
+  SET(THIS_CONFIG_IN ${HOMME_SOURCE_DIR}/src/${execType}/config.h.cmake.in)
+  SET(THIS_CONFIG_HC ${CMAKE_CURRENT_BINARY_DIR}/config.h.c)
+  SET(THIS_CONFIG_H ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+
+  # First configure the file (which formats the file as C)
+  HommeConfigFile (${THIS_CONFIG_IN} ${THIS_CONFIG_HC} ${THIS_CONFIG_H} )
+
+  ADD_DEFINITIONS(-DHAVE_CONFIG_H)
+
+  ADD_LIBRARY(${libName} ${libSrcs})
+  TARGET_INCLUDE_DIRECTORIES (${libName} PUBLIC ${inclDirs} ${modulesDir} ${CMAKE_CURRENT_BINARY_DIR})
+  SET_TARGET_PROPERTIES(${libName} PROPERTIES Fortran_MODULE_DIRECTORY ${modulesDir})
+  SET_TARGET_PROPERTIES(${libName} PROPERTIES LINKER_LANGUAGE Fortran)
+  IF(BUILD_HOMME_WITHOUT_PIOLIBRARY)
+    TARGET_COMPILE_DEFINITIONS(${libName} PUBLIC HOMME_WITHOUT_PIOLIBRARY)
+  ENDIF()
+
+  target_link_libraries(${execName} csm_share)
+  if (NOT HOMME_BUILD_SCORPIO)
+    # Needed for netcdf.mod usage in mesh_mod.F90.
+    target_link_libraries(${execName} piof)
+  endif()
+
+  IF (CXXLIB_SUPPORTED_CACHE)
+    MESSAGE(STATUS "   Linking Fortran with -cxxlib")
+    TARGET_LINK_LIBRARIES(${libName} -cxxlib)
+  ENDIF ()
+
+  STRING(TOUPPER "${PERFORMANCE_PROFILE}" PERF_PROF_UPPER)
+  IF ("${PERF_PROF_UPPER}" STREQUAL "VTUNE")
+    TARGET_LINK_LIBRARIES(${libName} ittnotify)
+  ENDIF ()
+
+  # COMPOSE_LIBRARY is empty if Compose SL transport is not enabled.
+  TARGET_LINK_LIBRARIES(${libName} timing ${COMPOSE_LIBRARY} ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+
+  IF (HOMME_USE_KOKKOS)
+    TARGET_LINK_LIBRARIES(${libName} kokkos)
+  ENDIF ()
+
+  IF (HOMME_USE_MKL)
+    TARGET_COMPILE_OPTIONS(${libName} PUBLIC -mkl)
+    TARGET_LINK_LIBRARIES(${libName} -mkl)
+  ELSE()
+    IF (NOT HOMME_FIND_BLASLAPACK)
+      TARGET_LINK_LIBRARIES(${libName} lapack blas)
+    ENDIF()
+  ENDIF()
+
+  IF (HAVE_EXTRAE)
+    TARGET_LINK_LIBRARIES(${libName} ${Extrae_LIBRARY})
+  ENDIF ()
+
+  IF (HOMME_USE_TRILINOS)
+    TARGET_LINK_LIBRARIES(${libName} ${Trilinos_LIBRARIES} ${Trilinos_TPL_LIBRARIES})
+  ENDIF()
+
+  IF (HOMME_USE_ARKODE AND "${execType}" STREQUAL "theta-l")
+    TARGET_LINK_LIBRARIES(${libName} sundials_farkode)
+    TARGET_LINK_LIBRARIES(${libName} sundials_arkode)
+    TARGET_LINK_LIBRARIES(${libName} sundials_nvecserial)
+    TARGET_LINK_LIBRARIES(${libName} sundials_fnvecserial)
+  ENDIF ()
+
+endmacro(createExecLib)
 
 macro (copyDirFiles testDir)
   # Copy all of the files into the binary dir
@@ -664,7 +781,6 @@ function (make_profiles_up_to profile profiles)
 endfunction ()
 
 MACRO(CREATE_CXX_VS_F90_TESTS_WITH_PROFILE TESTS_LIST testProfile)
-
   FOREACH (TEST ${${TESTS_LIST}})
     SET (TEST_FILE_F90 "${TEST}.cmake")
 
@@ -672,20 +788,21 @@ MACRO(CREATE_CXX_VS_F90_TESTS_WITH_PROFILE TESTS_LIST testProfile)
     set (PROFILE ${testProfile})
     INCLUDE (${HOMME_SOURCE_DIR}/test/reg_test/run_tests/${TEST_FILE_F90})
 
+    set (TEST_NAME_SUFFIX)
     if ("${TEST}" MATCHES "theta-f")
-      SET (TEST_NAME_SUFFIX "ne${HOMME_TEST_NE}-nu${HOMME_TEST_NU}-ndays${HOMME_TEST_NDAYS}")
+      SET (TEST_NAME_SUFFIX "-ne${HOMME_TEST_NE}-nu${HOMME_TEST_NU}-ndays${HOMME_TEST_NDAYS}")
     elseif ("${TEST}" MATCHES "preqx-nlev")
-      SET (TEST_NAME_SUFFIX "ne${HOMME_TEST_NE}-ndays${HOMME_TEST_NDAYS}")
+      SET (TEST_NAME_SUFFIX "-ne${HOMME_TEST_NE}-ndays${HOMME_TEST_NDAYS}")
     endif ()
 
-    SET (F90_TEST_NAME "${TEST}-${TEST_NAME_SUFFIX}")
-    SET (CXX_TEST_NAME "${TEST}-kokkos-${TEST_NAME_SUFFIX}")
+    SET (F90_TEST_NAME "${TEST}${TEST_NAME_SUFFIX}")
+    SET (CXX_TEST_NAME "${TEST}-kokkos${TEST_NAME_SUFFIX}")
     SET (F90_DIR ${HOMME_BINARY_DIR}/tests/${F90_TEST_NAME})
     SET (CXX_DIR ${HOMME_BINARY_DIR}/tests/${CXX_TEST_NAME})
 
     # Compare netcdf output files bit-for-bit AND compare diagnostic lines
     # in the raw output files
-    SET (TEST_NAME "${TEST}-${TEST_NAME_SUFFIX}_cxx_vs_f90")
+    SET (TEST_NAME "${TEST}${TEST_NAME_SUFFIX}_cxx_vs_f90")
     MESSAGE ("-- Creating cxx-f90 comparison test ${TEST_NAME}")
 
     CONFIGURE_FILE (${HOMME_SOURCE_DIR}/cmake/CxxVsF90.cmake.in

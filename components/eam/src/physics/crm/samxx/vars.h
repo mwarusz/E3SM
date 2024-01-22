@@ -2,6 +2,7 @@
 #pragma once
 
 #include "samxx_const.h"
+#include "YAKL_fft.h"
 
 
 void allocate();
@@ -39,6 +40,8 @@ extern real4d v             ; // Index as v             (    k , offy_v    +j , 
 extern real4d w             ; // Index as w             (    k , offy_w    +j , offx_w    +i , icrm )
 extern real4d t             ; // Index as t             (    k , offy_s    +j , offx_s    +i , icrm )
 extern real4d p             ; // Index as p             (    k , offy_p    +j , offx_p    +i , icrm )
+extern real4d u_esmt        ; // Index as u_esmt        (    k , offy_s    +j , offx_s    +i , icrm )
+extern real4d v_esmt        ; // Index as v_esmt        (    k , offy_s    +j , offx_s    +i , icrm )
 extern real4d tke2          ; // Index as tke2          (    k , offy_s +j , offx_s +i , icrm )
 extern real4d tk2           ; // Index as tk2           (    k , offy_tk2(or offy_d)  +j , offx_d  +i , icrm )
 extern real3d sstxy         ; // Index as sstxy         (        offy_sstxy+j , offx_sstxy+i , icrm )
@@ -53,47 +56,59 @@ void perturb_arrays();
 
 void create_and_copy_inputs(real *crm_input_bflxls_p, real *crm_input_wndls_p, real *crm_input_zmid_p, real *crm_input_zint_p, 
                             real *crm_input_pmid_p, real *crm_input_pint_p, real *crm_input_pdel_p, real *crm_input_ul_p, real *crm_input_vl_p, 
-                            real *crm_input_tl_p, real *crm_input_qccl_p, real *crm_input_qiil_p, real *crm_input_ql_p, real *crm_input_tau00_p, 
+                            real *crm_input_tl_p, real *crm_input_qccl_p, real *crm_input_qiil_p, real *crm_input_ql_p, real *crm_input_tau00_p,
+                            real *crm_input_ul_esmt_p, real *crm_input_vl_esmt_p,
+                            real *crm_input_t_vt_p, real *crm_input_q_vt_p, real *crm_input_u_vt_p,
                             real *crm_state_u_wind_p, real *crm_state_v_wind_p, real *crm_state_w_wind_p, real *crm_state_temperature_p, 
-                            real *crm_state_qt_p, real *crm_state_qp_p, real *crm_state_qn_p, real *crm_rad_qrad_p, real *crm_output_subcycle_factor_p, 
+                            real *crm_state_qv_p, real *crm_state_qp_p, real *crm_state_qn_p, real *crm_rad_qrad_p, real *crm_output_subcycle_factor_p, 
                             real *lat0_p, real *long0_p, int *gcolp_p, real *crm_output_cltot_p, real *crm_output_clhgh_p, real *crm_output_clmed_p,
                             real *crm_output_cllow_p);
                             
 
 
 void copy_outputs(real *crm_state_u_wind_p, real *crm_state_v_wind_p, real *crm_state_w_wind_p, real *crm_state_temperature_p, 
-                  real *crm_state_qt_p, real *crm_state_qp_p, real *crm_state_qn_p, real *crm_rad_temperature_p, 
+                  real *crm_state_qv_p, real *crm_state_qp_p, real *crm_state_qn_p, real *crm_rad_temperature_p, 
                   real *crm_rad_qv_p, real *crm_rad_qc_p, real *crm_rad_qi_p, real *crm_rad_cld_p, real *crm_output_subcycle_factor_p, 
                   real *crm_output_prectend_p, real *crm_output_precstend_p, real *crm_output_cld_p, real *crm_output_cldtop_p, 
                   real *crm_output_gicewp_p, real *crm_output_gliqwp_p, real *crm_output_mctot_p, real *crm_output_mcup_p, real *crm_output_mcdn_p, 
                   real *crm_output_mcuup_p, real *crm_output_mcudn_p, real *crm_output_qc_mean_p, real *crm_output_qi_mean_p, real *crm_output_qs_mean_p, 
                   real *crm_output_qg_mean_p, real *crm_output_qr_mean_p, real *crm_output_mu_crm_p, real *crm_output_md_crm_p, real *crm_output_eu_crm_p, 
                   real *crm_output_du_crm_p, real *crm_output_ed_crm_p, real *crm_output_flux_qt_p, real *crm_output_flux_u_p, real *crm_output_flux_v_p, 
-                  real *crm_output_fluxsgs_qt_p, real *crm_output_tkez_p, real *crm_output_tkesgsz_p, real *crm_output_tkz_p, real *crm_output_flux_qp_p, 
+                  real *crm_output_fluxsgs_qt_p, real *crm_output_tkez_p, real *crm_output_tkew_p, real *crm_output_tkesgsz_p, real *crm_output_tkz_p, real *crm_output_flux_qp_p, 
                   real *crm_output_precflux_p, real *crm_output_qt_trans_p, real *crm_output_qp_trans_p, real *crm_output_qp_fall_p, real *crm_output_qp_evp_p, 
                   real *crm_output_qp_src_p, real *crm_output_qt_ls_p, real *crm_output_t_ls_p, real *crm_output_jt_crm_p, real *crm_output_mx_crm_p, real *crm_output_cltot_p, 
-                  real *crm_output_clhgh_p, real *crm_output_clmed_p, real *crm_output_cllow_p, real *crm_output_sltend_p, real *crm_output_qltend_p, real *crm_output_qcltend_p, 
-                  real *crm_output_qiltend_p, real *crm_output_tk_p, real *crm_output_tkh_p, real *crm_output_qcl_p, real *crm_output_qci_p, real *crm_output_qpl_p, real *crm_output_qpi_p, 
+                  real *crm_output_clhgh_p, real *crm_output_clmed_p, real *crm_output_cllow_p, 
+                  real *crm_output_sltend_p, real *crm_output_qltend_p, real *crm_output_qcltend_p, real *crm_output_qiltend_p, 
+                  real *crm_output_t_vt_tend_p, real *crm_output_q_vt_tend_p, real *crm_output_u_vt_tend_p,
+                  real *crm_output_t_vt_ls_p, real *crm_output_q_vt_ls_p, real *crm_output_u_vt_ls_p,
+                  real *crm_output_ultend_p, real *crm_output_vltend_p,
+                  real *crm_output_tk_p, real *crm_output_tkh_p, real *crm_output_qcl_p, real *crm_output_qci_p, real *crm_output_qpl_p, real *crm_output_qpi_p, 
                   real *crm_output_z0m_p, real *crm_output_taux_p, real *crm_output_tauy_p, real *crm_output_precc_p, real *crm_output_precl_p, real *crm_output_precsc_p, 
-                  real *crm_output_precsl_p, real *crm_output_prec_crm_p, real *crm_clear_rh_p);
+                  real *crm_output_precsl_p, real *crm_output_prec_crm_p, 
+                  real *crm_clear_rh_p);
                             
 
 
 void copy_outputs_and_destroy(real *crm_state_u_wind_p, real *crm_state_v_wind_p, real *crm_state_w_wind_p, real *crm_state_temperature_p, 
-                              real *crm_state_qt_p, real *crm_state_qp_p, real *crm_state_qn_p, real *crm_rad_temperature_p, 
+                              real *crm_state_qv_p, real *crm_state_qp_p, real *crm_state_qn_p, real *crm_rad_temperature_p, 
                               real *crm_rad_qv_p, real *crm_rad_qc_p, real *crm_rad_qi_p, real *crm_rad_cld_p, real *crm_output_subcycle_factor_p, 
                               real *crm_output_prectend_p, real *crm_output_precstend_p, real *crm_output_cld_p, real *crm_output_cldtop_p, 
                               real *crm_output_gicewp_p, real *crm_output_gliqwp_p, real *crm_output_mctot_p, real *crm_output_mcup_p, real *crm_output_mcdn_p, 
                               real *crm_output_mcuup_p, real *crm_output_mcudn_p, real *crm_output_qc_mean_p, real *crm_output_qi_mean_p, real *crm_output_qs_mean_p, 
                               real *crm_output_qg_mean_p, real *crm_output_qr_mean_p, real *crm_output_mu_crm_p, real *crm_output_md_crm_p, real *crm_output_eu_crm_p, 
                               real *crm_output_du_crm_p, real *crm_output_ed_crm_p, real *crm_output_flux_qt_p, real *crm_output_flux_u_p, real *crm_output_flux_v_p, 
-                              real *crm_output_fluxsgs_qt_p, real *crm_output_tkez_p, real *crm_output_tkesgsz_p, real *crm_output_tkz_p, real *crm_output_flux_qp_p, 
+                              real *crm_output_fluxsgs_qt_p, real *crm_output_tkez_p, real *crm_output_tkew_p, real *crm_output_tkesgsz_p, real *crm_output_tkz_p, real *crm_output_flux_qp_p, 
                               real *crm_output_precflux_p, real *crm_output_qt_trans_p, real *crm_output_qp_trans_p, real *crm_output_qp_fall_p, real *crm_output_qp_evp_p, 
                               real *crm_output_qp_src_p, real *crm_output_qt_ls_p, real *crm_output_t_ls_p, real *crm_output_jt_crm_p, real *crm_output_mx_crm_p, real *crm_output_cltot_p, 
-                              real *crm_output_clhgh_p, real *crm_output_clmed_p, real *crm_output_cllow_p, real *crm_output_sltend_p, real *crm_output_qltend_p, real *crm_output_qcltend_p, 
-                              real *crm_output_qiltend_p, real *crm_output_tk_p, real *crm_output_tkh_p, real *crm_output_qcl_p, real *crm_output_qci_p, real *crm_output_qpl_p, real *crm_output_qpi_p, 
+                              real *crm_output_clhgh_p, real *crm_output_clmed_p, real *crm_output_cllow_p, 
+                              real *crm_output_sltend_p, real *crm_output_qltend_p, real *crm_output_qcltend_p, real *crm_output_qiltend_p, 
+                              real *crm_output_t_vt_tend_p, real *crm_output_q_vt_tend_p, real *crm_output_u_vt_tend_p,
+                              real *crm_output_t_vt_ls_p, real *crm_output_q_vt_ls_p, real *crm_output_u_vt_ls_p,
+                              real *crm_output_ultend_p, real *crm_output_vltend_p, 
+                              real *crm_output_tk_p, real *crm_output_tkh_p, real *crm_output_qcl_p, real *crm_output_qci_p, real *crm_output_qpl_p, real *crm_output_qpi_p, 
                               real *crm_output_z0m_p, real *crm_output_taux_p, real *crm_output_tauy_p, real *crm_output_precc_p, real *crm_output_precl_p, real *crm_output_precsc_p, 
-                              real *crm_output_precsl_p, real *crm_output_prec_crm_p, real *crm_clear_rh_p);
+                              real *crm_output_precsl_p, real *crm_output_prec_crm_p, 
+                              real *crm_clear_rh_p);
 
 
                             
@@ -173,7 +188,6 @@ extern int  nmovieend                ;
 extern bool isInitialized_scamiopdata;
 extern bool wgls_holds_omega         ;
 
-extern real epsv            ;
 extern bool dosubsidence    ;
 extern real ug              ;
 extern real vg              ;
@@ -217,6 +231,11 @@ extern real gamr3;
 extern real a_bg;
 extern real a_pr;
 extern real a_gr;
+
+extern bool use_VT;
+extern int  VT_wn_max;
+
+extern bool use_ESMT;
 
 extern bool crm_accel_uv;
 extern bool use_crm_accel;
@@ -308,6 +327,16 @@ extern real3d cloudtopheight  ;
 extern real3d echotopheight   ;
 extern real3d cloudtoptemp    ;
 
+extern real2d t_vt           ;
+extern real2d q_vt           ;
+extern real2d u_vt           ;
+extern real2d t_vt_tend      ;
+extern real2d q_vt_tend      ;
+extern real2d u_vt_tend      ;
+extern real4d t_vt_pert      ;
+extern real4d q_vt_pert      ;
+extern real4d u_vt_pert      ;
+
 extern real1d fcorz           ;
 extern real1d fcor            ;
 extern real1d longitude0      ;
@@ -346,6 +375,15 @@ extern real2d qpevp           ;
 extern intHost1d flag_precip  ;
 extern int3d flag_top         ;
 
+extern real2d u_esmt_sgs      ;
+extern real2d v_esmt_sgs      ;
+extern real2d u_esmt_diff     ;
+extern real2d v_esmt_diff     ;
+extern real3d fluxb_u_esmt    ;
+extern real3d fluxb_v_esmt    ;
+extern real3d fluxt_u_esmt    ;
+extern real3d fluxt_v_esmt    ;
+
 extern real2d accrsc          ;
 extern real2d accrsi          ;
 extern real2d accrrc          ;
@@ -366,6 +404,9 @@ extern real2d qccln           ;
 extern real2d qiiln           ;
 extern real2d uln             ;
 extern real2d vln             ;
+extern real2d uln_esmt        ;
+extern real2d vln_esmt        ;
+
 extern real3d cwp             ;
 extern real3d cwph            ;
 extern real3d cwpm            ;
@@ -398,11 +439,17 @@ extern real2d crm_input_qccl  ;
 extern real2d crm_input_qiil  ;
 extern real2d crm_input_ql    ;
 extern real1d crm_input_tau00 ;
+extern real2d crm_input_ul_esmt;
+extern real2d crm_input_vl_esmt;
+
+extern real2d crm_input_t_vt ;
+extern real2d crm_input_q_vt ;
+extern real2d crm_input_u_vt ;
 extern real4d crm_state_u_wind;
 extern real4d crm_state_v_wind;
 extern real4d crm_state_w_wind; 
 extern real4d crm_state_temperature;
-extern real4d crm_state_qt;
+extern real4d crm_state_qv;
 extern real4d crm_state_qp;
 extern real4d crm_state_qn;
 extern real4d crm_rad_qrad;
@@ -438,6 +485,7 @@ extern real2d crm_output_flux_u;
 extern real2d crm_output_flux_v;
 extern real2d crm_output_fluxsgs_qt;
 extern real2d crm_output_tkez; 
+extern real2d crm_output_tkew; 
 extern real2d crm_output_tkesgsz; 
 extern real2d crm_output_tkz; 
 extern real2d crm_output_flux_qp; 
@@ -459,6 +507,15 @@ extern real2d crm_output_sltend;
 extern real2d crm_output_qltend; 
 extern real2d crm_output_qcltend; 
 extern real2d crm_output_qiltend;
+extern real2d crm_output_t_vt_tend;
+extern real2d crm_output_q_vt_tend;
+extern real2d crm_output_u_vt_tend;
+extern real2d crm_output_t_vt_ls;
+extern real2d crm_output_q_vt_ls;
+extern real2d crm_output_u_vt_ls;
+extern real2d crm_output_ultend; 
+extern real2d crm_output_vltend; 
+
 extern real4d crm_output_tk;
 extern real4d crm_output_tkh; 
 extern real4d crm_output_qcl; 
@@ -473,6 +530,7 @@ extern real1d crm_output_precl;
 extern real1d crm_output_precsc; 
 extern real1d crm_output_precsl; 
 extern real3d crm_output_prec_crm; 
+
 extern real2d crm_clear_rh;
 extern int2d  crm_clear_rh_cnt;
 extern real1d lat0; 
@@ -494,4 +552,9 @@ extern bool crm_accel_ceaseflag;
 
 extern int igstep;
 
+extern yakl::RealFFT1D<real> pressure_fftx;
+extern yakl::RealFFT1D<real> pressure_ffty;
+extern yakl::RealFFT1D<real> vt_fftx;
+extern yakl::RealFFT1D<real> vt_ffty;
+extern yakl::RealFFT1D<real> esmt_fftx;
 

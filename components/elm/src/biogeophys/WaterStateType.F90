@@ -10,10 +10,10 @@ module WaterstateType
   use shr_kind_mod   , only : r8 => shr_kind_r8
   use shr_log_mod    , only : errMsg => shr_log_errMsg
   use decompMod      , only : bounds_type
-  use clm_varctl     , only : use_vancouver, use_mexicocity, use_cn, iulog, use_fates_planthydro, &
-                              use_hydrstress
-  use clm_varpar     , only : nlevgrnd, nlevurb, nlevsno 
-  use clm_varcon     , only : spval
+  use elm_varctl     , only : use_vancouver, use_mexicocity, use_cn, iulog, use_fates_planthydro, &
+                              use_hydrstress, use_fan
+  use elm_varpar     , only : nlevgrnd, nlevurb, nlevsno 
+  use elm_varcon     , only : spval
   use LandunitType   , only : lun_pp                
   use ColumnType     , only : col_pp                
   !
@@ -34,7 +34,8 @@ module WaterstateType
      real(r8), pointer :: snow_layer_unity_col   (:,:) ! value 1 for each snow layer, used for history diagnostics
      real(r8), pointer :: bw_col                 (:,:) ! col partial density of water in the snow pack (ice + liquid) [kg/m3] 
      real(r8), pointer :: finundated_col         (:)   ! fraction of column that is inundated, this is for bgc caclulation in betr
-
+     real(r8), pointer :: h2osoi_tend_tsl_col    (:)   ! col moisture tendency due to vertical movement at topmost layer (m3/m3/s)
+ 
      real(r8), pointer :: rhvap_soi_col          (:,:)
      real(r8), pointer :: rho_vap_col            (:,:)
      real(r8), pointer :: smp_l_col              (:,:) ! col liquid phase soil matric potential, mm
@@ -142,7 +143,8 @@ module WaterstateType
   end type waterstate_type
   ! minimum allowed snow effective radius (also "fresh snow" value) [microns]
   real(r8), public, parameter :: snw_rds_min = 54.526_r8    
-
+  
+  type(waterstate_type) ,public        :: waterstate_vars
   !------------------------------------------------------------------------
 
 contains
@@ -206,6 +208,9 @@ contains
     allocate(this%bw_col                 (begc:endc,-nlevsno+1:0))        ; this%bw_col                 (:,:) = nan   
     allocate(this%smp_l_col              (begc:endc,-nlevsno+1:nlevgrnd)) ; this%smp_l_col              (:,:) = nan
     allocate(this%finundated_col         (begc:endc))                     ; this%finundated_col         (:)   = nan
+    if (use_fan) then
+       allocate(this%h2osoi_tend_tsl_col(begc:endc))                      ; this%h2osoi_tend_tsl_col    (:)   = nan
+    end if
 
     allocate(this%h2osno_col             (begc:endc))                     ; this%h2osno_col             (:)   = nan   
     allocate(this%h2osno_old_col         (begc:endc))                     ; this%h2osno_old_col         (:)   = nan   
@@ -305,9 +310,9 @@ contains
     !
     ! !USES:
     use shr_infnan_mod , only : nan => shr_infnan_nan, assignment(=)
-    use clm_varctl     , only : create_glacier_mec_landunit, use_cn, use_lch4
-    use clm_varctl     , only : hist_wrtch4diag
-    use clm_varpar     , only : nlevsno, crop_prog 
+    use elm_varctl     , only : create_glacier_mec_landunit, use_cn, use_lch4
+    use elm_varctl     , only : hist_wrtch4diag, use_lake_wat_storage
+    use elm_varpar     , only : nlevsno, crop_prog 
     use histFileMod    , only : hist_addfld1d, hist_addfld2d, no_snow_normal, no_snow_zero
     !
     ! !ARGUMENTS:
@@ -326,6 +331,7 @@ contains
     begc = bounds%begc; endc= bounds%endc
     begg = bounds%begg; endg= bounds%endg
 
+
     ! h2osno also includes snow that is part of the soil column (an 
     ! initial snow layer is only created if h2osno > 10mm). 
 
@@ -335,7 +341,7 @@ contains
     ! snow layer existed by running the snow averaging routine on a field whose value is 1
     ! everywhere
     data2dptr => this%snow_layer_unity_col(:,-nlevsno+1:0)
-    call hist_addfld2d (fname='SNO_EXISTENCE', units='unitless', type2d='levsno', &
+    call hist_addfld2d (fname='SNO_EXISTENCE', units='1', type2d='levsno', &
          avgflag='A', long_name='Fraction of averaging period for which each snow layer existed', &
          ptr_col=data2dptr, no_snow_behavior=no_snow_zero, default='inactive')
 
@@ -355,13 +361,13 @@ contains
     use shr_spfn_mod    , only : shr_spfn_erf
     use shr_kind_mod    , only : r8 => shr_kind_r8
     use shr_const_mod   , only : SHR_CONST_TKFRZ
-    use clm_varpar      , only : nlevsoi, nlevgrnd, nlevsno, nlevlak, nlevurb
+    use elm_varpar      , only : nlevsoi, nlevgrnd, nlevsno, nlevlak, nlevurb
     use landunit_varcon , only : istice, istwet, istsoil, istdlak, istcrop, istice_mec  
     use column_varcon   , only : icol_shadewall, icol_road_perv
     use column_varcon   , only : icol_road_imperv, icol_roof, icol_sunwall
-    use clm_varcon      , only : denice, denh2o, spval, sb, bdsno 
-    use clm_varcon      , only : h2osno_max, zlnd, tfrz, spval, pc
-    use clm_varctl      , only : fsurdat, iulog
+    use elm_varcon      , only : denice, denh2o, spval, sb, bdsno 
+    use elm_varcon      , only : h2osno_max, zlnd, tfrz, spval
+    use elm_varctl      , only : fsurdat, iulog
     use spmdMod         , only : masterproc
     use abortutils      , only : endrun
     use fileutils       , only : getfil
@@ -430,6 +436,7 @@ contains
 
       this%frac_h2osfc_col(bounds%begc:bounds%endc) = 0._r8
 
+
       this%fwet_patch(bounds%begp:bounds%endp) = 0._r8
       this%fdry_patch(bounds%begp:bounds%endp) = 0._r8
 
@@ -490,11 +497,11 @@ contains
     !
     ! !USES:
     use spmdMod          , only : masterproc
-    use clm_varcon       , only : denice, denh2o, pondmx, watmin, spval  
+    use elm_varcon       , only : denice, denh2o, pondmx, watmin, spval  
     use landunit_varcon  , only : istcrop, istdlak, istsoil  
     use column_varcon    , only : icol_roof, icol_sunwall, icol_shadewall
-    use clm_time_manager , only : is_first_step
-    use clm_varctl       , only : bound_h2osoi
+    use elm_time_manager , only : is_first_step
+    use elm_varctl       , only : bound_h2osoi, use_lake_wat_storage
     use ncdio_pio        , only : file_desc_t, ncd_io, ncd_double
     use restUtilMod
     use subgridAveMod    , only : c2g
@@ -515,12 +522,6 @@ contains
     !------------------------------------------------------------------------
 
     SHR_ASSERT_ALL((ubound(watsat_col) == (/bounds%endc,nlevgrnd/)) , errMsg(__FILE__, __LINE__))
-
-
-    call restartvar(ncid=ncid, flag=flag, varname='TWS_MONTH_BEGIN', xtype=ncd_double,  &
-         dim1name='gridcell', &
-         long_name='surface watertotal water storage at the beginning of a month', units='mm', &
-          interpinic_flag='interp', readvar=readvar, data=this%tws_month_beg_grc)
 
     call restartvar(ncid=ncid, flag=flag, varname='ENDWB_COL', xtype=ncd_double, &
          dim1name='column', long_name='col-level water mass end of the time step', &

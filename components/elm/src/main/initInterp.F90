@@ -10,12 +10,12 @@ module initInterpMod
   use shr_sys_mod    , only: shr_sys_flush
   use shr_infnan_mod , only: shr_infnan_isnan
   use shr_log_mod    , only : errMsg => shr_log_errMsg
-  use clm_varctl     , only: iulog
+  use elm_varctl     , only: iulog
   use abortutils     , only: endrun
   use spmdMod        , only: masterproc
   use restUtilMod    , only: iflag_interp, iflag_copy, iflag_skip
   use restUtilMod    , only: iflag_noswitchdim, iflag_switchdim
-  use clm_varcon     , only: spval, re
+  use elm_varcon     , only: spval, re
   use ncdio_pio
   use pio
 
@@ -130,7 +130,7 @@ contains
     !--------------------------------------------------------------------
 
     if (masterproc) then
-       write (iulog,*) '**** Mapping clm initial data from input ',trim(filei),&
+       write (iulog,*) '**** Mapping elm initial data from input ',trim(filei),&
             '  to output ',trim(fileo),' ****'
     end if
 
@@ -309,7 +309,7 @@ contains
        !---------------------------------------------------          
 
        call pio_seterrorhandling(ncidi, PIO_BCAST_ERROR)
-       status = pio_inq_varid(ncidi, name=varname, vardesc=vardesc)
+       status = pio_inq_varid(ncidi, varname, vardesc)
        call pio_seterrorhandling(ncidi, PIO_INTERNAL_ERROR)
        if (status /= PIO_noerr) then
           if (masterproc) then
@@ -438,7 +438,7 @@ contains
           end if
           ! Determine order of level and subgrid dimension in restart file
           status = pio_inq_varid (ncidi, trim(varname), vardesc)
-          status = pio_inquire_variable(ncidi, vardesc=vardesc, dimids=dimidsi)
+          status = pio_inquire_variable(ncidi, vardesc, dimids=dimidsi)
           status = pio_get_att(ncidi, vardesc, 'switchdim_flag', switchdim_flag)
           if (switchdim_flag > 0) then
              levdimi = dimidsi(1)  

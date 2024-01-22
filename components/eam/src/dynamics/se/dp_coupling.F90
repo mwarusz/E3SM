@@ -19,7 +19,7 @@ module dp_coupling
   use spmd_utils,     only: mpicom, iam
   use perf_mod,       only: t_startf, t_stopf, t_barrierf
   use parallel_mod,   only: par
-  use scamMod,        only: single_column
+  use iop_data_mod,   only: single_column
   use element_ops,    only: get_temperature
   use phys_grid,      only: get_ncols_p, get_gcol_all_p, &
                             transpose_block_to_chunk, transpose_chunk_to_block,   &
@@ -484,7 +484,7 @@ CONTAINS
         call t_startf('fv_phys_to_dyn')
         ! Map FV physics state to dynamics grid
         dtime = get_step_size()
-        call gfr_fv_phys_to_dyn(par, dom_mt, TimeLevel%n0, dtime, hvcoord, elem, T_tmp, &
+        call gfr_fv_phys_to_dyn(par, dom_mt, TimeLevel%n0, hvcoord, elem, T_tmp, &
              uv_tmp, q_tmp)
         call t_stopf('fv_phys_to_dyn')
 

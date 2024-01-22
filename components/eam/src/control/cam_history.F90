@@ -102,7 +102,7 @@ module cam_history
   !
   !   The size of these parameters should match the assignments in restart_vars_setnames and restart_dims_setnames below
   !   
-  integer, parameter :: restartvarcnt              = 37
+  integer, parameter :: restartvarcnt              = 38
   integer, parameter :: restartdimcnt              = 10
   type(rvar_id)      :: restartvars(restartvarcnt)
   type(rdim_id)      :: restartdims(restartdimcnt)
@@ -260,7 +260,7 @@ module cam_history
   !        logic in the routine that optimizes character strings of length 8.
   !
 
-  integer, parameter :: gen_hash_key_offset = z'000053db'
+  integer, parameter :: gen_hash_key_offset = int(z'000053db')
 
   integer, parameter :: tbl_max_idx = 15  ! 2**N - 1
   integer, dimension(0:tbl_max_idx) :: tbl_gen_hash_key = &
@@ -486,6 +486,11 @@ CONTAINS
     character(len=fieldname_lenp2) :: fincl8(pflds)
     character(len=fieldname_lenp2) :: fincl9(pflds)
     character(len=fieldname_lenp2) :: fincl10(pflds)
+    character(len=fieldname_lenp2) :: fincl11(pflds)
+    character(len=fieldname_lenp2) :: fincl12(pflds)
+    character(len=fieldname_lenp2) :: fincl13(pflds)
+    character(len=fieldname_lenp2) :: fincl14(pflds)
+    character(len=fieldname_lenp2) :: fincl15(pflds)
 
     character(len=max_chars)       :: fincl1lonlat(pflds)
     character(len=max_chars)       :: fincl2lonlat(pflds)
@@ -497,6 +502,11 @@ CONTAINS
     character(len=max_chars)       :: fincl8lonlat(pflds)
     character(len=max_chars)       :: fincl9lonlat(pflds)
     character(len=max_chars)       :: fincl10lonlat(pflds)
+    character(len=max_chars)       :: fincl11lonlat(pflds)
+    character(len=max_chars)       :: fincl12lonlat(pflds)
+    character(len=max_chars)       :: fincl13lonlat(pflds)
+    character(len=max_chars)       :: fincl14lonlat(pflds)
+    character(len=max_chars)       :: fincl15lonlat(pflds)
 
     character(len=fieldname_len)   :: fexcl1(pflds)
     character(len=fieldname_len)   :: fexcl2(pflds)
@@ -508,6 +518,11 @@ CONTAINS
     character(len=fieldname_len)   :: fexcl8(pflds)
     character(len=fieldname_len)   :: fexcl9(pflds)
     character(len=fieldname_len)   :: fexcl10(pflds)
+    character(len=fieldname_len)   :: fexcl11(pflds)
+    character(len=fieldname_len)   :: fexcl12(pflds)
+    character(len=fieldname_len)   :: fexcl13(pflds)
+    character(len=fieldname_len)   :: fexcl14(pflds)
+    character(len=fieldname_len)   :: fexcl15(pflds)
 
     character(len=fieldname_lenp2) :: fwrtpr1(pflds)
     character(len=fieldname_lenp2) :: fwrtpr2(pflds)
@@ -519,6 +534,11 @@ CONTAINS
     character(len=fieldname_lenp2) :: fwrtpr8(pflds)
     character(len=fieldname_lenp2) :: fwrtpr9(pflds)
     character(len=fieldname_lenp2) :: fwrtpr10(pflds)
+    character(len=fieldname_lenp2) :: fwrtpr11(pflds)
+    character(len=fieldname_lenp2) :: fwrtpr12(pflds)
+    character(len=fieldname_lenp2) :: fwrtpr13(pflds)
+    character(len=fieldname_lenp2) :: fwrtpr14(pflds)
+    character(len=fieldname_lenp2) :: fwrtpr15(pflds)
 
     integer                        :: interpolate_nlat(size(interpolate_info))
     integer                        :: interpolate_nlon(size(interpolate_info))
@@ -529,14 +549,18 @@ CONTAINS
     namelist /cam_history_nl/ ndens, nhtfrq, mfilt, inithist, inithist_nsteps, &
          inithist_all, avgflag_pertape, empty_htapes, lcltod_start, lcltod_stop, &
          fincl1lonlat, fincl2lonlat, fincl3lonlat, fincl4lonlat, fincl5lonlat, &
-         fincl6lonlat, fincl7lonlat, fincl8lonlat, fincl9lonlat,               &
-         fincl10lonlat, collect_column_output, hfilename_spec,                 &
+         fincl6lonlat, fincl7lonlat, fincl8lonlat, fincl9lonlat, fincl10lonlat,&
+         fincl11lonlat,fincl12lonlat,fincl13lonlat,fincl14lonlat,fincl15lonlat,&
+         collect_column_output, hfilename_spec,                                &
          fincl1,  fincl2,  fincl3,  fincl4,  fincl5,                           &
          fincl6,  fincl7,  fincl8,  fincl9,  fincl10,                          &
+         fincl11, fincl12, fincl13, fincl14, fincl15,                          &
          fexcl1,  fexcl2,  fexcl3,  fexcl4,  fexcl5,                           &
          fexcl6,  fexcl7,  fexcl8,  fexcl9,  fexcl10,                          &
+         fexcl11, fexcl12, fexcl13, fexcl14, fexcl15,                          &
          fwrtpr1, fwrtpr2, fwrtpr3, fwrtpr4, fwrtpr5,                          &
          fwrtpr6, fwrtpr7, fwrtpr8, fwrtpr9, fwrtpr10,                         &
+         fwrtpr11,fwrtpr12,fwrtpr13,fwrtpr14,fwrtpr15,                         &
          interpolate_nlat, interpolate_nlon,                                   &
          interpolate_gridtype, interpolate_type, interpolate_output
 
@@ -576,6 +600,11 @@ CONTAINS
       fincl8(f)        = ' '         
       fincl9(f)        = ' '         
       fincl10(f)       = ' '         
+      fincl11(f)       = ' '         
+      fincl12(f)       = ' '         
+      fincl13(f)       = ' '         
+      fincl14(f)       = ' '         
+      fincl15(f)       = ' '         
       fincl1lonlat(f)  = ' '
       fincl2lonlat(f)  = ' '
       fincl3lonlat(f)  = ' '
@@ -586,6 +615,11 @@ CONTAINS
       fincl8lonlat(f)  = ' '
       fincl9lonlat(f)  = ' '
       fincl10lonlat(f) = ' '
+      fincl11lonlat(f) = ' '
+      fincl12lonlat(f) = ' '
+      fincl13lonlat(f) = ' '
+      fincl14lonlat(f) = ' '
+      fincl15lonlat(f) = ' '
       fexcl1(f)        = ' '
       fexcl2(f)        = ' '
       fexcl3(f)        = ' '
@@ -596,6 +630,11 @@ CONTAINS
       fexcl8(f)        = ' '
       fexcl9(f)        = ' '
       fexcl10(f)       = ' '
+      fexcl11(f)       = ' '
+      fexcl12(f)       = ' '
+      fexcl13(f)       = ' '
+      fexcl14(f)       = ' '
+      fexcl15(f)       = ' '
       fwrtpr1(f)       = ' '
       fwrtpr2(f)       = ' '
       fwrtpr3(f)       = ' '
@@ -606,6 +645,11 @@ CONTAINS
       fwrtpr8(f)       = ' '
       fwrtpr9(f)       = ' '
       fwrtpr10(f)      = ' '
+      fwrtpr11(f)      = ' '
+      fwrtpr12(f)      = ' '
+      fwrtpr13(f)      = ' '
+      fwrtpr14(f)      = ' '
+      fwrtpr15(f)      = ' '
     end do
 
     if (trim(history_namelist) /= 'cam_history_nl') then
@@ -636,6 +680,11 @@ CONTAINS
         fincl(f, 8) = fincl8(f)
         fincl(f, 9) = fincl9(f)
         fincl(f,10) = fincl10(f)
+        fincl(f,11) = fincl11(f)
+        fincl(f,12) = fincl12(f)
+        fincl(f,13) = fincl13(f)
+        fincl(f,14) = fincl14(f)
+        fincl(f,15) = fincl15(f)
 
         fincllonlat(f, 1) = fincl1lonlat(f)
         fincllonlat(f, 2) = fincl2lonlat(f)
@@ -647,6 +696,11 @@ CONTAINS
         fincllonlat(f, 8) = fincl8lonlat(f)
         fincllonlat(f, 9) = fincl9lonlat(f)
         fincllonlat(f,10) = fincl10lonlat(f)
+        fincllonlat(f,11) = fincl11lonlat(f)
+        fincllonlat(f,12) = fincl12lonlat(f)
+        fincllonlat(f,13) = fincl13lonlat(f)
+        fincllonlat(f,14) = fincl14lonlat(f)
+        fincllonlat(f,15) = fincl15lonlat(f)
 
         fexcl(f, 1) = fexcl1(f)
         fexcl(f, 2) = fexcl2(f)
@@ -658,6 +712,11 @@ CONTAINS
         fexcl(f, 8) = fexcl8(f)
         fexcl(f, 9) = fexcl9(f)
         fexcl(f,10) = fexcl10(f)
+        fexcl(f,11) = fexcl11(f)
+        fexcl(f,12) = fexcl12(f)
+        fexcl(f,13) = fexcl13(f)
+        fexcl(f,14) = fexcl14(f)
+        fexcl(f,15) = fexcl15(f)
 
         fwrtpr(f, 1) = fwrtpr1(f)
         fwrtpr(f, 2) = fwrtpr2(f)
@@ -669,6 +728,11 @@ CONTAINS
         fwrtpr(f, 8) = fwrtpr8(f)
         fwrtpr(f, 9) = fwrtpr9(f)
         fwrtpr(f,10) = fwrtpr10(f)
+        fwrtpr(f,11) = fwrtpr11(f)
+        fwrtpr(f,12) = fwrtpr12(f)
+        fwrtpr(f,13) = fwrtpr13(f)
+        fwrtpr(f,14) = fwrtpr14(f)
+        fwrtpr(f,15) = fwrtpr15(f)
       end do
 
       !
@@ -1056,6 +1120,14 @@ CONTAINS
     restartvars(rvindex)%dims(3) = ptapes_dim_ind
 
     rvindex = rvindex + 1
+    restartvars(rvindex)%name = 'standard_name'
+    restartvars(rvindex)%type = pio_char
+    restartvars(rvindex)%ndims = 3
+    restartvars(rvindex)%dims(1) = max_chars_dim_ind
+    restartvars(rvindex)%dims(2) = maxnflds_dim_ind
+    restartvars(rvindex)%dims(3) = ptapes_dim_ind
+
+    rvindex = rvindex + 1
     restartvars(rvindex)%name = 'units'
     restartvars(rvindex)%type = pio_char
     restartvars(rvindex)%ndims = 3
@@ -1289,6 +1361,7 @@ CONTAINS
     type(var_desc_t), pointer ::  avgflag_desc
     type(var_desc_t), pointer ::  sseq_desc
     type(var_desc_t), pointer ::  longname_desc
+    type(var_desc_t), pointer ::  standardname_desc
     type(var_desc_t), pointer ::  units_desc
     type(var_desc_t), pointer ::  hwrt_prec_desc
     type(var_desc_t), pointer ::  xyfill_desc
@@ -1407,6 +1480,7 @@ CONTAINS
 
     sseq_desc => restartvar_getdesc('sampling_seq')
     longname_desc => restartvar_getdesc('long_name')
+    standardname_desc => restartvar_getdesc('standard_name')
     units_desc => restartvar_getdesc('units')
     avgflag_desc => restartvar_getdesc('avgflag')
     xyfill_desc => restartvar_getdesc('xyfill')
@@ -1445,6 +1519,7 @@ CONTAINS
         ierr = pio_put_var(File, hwrt_prec_desc,start,tape(t)%hlist(f)%hwrt_prec)
         ierr = pio_put_var(File, sseq_desc,startc,tape(t)%hlist(f)%field%sampling_seq)
         ierr = pio_put_var(File, longname_desc,startc,tape(t)%hlist(f)%field%long_name)
+        ierr = pio_put_var(File, standardname_desc,startc,tape(t)%hlist(f)%field%standard_name)
         ierr = pio_put_var(File, units_desc,startc,tape(t)%hlist(f)%field%units)
         ierr = pio_put_var(File, avgflag_desc,start, tape(t)%hlist(f)%avgflag)
 
@@ -1552,6 +1627,7 @@ CONTAINS
 
     type(var_desc_t)                 :: vdesc
     type(var_desc_t)                 :: longname_desc
+    type(var_desc_t)                 :: standardname_desc
     type(var_desc_t)                 :: units_desc
     type(var_desc_t)                 :: avgflag_desc
     type(var_desc_t)                 :: sseq_desc
@@ -1728,6 +1804,7 @@ CONTAINS
     ierr = pio_inq_varid(File, 'avgflag', avgflag_desc)
 
     ierr = pio_inq_varid(File, 'long_name', longname_desc)
+    ierr = pio_inq_varid(File, 'standard_name', standardname_desc)
     ierr = pio_inq_varid(File, 'units', units_desc)
     ierr = pio_inq_varid(File, 'sampling_seq', sseq_desc)
 
@@ -1761,6 +1838,8 @@ CONTAINS
         ierr = pio_get_var(File,zonal_complement_desc, (/f,t/), tape(t)%hlist(f)%field%zonal_complement)
         ierr = pio_get_var(File,avgflag_desc, (/f,t/), tape(t)%hlist(f)%avgflag)
         ierr = pio_get_var(File,longname_desc, (/1,f,t/), tape(t)%hlist(f)%field%long_name)
+        tape(t)%hlist(f)%field%standard_name = ''
+        ierr = pio_get_var(File,standardname_desc, (/1,f,t/), tape(t)%hlist(f)%field%standard_name)
         ierr = pio_get_var(File,units_desc, (/1,f,t/), tape(t)%hlist(f)%field%units)
         tape(t)%hlist(f)%field%sampling_seq(1:max_chars) = ' '
         ierr = pio_get_var(File,sseq_desc, (/1,f,t/), tape(t)%hlist(f)%field%sampling_seq)
@@ -1779,6 +1858,7 @@ CONTAINS
         tape(t)%hlist(f)%field%name = tmpname(f,t)
         tape(t)%hlist(f)%field%decomp_type = decomp(f,t)
         tape(t)%hlist(f)%field%numlev = tmpnumlev(f,t)
+        tape(t)%hlist(f)%field%mixing_ratio = ''
         tape(t)%hlist(f)%hwrt_prec = tmpprec(f,t)
 
         mdimcnt = count(allmdims(:,f,t) > 0)
@@ -2092,7 +2172,7 @@ CONTAINS
     case ('B')
       time_op(:) = 'mean00z'
     case ('I')
-      time_op(:) = ' '
+      time_op(:) = 'point'
     case ('X')
       time_op(:) = 'maximum'
     case ('M')
@@ -3743,6 +3823,9 @@ end subroutine print_active_fldlst
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'E3SM_GENERATED_FORCING','create SCM IOP dataset')
 #endif
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'source', 'E3SM Atmosphere Model')
+    ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'source_id', version)
+    ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'product', 'model-output')
+    ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'realm', 'atmos')
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'case',caseid)
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'username',username)
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'hostname', hostname)
@@ -3750,11 +3833,22 @@ end subroutine print_active_fldlst
     call datetime(curdate, curtime)
     str = 'created on ' // curdate // ' ' // curtime
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'history' , trim(str))
-    str = 'CF-1.0'
+    str = 'CF-1.7'
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'Conventions', trim(str))
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'institution_id', 'E3SM-Project')
+    ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'institution', &
+    'LLNL (Lawrence Livermore National Laboratory, Livermore, CA 94550, USA); &
+    &ANL (Argonne National Laboratory, Argonne, IL 60439, USA); &
+    &BNL (Brookhaven National Laboratory, Upton, NY 11973, USA); &
+    &LANL (Los Alamos National Laboratory, Los Alamos, NM 87545, USA); &
+    &LBNL (Lawrence Berkeley National Laboratory, Berkeley, CA 94720, USA); &
+    &ORNL (Oak Ridge National Laboratory, Oak Ridge, TN 37831, USA); &
+    &PNNL (Pacific Northwest National Laboratory, Richland, WA 99352, USA); &
+    &SNL (Sandia National Laboratories, Albuquerque, NM 87185, USA). &
+    &Mailing address: LLNL Climate Program, c/o David C. Bader, &
+    &Principal Investigator, L-103, 7000 East Avenue, Livermore, CA 94550, USA')
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'contact',  &
-                      'e3sm-data-support@listserv.llnl.gov')
+                      'e3sm-data-support@llnl.gov')
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'initial_file', ncdata)
     ierr=pio_put_att (tape(t)%File, PIO_GLOBAL, 'topography_file', bnd_topo)
 
@@ -4055,12 +4149,19 @@ end subroutine print_active_fldlst
         ierr=pio_put_att (tape(t)%File, varid, 'long_name', trim(str))
         call cam_pio_handle_error(ierr,                                       &
              'h_define: cannot define long_name for '//trim(fname_tmp))
+
+        str = tape(t)%hlist(f)%field%standard_name
+        if (str /= ' ') then
+          ierr=pio_put_att (tape(t)%File, varid, 'standard_name', trim(str))
+          call cam_pio_handle_error(ierr,                                       &
+               'h_define: cannot define standard_name for '//trim(fname_tmp))
+        endif
         !
         ! Assign field attributes defining valid levels and averaging info
         !
         str = tape(t)%hlist(f)%time_op
         select case (str)
-        case ('mean', 'maximum', 'minimum' )
+        case ('mean', 'maximum', 'minimum','point' )
           ierr = pio_put_att(tape(t)%File, varid, 'cell_methods', 'time: '//str)
           call cam_pio_handle_error(ierr,                                     &
                'h_define: cannot define cell_methods for '//trim(fname_tmp))
@@ -4869,7 +4970,7 @@ end subroutine print_active_fldlst
 
     ! If the field is an advected constituent determine whether its concentration
     ! is based on dry or wet air.
-    call cnst_get_ind(fname_tmp, idx, abort=.false.)
+    call cnst_get_ind(fname_tmp, idx, abrtf=.false.)
     mixing_ratio = ''
     if (idx > 0) then
        mixing_ratio = cnst_get_type_byind(idx)
@@ -4889,6 +4990,12 @@ end subroutine print_active_fldlst
     listentry%htapeindx(:) = -1
     listentry%act_sometape = .false.
     listentry%actflag(:) = .false.
+
+    if (present(standard_name)) then
+     listentry%field%standard_name = standard_name
+    else
+     listentry%field%standard_name = ' '
+    end if
 
     ! Make sure we have a valid gridname
     if (present(gridname)) then

@@ -43,6 +43,8 @@ module element_state
   real (kind=real_kind), allocatable, target, public :: elem_state_Qdp  (:,:,:,:,:,:)           ! Tracer mass                        
 
   real (kind=real_kind), allocatable, target, public :: elem_derived_omega_p (:,:,:,:)          ! vertical tendency (derived)
+  real (kind=real_kind), allocatable, target, public :: elem_derived_eta_dot_dpdn (:,:,:,:)     ! used with prescribed_wind
+  real (kind=real_kind), allocatable, target, public :: elem_derived_vn0 (:,:,:,:,:)            ! used with prescribed_wind
 
   real (kind=real_kind), allocatable, target, public :: elem_accum_KEner     (:,:,:,:)
   real (kind=real_kind), allocatable, target, public :: elem_accum_PEner     (:,:,:,:)
@@ -57,6 +59,7 @@ module element_state
   real (kind=real_kind), allocatable, target, public :: elem_derived_FVTheta(:,:,:,:)           ! potential temperature forcing
   real (kind=real_kind), allocatable, target, public :: elem_derived_FPHI(:,:,:,:)              ! PHI (NH) forcing
   real (kind=real_kind), allocatable, target, public :: elem_derived_FQps(:,:,:)                ! forcing of FQ on ps_v
+  real (kind=real_kind), allocatable, target, public :: elem_derived_lap_p_wk(:,:,:,:)
 
   ! Reference states (computed from phis)
   real (kind=real_kind), allocatable, target, public :: elem_theta_ref(:,:,:,:)
@@ -91,14 +94,14 @@ module element_state
 
     ! storage for subcycling tracers/dynamics
 
-    real (kind=real_kind) :: vn0  (np,np,2,nlev)                      ! velocity for SE tracer advection
+    real (kind=real_kind), pointer :: vn0(:,:,:,:)                    ! velocity for SE tracer advection
     real (kind=real_kind) :: vstar(np,np,2,nlev)                      ! velocity on Lagrangian surfaces
     real (kind=real_kind) :: dpdiss_biharmonic(np,np,nlev)            ! mean dp dissipation tendency, if nu_p>0
     real (kind=real_kind) :: dpdiss_ave(np,np,nlev)                   ! mean dp used to compute psdiss_tens
 
     ! diagnostics
     real (kind=real_kind), pointer :: omega_p(:,:,:)                  ! vertical tendency (derived)
-    real (kind=real_kind) :: eta_dot_dpdn(np,np,nlevp)                ! mean vertical flux from dynamics
+    real (kind=real_kind), pointer :: eta_dot_dpdn(:,:,:)             ! mean vertical flux from dynamics
     real (kind=real_kind) :: eta_dot_dpdn_prescribed(np,np,nlevp)     ! prescribed wind test cases
 
     ! tracer advection fields used for consistency and limiters
@@ -112,6 +115,7 @@ module element_state
     real (kind=real_kind), pointer :: FVTheta(:,:,:)                  ! potential temperature forcing
     real (kind=real_kind), pointer :: FPHI(:,:,:)                     ! PHI (NH) forcing
     real (kind=real_kind), pointer :: FQps(:,:)                       ! forcing of FQ on ps_v
+    real (kind=real_kind), pointer :: lap_p_wk(:,:,:)                 ! 
 
     real (kind=real_kind) :: gradphis(np,np,2)   ! grad phi at the surface, computed once in model initialization
     real (kind=real_kind), pointer :: dp_ref(:,:,:)         ! ref states based on PHIS
@@ -190,7 +194,9 @@ contains
     allocate(elem_state_Qdp       (np,np,  nlev, qsize_d,2, nelemd) )
 
     ! Derived
-    allocate(elem_derived_omega_p (np,np,nlev,nelemd) )
+    allocate(elem_derived_omega_p (np,np,nlev,nelemd)       )
+    allocate(elem_derived_vn0     (np,np,2,nlev,nelemd)     )
+    allocate(elem_derived_eta_dot_dpdn (np,np,nlevp,nelemd) )
 
     ! Accum
     allocate(elem_accum_kener     (np,np,        diagtimes,nelemd) )
@@ -207,6 +213,7 @@ contains
     allocate(elem_derived_FPHI    (np,np,nlevp,nelemd) )
     allocate(elem_derived_FQ      (np,np,nlev,qsize_d,nelemd) )
     allocate(elem_derived_FQps    (np,np,nelemd) )
+    allocate(elem_derived_lap_p_wk(np,np,nlevp,nelemd) )
 
     ! Reference states
     allocate(elem_theta_ref (np,np,nlev,nelemd) )
@@ -241,6 +248,8 @@ contains
 
     ! Derived
     deallocate(elem_derived_omega_p )
+    deallocate(elem_derived_vn0     )
+    deallocate(elem_derived_eta_dot_dpdn )
 
     ! Accum
     deallocate(elem_accum_kener     )
@@ -257,6 +266,7 @@ contains
     deallocate(elem_derived_FPHI    )
     deallocate(elem_derived_FQ      )
     deallocate(elem_derived_FQps    )
+    deallocate(elem_derived_lap_p_wk)
 
     ! Reference states
     deallocate(elem_theta_ref       )
@@ -286,6 +296,8 @@ contains
 
     ! Derived
     derived%omega_p => elem_derived_omega_p(:,:,:,ie)
+    derived%vn0 => elem_derived_vn0(:,:,:,:,ie)
+    derived%eta_dot_dpdn => elem_derived_eta_dot_dpdn(:,:,:,ie)
 
     ! Accum
     accum%KEner     => elem_accum_KEner    (:,:,:,ie)
@@ -302,6 +314,7 @@ contains
     derived%FPHI    => elem_derived_FPHI(:,:,:,ie)
     derived%FQ      => elem_derived_FQ(:,:,:,:,ie)
     derived%FQps    => elem_derived_FQps(:,:,ie)
+    derived%lap_p_wk=> elem_derived_lap_p_wk(:,:,:,ie)
 
     ! Reference states
     derived%theta_ref => elem_theta_ref(:,:,:,ie)

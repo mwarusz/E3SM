@@ -17,6 +17,9 @@
   rsplit            = 6
   integration       = 'explicit'                ! explicit time integration
   tstep_type        = 5                         ! 1 => default method
+  hv_ref_profiles   = 0
+  hv_theta_correction=0
+  pgrad_correction   =0
   nu                = 1e15                      ! hyperviscosity
   nu_s              = 1e15
   nu_p              = 1e15
@@ -25,7 +28,6 @@
   omega             = 0.0                       ! earth angular speed = 0.0
 /
 &vert_nl
-  vform             = "ccm"                     ! vertical coordinate type "ccm"=hybrid pressure/terrain
   vanalytic         = 1                         ! set vcoords in initialization routine
   vtop              = 2.05e-1                   ! vertical coordinate at top of atm (z=12000m)
 /

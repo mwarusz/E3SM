@@ -13,9 +13,9 @@ module CNPhenologyBeTRMod
   use shr_log_mod         , only : errMsg => shr_log_errMsg
   use shr_sys_mod         , only : shr_sys_flush
   use decompMod           , only : bounds_type
-  use clm_varpar          , only : numpft
-  use clm_varctl          , only : iulog
-  use clm_varcon          , only : tfrz
+  use elm_varpar          , only : numpft
+  use elm_varctl          , only : iulog
+  use elm_varcon          , only : tfrz
   use abortutils          , only : endrun
   use CanopyStateType     , only : canopystate_type
   use CNCarbonFluxType    , only : carbonflux_type
@@ -30,7 +30,7 @@ module CNPhenologyBeTRMod
   use WaterstateType      , only : waterstate_type
   use PhosphorusFluxType  , only : phosphorusflux_type
   use PhosphorusStateType , only : phosphorusstate_type
-  use clm_varctl          , only : nu_com
+  use elm_varctl          , only : nu_com
   use CNBeTRIndicatorMod
   use GridcellType        , only : grc_pp
   use ColumnType          , only : col_pp
@@ -287,9 +287,9 @@ contains
     ! initialized, and after ecophyscon file is read in.
     !
     ! !USES:
-    use clm_time_manager, only: get_step_size
-    use clm_varpar      , only: crop_prog
-    use clm_varcon      , only: secspday
+    use elm_time_manager, only: get_step_size
+    use elm_varpar      , only: crop_prog
+    use elm_varcon      , only: secspday
     !
     ! !ARGUMENTS:
     implicit none
@@ -355,8 +355,8 @@ contains
     ! For coupled carbon-nitrogen code (CN).
     !
     ! !USES:
-    use clm_time_manager , only : get_days_per_year
-    use clm_time_manager , only : get_curr_date, is_first_step
+    use elm_time_manager , only : get_days_per_year
+    use elm_time_manager , only : get_curr_date, is_first_step
     !
     ! !ARGUMENTS:
     integer                , intent(in)    :: num_soilp       ! number of soil patches in filter
@@ -444,8 +444,8 @@ contains
     ! For coupled carbon-nitrogen code (CN).
     !
     ! !USES:
-    use clm_varcon       , only : secspday
-    use clm_time_manager , only : get_days_per_year
+    use elm_varcon       , only : secspday
+    use elm_time_manager , only : get_days_per_year
     !
     ! !ARGUMENTS:
     integer           , intent(in)    :: num_soilp       ! number of soil patches in filter
@@ -497,7 +497,7 @@ contains
     !
     ! !USES:
     use shr_const_mod   , only: SHR_CONST_TKFRZ, SHR_CONST_PI
-    use clm_varcon      , only: secspday
+    use elm_varcon      , only: secspday
     !
     ! !ARGUMENTS:
     integer                  , intent(in)    :: num_soilp       ! number of soil patches in filter
@@ -843,8 +843,8 @@ contains
     ! per year.
     !
     ! !USES:
-    use clm_time_manager , only : get_days_per_year
-    use clm_varcon       , only : secspday
+    use elm_time_manager , only : get_days_per_year
+    use elm_varcon       , only : secspday
     use shr_const_mod    , only : SHR_CONST_TKFRZ, SHR_CONST_PI
     !
     ! !ARGUMENTS:
@@ -1317,12 +1317,13 @@ contains
     ! handle CN fluxes during the phenological onset                       & offset periods.
 
     ! !USES:
-    use clm_time_manager , only : get_curr_date, get_curr_calday, get_days_per_year
+    use elm_time_manager , only : get_curr_date, get_curr_calday, get_days_per_year
     use pftvarcon        , only : ncorn, nscereal, nwcereal, nsoybean, gddmin, hybgdd
     use pftvarcon        , only : nwcerealirrig, nsoybeanirrig, ncornirrig, nscerealirrig
     use pftvarcon        , only : lfemerg, grnfill, mxmat, minplanttemp, planttemp
-    use clm_varcon       , only : spval, secspday
+    use elm_varcon       , only : spval, secspday
     use CropType         , only : tcvp, tcvt, cst
+    use elm_varctl       , only : fan_to_bgc_crop
     !
     ! !ARGUMENTS:
     integer                  , intent(in)    :: num_pcropp       ! number of prog crop patches in filter
@@ -1368,8 +1369,9 @@ contains
 
          leaf_long          =>    veg_vp%leaf_long                           , & ! Input:  [real(r8) (:) ]  leaf longevity (yrs)
          leafcn             =>    veg_vp%leafcn                              , & ! Input:  [real(r8) (:) ]  leaf C:N (gC/gN)
-         fertnitro          =>    veg_vp%fertnitro                           , & ! Input:  [real(r8) (:) ]  max fertilizer to be applied in total (kgN/m2)
-
+         manunitro          =>    veg_vp%manunitro                           , & ! Input:  [real(r8) (:) ]  max fertilizer to be applied in total (kgN/m2)
+         fertnitro          =>    crop_vars%fertnitro_patch                  , & ! Input:  [real(r8) (:) ]  max N fertilizer to be applied in total (kgN/m2)
+         fertphosp          =>    crop_vars%fertphosp_patch, & ! Input: [real(r8) (:) ]  max P fertilizer to be applied in total (kgP/m2)
          t_ref2m_min        =>    veg_es%t_ref2m_min         , & ! Input:  [real(r8) (:) ]  daily minimum of average 2 m height surface air temperature (K)
          t10                =>    veg_es%t_a10               , & ! Input:  [real(r8) (:) ]  10-day running mean of the 2 m temperature (K)
          a5tmin             =>    veg_es%t_a5min             , & ! Input:  [real(r8) (:) ]  5-day running mean of min 2-m temperature
@@ -1412,7 +1414,9 @@ contains
          leafcp             =>    veg_vp%leafcp                              , & ! Input:  [real(r8) (:) ]  leaf C:P (gC/gP)
          leafp_xfer         =>    veg_ps%leafp_xfer      , & ! Output: [real(r8) (:) ]  (gP/m2)   leaf P transfer
          crop_seedp_to_leaf =>    veg_pf%crop_seedp_to_leaf , & ! Output: [real(r8) (:) ]  (gP/m2/s) seed source to PFT-level
-         fert               =>    veg_nf%fert               , & ! Output: [real(r8) (:) ]  (gN/m2/s) fertilizer applied each timestep
+         synthfert          =>    veg_nf%synthfert          , & ! Output: [real(r8) (:) ]  (gN/m2/s) N fertilizer applied each timestep
+         manure             =>    veg_nf%manure             , & ! Output: [real(r8) (:) ]  (gN/m2/s) manure applied each timestep
+         fert_p             =>    veg_pf%fert_p             , & ! Output: [real(r8) (:) ]  (gN/m2/s) fertilizer applied each timestep
          cvt                =>    crop_vars%cvt_patch                     , & ! Output:  [real(r8) ):)]  exp weighted moving average CV precip
          cvp                =>    crop_vars%cvp_patch                     , & ! Output:  [real(r8) ):)]  exp weighted moving average average CV temp
          xt_bar             =>    crop_vars%xt_bar_patch                  , & ! Output:  [real(r8) ):)]  exp weighted moving average average monthly temp
@@ -1779,7 +1783,14 @@ contains
                   onset_flag(p)    = 1._r8
                   onset_counter(p) = dt
                   fert_counter(p)  = ndays_on * secspday
-                  fert(p) = fertnitro(ivt(p)) * 1000._r8 / fert_counter(p)
+                  fert_p(p) = (fertphosp(p) * 1000._r8) / fert_counter(p)
+                  synthfert(p) = (fertnitro(p) * 1000._r8) / fert_counter(p)
+                  if (.not. fan_to_bgc_crop) then
+                     manure(p) = (manunitro(ivt(p)) * 1000._r8) / fert_counter(p)
+                  else
+                     ! CLM default manure not used; FAN determines the application.
+                        manure(p) = 0.0_r8
+                  end if
                else
                   ! this ensures no re-entry to onset of phase2
                   ! b/c onset_counter(p) = onset_counter(p) - dt
@@ -1825,7 +1836,9 @@ contains
             ! assumes that onset of phase 2 took one time step only
 
             if (fert_counter(p) <= 0._r8) then
-               fert(p) = 0._r8
+               synthfert(p) = 0._r8
+               manure(p) = 0._r8
+               fert_p(p) = 0._r8
             else ! continue same fert application every timestep
                fert_counter(p) = fert_counter(p) - dt
             end if
@@ -1858,7 +1871,7 @@ contains
     use pftvarcon       , only: npcropmin, npcropmax, mnNHplantdate
     use pftvarcon       , only: mnSHplantdate, mxNHplantdate
     use pftvarcon       , only: mxSHplantdate
-    use clm_time_manager, only: get_calday
+    use elm_time_manager, only: get_calday
     !
     ! !ARGUMENTS:
     implicit none
@@ -2067,10 +2080,10 @@ contains
     ! CropPhenologyMod
     !
     ! !USES:
-    use clm_time_manager , only : get_curr_date
-    use clm_time_manager , only : get_step_size
-    use clm_varcon       , only : secspday
-    use clm_varpar       , only : numpft
+    use elm_time_manager , only : get_curr_date
+    use elm_time_manager , only : get_step_size
+    use elm_varcon       , only : secspday
+    use elm_varpar       , only : numpft
     use pftvarcon        , only : planttemp
     use CropMod          , only : calculate_eto, plant_month
 
@@ -2219,7 +2232,7 @@ contains
          xt(p,kmo) = xt(p,kmo) + t_ref2m(p) * fracday/ndaypm(kmo) ! monthly average temperature
          xp(p,kmo) = xp(p,kmo) + (forc_rain(t)+forc_snow(t))*dt   ! monthly average precipitation
          ! calculate the potential evapotranspiration
-         call calculate_eto(t_ref2m(p), netrad(p), eflx_soil_grnd(p), forc_pbot(t), forc_rh(t), forc_wind(t), es, dt, ETout)
+         call calculate_eto(t_ref2m(p), netrad(p), eflx_soil_grnd(p), forc_pbot(t), forc_rh(t), forc_wind(t), dt, ETout)
          ! monthly ETo
          ETo(p,kmo) = ETo(p,kmo) + ETout
          ! calculate the P:PET for each month
@@ -2966,7 +2979,7 @@ contains
     ! to the column level and assign them to the three litter pools
     !
     ! !USES:
-    use clm_varpar , only : max_patch_per_col, nlevdecomp
+    use elm_varpar , only : max_patch_per_col, nlevdecomp
     use pftvarcon  , only : npcropmin
     !
     ! !ARGUMENTS:
@@ -3147,7 +3160,7 @@ contains
    ! to the column level and assign them to a product pools
    !
    ! !USES:
-   use clm_varpar, only : maxpatch_pft
+   use elm_varpar, only : maxpatch_pft
    type(cnstate_type)       , intent(in)    :: cnstate_vars
    type(carbonflux_type)    , intent(inout) :: carbonflux_vars
    type(nitrogenflux_type)  , intent(inout) :: nitrogenflux_vars

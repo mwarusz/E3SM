@@ -170,6 +170,7 @@ ENDIF ()
 IF(${BUILD_HOMME_SWEQX})
   ADD_SUBDIRECTORY(swtcA)
   ADD_SUBDIRECTORY(swtcB)
+  ADD_SUBDIRECTORY(swtcC)
 ENDIF()
 
 
@@ -177,6 +178,7 @@ ENDIF()
 IF(${BUILD_HOMME_PREQX})
   ADD_SUBDIRECTORY(baroC)
   ADD_SUBDIRECTORY(baroCam)
+  ADD_SUBDIRECTORY(preqx-nlev10-native)
   ADD_SUBDIRECTORY(preqx-nlev20-interp)
   ADD_SUBDIRECTORY(preqx-nlev20-native)
   ADD_SUBDIRECTORY(preqx-nlev30-interp)
@@ -184,6 +186,9 @@ IF(${BUILD_HOMME_PREQX})
   ADD_SUBDIRECTORY(preqx-nlev40-interp)
   ADD_SUBDIRECTORY(preqx-nlev60-interp)
   ADD_SUBDIRECTORY(preqx-nlev60-native)
+#  ADD_SUBDIRECTORY(preqx-nlev100-native)
+#  ADD_SUBDIRECTORY(preqx-nlev140-native)
+#  ADD_SUBDIRECTORY(preqx-nlev200-native)
   IF(${BUILD_HOMME_PREQX_ACC})
     ADD_SUBDIRECTORY(baroCam-acc)
   ENDIF()
@@ -202,6 +207,18 @@ IF(${BUILD_HOMME_THETA})
   ADD_SUBDIRECTORY(theta-l-nlev30)
   ADD_SUBDIRECTORY(theta-l-nlev40)
   ADD_SUBDIRECTORY(theta-l-nlev60)
+  ADD_SUBDIRECTORY(theta-l-nlev10-native)
+  ADD_SUBDIRECTORY(theta-l-nlev20-native)
+#  ADD_SUBDIRECTORY(theta-l-nlev60-native)
+#  ADD_SUBDIRECTORY(theta-l-nlev30-native)
+#  ADD_SUBDIRECTORY(theta-l-nlev64-native)
+#  ADD_SUBDIRECTORY(theta-l-nlev100-native)
+#  ADD_SUBDIRECTORY(theta-l-nlev128-native)
+#  ADD_SUBDIRECTORY(theta-l-nlev140-native)
+#  ADD_SUBDIRECTORY(theta-l-nlev150-native)
+#  ADD_SUBDIRECTORY(theta-l-nlev200-native)
+#  ADD_SUBDIRECTORY(theta-l-nlev256-native)
+#  ADD_SUBDIRECTORY(theta-l-nlev300-native)
 ENDIF()
 
 IF (${BUILD_HOMME_THETA_KOKKOS})
@@ -209,6 +226,7 @@ IF (${BUILD_HOMME_THETA_KOKKOS})
   if (${HOMME_MACHINE} MATCHES "summit-gpu")
 
     ADD_SUBDIRECTORY(theta-nlev128-kokkos)
+    ADD_SUBDIRECTORY(theta-l-nlev72-kokkos)
 
   else()
 
@@ -217,15 +235,17 @@ IF (${BUILD_HOMME_THETA_KOKKOS})
 
     ADD_SUBDIRECTORY(theta-nlev128-kokkos)
 
+    # For doubly periodic tests.
+    ADD_SUBDIRECTORY(theta-l-nlev20-native-kokkos)
+    ADD_SUBDIRECTORY(theta-l-nlev10-native-kokkos)
+
     # This one we build it only if both theta and theta_kokkos are requested,
     # since it's just needed for perf/correctness comparisons
     IF (BUILD_HOMME_THETA)
       ADD_SUBDIRECTORY(theta-nlev128)
     ENDIF()
 
-    IF (HOMMEXX_BFB_TESTING)
-      ADD_SUBDIRECTORY(thetal_kokkos_ut)
-    ENDIF()
+    ADD_SUBDIRECTORY(thetal_kokkos_ut)
   endif()
 
 ENDIF()
@@ -240,19 +260,19 @@ IF(${BUILD_HOMME_SWIM})
   ADD_SUBDIRECTORY(swim5)
 ENDIF()
 
-IF (HOMMEXX_BFB_TESTING)
-  # Test some stuff in the shared folder
-  ADD_SUBDIRECTORY (share_kokkos_ut)
-ENDIF ()
+# Test some stuff in the shared folder
+ADD_SUBDIRECTORY (share_kokkos_ut)
 
 IF (${BUILD_HOMME_PREQX_KOKKOS})
-  ADD_SUBDIRECTORY(preqx-nlev26)
   ADD_SUBDIRECTORY(preqx-nlev26-kokkos)
-  ADD_SUBDIRECTORY(preqx-nlev72)
   ADD_SUBDIRECTORY(preqx-nlev72-kokkos)
   IF (HOMMEXX_BFB_TESTING)
+    ADD_SUBDIRECTORY(preqx-nlev26)
+    ADD_SUBDIRECTORY(preqx-nlev72)
     ADD_SUBDIRECTORY(preqx_kokkos_ut)
   ENDIF ()
+    # For doubly periodic tests.
+    ADD_SUBDIRECTORY(preqx-nlev10-native-kokkos)
 ENDIF ()
 
 # Read the test-list.cmake file to get the HOMME_TESTS list

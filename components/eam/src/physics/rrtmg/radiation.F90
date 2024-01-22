@@ -23,9 +23,7 @@ use time_manager,    only: get_nstep, is_first_restart_step
 use cam_abortutils,      only: endrun
 use error_messages,  only: handle_err
 use cam_control_mod, only: lambm0, obliqr, mvelpp, eccen
-use scamMod,         only: scm_crm_mode, single_column,have_cld,cldobs,&
-                           have_clwp,clwpobs,have_tg,tground,swrad_off,&
-                           lwrad_off
+use iop_data_mod,    only: single_column
 use perf_mod,        only: t_startf, t_stopf
 use cam_logfile,     only: iulog
 
@@ -41,6 +39,7 @@ public :: &
    radiation_nextsw_cday, &! calendar day of next radiation calculation
    radiation_do,          &! query which radiation calcs are done this timestep
    radiation_init,        &! calls radini
+   radiation_final,       &! deallocate
    radiation_readnl,      &! read radiation namelist
    radiation_tend          ! moved from radctl.F90
 
@@ -76,6 +75,9 @@ logical :: spectralflux  = .false. ! calculate fluxes (up and down) per band.
 
 logical :: use_rad_dt_cosz  = .false. ! if true, uses the radiation dt for all cosz calculations !BSINGH - Added for solar insolation calc.
 
+! Flag to indicate whether to read optics from spa netcdf file
+! NOTE: added for consistency with RRTMGP; this is non-functioning for RRTMG!
+logical :: do_spa_optics = .false.
 
 character(len=4) :: diag(0:N_DIAG) =(/'    ','_d1 ','_d2 ','_d3 ','_d4 ','_d5 ','_d6 ','_d7 ','_d8 ','_d9 ','_d10'/)
 
@@ -117,7 +119,8 @@ subroutine radiation_readnl(nlfile, dtime_in)
 
    ! Variables defined in namelist
    namelist /radiation_nl/ iradsw, iradlw, irad_always, &
-                           use_rad_dt_cosz, spectralflux
+                           use_rad_dt_cosz, spectralflux, &
+                           do_spa_optics
 
    ! Read the namelist, only if called from master process
    ! TODO: better documentation and cleaner logic here?
@@ -142,7 +145,13 @@ subroutine radiation_readnl(nlfile, dtime_in)
    call mpibcast(irad_always, 1, mpi_integer, mstrid, mpicom, ierr)
    call mpibcast(use_rad_dt_cosz, 1, mpi_logical, mstrid, mpicom, ierr)
    call mpibcast(spectralflux, 1, mpi_logical, mstrid, mpicom, ierr)
+   call mpibcast(do_spa_optics, 1, mpi_logical, mstrid, mpicom, ierr)
 #endif
+
+   ! Make sure nobody tries to use SPA optics with RRTMG
+   if (do_spa_optics) then
+      call endrun(trim(subroutine_name) // ':: SPA optics is not supported with RRTMG')
+   end if
 
    ! Convert iradsw, iradlw and irad_always from hours to timesteps if necessary
    if (present(dtime_in)) then
@@ -187,14 +196,13 @@ end subroutine radiation_readnl
 
 !================================================================================================
 
-subroutine radiation_defaultopts(iradsw_out, iradlw_out, iradae_out, irad_always_out, spectralflux_out, use_rad_dt_cosz_out) !BSINGH- Added use_rad_dt_cosz_out for slr insolation calc.
+subroutine radiation_defaultopts(iradsw_out, iradlw_out, irad_always_out, spectralflux_out, use_rad_dt_cosz_out) !BSINGH- Added use_rad_dt_cosz_out for slr insolation calc.
 !----------------------------------------------------------------------- 
 ! Purpose: Return default runtime options
 !-----------------------------------------------------------------------
 
    integer, intent(out), optional :: iradsw_out
    integer, intent(out), optional :: iradlw_out
-   integer, intent(out), optional :: iradae_out
    integer, intent(out), optional :: irad_always_out
    logical, intent(out), optional :: spectralflux_out
    logical, intent(out), optional :: use_rad_dt_cosz_out
@@ -203,7 +211,6 @@ subroutine radiation_defaultopts(iradsw_out, iradlw_out, iradae_out, irad_always
 
    if ( present(iradsw_out) )      iradsw_out = iradsw
    if ( present(iradlw_out) )      iradlw_out = iradlw
-   if ( present(iradae_out) )      iradae_out = -999
    if ( present(irad_always_out) ) irad_always_out = irad_always
    if ( present(spectralflux_out) ) spectralflux_out = spectralflux
    if ( present(use_rad_dt_cosz_out) ) use_rad_dt_cosz_out = use_rad_dt_cosz
@@ -212,7 +219,7 @@ end subroutine radiation_defaultopts
 
 !================================================================================================
 
-subroutine radiation_setopts(dtime, nhtfrq, iradsw_in, iradlw_in, iradae_in, &
+subroutine radiation_setopts(dtime, nhtfrq, iradsw_in, iradlw_in, &
    irad_always_in, spectralflux_in, use_rad_dt_cosz_in)!BSINGH- Added use_rad_dt_cosz_out for slr insolation calc.
 !----------------------------------------------------------------------- 
 ! Purpose: Set runtime options
@@ -226,7 +233,6 @@ subroutine radiation_setopts(dtime, nhtfrq, iradsw_in, iradlw_in, iradae_in, &
    integer, intent(in)           :: nhtfrq          ! output frequency of primary history file
    integer, intent(in), optional :: iradsw_in
    integer, intent(in), optional :: iradlw_in
-   integer, intent(in), optional :: iradae_in
    integer, intent(in), optional :: irad_always_in
    logical, intent(in), optional :: spectralflux_in
    logical, intent(in), optional :: use_rad_dt_cosz_in
@@ -234,12 +240,10 @@ subroutine radiation_setopts(dtime, nhtfrq, iradsw_in, iradlw_in, iradae_in, &
    ! Local
    integer :: ntspdy   ! no. timesteps per day
    integer :: nhtfrq1  ! local copy of input arg nhtfrq
-   integer :: iradae   ! not used by RRTMG
 !-----------------------------------------------------------------------
 
    if ( present(iradsw_in) )      iradsw = iradsw_in
    if ( present(iradlw_in) )      iradlw = iradlw_in
-   if ( present(iradae_in) )      iradae = iradae_in
    if ( present(irad_always_in) ) irad_always = irad_always_in
    if ( present(spectralflux_in) ) spectralflux = spectralflux_in
    if ( present(use_rad_dt_cosz_in) ) use_rad_dt_cosz = use_rad_dt_cosz_in
@@ -249,30 +253,23 @@ subroutine radiation_setopts(dtime, nhtfrq, iradsw_in, iradlw_in, iradae_in, &
    if (iradlw      < 0) iradlw      = nint((-iradlw     *3600._r8)/dtime)
    if (irad_always < 0) irad_always = nint((-irad_always*3600._r8)/dtime)
 
-   ! Has user specified iradae?
-   if (iradae /= -999) then
-      call endrun('radiation_setopts: iradae not used by RRTMG.')
-   end if
-
 end subroutine radiation_setopts
 
 !===============================================================================
 
-subroutine radiation_get(iradsw_out, iradlw_out, iradae_out, irad_always_out, spectralflux_out)
+subroutine radiation_get(iradsw_out, iradlw_out, irad_always_out, spectralflux_out)
 !----------------------------------------------------------------------- 
 ! Purpose: Provide access to private module data.  (This should be eliminated.)
 !-----------------------------------------------------------------------
 
    integer, intent(out), optional :: iradsw_out
    integer, intent(out), optional :: iradlw_out
-   integer, intent(out), optional :: iradae_out
    integer, intent(out), optional :: irad_always_out
    logical, intent(out), optional :: spectralflux_out
    !-----------------------------------------------------------------------
 
    if ( present(iradsw_out) )      iradsw_out = iradsw
    if ( present(iradlw_out) )      iradlw_out = iradlw
-   if ( present(iradae_out) )      iradae_out = -999
    if ( present(irad_always_out) ) irad_always_out = irad_always
    if ( present(spectralflux_out) ) spectralflux_out = spectralflux_out
 
@@ -316,24 +313,24 @@ function radiation_do(op, timestep)
    end if
 
    select case (op)
-
-   case ('sw') ! do a shortwave heating calc this timestep?
-      radiation_do = nstep == 0  .or.  iradsw == 1                     &
-                    .or. (mod(nstep-1,iradsw) == 0  .and.  nstep /= 1) &
-                    .or. nstep <= irad_always
-
-   case ('lw') ! do a longwave heating calc this timestep?
-      radiation_do = nstep == 0  .or.  iradlw == 1                     &
-                    .or. (mod(nstep-1,iradlw) == 0  .and.  nstep /= 1) &
-                    .or. nstep <= irad_always
-
-   case ('aeres') ! write absorptivity/emissivity to restart file this timestep?
-      ! for RRTMG there is no abs/ems restart file
-      radiation_do = .false.
-         
-   case default
-      call endrun('radiation_do: unknown operation:'//op)
-
+      case ('sw') ! do a shortwave heating calc this timestep?
+         if (iradsw==0) then
+            radiation_do = .false.
+         else
+            radiation_do = nstep == 0 .or. iradsw == 1                     &
+                          .or. (mod(nstep-1,iradsw) == 0 .and. nstep /= 1) &
+                          .or. nstep <= irad_always
+         end if
+      case ('lw') ! do a longwave heating calc this timestep?
+         if (iradlw==0) then
+            radiation_do = .false.
+         else
+            radiation_do = nstep == 0 .or. iradlw == 1                     &
+                          .or. (mod(nstep-1,iradlw) == 0 .and. nstep /= 1) &
+                          .or. nstep <= irad_always
+         end if
+      case default
+         call endrun('radiation_do: unknown operation:'//op)
    end select
 end function radiation_do
 
@@ -360,29 +357,28 @@ real(r8) function radiation_nextsw_cday()
    nstep  = get_nstep()
    dtime  = get_step_size()
    offset = 0
-   do while (.not. dosw)
-      nstep = nstep + 1
-      offset = offset + dtime
-      if (radiation_do('sw', nstep)) then
-         radiation_nextsw_cday = get_curr_calday(offset=offset) 
-         dosw = .true.
-      end if
-   end do
-   if(radiation_nextsw_cday == -1._r8) then
-      call endrun('error in radiation_nextsw_cday')
+   if (iradsw/=0) then
+      do while (.not. dosw)
+         nstep = nstep + 1
+         offset = offset + dtime
+         if (radiation_do('sw', nstep)) then
+            radiation_nextsw_cday = get_curr_calday(offset=offset) 
+            dosw = .true.
+         end if
+      end do
    end if
-        
+
 end function radiation_nextsw_cday
 
 !================================================================================================
 
-  subroutine radiation_init(phys_state)
+  subroutine radiation_init(phys_state, pbuf)
 !-----------------------------------------------------------------------
 !
 ! Initialize the radiation parameterization, add fields to the history buffer
 ! 
 !-----------------------------------------------------------------------
-    use physics_buffer, only: pbuf_get_index
+    use physics_buffer, only: pbuf_get_index, physics_buffer_desc
     use phys_grid,      only: npchunks, get_ncols_p, chunks, knuhcs, ngcols, dyn_to_latlon_gcol_map
     use cam_history,    only: addfld, horiz_only, add_default
     use constituents,   only: cnst_get_ind
@@ -405,6 +401,7 @@ end function radiation_nextsw_cday
 #endif
 
     type(physics_state), intent(in) :: phys_state(begchunk:endchunk)
+    type(physics_buffer_desc), pointer :: pbuf(:,:)  ! Added for compatibility with SPA
 
     integer :: icall, nmodes
     logical :: active_calls(0:N_DIAG)
@@ -601,53 +598,69 @@ end function radiation_nextsw_cday
 
        if (active_calls(icall)) then
 
-          call addfld('SOLIN'//diag(icall),  horiz_only,     'A',   'W/m2', 'Solar insolation', sampling_seq='rad_lwsw')
+          call addfld('SOLIN'//diag(icall),  horiz_only,     'A',   'W/m2', 'Solar insolation', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true., &
+                      standard_name='toa_incoming_shortwave_flux')
           call addfld('SOLL'//diag(icall),  horiz_only,     'A',    'W/m2', 'Solar downward near infrared direct  to surface',&
-	   sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('SOLS'//diag(icall),  horiz_only,     'A',    'W/m2', 'Solar downward visible direct  to surface', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('SOLLD'//diag(icall),  horiz_only,     'A',   'W/m2', 'Solar downward near infrared diffuse to surface', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('SOLSD'//diag(icall),  horiz_only,     'A',   'W/m2', 'Solar downward visible diffuse to surface', &
-                                                                                 sampling_seq='rad_lwsw')
-          call addfld('QRS'//diag(icall),   (/ 'lev' /),  'A',     'K/s', 'Solar heating rate', sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('QRS'//diag(icall),   (/ 'lev' /),  'A',     'K/s', 'Solar heating rate', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('QRSC'//diag(icall),   (/ 'lev' /),  'A',    'K/s', 'Clearsky solar heating rate', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSNS'//diag(icall),  horiz_only,     'A',    'W/m2', 'Net solar flux at surface', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSNT'//diag(icall),  horiz_only,     'A',    'W/m2', 'Net solar flux at top of model', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSNTOA'//diag(icall),  horiz_only,     'A',  'W/m2', 'Net solar flux at top of atmosphere', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSUTOA'//diag(icall),  horiz_only,     'A',  'W/m2', 'Upwelling solar flux at top of atmosphere', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true., &
+                      standard_name='toa_outgoing_shortwave_flux')
           call addfld('FSNTOAC'//diag(icall),  horiz_only,     'A', 'W/m2', 'Clearsky net solar flux at top of atmosphere', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSUTOAC'//diag(icall),  horiz_only,     'A',  'W/m2', 'Clearsky upwelling solar flux at top of atmosphere', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.,&
+                      standard_name='toa_outgoing_shortwave_flux_assuming_clear_sky')
           call addfld('FSN200'//diag(icall),  horiz_only,     'A',  'W/m2', 'Net shortwave flux at 200 mb', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSN200C'//diag(icall),  horiz_only,     'A', 'W/m2', 'Clearsky net shortwave flux at 200 mb', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSNTC'//diag(icall),  horiz_only,     'A',   'W/m2', 'Clearsky net solar flux at top of model', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSNSC'//diag(icall),  horiz_only,     'A',   'W/m2', 'Clearsky net solar flux at surface', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSDSC'//diag(icall),  horiz_only,     'A',   'W/m2', 'Clearsky downwelling solar flux at surface', &
-                                                                                 sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true., &
+                      standard_name= 'surface_downwelling_shortwave_flux_in_air_assuming_clear_sky')
           call addfld('FSDS'//diag(icall),  horiz_only,     'A',    'W/m2', 'Downwelling solar flux at surface', &
-                                                                                 sampling_seq='rad_lwsw')
-          call addfld('FUS'//diag(icall),  (/ 'ilev' /), 'I',     'W/m2', 'Shortwave upward flux')
-          call addfld('FDS'//diag(icall),  (/ 'ilev' /), 'I',     'W/m2', 'Shortwave downward flux')
-          call addfld('FUSC'//diag(icall),  (/ 'ilev' /), 'I',    'W/m2', 'Shortwave clear-sky upward flux')
-          call addfld('FDSC'//diag(icall),  (/ 'ilev' /), 'I',    'W/m2', 'Shortwave clear-sky downward flux')
-          call addfld('FSNIRTOA'//diag(icall),  horiz_only,     'A','W/m2',&
-	   'Net near-infrared flux (Nimbus-7 WFOV) at top of atmosphere', sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true., &
+                      standard_name='surface_downwelling_shortwave_flux_in_air')
+          call addfld('FUS'//diag(icall),  (/ 'ilev' /), 'I',     'W/m2', 'Shortwave upward flux', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FDS'//diag(icall),  (/ 'ilev' /), 'I',     'W/m2', 'Shortwave downward flux', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FUSC'//diag(icall),  (/ 'ilev' /), 'I',    'W/m2', 'Shortwave clear-sky upward flux', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FDSC'//diag(icall),  (/ 'ilev' /), 'I',    'W/m2', 'Shortwave clear-sky downward flux', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FSNIRTOA'//diag(icall),  horiz_only,     'A','W/m2', &
+                      'Net near-infrared flux (Nimbus-7 WFOV) at top of atmosphere', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSNRTOAC'//diag(icall),  horiz_only,     'A','W/m2', &
-                      'Clearsky net near-infrared flux (Nimbus-7 WFOV) at top of atmosphere', sampling_seq='rad_lwsw')
+                      'Clearsky net near-infrared flux (Nimbus-7 WFOV) at top of atmosphere', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FSNRTOAS'//diag(icall),  horiz_only,     'A','W/m2', &
-	  'Net near-infrared flux (>= 0.7 microns) at top of atmosphere', sampling_seq='rad_lwsw')
-          call addfld ('SWCF'//diag(icall),  horiz_only,     'A',   'W/m2', 'Shortwave cloud forcing', sampling_seq='rad_lwsw')
+                      'Net near-infrared flux (>= 0.7 microns) at top of atmosphere', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld ('SWCF'//diag(icall),  horiz_only,     'A',   'W/m2', 'Shortwave cloud forcing', &
+                       sampling_seq='rad_lwsw', flag_xyfill=.true., &
+                       standard_name='toa_shortwave_cloud_radiative_effect')
 
           if (history_amwg) then
              call add_default('SOLIN'//diag(icall),   1, ' ')
@@ -668,49 +681,49 @@ end function radiation_nextsw_cday
        end if
     end do
 
-
-    if (single_column .and. scm_crm_mode) then
-       call add_default ('FUS     ', 1, ' ')
-       call add_default ('FUSC    ', 1, ' ')
-       call add_default ('FDS     ', 1, ' ')
-       call add_default ('FDSC    ', 1, ' ')
-    endif
-
-
     ! Longwave radiation
 
     do icall = 0, N_DIAG
 
        if (active_calls(icall)) then
 
-          call addfld('QRL'//diag(icall),  (/ 'lev' /), 'A',     'K/s', 'Longwave heating rate', sampling_seq='rad_lwsw')
+          call addfld('QRL'//diag(icall),  (/ 'lev' /), 'A',     'K/s', 'Longwave heating rate', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('QRLC'//diag(icall),  (/ 'lev' /), 'A',    'K/s', 'Clearsky longwave heating rate', &
-                                                                           sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FLDS'//diag(icall), horiz_only,    'A',    'W/m2', 'Downwelling longwave flux at surface', &
-                                                                           sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true., &
+                      standard_name='surface_downwelling_longwave_flux_in_air')
           call addfld('FLDSC'//diag(icall), horiz_only,    'A',   'W/m2', 'Clearsky Downwelling longwave flux at surface', &
-                                                                           sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FLNS'//diag(icall), horiz_only,    'A',    'W/m2', 'Net longwave flux at surface', &
-                                                                           sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FLNT'//diag(icall), horiz_only,    'A',    'W/m2', 'Net longwave flux at top of model', &
-                                                                           sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FLUT'//diag(icall), horiz_only,    'A',    'W/m2', 'Upwelling longwave flux at top of model', &
-                                                                           sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FLUTC'//diag(icall), horiz_only,    'A',   'W/m2', 'Clearsky upwelling longwave flux at top of model', &
-                                                                           sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true., &
+                      standard_name='toa_outgoing_longwave_flux_assuming_clear_sky')
           call addfld('FLNTC'//diag(icall), horiz_only,    'A',   'W/m2', 'Clearsky net longwave flux at top of model', &
-                                                                           sampling_seq='rad_lwsw')
-          call addfld('LWCF'//diag(icall), horiz_only,    'A',    'W/m2', 'Longwave cloud forcing', sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('LWCF'//diag(icall), horiz_only,    'A',    'W/m2', 'Longwave cloud forcing', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true., &
+                      standard_name='toa_longwave_cloud_radiative_effect')
           call addfld('FLN200'//diag(icall), horiz_only,    'A',  'W/m2', 'Net longwave flux at 200 mb', &
-                                                                           sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FLN200C'//diag(icall), horiz_only,    'A', 'W/m2', 'Clearsky net longwave flux at 200 mb', &
-                                                                           sampling_seq='rad_lwsw')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
           call addfld('FLNSC'//diag(icall), horiz_only,    'A',   'W/m2', 'Clearsky net longwave flux at surface', &
-                                                                           sampling_seq='rad_lwsw')
-          call addfld('FUL'//diag(icall), (/ 'ilev' /),'I',     'W/m2', 'Longwave upward flux')
-          call addfld('FDL'//diag(icall), (/ 'ilev' /),'I',     'W/m2', 'Longwave downward flux')
-          call addfld('FULC'//diag(icall), (/ 'ilev' /),'I',    'W/m2', 'Longwave clear-sky upward flux')
-          call addfld('FDLC'//diag(icall), (/ 'ilev' /),'I',    'W/m2', 'Longwave clear-sky downward flux')
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FUL'//diag(icall), (/ 'ilev' /),'I',     'W/m2', 'Longwave upward flux', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FDL'//diag(icall), (/ 'ilev' /),'I',     'W/m2', 'Longwave downward flux', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FULC'//diag(icall), (/ 'ilev' /),'I',    'W/m2', 'Longwave clear-sky upward flux', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
+          call addfld('FDLC'//diag(icall), (/ 'ilev' /),'I',    'W/m2', 'Longwave clear-sky downward flux', &
+                      sampling_seq='rad_lwsw', flag_xyfill=.true.)
 
           if (history_amwg) then
              call add_default('QRL'//diag(icall),   1, ' ')
@@ -727,28 +740,33 @@ end function radiation_nextsw_cday
        end if
     end do
 
-    call addfld('EMIS', (/ 'lev' /), 'A', '1', 'Cloud longwave emissivity')
-
-    if (single_column.and.scm_crm_mode) then
-       call add_default ('FUL     ', 1, ' ')
-       call add_default ('FULC    ', 1, ' ')
-       call add_default ('FDL     ', 1, ' ')
-       call add_default ('FDLC    ', 1, ' ')
-    endif
+    call addfld('EMIS', (/ 'lev' /), 'A', '1', 'Cloud longwave emissivity', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
 
     ! HIRS/MSU diagnostic brightness temperatures
     if (dohirs) then
-       call addfld (hirsname(1),horiz_only,'A','K','HIRS CH2 infra-red brightness temperature')
-       call addfld (hirsname(2),horiz_only,'A','K','HIRS CH4 infra-red brightness temperature')
-       call addfld (hirsname(3),horiz_only,'A','K','HIRS CH6 infra-red brightness temperature')
-       call addfld (hirsname(4),horiz_only,'A','K','HIRS CH8 infra-red brightness temperature')
-       call addfld (hirsname(5),horiz_only,'A','K','HIRS CH10 infra-red brightness temperature')
-       call addfld (hirsname(6),horiz_only,'A','K','HIRS CH11 infra-red brightness temperature')
-       call addfld (hirsname(7),horiz_only,'A','K','HIRS CH12 infra-red brightness temperature')
-       call addfld (msuname(1),horiz_only,'A','K','MSU CH1 microwave brightness temperature')
-       call addfld (msuname(2),horiz_only,'A','K','MSU CH2 microwave brightness temperature')
-       call addfld (msuname(3),horiz_only,'A','K','MSU CH3 microwave brightness temperature')
-       call addfld (msuname(4),horiz_only,'A','K','MSU CH4 microwave brightness temperature')
+       call addfld (hirsname(1),horiz_only,'A','K','HIRS CH2 infra-red brightness temperature', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
+       call addfld (hirsname(2),horiz_only,'A','K','HIRS CH4 infra-red brightness temperature', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
+       call addfld (hirsname(3),horiz_only,'A','K','HIRS CH6 infra-red brightness temperature', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
+       call addfld (hirsname(4),horiz_only,'A','K','HIRS CH8 infra-red brightness temperature', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
+       call addfld (hirsname(5),horiz_only,'A','K','HIRS CH10 infra-red brightness temperature', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
+       call addfld (hirsname(6),horiz_only,'A','K','HIRS CH11 infra-red brightness temperature', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
+       call addfld (hirsname(7),horiz_only,'A','K','HIRS CH12 infra-red brightness temperature', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
+       call addfld (msuname(1),horiz_only,'A','K','MSU CH1 microwave brightness temperature', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
+       call addfld (msuname(2),horiz_only,'A','K','MSU CH2 microwave brightness temperature', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
+       call addfld (msuname(3),horiz_only,'A','K','MSU CH3 microwave brightness temperature', &
+                sampling_seq='rad_lwsw', flag_xyfill=.true.)
+       call addfld (msuname(4),horiz_only,'A','K','MSU CH4 microwave brightness temperature', &
+                    sampling_seq='rad_lwsw', flag_xyfill=.true.)
        call add_default (hirsname(1), 1, ' ')
        call add_default (hirsname(2), 1, ' ')
        call add_default (hirsname(3), 1, ' ')
@@ -763,7 +781,7 @@ end function radiation_nextsw_cday
     end if
 
     ! Heating rate needed for d(theta)/dt computation
-    call addfld ('HR',(/ 'lev' /), 'A','K/s','Heating rate needed for d(theta)/dt computation')
+    call addfld ('HR',(/ 'lev' /), 'A','K/s','Heating rate needed for d(theta)/dt computation', flag_xyfill=.true.)
 
     if ( history_budget .and. history_budget_histfile_num > 1 ) then
        call add_default ('QRL     ', history_budget_histfile_num, ' ')
@@ -780,6 +798,7 @@ end function radiation_nextsw_cday
     concld_idx   = pbuf_get_index('CONCLD')
 
     if (cldfsnow_idx > 0) then
+       ! CLDFSNOW output every call, does not need the sampling_seq flag
        call addfld ('CLDFSNOW',(/ 'lev' /),'I','1','CLDFSNOW',flag_xyfill=.true.)
        call addfld('SNOW_ICLD_VISTAU', (/ 'lev' /), 'A', '1', 'Snow in-cloud extinction visible sw optical depth', &
                                                        sampling_seq='rad_lwsw', flag_xyfill=.true.)
@@ -788,10 +807,17 @@ end function radiation_nextsw_cday
   end subroutine radiation_init
 
 !===============================================================================
+
+  subroutine radiation_final()
+    ! Do any needed clean-up and deallocation before model exit. Empty for now
+    ! but required for consistency with RRTMGPXX interface.
+  end subroutine radiation_final
+  
+!===============================================================================
   
   subroutine radiation_tend(state,ptend, pbuf, &
        cam_out, cam_in, &
-       landfrac,landm,icefrac,snowh, &
+       landfrac,icefrac,snowh, &
        fsns,    fsnt, flns,    flnt,  &
        fsds, net_flx, is_cmip6_volc, dt)
 
@@ -852,7 +878,6 @@ end function radiation_nextsw_cday
     logical,  intent(in)    :: is_cmip6_volc    ! true if cmip6 style volcanic file is read otherwise false 
     real(r8), intent(in)    :: landfrac(pcols)  ! land fraction
     real(r8), intent(in)    :: dt               ! time step(s)
-    real(r8), intent(in)    :: landm(pcols)     ! land fraction ramp
     real(r8), intent(in)    :: icefrac(pcols)   ! land fraction
     real(r8), intent(in)    :: snowh(pcols)     ! Snow depth (liquid water equivalent)
     real(r8), intent(inout) :: fsns(pcols)      ! Surface solar absorbed flux
@@ -1071,13 +1096,6 @@ end function radiation_nextsw_cday
     if (do_aerocom_ind3) then
       cld_tau_idx = pbuf_get_index('cld_tau')
     end if
-   
-!  For CRM, make cloud equal to input observations:
-    if (single_column.and.scm_crm_mode.and.have_cld) then
-       do k = 1,pver
-          cld(:ncol,k)= cldobs(k)
-       enddo
-    endif
 
     if (cldfsnow_idx > 0) then
       call outfld('CLDFSNOW',cldfsnow,pcols,lchnk)
@@ -1089,12 +1107,8 @@ end function radiation_nextsw_cday
     call get_rlat_all_p(lchnk, ncol, clat)
     call get_rlon_all_p(lchnk, ncol, clon)
     call zenith (calday, clat, clon, coszrs, ncol, dt_avg)
-    
-    if (swrad_off) then
-       coszrs(:)=0._r8 ! coszrs is only output for zenith
-    endif    
 
-    call output_rad_data(  pbuf, state, cam_in, landm, coszrs )
+    call output_rad_data(  pbuf, state, cam_in, coszrs )
 
     ! Gather night/day column indices.
     Nday = 0
@@ -1116,14 +1130,6 @@ end function radiation_nextsw_cday
 
        ! construct an RRTMG state object
        r_state => rrtmg_state_create( state, cam_in )
-
-       ! For CRM, make cloud liquid water path equal to input observations
-       if(single_column.and.scm_crm_mode.and.have_clwp)then
-          call endrun('cloud water path must be passed through radiation interface')
-          !do k=1,pver
-          !   cliqwp(:ncol,k) = clwpobs(k)
-          !end do
-       endif
 
        call t_stopf ('radiation_tend_init')
 
@@ -1378,10 +1384,10 @@ end function radiation_nextsw_cday
           if (cldfsnow_idx > 0) then
              snow_icld_vistau(:ncol,:) = snow_tau(idx_sw_diag,:ncol,:)
           endif
-	  ! multiply by total cloud fraction to get gridbox value
-	  tot_cld_vistau(:ncol,:) = c_cld_tau(idx_sw_diag,:ncol,:)*cldfprime(:ncol,:)
+          ! multiply by total cloud fraction to get gridbox value
+          tot_cld_vistau(:ncol,:) = c_cld_tau(idx_sw_diag,:ncol,:)*cldfprime(:ncol,:)
 
-	  ! add fillvalue for night columns
+          ! add fillvalue for night columns
           do i = 1, Nnite
               tot_cld_vistau(IdxNite(i),:)   = fillvalue
               tot_icld_vistau(IdxNite(i),:)  = fillvalue
@@ -1399,7 +1405,6 @@ end function radiation_nextsw_cday
           if (cldfsnow_idx > 0) then
              call outfld('SNOW_ICLD_VISTAU', snow_icld_vistau, pcols, lchnk)
           endif
-
           call t_stopf ('rad_sw')
        end if   ! dosw
 
@@ -1410,14 +1415,6 @@ end function radiation_nextsw_cday
 
        if (dolw) then
           call t_startf ('rad_lw')
-          !
-          ! Convert upward longwave flux units to CGS
-          !
-          do i=1,ncol
-             lwupcgs(i) = cam_in%lwup(i)*1000._r8
-             if(single_column.and.scm_crm_mode.and.have_tg) &
-                  lwupcgs(i) = 1000*stebol*tground(1)**4
-          end do
 
           call rad_cnst_get_call_list(active_calls)
 
@@ -1442,22 +1439,7 @@ end function radiation_nextsw_cday
                        clm_seed,     lu,           ld                                            )
                   call t_stopf ('rad_rrtmg_lw')
 
-                  if (lwrad_off) then
-                     qrl(:,:) = 0._r8
-                     qrlc(:,:) = 0._r8
-                     flns(:) = 0._r8
-                     flnt(:) = 0._r8
-                     flnsc(:) = 0._r8
-                     flntc(:) = 0._r8
-                     cam_out%flwds(:) = 0._r8
-                     flut(:) = 0._r8
-                     flutc(:) = 0._r8
-                     fnl(:,:) = 0._r8
-                     fcnl(:,:) = 0._r8
-                     fldsc(:) = 0._r8
-                  end if !lwrad_off
-		  
-		  do i=1,ncol
+                  do i=1,ncol
                      lwcf(i)=flutc(i) - flut(i)
                   end do
 

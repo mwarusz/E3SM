@@ -7,8 +7,8 @@ module VOCEmissionMod
   ! !USES:
   use shr_kind_mod       , only : r8 => shr_kind_r8
   use shr_log_mod        , only : errMsg => shr_log_errMsg
-  use clm_varctl         , only : iulog
-  use clm_varpar         , only : numpft, nlevcan
+  use elm_varctl         , only : iulog
+  use elm_varpar         , only : numpft, nlevcan
   use pftvarcon          , only : ndllf_evr_tmp_tree,  ndllf_evr_brl_tree
   use pftvarcon          , only : ndllf_dcd_brl_tree,  nbrdlf_evr_trp_tree
   use pftvarcon          , only : nbrdlf_evr_tmp_tree, nbrdlf_dcd_brl_shrub
@@ -22,7 +22,7 @@ module VOCEmissionMod
   use decompMod          , only : bounds_type
   use abortutils         , only : endrun
   use fileutils          , only : getfil
-  use clm_varcon         , only : grlnd
+  use elm_varcon         , only : grlnd
   use atm2lndType        , only : atm2lnd_type
   use CanopyStateType    , only : canopystate_type
   use PhotosynthesisType , only : photosyns_type
@@ -33,6 +33,8 @@ module VOCEmissionMod
   use ColumnDataType     , only : col_ws
   use VegetationType     , only : veg_pp                
   use VegetationDataType , only : veg_es  
+  use topounit_varcon    , only : max_topounits
+  use GridcellType        , only : grc_pp
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -63,7 +65,7 @@ module VOCEmissionMod
      real(r8) , pointer, private :: gammaC_out_patch  (:)   ! 
      real(r8) , pointer, private :: vocflx_tot_patch  (:)   ! total VOC flux into atmosphere [moles/m2/sec] 
      real(r8) , pointer, PUBLIC  :: vocflx_patch      (:,:) ! (num_mech_comps) MEGAN flux [moles/m2/sec] 
-     real(r8) , pointer, private :: efisop_grc        (:,:) ! gridcell isoprene emission factors
+     real(r8) , pointer, private :: efisop_grc        (:,:,:) ! gridcell isoprene emission factors
    contains
      procedure, public  :: Init
      procedure, private :: InitAllocate
@@ -154,7 +156,7 @@ contains
     allocate(this%gammaC_out_patch  (begp:endp)) ; this%gammaC_out_patch  (:)   = nan
 
     allocate(this%vocflx_tot_patch  (begp:endp));  this%vocflx_tot_patch  (:)   = nan
-    allocate(this%efisop_grc      (6,begg:endg));  this%efisop_grc        (:,:) = nan
+    allocate(this%efisop_grc      (6,begg:endg,1:max_topounits));  this%efisop_grc        (:,:,:) = nan
     allocate(meg_out(shr_megan_megcomps_n)) 
     do i=1,shr_megan_megcomps_n
        allocate(meg_out(i)%flux_out(begp:endp))
@@ -173,7 +175,7 @@ contains
     ! Initialize history output fields for MEGAN emissions diagnositics
     !
     ! !USES 
-    use clm_varcon  , only : spval
+    use elm_varcon  , only : spval
     use histFileMod , only : hist_addfld1d
     !
     ! !ARGUMENTS:
@@ -304,7 +306,7 @@ contains
     !
     ! !USES
     use ncdio_pio
-    use clm_varctl, only : fsurdat
+    use elm_varctl, only : fsurdat
     !
     ! !ARGUMENTS:
     class(vocemis_type) :: this
@@ -315,14 +317,14 @@ contains
     integer            :: begg, endg
     type(file_desc_t)  :: ncid       ! netcdf id
     character(len=256) :: locfn      ! local filename
-    real(r8) ,pointer  :: temp_ef(:) ! read in - temporary EFs 
+    real(r8) ,pointer  :: temp_ef(:,:) ! read in - temporary EFs 
     !-----------------------------------------------------------------------
 
     begg = bounds%begg; endg = bounds%endg
 
     ! Time constant
 
-    allocate(temp_ef(begg:endg))
+    allocate(temp_ef(begg:endg,1:max_topounits))
 
     call getfil (fsurdat, locfn, 0)
     call ncd_pio_openfile (ncid, locfn, 0)
@@ -330,37 +332,37 @@ contains
     if (.not. readvar) then
        call endrun(msg='iniTimeConst: errror reading EF1_BTR'//errMsg(__FILE__, __LINE__))
     end if
-    this%efisop_grc(1,begg:endg)=temp_ef(begg:endg)
+    this%efisop_grc(1,begg:endg,1:max_topounits)=temp_ef(begg:endg,1:max_topounits)
 
     call ncd_io(ncid=ncid, varname='EF1_FET', flag='read', data=temp_ef, dim1name=grlnd, readvar=readvar)
     if (.not. readvar) then
        call endrun(msg='iniTimeConst: errror reading EF1_FET'//errMsg(__FILE__, __LINE__))
     end if
-    this%efisop_grc(2,begg:endg)=temp_ef(begg:endg)
+    this%efisop_grc(2,begg:endg,1:max_topounits)=temp_ef(begg:endg,1:max_topounits)
 
     call ncd_io(ncid=ncid, varname='EF1_FDT', flag='read', data=temp_ef, dim1name=grlnd, readvar=readvar)
     if (.not. readvar) then
        call endrun(msg='iniTimeConst: errror reading EF1_FDT'//errMsg(__FILE__, __LINE__))
     end if
-    this%efisop_grc(3,begg:endg)=temp_ef(begg:endg)
+    this%efisop_grc(3,begg:endg,1:max_topounits)=temp_ef(begg:endg,1:max_topounits)
 
     call ncd_io(ncid=ncid, varname='EF1_SHR', flag='read', data=temp_ef, dim1name=grlnd, readvar=readvar)
     if (.not. readvar) then
        call endrun(msg='iniTimeConst: errror reading EF1_SHR'//errMsg(__FILE__, __LINE__))
     end if
-    this%efisop_grc(4,begg:endg)=temp_ef(begg:endg)
+    this%efisop_grc(4,begg:endg,1:max_topounits)=temp_ef(begg:endg,1:max_topounits)
 
     call ncd_io(ncid=ncid, varname='EF1_GRS', flag='read', data=temp_ef, dim1name=grlnd, readvar=readvar)
     if (.not. readvar) then
        call endrun(msg='iniTimeConst: errror reading EF1_GRS'//errMsg(__FILE__, __LINE__))
     end if
-    this%efisop_grc(5,begg:endg)=temp_ef(begg:endg)
+    this%efisop_grc(5,begg:endg,1:max_topounits)=temp_ef(begg:endg,1:max_topounits)
 
     call ncd_io(ncid=ncid, varname='EF1_CRP', flag='read', data=temp_ef, dim1name=grlnd, readvar=readvar)
     if (.not. readvar) then
        call endrun(msg='iniTimeConst: errror reading EF1_CRP'//errMsg(__FILE__, __LINE__))
     end if
-    this%efisop_grc(6,begg:endg)=temp_ef(begg:endg)
+    this%efisop_grc(6,begg:endg,1:max_topounits)=temp_ef(begg:endg,1:max_topounits)
 
     deallocate(temp_ef)
 
@@ -422,7 +424,7 @@ contains
     !                           and read in MEGAN factors from file.
     !
     ! !LOCAL VARIABLES:
-    integer  :: fp,p,g,t,c              ! indices
+    integer  :: fp,p,g,t,c,ti,topi              ! indices
     real(r8) :: epsilon                 ! emission factor [ug m-2 h-1]
     real(r8) :: gamma                   ! activity factor (accounting for light, T, age, LAI conditions)
     real(r8) :: gamma_p                 ! activity factor for PPFD
@@ -489,7 +491,7 @@ contains
          fsun24        => canopystate_vars%fsun24_patch         , & ! Input:  [real(r8) (:)   ]  sunlit fraction of canopy last 24 hrs             
          fsun240       => canopystate_vars%fsun240_patch        , & ! Input:  [real(r8) (:)   ]  sunlit fraction of canopy last 240 hrs            
          elai          => canopystate_vars%elai_patch           , & ! Input:  [real(r8) (:)   ]  one-sided leaf area index with burying by snow
-         elai_p        => canopystate_vars%elai_p_patch         , & ! Input:  [real(r8) (:)   ]  one-sided leaf area index from previous timestep  
+         elai240       => canopystate_vars%elai240_patch        , & ! Input:  [real(r8) (:)   ]  one-sided leaf area index with burying by snow 240 hrs  
 
          cisun_z       => photosyns_vars%cisun_z_patch          , & ! Input:  [real(r8) (:,:) ]  sunlit intracellular CO2 (Pa)
          cisha_z       => photosyns_vars%cisha_z_patch          , & ! Input:  [real(r8) (:,:) ]  shaded intracellular CO2 (Pa)
@@ -533,6 +535,8 @@ contains
        p = filter_soilp(fp)
        g = veg_pp%gridcell(p)
        t = veg_pp%topounit(p)
+       topi = grc_pp%topi(g)
+       ti = t - topi + 1
        c = veg_pp%column(p)
 
        ! initialize EF
@@ -578,7 +582,7 @@ contains
              ! set emis factor
              ! if specified, set EF for isoprene with mapped values
              if ( trim(meg_cmp%name) == 'isoprene' .and. shr_megan_mapped_emisfctrs) then
-                epsilon = get_map_EF(veg_pp%itype(p),g, vocemis_vars)
+                epsilon = get_map_EF(veg_pp%itype(p),g, ti, vocemis_vars)
              else
                 epsilon = meg_cmp%emis_factors(veg_pp%itype(p))
              end if
@@ -594,7 +598,7 @@ contains
                                    betaT(class_num),LDF(class_num), Ceo(class_num), Eopt, topt)
 
              ! Activity factor for Leaf Age
-             gamma_a = get_gamma_A(veg_pp%itype(p), elai_p(p),elai(p),class_num)
+             gamma_a = get_gamma_A(veg_pp%itype(p), elai240(p),elai(p),class_num)
 
              ! Activity factor for CO2 (only for isoprene)
              if (trim(meg_cmp%name) == 'isoprene') then 
@@ -668,7 +672,7 @@ contains
   end subroutine VOCEmission
 
   !-----------------------------------------------------------------------
-  function get_map_EF(ivt_in, g_in, vocemis_vars)
+  function get_map_EF(ivt_in, g_in, ti_in, vocemis_vars)
     !
     ! Get mapped EF for isoprene
     ! Use gridded values for 6 Patches specified by MEGAN following
@@ -678,6 +682,7 @@ contains
     ! !ARGUMENTS:
     integer, intent(in) :: ivt_in
     integer, intent(in) :: g_in
+    integer, intent(in) :: ti_in  ! Topounit index
     type(vocemis_type), intent(in) :: vocemis_vars
     !
     ! !LOCAL VARIABLES:
@@ -690,20 +695,20 @@ contains
     
     if (     ivt_in == ndllf_evr_tmp_tree  &
          .or.     ivt_in == ndllf_evr_brl_tree) then   !fineleaf evergreen
-       get_map_EF = vocemis_vars%efisop_grc(2,g_in)
+       get_map_EF = vocemis_vars%efisop_grc(2,g_in, ti_in)
     else if (ivt_in == ndllf_dcd_brl_tree) then        !fineleaf deciduous
-       get_map_EF = vocemis_vars%efisop_grc(3,g_in)
+       get_map_EF = vocemis_vars%efisop_grc(3,g_in, ti_in)
     else if (ivt_in >= nbrdlf_evr_trp_tree &
          .and.    ivt_in <= nbrdlf_dcd_brl_tree) then  !broadleaf trees
-       get_map_EF = vocemis_vars%efisop_grc(1,g_in)
+       get_map_EF = vocemis_vars%efisop_grc(1,g_in,ti_in)
     else if (ivt_in >= nbrdlf_evr_shrub &
          .and.    ivt_in <= nbrdlf_dcd_brl_shrub) then !shrubs
-       get_map_EF = vocemis_vars%efisop_grc(4,g_in)
+       get_map_EF = vocemis_vars%efisop_grc(4,g_in, ti_in)
     else if (ivt_in >= nc3_arctic_grass &
          .and.    ivt_in <= nc4_grass) then            !grass
-       get_map_EF = vocemis_vars%efisop_grc(5,g_in)
+       get_map_EF = vocemis_vars%efisop_grc(5,g_in, ti_in)
     else if (ivt_in >= nc3crop) then                   !crops
-       get_map_EF = vocemis_vars%efisop_grc(6,g_in)
+       get_map_EF = vocemis_vars%efisop_grc(6,g_in, ti_in)
     end if
 
   end function get_map_EF
@@ -787,8 +792,8 @@ contains
     ! Guenther et al., 2006 eq 3
     !
     ! !USES:
-    use clm_varcon   , only : denice
-    use clm_varpar   , only : nlevsoi
+    use elm_varcon   , only : denice
+    use elm_varpar   , only : nlevsoi
     !
     ! !ARGUMENTS:
     implicit none
@@ -820,8 +825,8 @@ contains
     ! convert to volumetric soil water using equation 7.118 of the CLM4 Technical Note
     !
     ! !USES:
-    use clm_varcon   , only : denice
-    use clm_varpar   , only : nlevsoi
+    use elm_varcon   , only : denice
+    use elm_varpar   , only : nlevsoi
     !
     ! !ARGUMENTS:
     implicit none
@@ -943,7 +948,7 @@ contains
   end function get_gamma_T
 
   !-----------------------------------------------------------------------
-  function get_gamma_A(ivt_in, elai_p_in,elai_in,nclass_in)
+  function get_gamma_A(ivt_in, elai240_in,elai_in,nclass_in)
 
     ! Activity factor for leaf age (Guenther et al., 2006)
     !-----------------------------
@@ -957,7 +962,7 @@ contains
     implicit none
     integer,intent(in)  :: ivt_in
     integer,intent(in)  :: nclass_in
-    real(r8),intent(in) :: elai_p_in
+    real(r8),intent(in) :: elai240_in
     real(r8),intent(in) :: elai_in
     !
     ! !LOCAL VARIABLES:
@@ -967,8 +972,8 @@ contains
     !-----------------------------------------------------------------------
     if ( (ivt_in == ndllf_dcd_brl_tree) .or. (ivt_in >= nbrdlf_dcd_trp_tree) ) then  ! non-evergreen
        
-       if ( (elai_p_in > 0.0_r8) .and. (elai_p_in < 1.e30_r8) )then 
-          elai_prev = 2._r8*elai_p_in-elai_in  ! have accumulated average lai over last timestep
+       if ( (elai240_in > 0.0_r8) .and. (elai240_in < 1.e30_r8) )then 
+          elai_prev = 2._r8*elai240_in-elai_in  ! have accumulated average lai over last timestep
           if (elai_prev == elai_in) then
              fnew = 0.0_r8
              fgro = 0.0_r8
@@ -1011,7 +1016,7 @@ contains
     ! Author: Colette L. Heald (11/30/11)
     !
     ! !USES:
-    use clm_varctl,    only : co2_ppmv      ! corresponds to CCSM_CO2_PPMV set in env_conf.xml
+    use elm_varctl,    only : co2_ppmv      ! corresponds to CCSM_CO2_PPMV set in env_conf.xml
     !
     ! !ARGUMENTS:
     implicit none

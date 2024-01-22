@@ -25,7 +25,7 @@ module cam_history_support
 
   integer, parameter, public :: max_string_len = 256   ! Length of strings
   integer, parameter, public :: max_chars = shr_kind_cl         ! max chars for char variables
-  integer, parameter, public :: fieldname_len = 24   ! max chars for field name
+  integer, parameter, public :: fieldname_len = 34   ! max chars for field name
   integer, parameter, public :: fieldname_suffix_len =  3 ! length of field name suffix ("&IC")
   integer, parameter, public :: fieldname_lenp2      = fieldname_len + 2 ! allow for extra characters
   ! max_fieldname_len = max chars for field name (including suffix)
@@ -33,7 +33,7 @@ module cam_history_support
 
   integer, parameter, public :: pflds  = 1000      ! max number of fields for namelist entries fincl and fexcl
                                                    ! also used in write restart
-  integer, parameter, public :: ptapes = 12        ! max number of tapes
+  integer, parameter, public :: ptapes = 17        ! max number of tapes
 
   ! A special symbol for declaring a field which has no vertical or
   ! non-grid dimensions. It is here (rather than cam_history) so that it
@@ -120,6 +120,7 @@ module cam_history_support
 
     character(len=max_fieldname_len) :: name ! field name
     character(len=max_chars) :: long_name    ! long name
+    character(len=max_chars) :: standard_name  ! CF standard name
     character(len=max_chars) :: units        ! units
     character(len=3)         :: mixing_ratio ! 'dry' or 'wet'
     character(len=max_chars) :: sampling_seq ! sampling sequence - if not every timestep, how often field is sampled
@@ -133,7 +134,7 @@ module cam_history_support
     generic   :: get_dims    => get_dims_2d, get_dims_3d
   end type field_info
 
-  real(r8), parameter, public :: fillvalue = 1.e36_r8     ! fill value for netcdf fields
+  real(r8), parameter, public :: fillvalue = 1.e+20_r8     ! fill value for netcdf fields
 
 
   !---------------------------------------------------------------------------

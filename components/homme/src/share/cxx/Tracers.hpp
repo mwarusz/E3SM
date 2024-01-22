@@ -8,6 +8,7 @@
 #define HOMMEXX_TRACERS_HPP
 
 #include "Types.hpp"
+#include "utilities/Hash.hpp"
 
 namespace Homme {
 
@@ -17,7 +18,7 @@ struct Tracers {
 
   void init (const int num_elems, const int num_tracers);
 
-  void randomize(const int seed);
+  void randomize (const int seed, const Real min = -1.0, const Real max = 1.0);
 
   void pull_qdp(CF90Ptr &state_qdp);
   void push_qdp(F90Ptr &state_qdp) const;
@@ -36,8 +37,10 @@ struct Tracers {
   ExecViewManaged<Scalar*[Q_NUM_TIME_LEVELS][QSIZE_D][NP][NP][NUM_LEV]> qdp;
   ExecViewManaged<Scalar*[QSIZE_D][NP][NP][NUM_LEV]>                    qtens_biharmonic; // Also doubles as just qtens.
   ExecViewManaged<Scalar*[QSIZE_D][2][NUM_LEV]>                         qlim;
-  ExecViewManaged<Scalar*[QSIZE_D][NP][NP][NUM_LEV]>                    Q;
-  ExecViewManaged<Scalar*[QSIZE_D][NP][NP][NUM_LEV]>                    fq;
+  ExecViewManaged<Scalar**[NP][NP][NUM_LEV]>                    Q;
+  ExecViewManaged<Scalar**[NP][NP][NUM_LEV]>                    fq;
+
+  HashType hash(const int qdp_time_level) const;
 
 private:
   int nt;

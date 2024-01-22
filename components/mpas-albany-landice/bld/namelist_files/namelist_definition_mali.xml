@@ -17,7 +17,7 @@
           An abbreviation of the fortran declaration for the variable.
       Valid declarations are:
 
-          char*n  
+          char*n
           integer
           logical
           real
@@ -31,7 +31,7 @@
      input_pathname
           Only include this attribute to indicate that the variable
           contains the pathname of an input dataset that resides in the
-          CESM inputdata directory tree.  
+          CESM inputdata directory tree.
 
       The recognized values are "abs" to indicate that an absolute
           pathname is required, or "rel:var_name" to indicate that the
@@ -124,6 +124,14 @@ Valid values: .true. or .false.
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_effective_pressure_max" type="real"
+	category="velocity_solver" group="velocity_solver">
+An optional maximum limit on effective pressure passed to the velocity solver.
+
+Valid values: Any positive, real number.
+Default: Defined in namelist_defaults.xml
+</entry>
+
 
 <!-- advection -->
 
@@ -143,14 +151,81 @@ Valid values: 'fo', 'none'
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_restore_thickness_after_advection" type="logical"
+	category="advection" group="advection">
+If true, reset thickness to values at previous timestep after advection occurs. This is used for spinning up tracer fields such as damage.  When this is true, geometry changes from surface and basal mass balance (grounded or floating) and facemelting are not retained, but changes from calving are.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_zero_sfcMassBalApplied_over_bare_land" type="logical"
+	category="advection" group="advection">
+Mask to zero out sfcMassBalApplied in regions where there is no ice at the timestep.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+
+<!-- solidearth -->
+
+<entry id="config_uplift_method" type="char*1024"
+	category="solidearth" group="solidearth">
+Selection of the method for bedrock uplift calculation.
+
+Valid values: 'none', 'data', 'sealevelmodel'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_slm_coupling_interval" type="char*1024"
+	category="solidearth" group="solidearth">
+Time interval at which the sea-level model is called by MALI. The interval has to be an even multiple of the option 'config_adaptive_timestep_force_interval
+
+Valid values: Any time interval of the format 'YYYY-MM-DD_HH:MM:SS'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_MALI_to_SLM_weights_file" type="char*1024"
+	category="solidearth" group="solidearth">
+File containing the interpolation weights for regridding from MPAS mesh to the Gaussian grid used by the Sea Level Model.
+
+Valid values: Any file name string
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_SLM_to_MALI_weights_file" type="char*1024"
+	category="solidearth" group="solidearth">
+File containing the interpolation weights for regridding from the Gaussian grid used by the Sea Level Model to the MPAS mesh.
+
+Valid values: Any file name string
+Default: Defined in namelist_defaults.xml
+</entry>
+
 
 <!-- calving -->
 
 <entry id="config_calving" type="char*1024"
 	category="calving" group="calving">
-Selection of the method for calving ice (as defined further below).
+Selection of the method for calving ice (as defined below). 'von_Mises_stress' and 'eigencalving' options can be used in combination with damage threshold calving (see descrption of config_damage_calving_method for details).
 
-Valid values: 'none', 'floating', 'topographic_threshold', 'thickness_threshold', 'eigencalving', 'mask'
+Valid values: 'none', 'floating', 'topographic_threshold', 'thickness_threshold', 'eigencalving', 'specified_calving_velocity', 'von_Mises_stress', 'damagecalving', 'ismip6_retreat'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_apply_calving_mask" type="logical"
+	category="calving" group="calving">
+Whether the field 'calvingMask' gets used to force calving.  This is independent of choice of 'config_calving'; the application of 'calvingMask' can be applied in conjunction with a physical calving law or with no calving law enabled.  The calving mask gets applied after a physical calving law, if one is selected.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_use_Albany_flowA_eqn_for_vM" type="logical"
+	category="calving" group="calving">
+Not yet supported. Determine whether to use MPAS or Albany calculation for flowParamA used in von Mises stress calving
+
+Valid values: .true. or .false.
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -186,6 +261,22 @@ Valid values: any positive real number
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_calving_specified_source" type="char*1024"
+	category="calving" group="calving">
+method of specified calving velocity
+
+Valid values: 'const' (constant calving velocity), 'data' (calving velocity given by data input)
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_calving_velocity_const" type="real"
+	category="calving" group="calving">
+constant calving velocity specified in the namelist
+
+Valid values: Any positive real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
 <entry id="config_data_calving" type="logical"
 	category="calving" group="calving">
 Select whether or not to configure calving in a 'data' model mode (calc. calving flux but do not update ice geometry)
@@ -204,7 +295,15 @@ Default: Defined in namelist_defaults.xml
 
 <entry id="config_restore_calving_front" type="logical"
 	category="calving" group="calving">
-If true, then restore the calving front to its initial position.  If ice grows beyond the initial extent, it is removed.  If ice shrinks to an extent behind the initial extent, those locations are filled with thin ice (defined as 1/10th the value of config_dynamic_thickness).  Note that this violates conservation of mass and energy.
+If true, then restore the calving front to its initial position.  If ice grows beyond the initial extent, it is removed.  If ice shrinks to an extent behind the initial extent, behavior is determined by config_restore_calving_front_prevent_retreat.  If that option is true, then those locations are filled with thin ice (defined as 1/10th the value of config_dynamic_thickness).  Note that this violates conservation of mass and energy.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_restore_calving_front_prevent_retreat" type="logical"
+	category="calving" group="calving">
+If true, then the config_restore_calving_front option will fill locations where ice shelves have retreated with a thin layer of ice.  This option should be used in E3SM when the ice shelf extent seen by the E3SM coupler cannot change.  If false, the config_restore_calving_front option will do nothing when ice shelves retreat.  For either value of this option, the config_restore_calving_front option will prevent ice-shelf advance.  True is likely the desired value for standalone runs where no advance is desired.  Default value is true for backwards compatibility.
 
 Valid values: .true. or .false.
 Default: Defined in namelist_defaults.xml
@@ -221,6 +320,150 @@ Default: Defined in namelist_defaults.xml
 <entry id="config_remove_small_islands" type="logical"
 	category="calving" group="calving">
 If true, then ice from small grounded islands is removed.  Specifically, this finds one- and two-cell masses of ice that are surrounded by open ocean and eliminates them by sending them to the calving flux.  Grounded such ice masses would be islands, floating would be icebergs.  The ice removed is added to the calvingThickness field.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_calving_speed_limit" type="real"
+	category="calving" group="calving">
+Limit calvingVelocity to this value. Currently only supported for von Mises calving.
+
+Valid values: Any positive real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_grounded_von_Mises_threshold_stress" type="real"
+	category="calving" group="calving">
+Threshold von Mises stress value required for calving velocity to exceed ice velocity on grounded ice. sigma_max in Morlighem et al. (2016) eq. 4. 1 MPa default value is from Morlighem et al.'s calibration for Store Glacier.
+
+Valid values: Any positive real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_floating_von_Mises_threshold_stress" type="real"
+	category="calving" group="calving">
+Threshold von Mises stress value required for calving velocity to exceed ice velocity on floating ice. Generally seems to need to be low (1e5 to 2e5 for Humboldt Glacier) to allow floating ice to retreat. If set to 0.0, floating ice will be removed from dynamic cells each timestep; calvingThickness will be correct, but calvingVelocity will not be correct for those cells. sigma_max in Morlighem et al. (2016) eq. 4. 1 MPa default value is from Morlighem et al.'s calibration for Store Glacier.
+
+Valid values: Any positive real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_grounded_von_Mises_threshold_stress_source" type="char*1024"
+	category="calving" group="calving">
+Source of von MIses threshold stress value for calving from grounded ice.
+
+Valid values: 'data' (read from input file), 'scalar' (specified by config_grounded_von_Mises_threshold_stress)
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_floating_von_Mises_threshold_stress_source" type="char*1024"
+	category="calving" group="calving">
+Source of von MIses threshold stress value for calving from floating ice.
+
+Valid values: 'data' (read from input file), 'scalar' (specified by config_floating_von_Mises_threshold_stress)
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_finalize_damage_after_advection" type="logical"
+	category="calving" group="calving">
+If true, then the 'li_finalize_damage_after_advection' subroutine is applied, doing the following: 1) set the value of damage at the grounding line based on the choice of 'config_damage_gl_setting', 2) reset the value of damage to its initial value (to avoid healing), based on choice of 'config_preserve_damage', 3) couple the updated damage value to the rheology if 'config_damage_rheology_coupling' is true.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_preserve_damage" type="logical"
+	category="calving" group="calving">
+If true, then preserve the value of damage before advection (i.e., do not allow healing of damage to occur).
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_calculate_damage" type="logical"
+	category="calving" group="calving">
+If .true., then turn on the 'calculate_damage' subroutine. Note that setting this to .true. will evolve damage even if damage-based calving is not being used, which is why it is .false. by default (and thus it should explicitly be set to .true. to use damage based calving).
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_damage_preserve_threshold" type="real"
+	category="calving" group="calving">
+It is a value above which the old damage number would be kept from the impact of advection (the damage would not heal). For example, if the damage at some location is 0.83, and we set config_damage_preserve_threshold to 0.8, then the damage number there will not fall below 0.83. Otherwise, if the damage is 0.7, then it could be decreased to a smaller number if non-damaged ice is transported from upstream. If we set config_damage_preserve_threshold to 0 (default), then it will just not play a role in pratical.
+
+Valid values: real value between 0 and 1
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_damage_calving_threshold" type="real"
+	category="calving" group="calving">
+When config_damage_calving_method==threshold, this is the value of damage above which the cell would be calved away.  When config_damage_calving_method==calving_rate, this is the value above which calving becomes proportional to damage.
+
+Valid values: real value between 0 and 1
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_damage_stiffness_min" type="real"
+	category="calving" group="calving">
+The minimum value the 'stiffnessFactor' can take due to evolving damage when 'stiffnessFactor' is calculated from damage (i.e., when 'config_damage_rheology_coupling'=.true.). This is used to prevent unrealistic and/or numerically challenging stiffness values. For example, if damage = 0.9, then 'stiffnessFactor' becomes 1 - damage = 0.1 (a small value that could be challenging for the solver). But if we set 'config_damage_stiffness_min' = 0.5, then 'stiffnessFactor' can only fall as low as 0.5.
+
+Valid values: real value between 0 and 1
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_damage_rheology_coupling" type="logical"
+	category="calving" group="calving">
+If true, then the value of 'stiffnessFactor' is coupled to damage evolution, i.e. 'stiffnessFactor' = 1-damage.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_damage_gl_setting" type="char*1024"
+	category="calving" group="calving">
+Selection of the method for initializing damage in the first floating grid cells past the grounding line: 'nye' uses Nye's zero stress criteria (Nye, 1957, Proc. R. Soc. A, 239) for defining the damage value, 'extrapolate' extrapolates values from the floating ice downstream back to the first floating cells.
+
+Valid values: 'nye', 'extrapolate'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_damage_calving_method" type="char*1024"
+	category="calving" group="calving">
+Selection of the method for damage calving. For 'threshold', ice with damage above the value specified by 'config_damage_calving_threshold' will be removed if it is connected to the marine margin. The 'threshold' option can be combined with config_calving = 'von_Mises_stress' and config_calving = 'eigencalving'. For 'calving_rate', a rate of calving is specified as proportional to the damage value above some threshold, with the constant of proportionality specified by 'config_damagecalvingParameter' and the threshold defined by config_damage_calving_threshold. The 'calving_rate' option cannot currently be combined with other calving routines, and requires config_calving = 'damagecalving'.
+
+Valid values: 'calving_rate', 'threshold', 'none'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_damagecalvingParameter" type="real"
+	category="calving" group="calving">
+A scalar parameter that specifies a calving rate as proportional to the value of damage above some threshold value when using the 'calving_rate' method for the 'config_damage_calving_method' option (with the threshold damage value specified by 'config_damage_calving_threshold').
+
+Valid values: any positive real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_ismip6_retreat_k" type="real"
+	category="calving" group="calving">
+Coefficient for ISMIP6 retreat parameterization from Slater et al. (2019)
+
+Valid values: any negative real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_calving_error_threshold" type="real"
+	category="calving" group="calving">
+Fraction of total volume intended to be ablated remaining before an error is triggered.
+
+Valid values: any positive real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_distribute_unablatedVolumeDynCell" type="logical"
+	category="calving" group="calving">
+If true, then distribute unablatedVolumeDynCell among dynamic neighbors when converting ablation velocity to ablation thickness. This should only be used as a clean-up measure, while limiting the timestep based on ablation velocity should be used as the primary method of getting accurate ablation thickness from ablation velocity.  If you choose to set config_adaptive_timestep_calvingCFL_fraction much larger than 1.0 (which is not recommended), setting this option to true usually results in more accurate calving behavior. 
 
 Valid values: .true. or .false.
 Default: Defined in namelist_defaults.xml
@@ -255,7 +498,7 @@ Default: Defined in namelist_defaults.xml
 
 <entry id="config_thermal_thickness" type="real"
 	category="thermal_solver" group="thermal_solver">
-Defines the minimum ice thickness for conducting thermal calculations. Ice thinner than this value is ignored by the thermal solver.
+Defines the minimum ice thickness for conducting thermal calculations. Ice thinner than this value is ignored by the thermal solver.  Default set to 0 to ensure reasonable values everywhere there is ice, which is needed for realistic behavior when using Albany due to the way temperature is handled in extended cells.
 
 Valid values: Any positive real value
 Default: Defined in namelist_defaults.xml
@@ -464,6 +707,70 @@ Valid values: any positive real value
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_front_mass_bal_grounded" type="char*1024"
+	category="iceshelf_melt" group="iceshelf_melt">
+Selection of the method for computing the frontal mass balance of submarine grounded ice.  'none' sets the front mass balance field to 0 everywhere. 'uniform' sets faceMeltSpeed to the value given by config_uniform_face_melt_rate. 'ismip6' uses the parameterization provided by ISMIP6 and requires an ocean thermal forcing field and subglacial hydrology.
+
+Valid values: 'none', 'uniform', 'ismip6'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_use_3d_thermal_forcing_for_face_melt" type="logical"
+	category="iceshelf_melt" group="iceshelf_melt">
+If true, use ismip6shelfMelt_3dThermalForcing and associated variables to calculate ocean-bottom thermal forcing for use with the config_front_mass_bal_grounded = 'ismip6' melt paramterization.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_beta_ocean_thermal_forcing" type="real"
+	category="iceshelf_melt" group="iceshelf_melt">
+Exponent of the ocean thermal forcing in ISMIP6 grounded ice front melting parameterization
+
+Valid values: any real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_add_ocean_thermal_forcing" type="real"
+	category="iceshelf_melt" group="iceshelf_melt">
+Adjust ismip6_2dThermalForcing by a scalar value
+
+Valid values: any real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_alpha_subglacial_discharge" type="real"
+	category="iceshelf_melt" group="iceshelf_melt">
+Exponent of the subglacial discharge term in ISMIP6 grounded ice front melting parameterization
+
+Valid values: any real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_subglacial_discharge_coefficient" type="real"
+	category="iceshelf_melt" group="iceshelf_melt">
+Coefficient of the subglacial discharge term in ISMIP6 grounded ice front melting parameterization
+
+Valid values: any real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_subglacial_discharge_intercept" type="real"
+	category="iceshelf_melt" group="iceshelf_melt">
+Added value B in ISMIP6 grounded ice front melting parameterization
+
+Valid values: any real value
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_uniform_face_melt_rate" type="real"
+	category="iceshelf_melt" group="iceshelf_melt">
+MISSING DESCRIPTION
+
+Valid values: any non-negative value
+Default: Defined in namelist_defaults.xml
+</entry>
+
 
 <!-- physical_parameters -->
 
@@ -560,15 +867,47 @@ Default: Defined in namelist_defaults.xml
 
 <entry id="config_adaptive_timestep_CFL_fraction" type="real"
 	category="time_integration" group="time_integration">
-A multiplier on the minimum allowable time step calculated from the CFL condition. (Setting to 1.0 may be unstable, so smaller values are recommended.)
+A multiplier on the minimum allowable time step calculated from the advective CFL condition. (Setting to 1.0 may be unstable, so smaller values are recommended.)  Note that 'advective' is not in the name.  This is for backwards compatibility
 
 Valid values: Any positive real value less than 1.0.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_adaptive_timestep_calvingCFL_fraction" type="real"
+	category="time_integration" group="time_integration">
+A multiplier on the minimum allowable time step calculated from the calving CFL condition. This should be conservative given the calving CFL calculation is lagged
+
+Valid values: Any positive real value.  Note that values greater than 1.0 are allowed and may be desired.  This is because the calving CFL is an approximate calculation.  A value between 0.75 and 1.0, possibly as large as 1.25, was found to maintain converged accuracy for many configurations explored, so it is recommended to use values in this range.  However, much larger values (up to 2 or 3) provide acceptable accuracy for some configurations (but it is not clear what conditions allow it).  If values much greater than 1.0 are used, it is recommended to set config_distribute_unablatedVolumeDynCell to true.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_adaptive_timestep_faceMeltingCFL_fraction" type="real"
+	category="time_integration" group="time_integration">
+A multiplier on the minimum allowable time step calculated from the face-melting CFL condition. This should be conservative given the calving CFL calculation is lagged
+
+Valid values: Any positive real value.  Note that values greater than 1.0 are allowed and may be desired.  This is because the face-melting CFL is an approximate calculation.  A value between 0.75 and 1.0, possibly as large as 1.25, was found to maintain converged accuracy for the analogous calving CFL fraction, so it is recommended to use values in this range. If values much greater than 1.0 are used, it is recommended to set config_distribute_unablatedVolumeDynCell to true.
 Default: Defined in namelist_defaults.xml
 </entry>
 
 <entry id="config_adaptive_timestep_include_DCFL" type="logical"
 	category="time_integration" group="time_integration">
 Option of whether to include the diffusive CFL condition in the determination of the maximum allowable timestep. The diffusive CFL condition at any location is estimated based on the local ice flux and surface slope.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_adaptive_timestep_include_calving" type="logical"
+	category="time_integration" group="time_integration">
+Option of whether to include the calving CFL condition in the determination of the maximum allowable timestep. This only is applied if config_calving is set to a method that uses a calvingVelocity.  Note that this is an approximate CFL condition and is lagged a timestep.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_adaptive_timestep_include_face_melting" type="logical"
+	category="time_integration" group="time_integration">
+Option of whether to include the face-melting CFL condition in the determination of the maximum allowable timestep. This only is applied if config_front_mass_bal_grounded is not set to 'none'.  Note that this is an approximate CFL condition and is lagged a timestep.
 
 Valid values: .true. or .false.
 Default: Defined in namelist_defaults.xml
@@ -629,7 +968,7 @@ Default: Defined in namelist_defaults.xml
 	category="time_management" group="time_management">
 Selection of the type of calendar that should be used in the simulation.
 
-Valid values: 'gregorian', 'gregorian_noleap'
+Valid values: 'gregorian', 'noleap'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -713,7 +1052,7 @@ Default: Defined in namelist_defaults.xml
 
 <entry id="config_num_halos" type="integer"
 	category="decomposition" group="decomposition">
-Determines the number of halo cells extending from a blocks owned cells (Called the 0-Halo). The default first-order upwinding advection requires a minimum of 2.  Note that a minimum of 3 is required for incremental remapping advection on a quad mesh or for FCT advection (neither of which is currently supported for land ice).
+Determines the number of halo cells extending from a blocks owned cells (Called the 0-Halo). The extension of the mesh for Albany requires 3 to cover all geometric possibilities.  The default first-order upwinding advection requires a minimum of 2.  Note that a minimum of 3 is required for incremental remapping advection on a quad mesh or for FCT advection (neither of which is currently supported for land ice).
 
 Valid values: Any positive interger value.
 Default: Defined in namelist_defaults.xml
@@ -805,6 +1144,14 @@ Valid values: .true. or .false.
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_ocean_connection_N" type="logical"
+	category="subglacial_hydro" group="subglacial_hydro">
+Calculate effective pressure assuming perfect connection with the ocean.  This is an alternative to the subglacial hydrology model and requires that config_SGH=.false.
+
+Valid values: .true. or .false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
 <entry id="config_SGH_adaptive_timestep_fraction" type="real"
 	category="subglacial_hydro" group="subglacial_hydro">
 fraction of adaptive CFL timestep to use
@@ -861,11 +1208,27 @@ Valid values: positive real number
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_SGH_conduc_coeff_drowned" type="real"
+	category="subglacial_hydro" group="subglacial_hydro">
+conductivity coefficient for subglacial water flux for fraction of water thickness that exceeds bump height.  Use 0.0 or negative value to disable.
+
+Valid values: positive real number or 0.0
+Default: Defined in namelist_defaults.xml
+</entry>
+
 <entry id="config_SGH_till_drainage" type="real"
 	category="subglacial_hydro" group="subglacial_hydro">
 background subglacial till drainage rate
 
-Valid values: positive real number.  Default value is 0.001 m/yr in SI units.
+Valid values: positive real number.  Disabled by default.  Bueler and van Pelt use 3.1709792e-11 m/s (0.001 m/yr).
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_SGH_till_max" type="real"
+	category="subglacial_hydro" group="subglacial_hydro">
+maximum water thickness in subglacial till. Bueler and van Pelt use 2.0 m
+
+Valid values: positive real number
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -904,14 +1267,6 @@ Default: Defined in namelist_defaults.xml
 <entry id="config_SGH_englacial_porosity" type="real"
 	category="subglacial_hydro" group="subglacial_hydro">
 notional englacial porosity
-
-Valid values: positive real number
-Default: Defined in namelist_defaults.xml
-</entry>
-
-<entry id="config_SGH_till_max" type="real"
-	category="subglacial_hydro" group="subglacial_hydro">
-maximum water thickness in subglacial till
 
 Valid values: positive real number
 Default: Defined in namelist_defaults.xml

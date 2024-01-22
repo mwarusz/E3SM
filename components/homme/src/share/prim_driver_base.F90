@@ -26,7 +26,7 @@ module prim_driver_base
   use reduction_mod,    only: reductionbuffer_ordered_1d_t, red_min, red_max, red_max_int, &
                               red_sum, red_sum_int, red_flops, initreductionbuffer, &
                               red_max_index, red_min_index
-#ifndef CAM
+#if !defined(CAM) && !defined(SCREAM)
   use prim_restart_mod, only : initrestartfile
   use restart_io_mod ,  only : readrestart
   use test_mod,         only: set_test_initial_conditions, compute_test_forcing
@@ -37,7 +37,8 @@ module prim_driver_base
   private
   public :: prim_init1, prim_init2 , prim_run_subcycle, prim_finalize
   public :: prim_init1_geometry, prim_init1_elem_arrays, prim_init1_buffers, prim_init1_cleanup
-#ifndef CAM
+  public :: prim_init1_compose
+#if !defined(CAM) && !defined(SCREAM)
   public :: prim_init1_no_cam
 #endif
 
@@ -92,7 +93,7 @@ contains
     !       as well as to inject code in between pieces that is needed to
     !       properly setup the C++ structures.
 
-#ifndef CAM
+#if !defined(CAM) && !defined(SCREAM)
     ! Initialize a few things that CAM would take care of (e.g., parsing namelist)
     call prim_init1_no_cam (par)
 #endif
@@ -138,15 +139,17 @@ contains
   end subroutine prim_init1
 
 
-#ifndef CAM
+#if !defined(CAM) && !defined(SCREAM)
   subroutine prim_init1_no_cam(par)
     use mesh_mod,       only : MeshUseMeshFile, MeshCubeElemCount
-    use cube_mod,       only : cubeelemcount
+    use cube_mod,       only : CubeElemCount
+    use planar_mod,     only : PlaneElemCount
     use parallel_mod,   only : parallel_t, abortmp
     use namelist_mod,   only : readnl
     use quadrature_mod, only : test_gauss, test_gausslobatto
     use repro_sum_mod,  only : repro_sum_defaultopts, repro_sum_setopts
     use time_mod,       only : nmax, time_at
+    use control_mod, only : topology
 #ifndef HOMME_WITHOUT_PIOLIBRARY
     use common_io_mod,  only : homme_pio_init
 #endif
@@ -170,8 +173,13 @@ contains
     if (MeshUseMeshFile) then
        total_nelem = MeshCubeElemCount()
     else
+      if (topology=="cube") then
        total_nelem = CubeElemCount()
+     else if (topology=="plane") then
+       total_nelem      = PlaneElemCount()
     end if
+    end if
+
 #ifndef HOMME_WITHOUT_PIOLIBRARY
     call homme_pio_init(par%rank,par%comm)
 #endif
@@ -218,18 +226,26 @@ contains
     ! --------------------------------
     use thread_mod, only : nthreads, hthreads, vthreads
     ! --------------------------------
-    use control_mod, only : topology, partmethod, z2_map_method, cubed_sphere_map
+    use control_mod, only : topology, geometry, partmethod, z2_map_method, cubed_sphere_map
     ! --------------------------------
     use prim_state_mod, only : prim_printstate_init
     ! --------------------------------
     use mass_matrix_mod, only : mass_matrix
     ! --------------------------------
     use cube_mod,  only : cubeedgecount , cubeelemcount, cubetopology, cube_init_atomic, &
-                          set_corner_coordinates, &
-                          set_area_correction_map0, set_area_correction_map2
+                          set_corner_coordinates
+    ! --------------------------------
+    use geometry_mod, only: set_area_correction_map0, set_area_correction_map2
     ! --------------------------------
     use mesh_mod, only : MeshSetCoordinates, MeshUseMeshFile, MeshCubeTopology, &
                          MeshCubeElemCount, MeshCubeEdgeCount, MeshCubeTopologyCoords
+    ! --------------------------------
+    use planar_mod,  only : PlaneEdgeCount , PlaneElemCount, PlaneTopology
+    ! --------------------------------
+    use planar_mesh_mod, only :   PlaneMeshSetCoordinates,      &
+                          MeshPlaneTopology, MeshPlaneTopologyCoords
+    ! --------------------------------
+    use planar_mod, only : plane_init_atomic, plane_set_corner_coordinates
     ! --------------------------------
     use metagraph_mod, only : localelemcount, initmetagraph, printmetavertex
     ! --------------------------------
@@ -294,9 +310,12 @@ contains
     if (MeshUseMeshFile) then
        nelem = MeshCubeElemCount()
        nelem_edge = MeshCubeEdgeCount()
-    else
+    else if (topology=="cube") then
        nelem      = CubeElemCount()
        nelem_edge = CubeEdgeCount()
+     else if (topology=="plane") then
+       nelem      = PlaneElemCount()
+       nelem_edge = PlaneEdgeCount()
     end if
 
     ! we want to exit elegantly when we are using too many processors.
@@ -314,10 +333,10 @@ contains
        call sgi_init_grid(par, GridVertex, GridEdge, MetaVertex)
     end if
 
-    if (topology=="cube" .and. .not. can_scalably_init_grid) then
+    if (.not. can_scalably_init_grid) then
 
        if (par%masterproc) then
-          write(iulog,*)"creating cube topology..."
+          write(iulog,*)"creating topology..."
        end if
 
        allocate(GridVertex(nelem))
@@ -331,15 +350,22 @@ contains
            if (par%masterproc) then
                write(iulog,*) "Set up grid vertex from mesh..."
            end if
+           if (topology=="cube") then
            call MeshCubeTopologyCoords(GridEdge, GridVertex, coord_dim1, coord_dim2, coord_dim3, coord_dimension)
            !MD:TODO: still need to do the coordinate transformation for this case.
-
+         else if  (topology=="plane") then
+           call MeshPlaneTopologyCoords(GridEdge,GridVertex, coord_dim1, coord_dim2, coord_dim3, coord_dimension)
+         end if
 
        else
+         if (topology=="cube") then
            call CubeTopology(GridEdge,GridVertex)
            if (is_zoltan_partition(partmethod) .or. is_zoltan_task_mapping(z2_map_method)) then
               call getfixmeshcoordinates(GridVertex, coord_dim1, coord_dim2, coord_dim3, coord_dimension)
            endif
+        else if (topology=="plane") then
+         call PlaneTopology(GridEdge,GridVertex)
+       end if
         end if
 
        if(par%masterproc)       write(iulog,*)"...done."
@@ -482,19 +508,36 @@ contains
 
     gp=gausslobatto(np)  ! GLL points
 
-    if (topology=="cube") then
-       if(par%masterproc) write(iulog,*) "initializing cube elements..."
-       if (MeshUseMeshFile) then
-           call MeshSetCoordinates(elem)
-       else
-           do ie=1,nelemd
+        if(par%masterproc) write(iulog,*)"initializing elements..."
+    
+         if (MeshUseMeshFile) then
+          if (geometry=="sphere") then
+            call MeshSetCoordinates(elem)
+          else if  (geometry=="plane") then
+            call PlaneMeshSetCoordinates(elem)
+          end if
+         else
+          if (geometry=="sphere") then
+            do ie=1,nelemd
                call set_corner_coordinates(elem(ie))
-           end do
-       end if
-       do ie=1,nelemd
-          call cube_init_atomic(elem(ie),gp%points)
-       enddo
-    end if
+            enddo
+          else if (geometry=="plane") then
+           do ie=1,nelemd
+              call plane_set_corner_coordinates(elem(ie))
+           enddo
+          end if
+           !call assign_node_numbers_to_elem(elem, GridVertex)
+         endif
+    
+      if (geometry=="sphere") then
+         do ie=1,nelemd
+            call cube_init_atomic(elem(ie),gp%points)
+         enddo
+      else if (geometry=="plane") then
+        do ie=1,nelemd
+           call plane_init_atomic(elem(ie),gp%points)
+        enddo
+      end if
 
     ! =================================================================
     ! Initialize mass_matrix
@@ -548,7 +591,7 @@ contains
     use parallel_mod,   only : parallel_t
     use control_mod,    only : runtype, restartfreq, transport_alg
     use bndry_mod,      only : sort_neighbor_buffer_mapping
-#ifndef CAM
+#if !defined(CAM) && !defined(SCREAM)
     use restart_io_mod, only : RestFile,readrestart
 #endif
 
@@ -580,7 +623,7 @@ contains
     !  This routines initalizes a Restart file.  This involves:
     !      I)  Setting up the MPI datastructures
     ! ==========================================================
-#ifndef CAM
+#if !defined(CAM) && !defined(SCREAM)
     if(restartfreq > 0 .or. runtype>=1)  then
        call initRestartFile(elem(1)%state,par,RestFile)
     endif
@@ -693,10 +736,11 @@ contains
   subroutine prim_init2(elem, hybrid, nets, nete, tl, hvcoord)
 
     use control_mod,          only: runtype, test_case, &
-                                    debug_level, vfile_int, vform, vfile_mid, &
+                                    debug_level, vfile_int, vfile_mid, &
                                     topology, dt_remap_factor, dt_tracer_factor,&
                                     sub_case, limiter_option, nu, nu_q, nu_div, tstep_type, hypervis_subcycle, &
-                                    hypervis_subcycle_q, hypervis_subcycle_tom
+                                    hypervis_subcycle_q, hypervis_subcycle_tom, &
+                                    transport_alg, prim_step_type
     use global_norms_mod,     only: test_global_integral, print_cfl
     use hybvcoord_mod,        only: hvcoord_t
     use parallel_mod,         only: parallel_t, haltmp, syncmp, abortmp
@@ -781,7 +825,7 @@ contains
   end interface
 #endif
 
-    if (topology == "cube") then
+    if (topology == "cube" .OR. topology=='plane') then
        call test_global_integral(elem, hybrid,nets,nete)
     end if
 
@@ -845,11 +889,7 @@ contains
     !$OMP BARRIER
 #endif
 
-    if (topology /= "cube") then
-       call abortmp('Error: only cube topology supported for primaitve equations')
-    endif
-
-#ifndef CAM
+#if !defined(CAM) && !defined(SCREAM)
 
     ! =================================
     ! HOMME stand alone initialization
@@ -945,17 +985,31 @@ contains
     ! may also adjust tensor coefficients based on CFL
     call print_cfl(elem,hybrid,nets,nete,dtnu)
 
+    ! Use the flexible time stepper if dt_remap_factor == 0 (vertically Eulerian
+    ! dynamics) or dt_remap < dt_tracer. This applies to SL transport only.
+    if( transport_alg > 1 .and. dt_remap_factor < dt_tracer_factor ) then
+       prim_step_type = 2
+    else
+       prim_step_type = 1
+    endif
+
     if (hybrid%masterthread) then
        ! CAM has set tstep based on dtime before calling prim_init2(),
        ! so only now does HOMME learn the timstep.  print them out:
-       write(iulog,'(a,2f9.2)') "dt_remap: (0=disabled)   ",tstep*dt_remap_factor
-       if (qsize>0) then
-          write(iulog,'(a,2f9.2)') "dt_tracer (SE), per RK stage: ", &
-               tstep*dt_tracer_factor,(tstep*dt_tracer_factor)/2
-       end if
-       write(iulog,'(a,2f9.2)')    "dt_dyn:                  ",tstep
-       write(iulog,'(a,2f9.2)')    "dt_dyn (viscosity):      ",dt_dyn_vis
-       write(iulog,'(a,2f9.2)')    "dt_tracer (viscosity):   ",dt_tracer_vis
+       write(iulog,'(a,2f9.2)')        "dt_remap: (0=disabled)   ",tstep*dt_remap_factor
+       if (transport_alg > 0) then
+          if (qsize>0) then
+              write(iulog,'(a,2f9.2)') "dt_tracer (SL):          ",tstep*dt_tracer_factor
+          endif
+       elseif(transport_alg == 0) then
+          if (qsize>0) then
+             write(iulog,'(a,2f9.2)')  "dt_tracer (EUL), per RK stage: ", &
+                 tstep*dt_tracer_factor,(tstep*dt_tracer_factor)/2
+          end if
+       endif
+       write(iulog,'(a,2f9.2)')        "dt_dyn:                  ",tstep
+       write(iulog,'(a,2f9.2)')        "dt_dyn (viscosity):      ",dt_dyn_vis
+       write(iulog,'(a,2f9.2)')        "dt_tracer (viscosity):   ",dt_tracer_vis
        if (hypervis_subcycle_tom==0) then                                                     
           ! applied with hyperviscosity                                                       
           write(iulog,'(a,2f9.2)') "dt_vis_TOM:  ",dt_dyn_vis                                 
@@ -963,9 +1017,15 @@ contains
           write(iulog,'(a,2f9.2)') "dt_vis_TOM:  ",tstep/hypervis_subcycle_tom               
        endif                                                                 
 
+       if (prim_step_type == 2) then
+          write(iulog,*) "Running with prim_step_flexible"
+       elseif(prim_step_type == 1) then
+          write(iulog,*) "Running with old code for prim_run_subcycle, not _flexible"
+       endif
 
 #ifdef CAM
        write(iulog,'(a,2f9.2)') "CAM dtime (dt_phys):         ",tstep*nsplit*max(dt_remap_factor, dt_tracer_factor)
+       write(iulog,'(a,i5)')    "nsplit:                      ",nsplit
 #endif
     end if
 
@@ -996,7 +1056,7 @@ contains
     !       tl%n0    time t + dt_q
 
     use control_mod,        only: statefreq, qsplit, rsplit, disable_diagnostics, &
-         dt_remap_factor, dt_tracer_factor, transport_alg
+         dt_remap_factor, dt_tracer_factor, transport_alg, prim_step_type
     use hybvcoord_mod,      only: hvcoord_t
     use parallel_mod,       only: abortmp
     use prim_state_mod,     only: prim_printstate
@@ -1023,11 +1083,7 @@ contains
     real(kind=real_kind) :: dp_np1(np,np)
     integer :: ie,i,j,k,n,q,t,scm_dum
     integer :: n0_qdp,np1_qdp,r,nstep_end,nets_in,nete_in,step_factor
-    logical :: compute_diagnostics, independent_time_steps
-
-    ! Use the flexible time stepper if dt_remap_factor == 0 (vertically Eulerian
-    ! dynamics) or dt_remap < dt_tracer. This applies to SL transport only.
-    independent_time_steps = transport_alg > 1 .and. dt_remap_factor < dt_tracer_factor
+    logical :: compute_diagnostics
 
     ! compute timesteps for tracer transport and vertical remap
     dt_q = dt*dt_tracer_factor
@@ -1051,10 +1107,10 @@ contains
     ! compute scalar diagnostics if currently active
     if (compute_diagnostics) call run_diagnostics(elem,hvcoord,tl,3,.true.,nets,nete)
 
-    if (.not. independent_time_steps) then
+    if (prim_step_type == 1) then
        call TimeLevel_Qdp(tl, dt_tracer_factor, n0_qdp, np1_qdp)
 
-#ifndef CAM
+#if !defined(CAM) && !defined(SCREAM)
        ! compute HOMME test case forcing
        ! by calling it here, it mimics eam forcings computations in standalone
        ! homme.
@@ -1121,10 +1177,12 @@ contains
       endif
 
       call vertical_remap(hybrid,elem,hvcoord,dt_remap,tl%np1,np1_qdp,nets_in,nete_in)
-    else
+    elseif(prim_step_type == 2) then
       ! This time stepping routine permits the vertical remap time
       ! step to be shorter than the tracer transport time step.
       call prim_step_flexible(hybrid, elem, nets, nete, dt, tl, hvcoord, compute_diagnostics)
+    else
+      call abortmp('prim_step_type is not set')
     end if ! independent_time_steps
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1287,7 +1345,7 @@ contains
 
     call TimeLevel_Qdp(tl, dt_tracer_factor, n0_qdp, np1_qdp)
 
-#ifndef CAM
+#if !defined(CAM) && !defined(SCREAM)
     ! Compute test forcing over tracer time step.
     call compute_test_forcing(elem,hybrid,hvcoord,tl%n0,n0_qdp,dt_q,nets,nete,tl)
 #endif
@@ -1528,7 +1586,7 @@ contains
   logical,                intent(in)    :: adjustment
 
   ! local
-  integer :: i,j,k,ie,q
+  integer :: i,j,k,q
   real (kind=real_kind)  :: fq
   real (kind=real_kind)  :: dp(np,np,nlev), ps(np,np), dp_adj(np,np,nlev)
   real (kind=real_kind)  :: phydro(np,np,nlev)  ! hydrostatic pressure
@@ -1544,11 +1602,24 @@ contains
   real (kind=real_kind)  :: dpnh_dp_i(np,np,nlevp)
 #endif
 
+#ifdef HOMMEXX_BFB_TESTING
+  ! BFB comparison with C++ requires to perform the reduction
+  ! of FQ over the whole column *before* adding to ps
+  real (kind=real_kind) :: sum_fq(np,np)
+  sum_fq = 0
+#endif
+
+  call t_startf("ApplyCAMForcing_tracers")
+
 #ifdef MODEL_THETA_L
   if (dt_remap_factor==0) then
      adjust_ps=.true.   ! stay on reference levels for Eulerian case
   else
+#ifdef SCREAM
+     adjust_ps=.false.  ! Lagrangian case can support adjusting dp3d or ps
+#else
      adjust_ps=.true.   ! Lagrangian case can support adjusting dp3d or ps
+#endif
   endif
 #else
   adjust_ps=.true.      ! preqx requires forcing to stay on reference levels
@@ -1561,7 +1632,6 @@ contains
 
   ! after calling this routine, ps_v may not be valid and should not be used
   elem%state%ps_v(:,:,np1)=0
-
 
 #ifdef MODEL_THETA_L
    !compute temperatue and NH perturbation pressure before Q tendency
@@ -1581,6 +1651,7 @@ contains
 #endif
 
    if (adjustment) then 
+
       ! hard adjust Q from physics.  negativity check done in physics
       do k=1,nlev
          do j=1,np
@@ -1596,13 +1667,24 @@ contains
                      fq = dp(i,j,k)*( elem%derived%FQ(i,j,k,q) -&
                           elem%state%Q(i,j,k,q))
                      ! force ps to conserve mass:  
+#ifdef HOMMEXX_BFB_TESTING
+                     sum_fq(i,j) = sum_fq(i,j) + fq
+#else
                      ps(i,j)=ps(i,j) + fq
+#endif
                      dp_adj(i,j,k)=dp_adj(i,j,k) + fq   !  ps =  ps0+sum(dp(k))
                   endif
                enddo
             end do
          end do
       end do
+#ifdef HOMMEXX_BFB_TESTING
+      do j=1,np
+        do i=1,np
+          ps(i,j) = ps(i,j) + sum_fq(i,j)
+        end do
+      end do
+#endif
    else ! end of adjustment
       ! apply forcing to Qdp
       elem%derived%FQps(:,:)=0
@@ -1696,6 +1778,8 @@ contains
    
 #endif
 
+  call t_stopf("ApplyCAMForcing_tracers")
+
   end subroutine applyCAMforcing_tracers
   
   
@@ -1740,8 +1824,6 @@ contains
     integer :: ie, t, q,k,i,j,n,qn0
     real (kind=real_kind)                          :: maxcflx, maxcfly
     real (kind=real_kind) :: dp_np1(np,np)
-
-    dt_q = dt*dt_tracer_factor
  
     ! ===============
     ! initialize mean flux accumulation variables and save some variables at n0
@@ -1780,7 +1862,7 @@ contains
       
     enddo
 
-  end subroutine prim_step_scm  
+  end subroutine prim_step_scm
 
 
 !=======================================================================================================!
@@ -1817,7 +1899,7 @@ contains
 
 
     subroutine smooth_topo_datasets(elem,hybrid,nets,nete)
-    use control_mod, only : smooth_phis_numcycle, smooth_phis_nudt
+    use control_mod, only : smooth_phis_numcycle, smooth_phis_nudt, smooth_phis_p2filt
     use hybrid_mod, only : hybrid_t
     use bndry_mod, only : bndry_exchangev
     use derivative_mod, only : derivative_t , laplace_sphere_wk
@@ -1828,22 +1910,28 @@ contains
     type (hybrid_t)      , intent(in) :: hybrid
     type (element_t)     , intent(inout), target :: elem(:)
     ! local
-    integer :: ie
+    integer :: ie, p2filt
     real (kind=real_kind) :: minf
-    real (kind=real_kind) :: phis(np,np,nets:nete)
+    real (kind=real_kind) :: phis(np,np,nets:nete),phis4(4),xgll(np)
+    type (quadrature_t)    :: gp
+    gp=gausslobatto(np)
+    xgll = gp%points(1:np)
+    deallocate(gp%points)
+    deallocate(gp%weights)
 
     do ie=nets,nete
        phis(:,:,ie)=elem(ie)%state%phis(:,:)
     enddo
-    
+
     minf=-9e9
     if (hybrid%masterthread) then
        write(iulog,*) "Applying hyperviscosity smoother to PHIS"
        write(iulog,'(a,i10)')  " smooth_phis_numcycle =",smooth_phis_numcycle
+       write(iulog,'(a,i10)')  " smooth_phis_p2filt =",smooth_phis_p2filt
        write(iulog,'(a,e13.5)')" smooth_phis_nudt =",smooth_phis_nudt
     endif
-    call smooth_phis(phis,elem,hybrid,deriv1,nets,nete,minf,smooth_phis_numcycle)
-
+    call smooth_phis(phis,elem,hybrid,deriv1,nets,nete,minf,smooth_phis_numcycle,&
+         smooth_phis_p2filt,xgll)
 
     do ie=nets,nete
        elem(ie)%state%phis(:,:)=phis(:,:,ie)
@@ -1877,22 +1965,35 @@ contains
     call TimeLevel_Qdp(tl, dt_tracer_factor, n0_qdp, np1_qdp)
     
     do k=1,nlev
-      eta_dot_dpdn(:,:,k)=elem(1)%derived%omega_p(1,1,k)   
+      eta_dot_dpdn(:,:,k)=elem(1)%derived%omega_p(1,1,k)
     enddo  
-    eta_dot_dpdn(:,:,nlev+1) = eta_dot_dpdn(:,:,nlev) 
+    eta_dot_dpdn(:,:,nlev+1) = eta_dot_dpdn(:,:,nlev)
     
     do k=1,nlev
       elem(1)%state%dp3d(:,:,k,np1) = elem(1)%state%dp3d(:,:,k,n0) &
-        + dt*(eta_dot_dpdn(:,:,k+1) - eta_dot_dpdn(:,:,k))    
-    enddo       
+        + dt*(eta_dot_dpdn(:,:,k+1) - eta_dot_dpdn(:,:,k))
+    enddo
+
+    ! Update temperature variable for the theta-l or preqx implementation
+#ifdef MODEL_THETA_L
+    do k=1,nlev
+      elem(1)%state%vtheta_dp(:,:,k,np1) = (elem(1)%state%vtheta_dp(:,:,k,n0)/ &
+                elem(1)%state%dp3d(:,:,k,n0))*elem(1)%state%dp3d(:,:,k,np1)
+    enddo
+#else
+   do k=1,nlev
+     elem(1)%state%T(:,:,k,np1) = elem(1)%state%T(:,:,k,n0)
+   enddo
+#endif
 
     do p=1,qsize
       do k=1,nlev
-        elem(1)%state%Qdp(:,:,k,p,np1_qdp)=elem(1)%state%Q(:,:,k,p)*elem(1)%state%dp3d(:,:,k,np1)
+        elem(1)%state%Qdp(:,:,k,p,np1_qdp)=elem(1)%state%Q(:,:,k,p)*&
+          elem(1)%state%dp3d(:,:,k,np1)
       enddo
     enddo
     
-  end subroutine set_prescribed_scm        
+  end subroutine set_prescribed_scm
     
 end module prim_driver_base
 

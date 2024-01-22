@@ -14,8 +14,8 @@ module prim_cxx_driver_base
   public :: prim_finalize
 
   private :: generate_global_to_local
-  private :: init_cxx_connectivity
-  private :: setup_element_pointers
+  public  :: init_cxx_connectivity
+  public  :: setup_element_pointers
 
 #include <mpif.h>
 
@@ -33,7 +33,13 @@ module prim_cxx_driver_base
     use prim_driver_base, only : prim_init1_geometry, prim_init1_elem_arrays, &
                                  prim_init1_cleanup, prim_init1_buffers,      &
                                  MetaVertex, GridEdge, deriv1
-#ifndef CAM
+                         
+#ifdef HOMME_ENABLE_COMPOSE
+    use prim_driver_base, only : prim_init1_compose
+    use compose_mod,      only : compose_control_kokkos_init_and_fin
+#endif
+
+#if !defined(CAM) && !defined(SCREAM)
     use prim_driver_base, only : prim_init1_no_cam
 #endif
 
@@ -62,8 +68,12 @@ module prim_cxx_driver_base
 
     ! Initialize kokkos before any environment changes from the Fortran
     call initialize_hommexx_session()
+    ! Don't let any other components that use Kokkos control init/finalization.
+#ifdef HOMME_ENABLE_COMPOSE
+    call compose_control_kokkos_init_and_fin(.false.)
+#endif    
 
-#ifndef CAM
+#if !defined(CAM) && !defined(SCREAM)
     call prim_init1_no_cam(par)
 #endif
 
@@ -82,14 +92,6 @@ module prim_cxx_driver_base
     ! ==================================
     call init_cxx_connectivity(nelemd,GridEdge,MetaVertex,par)
 
-    ! Cleanup the tmp stuff used in prim_init1_geometry
-    call prim_init1_cleanup()
-
-    ! ==================================
-    ! Initialize the buffers for exchanges
-    ! ==================================
-    call prim_init1_buffers(elem,par)
-
     ! ==================================
     ! Initialize element pointers
     ! ==================================
@@ -100,6 +102,18 @@ module prim_cxx_driver_base
     ! ==================================
     call prim_init1_elem_arrays(elem,par)
 
+#ifdef HOMME_ENABLE_COMPOSE
+    call prim_init1_compose(par,elem)
+#endif
+
+    ! ==================================
+    ! Initialize the buffers for exchanges
+    ! ==================================
+    call prim_init1_buffers(elem,par)
+
+    ! Cleanup the tmp stuff used in prim_init1_geometry
+    call prim_init1_cleanup()
+
     ! Initialize the time levels
     call TimeLevel_init(tl)
 
@@ -107,39 +121,41 @@ module prim_cxx_driver_base
   end subroutine prim_init1
 
   subroutine prim_finalize ()
+    use prim_driver_base, only: prim_finalize_base=>prim_finalize
     interface
       subroutine finalize_hommexx_session() bind(c)
       end subroutine finalize_hommexx_session
     end interface
+
+    call prim_finalize_base()
 
     ! This call lets C++ destroy the singleton containing all the views,
     ! and finalize the Kokkos execution space.
     call finalize_hommexx_session()
   end subroutine prim_finalize
 
-!!!!!!!!!!!!!!!!!!!!!!! PRIVATE SUBROUTINES BELOW THIS LINE !!!!!!!!!!!!!!!!!!!!!!!
-
   subroutine init_cxx_connectivity (nelemd, GridEdge, MetaVertex, par)
     use dimensions_mod, only : nelem
     use gridgraph_mod,  only : GridEdge_t
     use metagraph_mod,  only : MetaVertex_t
     use parallel_mod,   only : parallel_t
+    use dimensions_mod, only : max_corner_elem
     !
     ! Interfaces
     !
     interface
-      subroutine init_connectivity (num_local_elems) bind (c)
+      subroutine init_connectivity (num_local_elems, max_corner_elems) bind (c)
         use iso_c_binding, only : c_int
         !
         ! Inputs
         !
-        integer (kind=c_int), intent(in) :: num_local_elems
+        integer (kind=c_int), intent(in) :: num_local_elems, max_corner_elems
       end subroutine init_connectivity
 
       subroutine finalize_connectivity () bind(c)
       end subroutine finalize_connectivity
 
-      subroutine add_connection (first_lid,  first_gid,  first_pos,  first_pid, &
+      subroutine add_connection (first_lid,  first_gid,  first_pos,  first_pid,  &
                                  second_lid, second_gid, second_pos, second_pid) bind(c)
         use iso_c_binding, only : c_int
         !
@@ -167,7 +183,7 @@ module prim_cxx_driver_base
     call generate_global_to_local(MetaVertex,Global2Local,par)
 
     ! Initialize C++ connectivity structure
-    call init_connectivity(nelemd)
+    call init_connectivity(nelemd, max_corner_elem)
 
     ! Add all connections to the C++ structure
     num_edges = SIZE(GridEdge)
@@ -179,6 +195,29 @@ module prim_cxx_driver_base
 
     call finalize_connectivity()
   end subroutine init_cxx_connectivity
+
+  subroutine setup_element_pointers (elem)
+    use element_mod,    only : element_t
+    use element_state,  only : allocate_element_arrays, setup_element_pointers_ie
+    use dimensions_mod, only : nelemd
+    !
+    ! Inputs
+    !
+    type (element_t), intent(inout) :: elem(:)
+    !
+    ! Locals
+    !
+    integer :: ie
+
+    call allocate_element_arrays(nelemd)
+
+    do ie=1,nelemd
+      call setup_element_pointers_ie(ie, elem(ie)%state, elem(ie)%derived, elem(ie)%accum)
+    enddo
+
+  end subroutine setup_element_pointers
+
+!!!!!!!!!!!!!!!!!!!!!!! PRIVATE SUBROUTINES BELOW THIS LINE !!!!!!!!!!!!!!!!!!!!!!!
 
   subroutine generate_global_to_local (MetaVertex, Global2Local, par)
     use dimensions_mod, only : nelem
@@ -204,26 +243,5 @@ module prim_cxx_driver_base
     call MPI_Allreduce(MPI_IN_PLACE,Global2Local,nelem,MPIinteger_t,MPI_MAX,par%comm,ierr)
 
   end subroutine generate_global_to_local
-
-  subroutine setup_element_pointers (elem)
-    use element_mod,    only : element_t
-    use element_state,  only : allocate_element_arrays, setup_element_pointers_ie
-    use dimensions_mod, only : nelemd
-    !
-    ! Inputs
-    !
-    type (element_t), intent(inout) :: elem(:)
-    !
-    ! Locals
-    !
-    integer :: ie
-
-    call allocate_element_arrays(nelemd)
-
-    do ie=1,nelemd
-      call setup_element_pointers_ie(ie, elem(ie)%state, elem(ie)%derived, elem(ie)%accum)
-    enddo
-
-  end subroutine setup_element_pointers
 
 end module

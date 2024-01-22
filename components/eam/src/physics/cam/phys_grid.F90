@@ -103,7 +103,7 @@ module phys_grid
    use cam_abortutils,   only: endrun
    use perf_mod
    use cam_logfile,      only: iulog
-   use scamMod,          only: single_column, scmlat, scmlon
+   use iop_data_mod,     only: single_column, scmlat, scmlon, scm_multcols
    use shr_const_mod,    only: SHR_CONST_PI
    use dycore,           only: dycore_is
    use units,            only: getunit, freeunit
@@ -470,9 +470,9 @@ contains
     !
     ! Initialize physics grid, using dynamics grid
     ! a) column coordinates
-    if (single_column .and. dycore_is ('SE')) lbal_opt = -1 !+PAB make this default option for SCM
+    if (single_column .and. .not. scm_multcols) lbal_opt = -1
     call get_horiz_grid_dim_d(hdim1_d,hdim2_d)
-    if (single_column .and. dycore_is('SE')) then
+    if (single_column .and. .not. scm_multcols) then
       ngcols = 1
     else
       ngcols = hdim1_d*hdim2_d
@@ -484,7 +484,7 @@ contains
     allocate( cdex(1:ngcols) )
     clat_d = 100000.0_r8
     clon_d = 100000.0_r8
-    if (single_column .and. dycore_is('SE')) then
+    if (single_column) then
       lat_d = scmlat
       lon_d = scmlon
       clat_d = scmlat * deg2rad
@@ -707,7 +707,7 @@ contains
        !
        ! Calculate maximum block size for each process
        !
-       if (single_column .and. dycore_is('SE')) then
+       if (single_column .and. .not. scm_multcols) then
           maxblksiz_proc(:) = 1
        else
           maxblksiz_proc(:) = 0
@@ -755,7 +755,7 @@ contains
        !
        ! Determine total number of chunks
        !
-       if (single_column .and. dycore_is('SE')) then
+       if (single_column .and. .not. scm_multcols) then
          nchunks = 1
        else
 	 nchunks = (lastblock-firstblock+1)
@@ -780,7 +780,7 @@ contains
 
        do cid=1,nchunks
           ! get number of global column indices in block
-          if (single_column .and. dycore_is('SE')) then
+          if (single_column .and. .not. scm_multcols) then
 	    max_ncols = 1
 	  else
 	    max_ncols = get_block_gcol_cnt_d(cid+firstblock-1)
@@ -1033,20 +1033,20 @@ contains
     area_d = 0.0_r8
     wght_d = 0.0_r8
 
-    if (single_column .and. dycore_is('SE')) then
+    if (single_column .and. .not. scm_multcols) then
       area_d = 4.0_r8*pi
       wght_d = 4.0_r8*pi
     else
       call get_horiz_grid_d(ngcols, area_d_out=area_d, wght_d_out=wght_d)
     endif
 
-    if ( abs(sum(area_d) - 4.0_r8*pi) > 1.e-10_r8 ) then
+    if ( abs(sum(area_d) - 4.0_r8*pi) > 1.e-10_r8 .and. .not. single_column) then
        write(iulog,*) ' ERROR: sum of areas on globe does not equal 4*pi'
        write(iulog,*) ' sum of areas = ', sum(area_d), sum(area_d)-4.0_r8*pi
        call endrun('phys_grid')
     end if
 
-    if ( abs(sum(wght_d) - 4.0_r8*pi) > 1.e-10_r8 ) then
+    if ( abs(sum(wght_d) - 4.0_r8*pi) > 1.e-10_r8 .and. .not. single_column) then
        write(iulog,*) ' ERROR: sum of integration weights on globe does not equal 4*pi'
        write(iulog,*) ' sum of weights = ', sum(wght_d), sum(wght_d)-4.0_r8*pi
        call endrun('phys_grid')
@@ -1094,7 +1094,13 @@ contains
              if (iam == owner_d) then
                 if (.not. associated(btofc_blk_offset(blockids(jb))%pter)) then
                    blksiz = get_block_gcol_cnt_d(blockids(jb))
+#ifdef CPRCRAY
+!DIR$ NOINLINE
                    numlvl = get_block_lvl_cnt_d(blockids(jb),bcids(jb))
+!DIR$ INLINE
+#else
+                   numlvl = get_block_lvl_cnt_d(blockids(jb),bcids(jb))
+#endif
                    btofc_blk_offset(blockids(jb))%ncols = blksiz
                    btofc_blk_offset(blockids(jb))%nlvls = numlvl
                    allocate( btofc_blk_offset(blockids(jb))%pter(blksiz,numlvl) )
@@ -6156,6 +6162,9 @@ logical function phys_grid_initialized ()
    integer :: max_nvsmptasks             ! maximum number of processes associated
                                          !  with any virtual SMP
    integer :: proc_heap_len              ! current process heap length
+   integer :: updated                    ! index in heap for process whose cost has
+                                         !  been updated or which needs to be
+                                         !  removed from the heap
    integer, dimension(:), allocatable  :: proc_heap
                                          ! process heap to process id map
    integer, dimension(:), allocatable  :: inv_proc_heap
@@ -6383,7 +6392,11 @@ logical function phys_grid_initialized ()
             proc_heap_remove = .true.
          endif
          if ((proc_heap_update) .or. (proc_heap_remove)) then
-            call proc_heap_adjust(inv_proc_heap(ntmp2), proc_heap_remove,   &
+            ! Pass scalar 'updated' to 'proc_heap_adjust' instead of
+            ! 'inv_proc_heap(ntmp2)' to prevent this argument from changing
+            ! value when 'inv_proc_heap' is modified inside of 'proc_heap_adjust'
+            updated = inv_proc_heap(ntmp2)
+            call proc_heap_adjust(updated, proc_heap_remove,   &
                                   max_nvsmptasks, proc_heap_len, proc_heap, &
                                   proc_cost, inv_proc_heap)
          endif
@@ -6486,9 +6499,9 @@ logical function phys_grid_initialized ()
    integer :: proc_last    ! process id of last element
    integer :: proc_updated ! process id of updated element
    integer :: proc_i       ! process id of current element
-   real(r8):: proc_ip      ! process id of parent of current element
-   real(r8):: proc_il      ! process id of left child of current element
-   real(r8):: proc_ir      ! process id of right child of current
+   integer :: proc_ip      ! process id of parent of current element
+   integer :: proc_il      ! process id of left child of current element
+   integer :: proc_ir      ! process id of right child of current
                            !  element
 
    integer :: last_nonleaf ! index of last non-leaf in heap

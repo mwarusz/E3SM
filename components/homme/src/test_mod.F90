@@ -4,7 +4,7 @@
 
 module test_mod
 
-use control_mod,    only: test_case, sub_case, dt_remap_factor, runtype
+use control_mod,    only: test_case, sub_case, dt_remap_factor, runtype, bubble_moist, test_with_forcing
 use dimensions_mod, only: np, nlev, nlevp, qsize
 use derivative_mod, only: derivative_t, gradient_sphere
 use element_mod,    only: element_t
@@ -24,8 +24,14 @@ use dcmip12_wrapper,      only: dcmip2012_test1_1, dcmip2012_test1_2, dcmip2012_
                                 dcmip2012_test4_init, mtest_init, dcmip2012_test1_1_conv
 use dcmip16_wrapper,      only: dcmip2016_test1, dcmip2016_test2, dcmip2016_test3, &
                                 dcmip2016_test1_forcing, dcmip2016_test2_forcing, dcmip2016_test3_forcing, &
-                                dcmip2016_test1_pg, dcmip2016_test1_pg_forcing, dcmip2016_init
+                                dcmip2016_pg_init, dcmip2016_test1_pg, dcmip2016_test1_pg_forcing, dcmip2016_init
 use held_suarez_mod,      only: hs0_init_state
+
+use dry_planar_tests,     only: planar_hydro_gravity_wave_init, planar_nonhydro_gravity_wave_init
+use dry_planar_tests,     only: planar_hydro_mountain_wave_init, planar_nonhydro_mountain_wave_init, planar_schar_mountain_wave_init
+use dry_planar_tests,     only: planar_rising_bubble_init, planar_density_current_init, planar_baroclinic_instab_init
+use moist_planar_tests,   only: planar_moist_rising_bubble_init, planar_moist_density_current_init, planar_moist_baroclinic_instab_init
+use moist_planar_tests,   only: planar_tropical_cyclone_init, planar_supercell_init
 
 implicit none
 
@@ -48,7 +54,11 @@ subroutine set_test_initial_conditions(elem, deriv, hybrid, hvcoord, tl, nets, n
   type(hvcoord_t),    intent(inout)         :: hvcoord                  ! hybrid vertical coordinates
   type(timelevel_t),  intent(in)            :: tl                       ! time level sctructure
   integer,            intent(in)            :: nets,nete                ! start, end element index
+
+  integer :: ie
  
+!which ones are with forcing????
+
   ! init calls for any runtype
   select case(test_case)
     case('asp_baroclinic');
@@ -62,20 +72,37 @@ subroutine set_test_initial_conditions(elem, deriv, hybrid, hvcoord, tl, nets, n
     case('dcmip2012_test1_2');
     case('dcmip2012_test1_3');
     case('dcmip2012_test2_0');
-    case('dcmip2012_test2_1');
-    case('dcmip2012_test2_2');
+    case('dcmip2012_test2_1'); test_with_forcing = .true. ;
+    case('dcmip2012_test2_2'); test_with_forcing = .true. ;
     case('dcmip2012_test3');
     case('dcmip2012_test4');
-    case('dcmip2016_test1');    call dcmip2016_init();
-    case('dcmip2016_test1_pg1', 'dcmip2016_test1_pg2', 'dcmip2016_test1_pg3', 'dcmip2016_test1_pg4')
-       call dcmip2016_init();
-    case('dcmip2016_test2');    call dcmip2016_init();
-    case('dcmip2016_test3');    call dcmip2016_init();
-    case('mtest1');
-    case('mtest2');
-    case('mtest3');
-    case('held_suarez0');
+    case('dcmip2016_test1', &
+         'dcmip2016_test1_pg1', 'dcmip2016_test1_pg2', 'dcmip2016_test1_pg3', 'dcmip2016_test1_pg4')
+       call dcmip2016_init();  test_with_forcing = .true. ;
+    case('dcmip2016_test2');    call dcmip2016_init();  test_with_forcing = .true. ;
+    case('dcmip2016_test3');    call dcmip2016_init();  test_with_forcing = .true. ;
+    case('mtest1'); test_with_forcing = .true. ;
+    case('mtest2'); test_with_forcing = .true. ;
+    case('mtest3'); test_with_forcing = .true. ;
+    case('held_suarez0'); test_with_forcing = .true. ;
     case('jw_baroclinic');
+    case('planar_hydro_gravity_wave');
+    case('planar_nonhydro_gravity_wave');
+    case('planar_hydro_mtn_wave');
+    case('planar_nonhydro_mtn_wave');
+    case('planar_schar_mtn_wave');
+    case('planar_rising_bubble', 'planar_rising_bubble_pg2')
+           if (bubble_moist) then 
+              call dcmip2016_init();
+              test_with_forcing = .true. ;
+           endif
+    case('planar_density_current');
+    case('planar_baroclinic_instab');
+    case('planar_moist_rising_bubble');
+    case('planar_moist_density_current');
+    case('planar_moist_baroclinic_instab'); 
+    case('planar_tropical_cyclone'); 
+    case('planar_supercell'); 
     case default;               call abortmp('unrecognized test case')
   endselect
 
@@ -113,10 +140,32 @@ subroutine set_test_initial_conditions(elem, deriv, hybrid, hvcoord, tl, nets, n
       case('mtest3');             call mtest_init       (elem,hybrid,hvcoord,nets,nete,3)
       case('held_suarez0');       call hs0_init_state   (elem,hybrid,hvcoord,nets,nete,300.0_rl)
       case('jw_baroclinic');      call jw_baroclinic    (elem,hybrid,hvcoord,nets,nete)
+      case('planar_hydro_gravity_wave');            call planar_hydro_gravity_wave_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_nonhydro_gravity_wave');         call planar_nonhydro_gravity_wave_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_hydro_mtn_wave');                call planar_hydro_mountain_wave_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_nonhydro_mtn_wave');             call planar_nonhydro_mountain_wave_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_schar_mtn_wave');                call planar_schar_mountain_wave_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_rising_bubble');                 call planar_rising_bubble_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_rising_bubble_pg2')
+         call dcmip2016_pg_init(elem,hybrid,hvcoord,nets,nete,2)
+         call planar_rising_bubble_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_density_current');               call planar_density_current_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_baroclinic_instab');             call planar_baroclinic_instab_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_moist_rising_bubble');           call planar_moist_rising_bubble_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_moist_density_current');         call planar_moist_density_current_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_moist_baroclinic_instab');       call planar_moist_baroclinic_instab_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_tropical_cyclone');              call planar_tropical_cyclone_init(elem,hybrid,hvcoord,nets,nete)
+      case('planar_supercell');                     call planar_supercell_init(elem,hybrid,hvcoord,nets,nete)
       case default;               call abortmp('unrecognized test case')
 
     endselect
 !  endif
+
+    if (midpoint_eta_dot_dpdn) then
+       do ie = nets,nete
+          elem(ie)%derived%eta_dot_dpdn = 0
+       end do
+    end if
 end subroutine
 
 !_______________________________________________________________________
@@ -203,6 +252,11 @@ subroutine compute_test_forcing(elem,hybrid,hvcoord,nt,ntQ,dt,nets,nete,tl)
     case('dcmip2016_test2');    call dcmip2016_test2_forcing(elem,hybrid,hvcoord,nets,nete,nt,ntQ,dt,tl,2)
     case('dcmip2016_test3');    call dcmip2016_test3_forcing(elem,hybrid,hvcoord,nets,nete,nt,ntQ,dt,tl)
 
+    case('planar_rising_bubble');  
+            if (bubble_moist) call dcmip2016_test1_forcing(elem,hybrid,hvcoord,nets,nete,nt,ntQ,dt,tl)
+    case('planar_rising_bubble_pg2');  
+            if (bubble_moist) call dcmip2016_test1_pg_forcing(elem,hybrid,hvcoord,nets,nete,nt,ntQ,dt,tl)
+
     case('held_suarez0');
        do ie=nets,nete
           call hs_forcing(elem(ie),hvcoord,nt,ntQ,dt)
@@ -210,21 +264,7 @@ subroutine compute_test_forcing(elem,hybrid,hvcoord,nt,ntQ,dt,nets,nete,tl)
 
   endselect
 
-!for ftype3 we scale tendencies by dp
-  if(ftype == 3) then
-    !initialize dp3d from ps
-    do ie=nets,nete
-      do k=1,nlev
-        dp(:,:)= ( hvcoord%hyai(k+1) - hvcoord%hyai(k) )*hvcoord%ps0 + &
-                 ( hvcoord%hybi(k+1) - hvcoord%hybi(k) )*elem(ie)%state%ps_v(:,:,nt)
-        elem(ie)%derived%FT(:,:,k) = elem(ie)%derived%FT(:,:,k) * dp(:,:)
-        elem(ie)%derived%FM(:,:,1,k) = elem(ie)%derived%FM(:,:,1,k) * dp(:,:)
-        elem(ie)%derived%FM(:,:,2,k) = elem(ie)%derived%FM(:,:,2,k) * dp(:,:)
-      enddo
-    enddo
-  endif
-    
-end subroutine
+end subroutine compute_test_forcing
 
 
   !_____________________________________________________________________

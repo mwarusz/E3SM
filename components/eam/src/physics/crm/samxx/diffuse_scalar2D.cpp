@@ -3,16 +3,16 @@
 
 void diffuse_scalar2D(real4d &field, real3d &fluxb, real3d &fluxt, real5d &tkh,
                       int ind_tkh, real2d &flux) {
-  auto &dx     = ::dx;
-  auto &rhow   = ::rhow;
-  auto &adzw   = ::adzw;
-  auto &adz    = ::adz; 
-  auto &dz     = ::dz; 
-  auto &dtn    = ::dtn;
-  auto &rho    = ::rho;
-  auto &grdf_x = ::grdf_x;
-  auto &grdf_z = ::grdf_z;
-  auto &ncrms  = ::ncrms;
+  YAKL_SCOPE( dx     , ::dx );
+  YAKL_SCOPE( rhow   , ::rhow );
+  YAKL_SCOPE( adzw   , ::adzw );
+  YAKL_SCOPE( adz    , ::adz ); 
+  YAKL_SCOPE( dz     , ::dz ); 
+  YAKL_SCOPE( dtn    , ::dtn );
+  YAKL_SCOPE( rho    , ::rho );
+  YAKL_SCOPE( grdf_x , ::grdf_x );
+  YAKL_SCOPE( grdf_z , ::grdf_z );
+  YAKL_SCOPE( ncrms  , ::ncrms );
 
   if (dosgs || docolumn) {
     real rdx2=1.0/(dx*dx);
@@ -72,7 +72,7 @@ void diffuse_scalar2D(real4d &field, real3d &fluxb, real3d &fluxt, real5d &tkh,
         real tmp=1.0/adzw(nz-1,icrm);
         real rdz=1.0/dz(icrm);
         flx(0,j,i+offx_flx,icrm)=fluxb(j,i,icrm)*rdz*rhow(0,icrm);
-        flx(nzm-1,j,i+offx_flx,icrm)=fluxt(j,i,icrm)*rdz*tmp*rhow(nz-1,icrm);
+        flx(nzm-1+offz_flx,j,i+offx_flx,icrm)=fluxt(j,i,icrm)*rdz*tmp*rhow(nz-1,icrm);
         yakl::atomicAdd(flux(0,icrm),flx(0,j,i+offx_flx,icrm));
       }
     });
@@ -92,16 +92,16 @@ void diffuse_scalar2D(real4d &field, real3d &fluxb, real3d &fluxt, real5d &tkh,
 
 void diffuse_scalar2D(real5d &field, int ind_field, real3d &fluxb, real3d &fluxt,
                       real5d &tkh, int ind_tkh, real2d &flux) {
-  auto &dx     = ::dx;
-  auto &rhow   = ::rhow;
-  auto &adzw   = ::adzw;
-  auto &adz    = ::adz; 
-  auto &dz     = ::dz; 
-  auto &dtn    = ::dtn;
-  auto &rho    = ::rho;
-  auto &grdf_x = ::grdf_x;
-  auto &grdf_z = ::grdf_z;
-  auto &ncrms  = ::ncrms;
+  YAKL_SCOPE( dx     , ::dx );
+  YAKL_SCOPE( rhow   , ::rhow );
+  YAKL_SCOPE( adzw   , ::adzw );
+  YAKL_SCOPE( adz    , ::adz ); 
+  YAKL_SCOPE( dz     , ::dz ); 
+  YAKL_SCOPE( dtn    , ::dtn );
+  YAKL_SCOPE( rho    , ::rho );
+  YAKL_SCOPE( grdf_x , ::grdf_x );
+  YAKL_SCOPE( grdf_z , ::grdf_z );
+  YAKL_SCOPE( ncrms  , ::ncrms );
 
   if (dosgs || docolumn) {
     real rdx2=1.0/(dx*dx);
@@ -162,7 +162,7 @@ void diffuse_scalar2D(real5d &field, int ind_field, real3d &fluxb, real3d &fluxt
         real tmp=1.0/adzw(nz-1,icrm);
         real rdz=1.0/dz(icrm);
         flx(0,j,i+offx_flx,icrm)=fluxb(j,i,icrm)*rdz*rhow(0,icrm);
-        flx(nzm-1,j,i+offx_flx,icrm)=fluxt(j,i,icrm)*rdz*tmp*rhow(nz-1,icrm);
+        flx(nzm-1+offz_flx,j,i+offx_flx,icrm)=fluxt(j,i,icrm)*rdz*tmp*rhow(nz-1,icrm);
         yakl::atomicAdd(flux(0,icrm),flx(0,j,i+offx_flx,icrm));
       }
     });
@@ -181,16 +181,16 @@ void diffuse_scalar2D(real5d &field, int ind_field, real3d &fluxb, real3d &fluxt
 
 void diffuse_scalar2D(real5d &field, int ind_field, real4d &fluxb, int ind_fluxb, real4d &fluxt,
                       int ind_fluxt, real5d &tkh, int ind_tkh, real3d &flux, int ind_flux) {
-  auto &dx            = :: dx;
-  auto &rhow          = :: rhow;
-  auto &adzw          = :: adzw;
-  auto &adz           = :: adz; 
-  auto &dz            = :: dz; 
-  auto &dtn           = :: dtn;
-  auto &rho           = :: rho;
-  auto &grdf_x        = :: grdf_x;
-  auto &grdf_z        = :: grdf_z;
-  auto &ncrms         = :: ncrms;
+  YAKL_SCOPE( dx            , :: dx );
+  YAKL_SCOPE( rhow          , :: rhow );
+  YAKL_SCOPE( adzw          , :: adzw );
+  YAKL_SCOPE( adz           , :: adz ); 
+  YAKL_SCOPE( dz            , :: dz ); 
+  YAKL_SCOPE( dtn           , :: dtn );
+  YAKL_SCOPE( rho           , :: rho );
+  YAKL_SCOPE( grdf_x        , :: grdf_x );
+  YAKL_SCOPE( grdf_z        , :: grdf_z );
+  YAKL_SCOPE( ncrms         , :: ncrms );
 
   if (dosgs || docolumn) {
     real rdx2=1.0/(dx*dx);
@@ -252,7 +252,7 @@ void diffuse_scalar2D(real5d &field, int ind_field, real4d &fluxb, int ind_fluxb
         real tmp=1.0/adzw(nz-1,icrm);
         real rdz=1.0/dz(icrm);
         flx(0,j,i+offx_flx,icrm)=fluxb(ind_fluxb,j,i,icrm)*rdz*rhow(0,icrm);
-        flx(nzm-1,j,i+offx_flx,icrm)=fluxt(ind_fluxt,j,i,icrm)*rdz*tmp*rhow(nz-1,icrm);
+        flx(nzm-1+offz_flx,j,i+offx_flx,icrm)=fluxt(ind_fluxt,j,i,icrm)*rdz*tmp*rhow(nz-1,icrm);
         yakl::atomicAdd(flux(ind_flux,0,icrm),flx(0,j,i+offx_flx,icrm));
       }
     });

@@ -12,15 +12,16 @@ module initGridCellsMod
   use shr_log_mod    , only : errMsg => shr_log_errMsg
   use spmdMod        , only : masterproc,iam
   use abortutils     , only : endrun
-  use clm_varctl     , only : iulog
-  use clm_varcon     , only : namep, namec, namel, nameg
+  use elm_varctl     , only : iulog
+  use elm_varctl     , only : use_fates, use_fates_sp
+  use elm_varcon     , only : namep, namec, namel, nameg
   use decompMod      , only : bounds_type, ldecomp
   use GridcellType   , only : grc_pp
   use TopounitType   , only : top_pp  
   use LandunitType   , only : lun_pp                
   use ColumnType     , only : col_pp                
   use VegetationType , only : veg_pp                
-  use initSubgridMod , only : clm_ptrs_compdown, clm_ptrs_check
+  use initSubgridMod , only : elm_ptrs_compdown, elm_ptrs_check
   use initSubgridMod , only : add_topounit, add_landunit, add_column, add_patch
   !
   ! !PUBLIC TYPES:
@@ -37,6 +38,7 @@ module initGridCellsMod
   private set_landunit_wet_ice_lake
   private set_landunit_crop_noncompete
   private set_landunit_urban
+  private set_topounit
   !-----------------------------------------------------------------------
 
 contains
@@ -46,22 +48,22 @@ contains
     !
     ! !DESCRIPTION: 
     ! Initialize sub-grid mapping and allocates space for derived type hierarchy.
-    ! For each land gridcell determine landunit, column and pft properties.
+    ! For each land gridcell determine topounit, landunit, column and pft properties.
     !
     ! !USES
     use domainMod         , only : ldomain
     use decompMod         , only : get_proc_bounds, get_clump_bounds, get_proc_clumps
     use subgridWeightsMod , only : compute_higher_order_weights
-    use topounit_varcon   , only : max_topounits
+    use topounit_varcon   , only : max_topounits, has_topounit 
+    !!use elm_varsur       , only : wt_tunit, elv_tunit, slp_tunit,asp_tunit,num_tunit_per_grd
     use landunit_varcon   , only : istsoil, istice, istwet, istdlak, istice_mec
     use landunit_varcon   , only : isturb_tbd, isturb_hd, isturb_md, istcrop
-    use clm_varctl        , only : create_glacier_mec_landunit
+    use elm_varctl        , only : create_glacier_mec_landunit
     use shr_const_mod     , only : SHR_CONST_PI
     !
     ! !LOCAL VARIABLES:
-    integer :: nc,ti,li,ci,pi,gdc,topounit  ! indices
-    integer :: nclumps                      ! number of clumps on this processor
-    real(r8) :: wttopounit2gridcell         ! topounit weight on gridcell
+    integer :: nc,ti,li,ci,pi,gdc,topounit, topo_ind      ! indices
+    integer :: nclumps                           ! number of clumps on this processor
     type(bounds_type) :: bounds_proc
     type(bounds_type) :: bounds_clump
     !------------------------------------------------------------------------
@@ -123,78 +125,82 @@ contains
        ci = bounds_clump%begc-1
        pi = bounds_clump%begp-1
        
-       ! For each gridcell in clump, create the correct number of topounits
-       ! As a preliminary implementation, every gridcell has the same number of topounits,
-       ! and each topounit on the gridcell has an equal weight.
+       ! For each gridcell in clump, create the correct number of topounits       
        do gdc = bounds_clump%begg, bounds_clump%endg
-          do topounit = 1, max_topounits
-             wttopounit2gridcell = 1._r8/(max_topounits)
-             call add_topounit(ti=ti, gi=gdc, wtgcell=wttopounit2gridcell)
-          end do
+          call set_topounit(gdc, ti, ldomain%num_tunits_per_grd(gdc) )
        end do
 
        ! With all topounits defined, next place landunits
 
        ! Determine naturally vegetated landunit
        do topounit = bounds_clump%begt,bounds_clump%endt
+          topo_ind = top_pp%topo_grc_ind(topounit)
           call set_landunit_veg_compete(               &
-               ltype=istsoil, gi=top_pp%gridcell(topounit), ti=topounit, li=li, ci=ci, pi=pi, &
+               ltype=istsoil, gi=top_pp%gridcell(topounit), ti=topounit,topo_ind=topo_ind, li=li, ci=ci, pi=pi, &
                setdata=.true.)
        end do
 
        ! Determine crop landunit
        do topounit = bounds_clump%begt,bounds_clump%endt
+          topo_ind = top_pp%topo_grc_ind(topounit)
           call set_landunit_crop_noncompete(           &
-               ltype=istcrop, gi=top_pp%gridcell(topounit), ti=topounit, li=li, ci=ci, pi=pi, &
+               ltype=istcrop, gi=top_pp%gridcell(topounit), ti=topounit,topo_ind=topo_ind, li=li, ci=ci, pi=pi, &
                setdata=.true.)
        end do
 
        ! Determine urban tall building district landunit
        do topounit = bounds_clump%begt,bounds_clump%endt
+          topo_ind = top_pp%topo_grc_ind(topounit)
           call set_landunit_urban( &
-               ltype=isturb_tbd, gi=top_pp%gridcell(topounit), ti=topounit, li=li, ci=ci, pi=pi, &
+               ltype=isturb_tbd, gi=top_pp%gridcell(topounit), ti=topounit,topo_ind=topo_ind, li=li, ci=ci, pi=pi, &
                setdata=.true.)
 
        end do
 
        ! Determine urban high density landunit
        do topounit = bounds_clump%begt,bounds_clump%endt
+          topo_ind = top_pp%topo_grc_ind(topounit)
           call set_landunit_urban( &
-               ltype=isturb_hd, gi=top_pp%gridcell(topounit), ti=topounit, li=li, ci=ci, pi=pi, &
+               ltype=isturb_hd, gi=top_pp%gridcell(topounit), ti=topounit,topo_ind=topo_ind, li=li, ci=ci, pi=pi, &
                setdata=.true.)
        end do
 
        ! Determine urban medium density landunit
        do topounit = bounds_clump%begt,bounds_clump%endt
+          topo_ind = top_pp%topo_grc_ind(topounit)
           call set_landunit_urban( &
-               ltype=isturb_md, gi=top_pp%gridcell(topounit), ti=topounit, li=li, ci=ci, pi=pi, &
+               ltype=isturb_md, gi=top_pp%gridcell(topounit), ti=topounit,topo_ind=topo_ind, li=li, ci=ci, pi=pi, &
                setdata=.true.)
        end do
 
        ! Determine lake, wetland and glacier landunits 
        do topounit = bounds_clump%begt,bounds_clump%endt
+          topo_ind = top_pp%topo_grc_ind(topounit)
           call set_landunit_wet_ice_lake(              &
-               ltype=istdlak, gi=top_pp%gridcell(topounit), ti=topounit, li=li, ci=ci, pi=pi, &
+               ltype=istdlak, gi=top_pp%gridcell(topounit), ti=topounit,topo_ind=topo_ind, li=li, ci=ci, pi=pi, &
                setdata=.true.)
        end do
 
        do topounit = bounds_clump%begt,bounds_clump%endt
+          topo_ind = top_pp%topo_grc_ind(topounit)
           call set_landunit_wet_ice_lake(              &
-               ltype=istwet, gi=top_pp%gridcell(topounit), ti=topounit, li=li, ci=ci, pi=pi, &
+               ltype=istwet, gi=top_pp%gridcell(topounit), ti=topounit,topo_ind=topo_ind, li=li, ci=ci, pi=pi, &
                setdata=.true.)
        end do
 
        do topounit = bounds_clump%begt,bounds_clump%endt
+          topo_ind = top_pp%topo_grc_ind(topounit)
           call set_landunit_wet_ice_lake(              &
-               ltype=istice, gi=top_pp%gridcell(topounit), ti=topounit, li=li, ci=ci, pi=pi, &
+               ltype=istice, gi=top_pp%gridcell(topounit), ti=topounit,topo_ind=topo_ind, li=li, ci=ci, pi=pi, &
                setdata=.true.)
        end do
 
        if (create_glacier_mec_landunit) then
           do topounit = bounds_clump%begt,bounds_clump%endt
+             topo_ind = top_pp%topo_grc_ind(topounit)
              gdc = top_pp%gridcell(topounit)
              call set_landunit_wet_ice_lake(              &
-                  ltype=istice_mec, gi=gdc, ti=topounit, li=li, ci=ci, pi=pi, &
+                  ltype=istice_mec, gi=gdc, ti=topounit,topo_ind=topo_ind, li=li, ci=ci, pi=pi, &
                   setdata=.true., &
                   glcmask = ldomain%glcmask(gdc))
           end do
@@ -215,51 +221,107 @@ contains
           grc_pp%londeg(gdc) = ldomain%lonc(gdc) 
           grc_pp%lat(gdc)    = grc_pp%latdeg(gdc) * SHR_CONST_PI/180._r8  
           grc_pp%lon(gdc)    = grc_pp%londeg(gdc) * SHR_CONST_PI/180._r8
+
+          grc_pp%stdev_elev(gdc)     = ldomain%stdev_elev(gdc)
+          grc_pp%sky_view(gdc)       = ldomain%sky_view(gdc)
+          grc_pp%terrain_config(gdc) = ldomain%terrain_config(gdc)
+          grc_pp%sinsl_cosas(gdc)    = ldomain%sinsl_cosas(gdc)
+          grc_pp%sinsl_sinas(gdc)    = ldomain%sinsl_sinas(gdc)
+          
        enddo
 
        ! Fill in subgrid datatypes
 
-       call clm_ptrs_compdown(bounds_clump)
+       call elm_ptrs_compdown(bounds_clump)
 
        ! By putting this check within the loop over clumps, we ensure that (for example)
        ! if a clump is responsible for landunit L, then that same clump is also
        ! responsible for all columns and pfts in L.
-       call clm_ptrs_check(bounds_clump)
+       call elm_ptrs_check(bounds_clump)
 
        ! Set veg_pp%wtlunit, veg_pp%wtgcell and col_pp%wtgcell
        call compute_higher_order_weights(bounds_clump)
 
     end do
-    !$OMP END PARALLEL DO
-
+   !$OMP END PARALLEL DO 
   end subroutine initGridcells
 
-
+  !----------------------------------------------------------------------
+  subroutine set_topounit(gdc, ti, num_tunits_per_grd ) 
+    !
+    ! !DESCRIPTION:
+    ! Initialize each topounit for a gridcell.
+    !
+    ! !USES
+    use elm_varsur , only : wt_tunit, elv_tunit, slp_tunit, asp_tunit, num_tunit_per_grd 
+    use topounit_varcon   , only : max_topounits, has_topounit 
+    ! !ARGUMENTS
+    integer, intent(in) :: gdc
+    integer, intent(inout) :: ti
+    integer, intent(in) :: num_tunits_per_grd
+    ! !LOCAL VARIABLES
+    integer :: topounit, ntopos,topo_ind, num_topo_tmp,tmp_tpu
+    real(r8) :: wttopounit2gridcell, elv, slp                  ! topounit weight on gridcell, elevation and slope
+    integer :: asp                                             ! aspect
+    logical :: is_tpu_active                                   ! Check if topounit is active
+     
+    tmp_tpu = num_tunits_per_grd       ! Actual number of topounits per grid
+    if(max_topounits > 1) then
+       ntopos = tmp_tpu                                
+    else 
+       ntopos = max_topounits
+    endif
+    
+    do topounit = 1, ntopos                    ! use actual/valid # of topounits per grid intead of max_topounits
+       if (max_topounits == 1) then
+           wttopounit2gridcell = 1.0           ! The weight of topounit is 1 if only 1 topounit per grid
+           is_tpu_active = .true.              ! Make topounit active if only one topounit is in a grid
+       else
+           wttopounit2gridcell = wt_tunit(gdc,topounit) !grc_pp%tfrc_area(gdc,topounit) 
+           !if (topounit <= num_topo_tmp) then
+           if (wttopounit2gridcell > 0.0) then
+               is_tpu_active = .true.
+           else
+               is_tpu_active = .false.
+           endif                    
+       endif
+       elv = elv_tunit(gdc,topounit) !grc_pp%televation(gdc,topounit) 
+       slp = slp_tunit(gdc,topounit) !grc_pp%tslope(gdc,topounit) 
+       asp = asp_tunit(gdc,topounit) !grc_pp%taspect(gdc,topounit) 
+       topo_ind = topounit
+       call add_topounit(ti=ti, gi=gdc, wtgcell=wttopounit2gridcell, elv=elv, slp=slp, asp=asp,topo_ind=topo_ind,is_tpu_active = is_tpu_active)
+    end do
+ 
+  end subroutine set_topounit  
+ 
+ 
   !------------------------------------------------------------------------
-  subroutine set_landunit_veg_compete (ltype, gi, ti, li, ci, pi, setdata)
+  subroutine set_landunit_veg_compete (ltype, gi, ti,topo_ind, li, ci, pi, setdata)
     !
     ! !DESCRIPTION: 
     ! Initialize vegetated landunit with competition
     !
     ! !USES
-    use clm_varsur, only : wt_lunit, wt_nat_patch
+    use elm_varsur, only : wt_lunit, wt_nat_patch
     use subgridMod, only : subgrid_get_topounitinfo
-    use clm_varpar, only : numpft, maxpatch_pft, numcft, natpft_lb, natpft_ub
+    use elm_varpar, only : numpft, maxpatch_pft, numcft, natpft_lb, natpft_ub, natpft_size
     !
-    ! !ARGUMENTS:
+    ! !ARGUMENTS:    
     integer , intent(in)    :: ltype             ! landunit type
     integer , intent(in)    :: gi                ! gridcell index
     integer , intent(in)    :: ti                ! topounit index
     integer , intent(inout) :: li                ! landunit index
     integer , intent(inout) :: ci                ! column index
     integer , intent(inout) :: pi                ! patch index
+    integer , intent(inout) :: topo_ind                ! topounit index within each grid
     logical , intent(in)    :: setdata           ! set info or just compute
     !
     ! !LOCAL VARIABLES:
-    integer  :: m                                ! index
+    integer  :: m,tgi                                ! index
     integer  :: npfts                            ! number of pfts in landunit
     integer  :: pitype                           ! patch itype
     real(r8) :: wtlunit2topounit                 ! landunit weight on topounit
+    real(r8) :: p_wt                             ! patch weight (0-1)
     !------------------------------------------------------------------------
 
     ! Set decomposition properties
@@ -268,49 +330,62 @@ contains
     ! level to assign PFTs on veg landunit for each topounit. Also, use the existing landunit weights on the 
     ! gridcell as the new landunit weights on each topounit.
     ! Later, this information will come from new surface datasat.
-    call subgrid_get_topounitinfo(ti, gi, nveg=npfts)
-    wtlunit2topounit = wt_lunit(gi, ltype)
+    call subgrid_get_topounitinfo(ti, gi,tgi=topo_ind, nveg=npfts)
+    wtlunit2topounit = wt_lunit(gi,topo_ind, ltype)
 
+    ! For FATES: the total number of patches may not match what is in the surface
+    ! file, and therefor the weighting can't be used. The weightings in
+    ! wt_nat_patch may be meaningful (like with fixed biogeography), but they
+    ! they need a mapping table to connect to the allocated patches (in fates)
+    ! so the wt_nat_patch array is not applicable to these area weights
+    ! A subsequent call, via the clmfates interface will update these weights
+    ! by using said mapping table
+    
     if (npfts > 0) then
        call add_landunit(li=li, ti=ti, ltype=ltype, wttopounit=wtlunit2topounit)
        
        ! Assume one column on the landunit
        call add_column(ci=ci, li=li, ctype=1, wtlunit=1.0_r8)
-
        do m = natpft_lb,natpft_ub
-          call add_patch(pi=pi, ci=ci, ptype=m, wtcol=wt_nat_patch(gi,m))
+          if(use_fates .and. .not.use_fates_sp)then
+             p_wt = 1.0_r8/real(natpft_size,r8)
+          else
+             p_wt = wt_nat_patch(gi,topo_ind,m)
+          end if
+          call add_patch(pi=pi, ci=ci, ptype=m, wtcol=p_wt)
        end do
     end if
 
   end subroutine set_landunit_veg_compete
   
   !------------------------------------------------------------------------
-  subroutine set_landunit_wet_ice_lake (ltype, gi, ti, li, ci, pi, setdata, glcmask)
+  subroutine set_landunit_wet_ice_lake (ltype, gi, ti,topo_ind, li, ci, pi, setdata, glcmask)
     !
     ! !DESCRIPTION: 
     ! Initialize wet_ice_lake landunits that are non-urban (lake, wetland, glacier, glacier_mec)
     !
     ! !USES
-    use clm_varpar      , only : maxpatch_glcmec
-    use clm_varsur      , only : wt_lunit, wt_glc_mec
+    use elm_varpar      , only : maxpatch_glcmec
+    use elm_varsur      , only : wt_lunit, wt_glc_mec
     use landunit_varcon , only : istwet, istdlak, istice, istice_mec
     use column_varcon   , only : icemec_class_to_col_itype
     use subgridMod      , only : subgrid_get_topounitinfo
     use pftvarcon       , only : noveg
 
     !
-    ! !ARGUMENTS:
+    ! !ARGUMENTS:    
     integer , intent(in)    :: ltype             ! landunit type
     integer , intent(in)    :: gi                ! gridcell index
     integer , intent(in)    :: ti                ! topounit index
     integer , intent(inout) :: li                ! landunit index
     integer , intent(inout) :: ci                ! column index
     integer , intent(inout) :: pi                ! patch index
+    integer , intent(inout) :: topo_ind                ! topounit index within each grid
     logical , intent(in)    :: setdata           ! set info or just compute
     integer , intent(in), optional :: glcmask    ! = 1 where glc requires sfc mass balance
     !
     ! !LOCAL VARIABLES:
-    integer  :: m                                ! index
+    integer  :: m,tgi                                ! index
     integer  :: c                                ! column loop index
     integer  :: ier                              ! error status 
     integer  :: npfts                            ! number of pfts in landunit
@@ -325,20 +400,20 @@ contains
     ! Later, this information will come from new surface datasat.
 
     if (ltype == istwet) then
-       call subgrid_get_topounitinfo(ti, gi, nwetland=npfts)
+       call subgrid_get_topounitinfo(ti, gi,tgi=topo_ind, nwetland=npfts)
     else if (ltype == istdlak) then
-       call subgrid_get_topounitinfo(ti, gi, nlake=npfts)
+       call subgrid_get_topounitinfo(ti, gi,tgi=topo_ind, nlake=npfts)
     else if (ltype == istice) then 
-       call subgrid_get_topounitinfo(ti, gi, nglacier=npfts)
+       call subgrid_get_topounitinfo(ti, gi,tgi=topo_ind, nglacier=npfts)
     else if (ltype == istice_mec) then
-       call subgrid_get_topounitinfo(ti, gi, nglacier_mec=npfts, glcmask = glcmask)
+       call subgrid_get_topounitinfo(ti, gi,tgi=topo_ind, nglacier_mec=npfts, glcmask = glcmask)
     else
        write(iulog,*)' set_landunit_wet_ice_lake: ltype of ',ltype,' not valid'
        write(iulog,*)' only istwet, istdlak, istice and istice_mec ltypes are valid'
        call endrun(msg=errMsg(__FILE__, __LINE__))
     end if
 
-    wtlunit2topounit = wt_lunit(gi, ltype)
+    wtlunit2topounit = wt_lunit(gi,topo_ind, ltype)
 
     if (npfts > 0) then
 
@@ -365,7 +440,7 @@ contains
  
           do m = 1, maxpatch_glcmec
 
-             wtcol2lunit = wt_glc_mec(gi,m)
+             wtcol2lunit = wt_glc_mec(gi,topo_ind, m)
 
              if (wtcol2lunit > 0._r8 .or. glcmask == 1) then
                 call add_column(ci=ci, li=li, ctype=icemec_class_to_col_itype(m), wtlunit=wtcol2lunit)
@@ -389,7 +464,7 @@ contains
 
   !------------------------------------------------------------------------
 
-  subroutine set_landunit_crop_noncompete (ltype, gi, ti, li, ci, pi, setdata)
+  subroutine set_landunit_crop_noncompete (ltype, gi, ti,topo_ind, li, ci, pi, setdata)
     !
     ! !DESCRIPTION: 
     ! Initialize crop landunit without competition
@@ -399,16 +474,17 @@ contains
     ! since itype is istsoil if we are running with create_crop_landunit but crop_prog = false.
     !
     ! !USES
-    use clm_varsur      , only : wt_lunit, wt_cft
+    use elm_varsur      , only : wt_lunit, wt_cft
     use landunit_varcon , only : istcrop, istsoil
     use subgridMod      , only : subgrid_get_topounitinfo
-    use clm_varctl      , only : create_crop_landunit
-    use clm_varpar      , only : maxpatch_pft, numcft, crop_prog, cft_lb, cft_ub
+    use elm_varctl      , only : create_crop_landunit
+    use elm_varpar      , only : maxpatch_pft, numcft, crop_prog, cft_lb, cft_ub
     !
     ! !ARGUMENTS:
     integer , intent(in)    :: ltype             ! landunit type
     integer , intent(in)    :: gi                ! gridcell index
     integer , intent(in)    :: ti                ! topounit index
+    integer , intent(inout) :: topo_ind                ! topounit index within each grid
     integer , intent(inout) :: li                ! landunit index
     integer , intent(inout) :: ci                ! column index
     integer , intent(inout) :: pi                ! patch index
@@ -416,7 +492,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     integer  :: my_ltype                         ! landunit type for crops
-    integer  :: m                                ! index
+    integer  :: m,tgi                                ! index
     integer  :: npfts                            ! number of pfts in landunit
     real(r8) :: wtlunit2topounit                 ! landunit weight in topounit
     !------------------------------------------------------------------------
@@ -427,8 +503,8 @@ contains
     ! level to assign PFTs on landunit for each topounit. Also, use the existing landunit weights on the 
     ! gridcell as the new landunit weights on each topounit.
     ! Later, this information will come from new surface datasat.
-    call subgrid_get_topounitinfo(ti, gi, ncrop=npfts)
-    wtlunit2topounit = wt_lunit(gi, ltype)
+    call subgrid_get_topounitinfo(ti, gi,tgi=topo_ind, ncrop=npfts)
+    wtlunit2topounit = wt_lunit(gi,topo_ind, ltype)
 
     if (npfts > 0) then
 
@@ -447,7 +523,7 @@ contains
 
        if (create_crop_landunit) then
           do m = cft_lb, cft_ub
-             call add_column(ci=ci, li=li, ctype=((istcrop*100) + m), wtlunit=wt_cft(gi,m))
+             call add_column(ci=ci, li=li, ctype=((istcrop*100) + m), wtlunit=wt_cft(gi,topo_ind,m))
              call add_patch(pi=pi, ci=ci, ptype=m, wtcol=1.0_r8)
           end do
        end if
@@ -458,7 +534,7 @@ contains
 
   !------------------------------------------------------------------------------
 
-  subroutine set_landunit_urban (ltype, gi, ti, li, ci, pi, setdata)
+  subroutine set_landunit_urban (ltype, gi, ti,topo_ind, li, ci, pi, setdata)
     !
     ! !DESCRIPTION: 
     ! Initialize urban landunits
@@ -467,8 +543,8 @@ contains
     use column_varcon   , only : icol_roof, icol_sunwall, icol_shadewall
     use column_varcon   , only : icol_road_perv, icol_road_imperv
     use landunit_varcon , only : isturb_tbd, isturb_hd, isturb_md, isturb_MIN
-    use clm_varpar      , only : maxpatch_urb
-    use clm_varsur      , only : wt_lunit
+    use elm_varpar      , only : maxpatch_urb
+    use elm_varsur      , only : wt_lunit
     use subgridMod      , only : subgrid_get_topounitinfo
     use UrbanParamsType , only : urbinp
     use decompMod       , only : ldecomp
@@ -478,6 +554,7 @@ contains
     integer , intent(in)    :: ltype             ! landunit type
     integer , intent(in)    :: gi                ! gridcell index
     integer , intent(in)    :: ti                ! topounit index
+    integer , intent(inout) :: topo_ind                ! topounit index within each grid
     integer , intent(inout) :: li                ! landunit index
     integer , intent(inout) :: ci                ! column index
     integer , intent(inout) :: pi                ! patch index
@@ -485,7 +562,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     integer  :: c                ! column loop index
-    integer  :: m                ! index
+    integer  :: m,tgi                ! index
     integer  :: n                ! urban density type index
     integer  :: ctype            ! column type
     integer  :: npfts            ! number of pfts in landunit
@@ -504,21 +581,21 @@ contains
 
     select case (ltype)
     case (isturb_tbd)
-       call subgrid_get_topounitinfo(ti, gi, nurban_tbd=npfts)
+       call subgrid_get_topounitinfo(ti, gi,tgi=topo_ind, nurban_tbd=npfts)
     case (isturb_hd)
-       call subgrid_get_topounitinfo(ti, gi, nurban_hd=npfts)
+       call subgrid_get_topounitinfo(ti, gi,tgi=topo_ind, nurban_hd=npfts)
     case (isturb_md)
-       call subgrid_get_topounitinfo(ti, gi, nurban_md=npfts)
+       call subgrid_get_topounitinfo(ti, gi,tgi=topo_ind, nurban_md=npfts)
     case default
        write(iulog,*)' set_landunit_urban: unknown ltype: ', ltype
        call endrun(msg=errMsg(__FILE__, __LINE__))
     end select
 
-    wtlunit2topounit = wt_lunit(gi, ltype)
+    wtlunit2topounit = wt_lunit(gi,topo_ind, ltype)
 
     n = ltype - isturb_MIN + 1
-    wtlunit_roof = urbinp%wtlunit_roof(gi,n)
-    wtroad_perv  = urbinp%wtroad_perv(gi,n)
+    wtlunit_roof = urbinp%wtlunit_roof(gi,topo_ind,n)
+    wtroad_perv  = urbinp%wtroad_perv(gi,topo_ind,n)
 
     if (npfts > 0) then
 
@@ -1125,7 +1202,7 @@ contains
     !
     ! !USES
     use decompMod         , only : get_proc_bounds
-    use clm_varcon, only : ispval
+    use elm_varcon, only : ispval
     !
     ! !LOCAL VARIABLES:
     type(bounds_type) :: bounds_proc
@@ -1141,7 +1218,7 @@ contains
        curg  = lun_pp%gridcell(l)
        if (curg < bounds_proc%begg_all .or. curg > bounds_proc%endg_all) then
           write(iulog,*) 'ERROR: landunit_indices ', l,curg,bounds_proc%begg_all,bounds_proc%endg_all
-          call endrun(decomp_index=l, clmlevel=namel, msg=errMsg(__FILE__, __LINE__))
+          call endrun(decomp_index=l, elmlevel=namel, msg=errMsg(__FILE__, __LINE__))
        end if
 
        if (grc_pp%landunit_indices(ltype, curg) == ispval) then
@@ -1149,7 +1226,7 @@ contains
        else
           write(iulog,*) 'CheckGhostSubgridHierarchy ERROR: This landunit type has already been set for this gridcell'
           write(iulog,*) 'l, ltype, curg = ', l, ltype, curg
-          call endrun(decomp_index=l, clmlevel=namel, msg=errMsg(__FILE__, __LINE__))
+          call endrun(decomp_index=l, elmlevel=namel, msg=errMsg(__FILE__, __LINE__))
        end if
     end do
 

@@ -19,7 +19,7 @@ private:
     template<typename ExecSpaceType>
     static
     KOKKOS_INLINE_FUNCTION
-    typename std::enable_if<!std::is_same<ExecSpaceType,Hommexx_Cuda>::value &&
+    typename std::enable_if<!std::is_same<ExecSpaceType,HommexxGPU>::value &&
                             !std::is_same<ExecSpaceType,Hommexx_OpenMP>::value,
                             int
                            >::type
@@ -28,24 +28,14 @@ private:
       return 0;
     }
 
-#ifdef KOKKOS_ENABLE_CUDA
-#ifdef __CUDA_ARCH__
+#ifdef HOMMEXX_ENABLE_GPU
     template <typename ExecSpaceType>
     static KOKKOS_INLINE_FUNCTION typename std::enable_if<
         OnGpu<ExecSpaceType>::value, int>::type
     get_team_idx(const int /*team_size*/, const int league_rank) {
       return league_rank;
     }
-#else
-    template <typename ExecSpaceType>
-    static KOKKOS_INLINE_FUNCTION typename std::enable_if<
-        OnGpu<ExecSpaceType>::value, int>::type
-    get_team_idx(const int /*team_size*/, const int /*league_rank*/) {
-      assert(false); // should never happen
-      return -1;
-    }
-#endif // __CUDA_ARCH__
-#endif // KOKKOS_ENABLE_CUDA
+#endif // HOMMEXX_ENABLE_GPU
 
 #ifdef KOKKOS_ENABLE_OPENMP
     template<typename ExecSpaceType>
@@ -78,7 +68,7 @@ public:
       : team(team_in)
       , ie(team_in.league_rank())
       , iq(-1)
-#if HOMMEXX_CUDA_SHARE_BUFFER
+#ifdef HOMMEXX_CUDA_SHARE_BUFFER
       , team_idx(utils.get_workspace_idx(team_in))
       , team_utils(&utils)
 #else
@@ -105,7 +95,7 @@ public:
       : team(team_in)
       , ie(team_in.league_rank() / qsize)
       , iq(team_in.league_rank() % qsize)
-#if HOMMEXX_CUDA_SHARE_BUFFER
+#ifdef HOMMEXX_CUDA_SHARE_BUFFER
       , team_idx(utils.get_workspace_idx(team_in))
       , team_utils(&utils)
 #else
@@ -116,7 +106,7 @@ public:
     // Nothing to be done here
   }
 
-#if HOMMEXX_CUDA_SHARE_BUFFER
+#ifdef HOMMEXX_CUDA_SHARE_BUFFER
   KOKKOS_INLINE_FUNCTION
   ~KernelVariables() {
     if (team_utils != nullptr) {

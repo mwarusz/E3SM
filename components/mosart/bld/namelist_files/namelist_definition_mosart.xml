@@ -110,6 +110,14 @@ Default: .false.
 If .true., heat model will be turned on.
 </entry>
 
+<entry id="data_bgc_fluxes_to_ocean_flag" 
+       type="logical" 
+       category="mosart"
+       group="mosart_inparm">
+Default: .false.
+If .true., mosart will read in bgc nutrients and send to ocean.
+</entry>
+
 <entry id="rstraflag" 
        type="logical" 
        category="mosart"
@@ -217,7 +225,16 @@ Full pathname of master restart file for a branch run. (only used if RUN_TYPE=br
        input_pathname="abs" 
        group="mosart_inparm" 
        valid_values="" >
-Full pathname of input datafile for MOSART.
+Full pathname of input river routing file for MOSART.
+</entry>
+
+<entry id="frivinp_mesh"
+       type="char*256"
+       category="mosart"
+       input_pathname="abs"
+       group="mosart_inparm"
+       valid_values="" >
+Full pathname of input mesh file for MOSART.
 </entry>
 
 <entry id="rtmhist_fexcl1" 

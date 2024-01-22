@@ -5,18 +5,18 @@
 #  Generate NP4 scrip and subcell files
 # 
 set TOOLDIR = `pwd`
-set WDIR = ~/scratch1/regtest/homme
+set WDIR = ~/scratch1/hommetool
 set MACH = $TOOLDIR/../../cmake/machineFiles/darwin.cmake
 set exe = $WDIR/src/tool/homme_tool
 
-set NE=4
+set NE=1024
 set NPTS=4   # be sure to rerun CMAKE if this is changed
 set mesh = ne${NE}np${NPTS}
 
 
 cd $WDIR
 if (!  -x $exe ) then
-  # configure  set output = `$TOOLDIR/../../../../cime/scripts/Tools/get_case_env`
+  # configure  set output = `$TOOLDIR/../../../../cime/CIME/Tools/get_case_env`
   eval $output
   cmake -C $MACH -DPREQX_NP=$NPTS -DPREQX_PLEV=26 $TOOLDIR/../..
   # compile the tool

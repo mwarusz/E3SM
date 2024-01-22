@@ -27,19 +27,24 @@ module gllfvremap_mod
   !     * pg1's OOA is boosted to ~1.6.
   !   This module works with cubed_sphere_map 0 and 2, but only 2 will
   ! work in the fully coupled E3SM.
-  !   This module supports all ftype values 0 to 4.
+  !   This module supports all ftype values 0 to 4, as the calculations
+  ! in this module are independent of ftype.
   !   We find in practice that pg1 is too coarse. To see this, run the
   ! Homme-standalone test dcmip2016_test1_pg1 and compare results with
   ! dcmip2016_test1_pg2 and dcmip2016_test1 (np4). pg2 and np4 fields are
   ! nearly identical out to day 30, whereas pg1 fields differ visibly.
   !
   ! AMB 2019/07-2020/06 Initial
+  ! AMB 2023/11         Handle planar geometry
 
   use hybrid_mod, only: hybrid_t
   use kinds, only: real_kind
   use dimensions_mod, only: np, npsq, qsize, nelemd
   use element_mod, only: element_t
   use coordinate_systems_mod, only: cartesian3D_t
+#ifdef HOMMEXX_BFB_TESTING
+  use bfb_mod, only: bfb_pow
+#endif
 
   implicit none
 
@@ -80,7 +85,7 @@ module gllfvremap_mod
   ! GLL remap.
   type, private :: GllFvRemap_t
      integer :: nphys, npi, check
-     logical :: have_fv_topo_file_phis, boost_pg1
+     logical :: have_fv_topo_file_phis, boost_pg1, check_ok, is_planar
      real(kind=real_kind) :: tolfac ! for checking
      real(kind=real_kind) :: &
           ! Node or cell weights
@@ -99,7 +104,7 @@ module gllfvremap_mod
           ! FV subcell areas; FV analogue of GLL elem(ie)%metdet arrays
           fv_metdet(:,:), & ! (nphys*nphys,nelemd)
           ! Vector on ref elem -> vector on sphere
-          D_f(:,:,:,:), & ! (nphys,nphys,2,2,nelemd)
+          D_f(:,:,:,:), & ! (nphys*nphys,2,2,nelemd)
           ! Inverse of D_f
           Dinv_f(:,:,:,:), &
           qmin(:,:,:), qmax(:,:,:), &
@@ -114,12 +119,18 @@ module gllfvremap_mod
 
   type (GllFvRemap_t), private :: gfr
 
-  ! For testing.
+  ! For testing in gllfvremap_util_mod and gllfvremap_ut.
   public :: &
        gfr_test, &
        gfr_g2f_scalar, gfr_f2g_scalar, gfr_g2f_vector, &
        gfr_f_get_area, gfr_f_get_latlon, gfr_f_get_corner_latlon, gfr_f_get_cartesian3d, &
        gfr_g_make_nonnegative, gfr_dyn_to_fv_phys_topo_elem, gfr_f2g_dss
+  ! For testing in gllfvremap_ut.
+  public :: &
+       limiter1_clip_and_sum, calc_dp_fv, gfr_get_nphys
+  ! For C++ dycore.
+  public :: &
+       gfr_init_hxx
 
   ! Interfaces to support calling inside or outside a horizontally
   ! threaded region.
@@ -172,8 +183,8 @@ contains
     use kinds, only: iulog
     use dimensions_mod, only: nlev
     use parallel_mod, only: parallel_t, abortmp
-    use quadrature_mod, only : gausslobatto, quadrature_t
-    use control_mod, only: ftype
+    use quadrature_mod, only: gausslobatto, quadrature_t
+    use control_mod, only: geometry, cubed_sphere_map
 
     type (parallel_t), intent(in) :: par
     type (element_t), intent(in) :: elem(:)
@@ -186,6 +197,7 @@ contains
 
     gfr%check = 0
     if (present(check)) gfr%check = check
+    gfr%check_ok = .true.
 
     gfr%boost_pg1 = .false.
     if (nphys == 1 .and. present(boost_pg1)) gfr%boost_pg1 = boost_pg1    
@@ -193,8 +205,8 @@ contains
     gfr%tolfac = one
     if (par%masterproc) then
        write(iulog,*) 'gfr> Running with dynamics and physics on separate grids (physgrid).'
-       write(iulog, '(a,i3,a,i2,a,i2,a,l2)') 'gfr> init nphys', nphys, ' check', gfr%check, &
-            ' ftype', ftype, ' boost_pg1', gfr%boost_pg1
+       write(iulog, '(a,i3,a,i2,a,l2)') 'gfr> init nphys', nphys, ' check', gfr%check, &
+            ' boost_pg1', gfr%boost_pg1
        if (nphys == 1) then
           ! Document state of pg1. dcmip2016_test1 shows it is too coarse. For
           ! boost_pg1 = true, stepon's DSS loop needs to be separated from its
@@ -226,6 +238,8 @@ contains
     gfr%npi = max(2, nphys)
     nphys2 = nphys*nphys
 
+    gfr%is_planar = trim(geometry) == 'plane'
+
     call gfr_init_w_gg(np, gfr%w_gg)
     call gfr_init_w_gg(gfr%npi, gfr%w_sgsg)
     call gfr_init_w_ff(nphys, gfr%w_ff)
@@ -237,7 +251,7 @@ contains
     call gfr_init_f2g_remapd(gfr, R, tau)
 
     allocate(gfr%fv_metdet(nphys2,nelemd), &
-         gfr%D_f(nphys*nphys,2,2,nelemd), gfr%Dinv_f(nphys*nphys,2,2,nelemd), &
+         gfr%D_f(nphys2,2,2,nelemd), gfr%Dinv_f(nphys2,2,2,nelemd), &
          gfr%qmin(nlev,max(1,qsize),nelemd), gfr%qmax(nlev,max(1,qsize),nelemd), &
          gfr%phis(nphys2,nelemd), gfr%center_f(nphys,nphys,nelemd), &
          gfr%corners_f(4,nphys,nphys,nelemd))
@@ -248,6 +262,34 @@ contains
 
     if (gfr%check > 0) call check_areas(par, gfr, elem, 1, nelemd)
   end subroutine gfr_init
+
+  subroutine gfr_init_hxx() bind(c)
+#if KOKKOS_TARGET
+    use control_mod, only: theta_hydrostatic_mode
+    use iso_c_binding, only: c_bool
+    interface
+       subroutine init_gllfvremap_c(nelemd, np, nf, nf_max, theta_hydrostatic_mode, &
+            fv_metdet, g2f_remapd, f2g_remapd, D_f, Dinv_f) bind(c)
+         use iso_c_binding, only: c_bool, c_int, c_double
+         integer (c_int), value, intent(in) :: nelemd, np, nf, nf_max
+         logical (c_bool), value, intent(in) :: theta_hydrostatic_mode
+         real (c_double), dimension(nf*nf,nelemd), intent(in) :: fv_metdet
+         real (c_double), dimension(np,np,nf_max*nf_max), intent(in) :: g2f_remapd
+         real (c_double), dimension(nf_max*nf_max,np,np), intent(in) :: f2g_remapd
+         real (c_double), dimension(nf*nf,2,2,nelemd), intent(in) :: D_f, Dinv_f
+       end subroutine init_gllfvremap_c
+    end interface
+    logical (c_bool) :: thm
+    thm = theta_hydrostatic_mode
+    call init_gllfvremap_c(nelemd, np, gfr%nphys, nphys_max, thm, &
+         gfr%fv_metdet, gfr%g2f_remapd, gfr%f2g_remapd, gfr%D_f, gfr%Dinv_f)
+#endif
+  end subroutine gfr_init_hxx
+
+  function gfr_get_nphys() result(nf)
+    integer :: nf
+    nf = gfr%nphys
+  end function gfr_get_nphys
 
   subroutine gfr_finish()
     ! Deallocate the internal gfr structure.
@@ -277,20 +319,20 @@ contains
     real(kind=real_kind), dimension(np,np,nlev) :: wg1, dp, p
     real(kind=real_kind), dimension(np*np,nlev) :: wf1, dp_fv, p_fv
     real(kind=real_kind) :: qmin, qmax, ones(np,np)
-    integer :: ie, nf, nf2, qi, qsize, k
+    integer :: ie, nf, nf2, qi, qsize, k, nerr
 
     ones = one
     nf = gfr%nphys
     nf2 = nf*nf
 
     qsize = size(q,3)
-    
+
     do ie = nets,nete
        call gfr_g2f_scalar(ie, elem(ie)%metdet, elem(ie)%state%ps_v(:,:,nt:nt), wf1(:,:1))
        ps(:nf2,ie) = wf1(:nf2,1)
        dp = elem(ie)%state%dp3d(:,:,:,nt)
        call calc_dp_fv(nf, hvcoord, ps(:,ie), dp_fv)
-       
+
        if (gfr%have_fv_topo_file_phis) then
           phis(:nf2,ie) = gfr%phis(:,ie)
        else
@@ -301,10 +343,16 @@ contains
        call get_temperature(elem(ie), wg1, hvcoord, nt)
        call get_field(elem(ie), 'p', p, hvcoord, nt, -1)
        call gfr_g2f_scalar(ie, elem(ie)%metdet, p, p_fv)
+#ifndef HOMMEXX_BFB_TESTING
        wg1 = wg1*(p0/p)**kappa
        call gfr_g2f_scalar_dp(gfr, ie, elem(ie)%metdet, dp, dp_fv, wg1, wf1)
        T(:nf2,:,ie) = wf1(:nf2,:)*(p_fv(:nf2,:)/p0)**kappa
-
+#else
+       wg1 = wg1*bfb_pow(p0/p, kappa)
+       call gfr_g2f_scalar_dp(gfr, ie, elem(ie)%metdet, dp, dp_fv, wg1, wf1)
+       T(:nf2,:,ie) = wf1(:nf2,:)*bfb_pow(p_fv(:nf2,:)/p0, kappa)
+#endif
+       
        call gfr_g2f_vector(ie, elem, &
             elem(ie)%state%v(:,:,1,:,nt), elem(ie)%state%v(:,:,2,:,nt), &
             uv(:,1,:,ie), uv(:,2,:,ie))
@@ -317,28 +365,29 @@ contains
        ! for preqx, omega_p = omega/p
        omega_p(:nf2,:,ie) = wf1(:nf2,:)/p_fv(:nf2,:)
 #endif
+
        do qi = 1,qsize
           call gfr_g2f_mixing_ratio(gfr, ie, elem(ie)%metdet, dp, dp_fv, &
                elem(ie)%state%Q(:,:,:,qi), wf1)
           q(:nf2,:,qi,ie) = wf1(:nf2,:)
           if (gfr%check > 1) then
-             call check_g2f_mixing_ratio(gfr, hybrid, ie, qi, elem, dp, dp_fv, &
+             nerr = check_g2f_mixing_ratio(gfr, hybrid, ie, qi, elem, dp, dp_fv, &
                   elem(ie)%state%Q(:,:,:,qi), wf1)
+             if (nerr > 0) gfr%check_ok = .false.
           end if
        end do
     end do
 
     if (gfr%check > 0) then
-       call check_global_properties(gfr, hybrid, hvcoord, elem, nt, nets, nete, &
-            .true., .true., q)
+       nerr = check_global_properties(gfr, hybrid, hvcoord, elem, nt, nets, nete, .true., q)
+       if (nerr > 0) gfr%check_ok = .false.
     end if
   end subroutine gfr_dyn_to_fv_phys_hybrid
 
-  subroutine gfr_fv_phys_to_dyn_hybrid(hybrid, nt, dt, hvcoord, elem, nets, nete, T, uv, q)
-    ! Remap T, uv, q states or tendencies from FV to GLL grids.
-    !   If ftype is in 1:4, then q is the full mixing ratio state and
-    ! dt is not used; if it is not, then q is Qdp tendency, and dt
-    ! must be the correct physics time step.
+  subroutine gfr_fv_phys_to_dyn_hybrid(hybrid, nt, hvcoord, elem, nets, nete, T, uv, q)
+    ! Remap T, uv, and q tendencies and from FV to GLL grids.
+    !   On input, T and uv are tendencies and q is state.
+    !   On output, FM and FT are tendencies and FQ is state.
 
 #ifdef __INTEL_COMPILER
 # if __INTEL_COMPILER >= 1700 && __INTEL_COMPILER < 1800
@@ -356,11 +405,9 @@ contains
     use dimensions_mod, only: nlev
     use hybvcoord_mod, only: hvcoord_t
     use physical_constants, only: p0, kappa
-    use control_mod, only: ftype
 
     type (hybrid_t), intent(in) :: hybrid
     integer, intent(in) :: nt
-    real(kind=real_kind), intent(in) :: dt
     type (hvcoord_t), intent(in) :: hvcoord
     type (element_t), intent(inout) :: elem(:)
     integer, intent(in) :: nets, nete
@@ -369,12 +416,10 @@ contains
     real(kind=real_kind), dimension(np,np,nlev) :: dp, wg1, p
     real(kind=real_kind), dimension(np*np,nlev) :: wf1, wf2, dp_fv, p_fv
     real(kind=real_kind) :: qmin, qmax
-    integer :: ie, nf, nf2, k, qsize, qi
-    logical :: q_adjustment
+    integer :: ie, nf, nf2, k, qsize, qi, nerr
 
     nf = gfr%nphys
     nf2 = nf*nf
-    q_adjustment = ftype >= 1 .and. ftype <= 4
     qsize = size(q,3)
 
     do ie = nets,nete
@@ -388,60 +433,41 @@ contains
 
        call get_field(elem(ie), 'p', p, hvcoord, nt, -1)
        call gfr_g2f_scalar(ie, elem(ie)%metdet, p, p_fv)
+#ifndef HOMMEXX_BFB_TESTING
        wf1(:nf2,:) = T(:nf2,:,ie)*(p0/p_fv(:nf2,:))**kappa
        call gfr_f2g_scalar_dp(gfr, ie, elem(ie)%metdet, dp_fv, dp, wf1, &
             elem(ie)%derived%FT)
        elem(ie)%derived%FT = elem(ie)%derived%FT*(p/p0)**kappa
+#else
+       wf1(:nf2,:) = T(:nf2,:,ie)*bfb_pow(p0/p_fv(:nf2,:), kappa)
+       call gfr_f2g_scalar_dp(gfr, ie, elem(ie)%metdet, dp_fv, dp, wf1, &
+            elem(ie)%derived%FT)
+       elem(ie)%derived%FT = elem(ie)%derived%FT*bfb_pow(p/p0, kappa)
+#endif
 
        do qi = 1,qsize
-          if (q_adjustment) then
-             ! FV Q_ten
-             !   GLL Q0 -> FV Q0
-             call gfr_g2f_mixing_ratio(gfr, ie, elem(ie)%metdet, dp, dp_fv, &
-                  elem(ie)%state%Q(:,:,:,qi), wf1)
-             !   FV Q_ten = FV Q1 - FV Q0
-             wf1(:nf2,:) = q(:nf2,:,qi,ie) - wf1(:nf2,:)
-             if (nf > 1 .or. .not. gfr%boost_pg1) then
-                ! GLL Q_ten
-                call gfr_f2g_scalar_dp(gfr, ie, elem(ie)%metdet, dp_fv, dp, wf1, wg1)
-                ! GLL Q1
-                elem(ie)%derived%FQ(:,:,:,qi) = elem(ie)%state%Q(:,:,:,qi) + wg1
-             else
-                ! GLL Q_ten
-                do k = 1,nlev
-                   elem(ie)%derived%FQ(:,:,k,qi) = wf1(1,k)
-                end do
-             end if
-             ! Get limiter bounds.
-             do k = 1,nlev
-                gfr%qmin(k,qi,ie) = minval(q(:nf2,k,qi,ie))
-                gfr%qmax(k,qi,ie) = maxval(q(:nf2,k,qi,ie))
-             end do
+          ! FV Q_ten
+          !   GLL Q0 -> FV Q0
+          call gfr_g2f_mixing_ratio(gfr, ie, elem(ie)%metdet, dp, dp_fv, &
+               elem(ie)%state%Q(:,:,:,qi), wf1)
+          !   FV Q_ten = FV Q1 - FV Q0
+          wf1(:nf2,:) = q(:nf2,:,qi,ie) - wf1(:nf2,:)
+          if (nf > 1 .or. .not. gfr%boost_pg1) then
+             ! GLL Q_ten
+             call gfr_f2g_scalar_dp(gfr, ie, elem(ie)%metdet, dp_fv, dp, wf1, wg1)
+             ! GLL Q1
+             elem(ie)%derived%FQ(:,:,:,qi) = elem(ie)%state%Q(:,:,:,qi) + wg1
           else
-             ! FV Q_ten
-             wf1(:nf2,:) = dt*q(:nf2,:,qi,ie)/dp_fv(:nf2,:)
-             if (nf > 1 .or. .not. gfr%boost_pg1) then
-                ! GLL Q_ten
-                call gfr_f2g_scalar_dp(gfr, ie, elem(ie)%metdet, dp_fv, dp, wf1, wg1)
-                ! GLL Q1
-                elem(ie)%derived%FQ(:,:,:,qi) = elem(ie)%state%Q(:,:,:,qi) + wg1
-             else
-                ! GLL Q_ten
-                do k = 1,nlev
-                   elem(ie)%derived%FQ(:,:,k,qi) = wf1(1,k)
-                end do
-             end if
-             ! GLL Q0 -> FV Q0
-             call gfr_g2f_mixing_ratio(gfr, ie, elem(ie)%metdet, dp, dp_fv, &
-                  elem(ie)%state%Q(:,:,:,qi), wf2)
-             ! FV Q1
-             wf2(:nf2,:) = wf2(:nf2,:) + wf1(:nf2,:)
-             ! Get limiter bounds.
+             ! GLL Q_ten
              do k = 1,nlev
-                gfr%qmin(k,qi,ie) = minval(wf2(:nf2,k))
-                gfr%qmax(k,qi,ie) = maxval(wf2(:nf2,k))
+                elem(ie)%derived%FQ(:,:,k,qi) = wf1(1,k)
              end do
           end if
+          ! Get limiter bounds.
+          do k = 1,nlev
+             gfr%qmin(k,qi,ie) = minval(q(:nf2,k,qi,ie))
+             gfr%qmax(k,qi,ie) = maxval(q(:nf2,k,qi,ie))
+          end do
        end do
     end do
 
@@ -462,24 +488,20 @@ contains
              gfr%qmin(k,qi,ie) = min(minval(elem(ie)%state%Q(:,:,k,qi)), gfr%qmin(k,qi,ie))
              gfr%qmax(k,qi,ie) = max(maxval(elem(ie)%state%Q(:,:,k,qi)), gfr%qmax(k,qi,ie))
              ! Final GLL Q1, except for DSS, which is not done in this routine.
-             call limiter_clip_and_sum(np, elem(ie)%spheremp, gfr%qmin(k,qi,ie), &
+             call limiter_clip_and_sum(elem(ie)%spheremp, gfr%qmin(k,qi,ie), &
                   gfr%qmax(k,qi,ie), dp(:,:,k), elem(ie)%derived%FQ(:,:,k,qi))
           end do
           if (gfr%check > 1) then
-             call check_f2g_mixing_ratio(gfr, hybrid, ie, qi, elem, gfr%qmin(:,qi,ie), &
+             nerr = check_f2g_mixing_ratio(gfr, hybrid, ie, qi, elem, gfr%qmin(:,qi,ie), &
                   gfr%qmax(:,qi,ie), dp, wg1, elem(ie)%derived%FQ(:,:,:,qi))
-          end if
-          if (.not. q_adjustment) then
-             ! Convert to a tendency.
-             elem(ie)%derived%FQ(:,:,:,qi) = &
-                  dp*(elem(ie)%derived%FQ(:,:,:,qi) - elem(ie)%state%Q(:,:,:,qi))/dt
+             if (nerr > 0) gfr%check_ok = .false.
           end if
        end do
     end do
 
     if (gfr%check > 0) then
-       call check_global_properties(gfr, hybrid, hvcoord, elem, nt, nets, nete, &
-            .false., q_adjustment, q)
+       nerr = check_global_properties(gfr, hybrid, hvcoord, elem, nt, nets, nete, .false., q)
+       if (nerr > 0) gfr%check_ok = .false.
     end if
   end subroutine gfr_fv_phys_to_dyn_hybrid
 
@@ -595,7 +617,7 @@ contains
     real(kind=real_kind), intent(in) :: phis(:,:)
 
     real(kind=real_kind) :: wg(np,np,2), ones(np,np,1)
-    integer :: ie, nf, nf2
+    integer :: ie, nf, nf2, nerr
 
     ones = one
     nf = gfr%nphys
@@ -622,16 +644,18 @@ contains
     if (nf > 1 .or. .not. gfr%boost_pg1) then
        do ie = nets,nete
           if (gfr%check > 1) wg(:,:,1) = elem(ie)%state%phis
-          call limiter_clip_and_sum(np, elem(ie)%spheremp, gfr%qmin(1,1,ie), &
+          call limiter_clip_and_sum(elem(ie)%spheremp, gfr%qmin(1,1,ie), &
                gfr%qmax(1,1,ie), ones(:,:,1), elem(ie)%state%phis)
           if (gfr%check > 1) then
              if (gfr%qmin(1,1,ie) < zero) then
                 write(iulog,*) 'gfr> topo min:', hybrid%par%rank, hybrid%ithr, ie, &
                      gfr%qmin(1,1,ie), 'ERROR'
+                gfr%check_ok = .false.
              end if
              wg(:,:,2) = elem(ie)%state%phis
-             call check_f2g_mixing_ratio(gfr, hybrid, ie, 1, elem, gfr%qmin(:1,1,ie), &
+             nerr = check_f2g_mixing_ratio(gfr, hybrid, ie, 1, elem, gfr%qmin(:1,1,ie), &
                   gfr%qmax(:1,1,ie), ones, wg(:,:,:1), wg(:,:,2:))
+             if (nerr > 0) gfr%check_ok = .false.
           end if
        end do
     end if
@@ -673,7 +697,7 @@ contains
 #endif
   end subroutine gfr_dyn_to_fv_phys_dom_mt
 
-  subroutine gfr_fv_phys_to_dyn_dom_mt(par, dom_mt, nt, dt, hvcoord, elem, T, uv, q)
+  subroutine gfr_fv_phys_to_dyn_dom_mt(par, dom_mt, nt, hvcoord, elem, T, uv, q)
     ! Wrapper to the hybrid-threading main routine.
 
     use parallel_mod, only: parallel_t
@@ -684,7 +708,6 @@ contains
     type (parallel_t), intent(in) :: par
     type (domain1d_t), intent(in) :: dom_mt(:)
     integer, intent(in) :: nt
-    real(kind=real_kind), intent(in) :: dt
     type (hvcoord_t), intent(in) :: hvcoord
     type (element_t), intent(inout) :: elem(:)
     real(kind=real_kind), intent(inout) :: T(:,:,:), uv(:,:,:,:), q(:,:,:,:)
@@ -697,7 +720,7 @@ contains
     !$omp parallel num_threads(hthreads), default(shared), private(nets,nete,hybrid)
 #endif
     call gfr_hybrid_create(par, dom_mt, hybrid, nets, nete)
-    call gfr_fv_phys_to_dyn_hybrid(hybrid, nt, dt, hvcoord, elem, nets, nete, T, uv, q)
+    call gfr_fv_phys_to_dyn_hybrid(hybrid, nt, hvcoord, elem, nets, nete, T, uv, q)
 #ifdef HORIZ_OPENMP
     !$omp end parallel
 #endif
@@ -1052,12 +1075,12 @@ contains
     !     g = inv(M_sgsg) M_sgf inv(S) M_ff f
     wrk = reshape(gfr%w_ff(:nf2), (/nf,nf/))*f(:nf,:nf)
     if (nf == npi) then
-       call dtrsm('l', 'u', 't', 'n', nf2, 1, one, R, size(R,1), wrk, nf2)
-       call dormqr('l', 'n', nf2, 1, nf2, R, size(R,1), tau, wrk, nf2, wr, np2, info)
+       call dtrsm('L', 'U', 'T', 'N', nf2, 1, one, R, size(R,1), wrk, nf2)
+       call dormqr('L', 'N', nf2, 1, nf2, R, size(R,1), tau, wrk, nf2, wr, np2, info)
        g(:npi,:npi) =  wrk
     else
-       call dtrtrs('u', 't', 'n', nf2, 1, R, size(R,1), wrk, nf2, info)
-       call dtrtrs('u', 'n', 'n', nf2, 1, R, size(R,1), wrk, nf2, info)
+       call dtrtrs('U', 'T', 'N', nf2, 1, R, size(R,1), wrk, nf2, info)
+       call dtrtrs('U', 'N', 'N', nf2, 1, R, size(R,1), wrk, nf2, info)
        g(:npi,:npi) = zero
        do fj = 1,nf
           do fi = 1,nf
@@ -1099,6 +1122,7 @@ contains
     use coordinate_systems_mod, only: cartesian3D_t, spherical_polar_t, &
          sphere_tri_area, change_coordinates
     use cube_mod, only: ref2sphere
+    use physical_constants, only: dx, dy
 
     type (element_t), intent(in) :: elem(:)
     type (GllFvRemap_t), intent(inout) :: gfr
@@ -1135,14 +1159,19 @@ contains
                       end if
                       fv_corners_xyz(ai,bi) = elem(ie)%corners3D(idx)
                    else
-                      ! p_sphere is unused. fv_corners_xyz(ai,bi) contains
-                      ! the cartesian point before it's converted to lat-lon.
-                      p_sphere = ref2sphere(ae(ai), be(bi), elem(ie)%corners3D, &
-                           cubed_sphere_map, elem(ie)%corners, elem(ie)%facenum, &
-                           fv_corners_xyz(ai,bi))
-                      if (cubed_sphere_map == 0) then
-                         ! In this case, fv_corners_xyz above is not set.
-                         fv_corners_xyz(ai,bi) = change_coordinates(p_sphere)
+                      if (gfr%is_planar) then
+                         call ref2plane(elem(ie)%corners3D, ae(ai), be(bi), &
+                              fv_corners_xyz(ai,bi))
+                      else
+                         ! fv_corners_xyz(ai,bi) contains the cartesian point
+                         ! before it's converted to lat-lon.
+                         p_sphere = ref2sphere(ae(ai), be(bi), elem(ie)%corners3D, &
+                              cubed_sphere_map, elem(ie)%corners, elem(ie)%facenum, &
+                              fv_corners_xyz(ai,bi))
+                         if (cubed_sphere_map == 0) then
+                            ! In this case, fv_corners_xyz above is not set.
+                            fv_corners_xyz(ai,bi) = change_coordinates(p_sphere)
+                         end if
                       end if
                    end if
                    ctr%x = ctr%x + fv_corners_xyz(ai,bi)%x
@@ -1151,16 +1180,29 @@ contains
                 end do
              end do
 
-             if (cubed_sphere_map == 2) then
+             if (gfr%is_planar) then
+                ! The cell area is (dx*dy)/nf^2. This must then be divided by
+                ! w_ff = 4/nf^2, leaving (dx*dy)/4.
+                gfr%fv_metdet(k,ie) = (dx*dy)/four
+             elseif (cubed_sphere_map == 2) then
                 call sphere_tri_area(fv_corners_xyz(1,1), fv_corners_xyz(2,1), &
                      fv_corners_xyz(2,2), spherical_area)
                 call sphere_tri_area(fv_corners_xyz(1,1), fv_corners_xyz(2,2), &
                      fv_corners_xyz(1,2), tmp)
                 spherical_area = spherical_area + tmp
                 gfr%fv_metdet(k,ie) = spherical_area/gfr%w_ff(k)
-
-                ! Center is average of 4 corner points projected to sphere.
+             end if
+             if (gfr%is_planar .or. cubed_sphere_map == 2) then
                 ctr%x = ctr%x/four; ctr%y = ctr%y/four; ctr%z = ctr%z/four
+                if (cubed_sphere_map == 2) then
+                   ! [Projection bug 2023/11]: In the initial implementation, I
+                   ! forgot to project to the sphere. Mathematically, it doesn't
+                   ! matter: change_coordinates is invariant to the norm, and
+                   ! sphere2ref does the right thing since it solves a
+                   ! least-squares problem. In finite precision, fixing this bug
+                   ! would cause eps-level changes in ref2sphere and thus cause
+                   ! all pg2 tests to be non-BFB. I'm leaving it as is.
+                end if
                 gfr%center_f(i,j,ie) = ctr
              end if
 
@@ -1180,7 +1222,7 @@ contains
        end do
     end do
 
-    if (cubed_sphere_map == 0) then
+    if (cubed_sphere_map == 0 .and. .not. gfr%is_planar) then
        ! For cubed_sphere_map == 0, we set the center so that it maps to the ref
        ! element center and set fv_metdet so that it corresponds to the integral
        ! of metdet over the FV subcell. TempestRemap establishes the
@@ -1237,6 +1279,7 @@ contains
   subroutine gfr_init_Dmap(elem, gfr)
     use control_mod, only: cubed_sphere_map
     use cube_mod, only: Dmap, ref2sphere
+    use planar_mod, only: plane_Dmap
     use coordinate_systems_mod, only: cartesian3D_t, change_coordinates
 
     type (element_t), intent(in) :: elem(:)
@@ -1253,16 +1296,21 @@ contains
     do ie = 1,nelemd
        do j = 1,nf
           do i = 1,nf
-             if (cubed_sphere_map == 2) then
+             if (gfr%is_planar .or. cubed_sphere_map == 0) then
+                call gfr_f_ref_center(nf, i, a)
+                call gfr_f_ref_center(nf, j, b)                
+             else
                 call gfr_f_get_cartesian3d(ie, i, j, sphere)
                 call sphere2ref(elem(ie)%corners3D, sphere, a, b)
-             else
-                call gfr_f_ref_center(nf, i, a)
-                call gfr_f_ref_center(nf, j, b)
              end if
 
-             call Dmap(wrk, a, b, elem(ie)%corners3D, cubed_sphere_map, elem(ie)%cartp, &
-                  elem(ie)%facenum)
+             if (gfr%is_planar) then
+                call plane_Dmap(wrk, a, b, elem(ie)%corners3D, cubed_sphere_map, &
+                     elem(ie)%cartp, elem(ie)%facenum)
+             else
+                call       Dmap(wrk, a, b, elem(ie)%corners3D, cubed_sphere_map, &
+                     elem(ie)%cartp, elem(ie)%facenum)
+             end if
 
              det = wrk(1,1)*wrk(2,2) - wrk(1,2)*wrk(2,1)
 
@@ -1392,7 +1440,7 @@ contains
        call gfr_g2f_remapd(gfr, gll_metdet, gfr%fv_metdet(:,ie), wg, wf1)
        wf1(:nf2) = wf1(:nf2)/dp_f(:nf2,k)
        wf2(:nf2) = gfr%w_ff(:nf2)*gfr%fv_metdet(:nf2,ie)
-       call limiter1_clip_and_sum(nf, wf2, qmin, qmax, dp_f(:,k), wf1)
+       call limiter1_clip_and_sum(nf2, wf2, qmin, qmax, dp_f(:,k), wf1)
        q_f(:nf2,k) = wf1(:nf2)
     end do
   end subroutine gfr_g2f_mixing_ratio
@@ -1418,7 +1466,7 @@ contains
     call gfr_g2f_scalar(ie, gll_metdet, wg(:,:,:1), wf(:,:1))
     f(:nf2) = wf(:nf2,1)
     wf(:nf2,1) = gfr%w_ff(:nf2)*gfr%fv_metdet(:nf2,ie)
-    call limiter1_clip_and_sum(gfr%nphys, wf(:,1), qmin, qmax, ones, f)
+    call limiter1_clip_and_sum(nf2, wf(:,1), qmin, qmax, ones, f)
   end subroutine gfr_g2f_scalar_and_limit
 
   ! FV -> GLL (f2g)
@@ -1511,6 +1559,7 @@ contains
     type (element_t), intent(inout) :: elem(:)
     integer, intent(in) :: nets, nete
 
+    real(kind=real_kind) :: tmp(np,np,nlev)
     integer :: ie, q, k, npack
 
     npack = (qsize + 3)*nlev
@@ -1526,7 +1575,10 @@ contains
              elem(ie)%derived%FM(:,:,q,k) = elem(ie)%derived%FM(:,:,q,k)*elem(ie)%spheremp(:,:)
           end do
        end do
-       call edgeVpack_nlyr(edge_g, elem(ie)%desc, elem(ie)%derived%FM, 2*nlev, qsize*nlev, npack)
+       do q = 1,2
+          tmp = elem(ie)%derived%FM(:,:,q,:)
+          call edgeVpack_nlyr(edge_g, elem(ie)%desc, tmp, nlev, (qsize+q-1)*nlev, npack)
+       end do
        do k = 1,nlev
           elem(ie)%derived%FT(:,:,k) = elem(ie)%derived%FT(:,:,k)*elem(ie)%spheremp(:,:)
        end do
@@ -1540,7 +1592,11 @@ contains
              elem(ie)%derived%FQ(:,:,k,q) = elem(ie)%derived%FQ(:,:,k,q)*elem(ie)%rspheremp(:,:)
           end do
        end do
-       call edgeVunpack_nlyr(edge_g, elem(ie)%desc, elem(ie)%derived%FM, 2*nlev, qsize*nlev, npack)
+       do q = 1,2
+          tmp = elem(ie)%derived%FM(:,:,q,:)
+          call edgeVunpack_nlyr(edge_g, elem(ie)%desc, tmp, nlev, (qsize+q-1)*nlev, npack)
+          elem(ie)%derived%FM(:,:,q,:) = tmp
+       end do
        do q = 1,2
           do k = 1,nlev
              elem(ie)%derived%FM(:,:,q,k) = elem(ie)%derived%FM(:,:,q,k)*elem(ie)%rspheremp(:,:)
@@ -1593,7 +1649,7 @@ contains
 
     n = np*np
 
-    call dpotrf('u', n, gfr%pg1sd%Achol, size(gfr%pg1sd%Achol,1), info)
+    call dpotrf('U', n, gfr%pg1sd%Achol, size(gfr%pg1sd%Achol,1), info)
     if (info /= 0) print *, 'gfr ERROR> dpotrf returned', info
 
     do i = 1,n
@@ -1604,7 +1660,7 @@ contains
     gfr%pg1sd%s = reshape(gfr%w_gg(:np,:np), (/np*np/))
 
     ! Form R's = c
-    call dtrtrs('u', 't', 'n', n, 1, gfr%pg1sd%Achol, size(gfr%pg1sd%Achol,1), &
+    call dtrtrs('U', 'T', 'N', n, 1, gfr%pg1sd%Achol, size(gfr%pg1sd%Achol,1), &
          gfr%pg1sd%s, np*np, info)
     if (info /= 0) print *, 'gfr ERROR> dtrtrs returned', info
     gfr%pg1sd%sts = sum(gfr%pg1sd%s*gfr%pg1sd%s)
@@ -1638,11 +1694,11 @@ contains
     mass = sum(gfr%w_gg*g)
 
     ! Solve R'z = b.
-    call dtrtrs('u', 't', 'n', n, 1, s%Achol, size(s%Achol,1), x, np*np, info)
+    call dtrtrs('U', 'T', 'N', n, 1, s%Achol, size(s%Achol,1), x, np*np, info)
     ! Assemble z + (d - s'z)/(s's) s.
     x(:n) = x(:n) + ((mass - sum(s%s(:n)*x(:n)))/s%sts)*s%s(:n)
     ! Solve R x = z + (d - s'z)/(s's) s.
-    call dtrtrs('u', 'n', 'n', n, 1, s%Achol, size(s%Achol,1), x, np*np, info)
+    call dtrtrs('U', 'N', 'N', n, 1, s%Achol, size(s%Achol,1), x, np*np, info)
 
     ! Extract g(I).
     g = reshape(x(:n), (/np,np/))
@@ -1714,7 +1770,7 @@ contains
     integer, intent(in) :: nets, nete
 
     real(kind=real_kind) :: wr(np,np,2), ones(np,np,1)
-    integer :: ie, nf
+    integer :: ie, nf, nerr
 
     if (gfr%nphys /= 1 .or. .not. gfr%boost_pg1) return
 
@@ -1724,16 +1780,18 @@ contains
        wr(:,:,1) = elem(ie)%state%phis
        call gfr_pg1_g_reconstruct_scalar(gfr, ie, elem(ie)%metdet, wr(:,:,:1))
        elem(ie)%state%phis = wr(:,:,1)
-       call limiter_clip_and_sum(np, elem(ie)%spheremp, gfr%qmin(1,1,ie), &
+       call limiter_clip_and_sum(elem(ie)%spheremp, gfr%qmin(1,1,ie), &
             gfr%qmax(1,1,ie), ones(:,:,1), elem(ie)%state%phis)
        if (gfr%check > 1) then
           if (gfr%qmin(1,1,ie) < zero) then
              write(iulog,*) 'gfr> topo min:', hybrid%par%rank, hybrid%ithr, ie, &
                   gfr%qmin(1,1,ie), 'ERROR'
+             gfr%check_ok = .false.
           end if
           wr(:,:,2) = elem(ie)%state%phis
-          call check_f2g_mixing_ratio(gfr, hybrid, ie, 1, elem, gfr%qmin(:1,1,ie), &
+          nerr = check_f2g_mixing_ratio(gfr, hybrid, ie, 1, elem, gfr%qmin(:1,1,ie), &
                gfr%qmax(:1,1,ie), ones, wr(:,:,1:1), wr(:,:,2:2))
+          if (nerr > 0) gfr%check_ok = .false.
        end if
     end do
 
@@ -1750,30 +1808,25 @@ contains
     end if
   end subroutine gfr_pg1_reconstruct_topo_hybrid
 
-  subroutine gfr_pg1_reconstruct_hybrid(hybrid, nt, dt, hvcoord, elem, nets, nete)
+  subroutine gfr_pg1_reconstruct_hybrid(hybrid, nt, hvcoord, elem, nets, nete)
     ! pg1 reconstruction routine for tendencies and states.
 
     use element_ops, only: get_field
     use dimensions_mod, only: nlev, qsize
     use hybvcoord_mod, only: hvcoord_t
     use physical_constants, only: p0, kappa
-    use control_mod, only: ftype
 
     type (hybrid_t), intent(in) :: hybrid
     integer, intent(in) :: nt
-    real(kind=real_kind), intent(in) :: dt
     type (hvcoord_t), intent(in) :: hvcoord
     type (element_t), intent(inout) :: elem(:)
     integer, intent(in) :: nets, nete
 
     real(kind=real_kind), dimension(np,np,nlev) :: dp, p, wr1
     real(kind=real_kind) :: qmin, qmax
-    integer :: ie, k, qi
-    logical :: q_adjustment
+    integer :: ie, k, qi, nerr
 
     if (gfr%nphys /= 1 .or. .not. gfr%boost_pg1) return
-
-    q_adjustment = ftype >= 1 .and. ftype <= 4
 
     do ie = nets,nete
        dp = elem(ie)%state%dp3d(:,:,:,nt)
@@ -1799,17 +1852,13 @@ contains
              ! Augment bounds with GLL Q0 bounds.
              gfr%qmin(k,qi,ie) = min(minval(elem(ie)%state%Q(:,:,k,qi)), gfr%qmin(k,qi,ie))
              gfr%qmax(k,qi,ie) = max(maxval(elem(ie)%state%Q(:,:,k,qi)), gfr%qmax(k,qi,ie))
-             call limiter_clip_and_sum(np, gfr%w_gg*elem(ie)%metdet, gfr%qmin(k,qi,ie), &
+             call limiter_clip_and_sum(elem(ie)%spheremp, gfr%qmin(k,qi,ie), &
                   gfr%qmax(k,qi,ie), dp(:,:,k), elem(ie)%derived%FQ(:,:,k,qi))
           end do
           if (gfr%check > 1) then
-             call check_f2g_mixing_ratio(gfr, hybrid, ie, qi, elem, gfr%qmin(:,qi,ie), &
+             nerr = check_f2g_mixing_ratio(gfr, hybrid, ie, qi, elem, gfr%qmin(:,qi,ie), &
                   gfr%qmax(:,qi,ie), dp, wr1, elem(ie)%derived%FQ(:,:,:,qi))
-          end if
-          if (.not. q_adjustment) then
-             ! Convert to a tendency.
-             elem(ie)%derived%FQ(:,:,:,qi) = &
-                  dp*(elem(ie)%derived%FQ(:,:,:,qi) - elem(ie)%state%Q(:,:,:,qi))/dt
+             if (nerr > 0) gfr%check_ok = .false.
           end if
        end do
     end do
@@ -1844,7 +1893,6 @@ contains
     real(kind=real_kind), intent(inout) :: g(:,:,:)
 
     real(kind=real_kind) wr(np*np)
-    integer :: nlev, k, edgeidx
 
     g = dp*g
     call gfr_pg1_g_reconstruct_scalar(gfr, ie, gll_metdet, g)
@@ -1878,7 +1926,7 @@ contains
     end do
   end subroutine gfr_pg1_g_reconstruct_vector
 
-  subroutine gfr_pg1_reconstruct_dom_mt(par, dom_mt, nt, dt, hvcoord, elem)
+  subroutine gfr_pg1_reconstruct_dom_mt(par, dom_mt, nt, hvcoord, elem)
     ! Wrapper to the hybrid-threading main routine.
 
     use parallel_mod, only: parallel_t
@@ -1889,7 +1937,6 @@ contains
     type (parallel_t), intent(in) :: par
     type (domain1d_t), intent(in) :: dom_mt(:)
     integer, intent(in) :: nt
-    real(kind=real_kind), intent(in) :: dt
     type (hvcoord_t), intent(in) :: hvcoord
     type (element_t), intent(inout) :: elem(:)
 
@@ -1901,7 +1948,7 @@ contains
     !$omp parallel num_threads(hthreads), default(shared), private(nets,nete,hybrid)
 #endif
     call gfr_hybrid_create(par, dom_mt, hybrid, nets, nete)
-    call gfr_pg1_reconstruct_hybrid(hybrid, nt, dt, hvcoord, elem, nets, nete)
+    call gfr_pg1_reconstruct_hybrid(hybrid, nt, hvcoord, elem, nets, nete)
 #ifdef HORIZ_OPENMP
     !$omp end parallel
 #endif
@@ -2063,9 +2110,13 @@ contains
 
   subroutine gfr_f_get_cartesian3d(ie, i, j, p)
     ! Get (x,y,z) of FV point i,j.
+    !   [Projection bug] In the case of sphere goemetry, output is not
+    ! normalized to the sphere.
 
     integer, intent(in) :: ie, i, j
     type (cartesian3D_t), intent(out) :: p
+
+    real(kind=real_kind) :: r
 
     p = gfr%center_f(i,j,ie)
   end subroutine gfr_f_get_cartesian3d
@@ -2101,17 +2152,16 @@ contains
     !           qmin < q* < qmax
 
     integer, intent(in) :: n
-    real (kind=real_kind), intent(in) :: spheremp(:), dp(:)
-    real (kind=real_kind), intent(inout) :: qmin, qmax, q(:)
+    real (kind=real_kind), intent(in) :: spheremp(n), dp(n)
+    real (kind=real_kind), intent(inout) :: qmin, qmax, q(n)
 
     integer :: n2, k1, i, j
     logical :: modified
     real(kind=real_kind) :: addmass, mass, sumc, den
-    real(kind=real_kind) :: x(n*n), c(n*n), v(n*n)
+    real(kind=real_kind) :: x(n), c(n), v(n)
 
-    n2 = n*n
-    x = q(:n2)
-    c = spheremp(:n2)*dp(:n2)
+    x = q(:n)
+    c = spheremp(:n)*dp(:n)
 
     sumc = sum(c)
     mass = sum(c*x)
@@ -2124,7 +2174,7 @@ contains
 
     ! Clip.
     modified = .false.
-    do k1 = 1, n*n
+    do k1 = 1, n
        if (x(k1) > qmax) then
           modified = .true.
           addmass = addmass + (x(k1) - qmax)*c(k1)
@@ -2148,24 +2198,38 @@ contains
        if (den > zero) x = x + addmass*(v/den)
     end if
 
-    q(:n2) = x
+    q(:n) = x
   end subroutine limiter1_clip_and_sum
 
-  subroutine limiter_clip_and_sum(n, spheremp, qmin, qmax, dp, q)
-    integer, intent(in) :: n
-    real (kind=real_kind), intent(in) :: spheremp(:,:), dp(:,:)
-    real (kind=real_kind), intent(inout) :: qmin, qmax, q(:,:)
+  subroutine limiter_clip_and_sum(spheremp, qmin, qmax, dp, q)
+    real (kind=real_kind), intent(in) :: spheremp(np,np), dp(np,np)
+    real (kind=real_kind), intent(inout) :: qmin, qmax, q(np,np)
 
-    integer :: n2
-    real(kind=real_kind) :: spheremp1(n*n), dp1(n*n), q1(n*n)
-
-    n2 = n*n
-    spheremp1 = reshape(spheremp(:n,:n), (/n2/))
-    dp1 = reshape(dp(:n,:n), (/n2/))
-    q1 = reshape(q(:n,:n), (/n2/))
-    call limiter1_clip_and_sum(n, spheremp1, qmin, qmax, dp1, q1)
-    q(:n,:n) = reshape(q1(:n2), (/n,n/))
+    call limiter1_clip_and_sum(np*np, spheremp, qmin, qmax, dp, q)
   end subroutine limiter_clip_and_sum
+
+  subroutine ref2plane(corners, a, b, plane)
+    ! For planar geometry.
+    
+    use coordinate_systems_mod, only: cartesian3D_t
+
+    type (cartesian3D_t), intent(in) :: corners(4)
+    real(real_kind), intent(in) :: a, b
+    type (cartesian3D_t), intent(out) :: plane
+
+    real(real_kind) :: q(4), c(4,3), p(3)
+    integer :: i
+
+    do i = 1,4
+       c(i,1) = corners(i)%x; c(i,2) = corners(i)%y; c(i,3) = corners(i)%z
+    end do
+    q(1) = (1-a)*(1-b); q(2) = (1+a)*(1-b); q(3) = (1+a)*(1+b); q(4) = (1-a)*(1+b)
+    q = q/four
+    do i = 1,3
+       p(i) = sum(c(:,i)*q)
+    end do
+    plane%x = p(1); plane%y = p(2); plane%z = p(3)
+  end subroutine ref2plane
 
   subroutine ref2spherea_deriv(c, a, b, s_ab, s)
     ! For cubed_sphere_map = 2.
@@ -2277,8 +2341,8 @@ contains
     end do
   end subroutine set_ps_Q
 
-  subroutine check_global_properties(gfr, hybrid, hvcoord, elem, nt, nets, nete, &
-       use_state_Q, q_adjustment, q_f)
+  function check_global_properties(gfr, hybrid, hvcoord, elem, nt, nets, nete, &
+       use_state_Q, q_f) result(nerr)
 
     ! Compare global mass on dynamics and physics grids.
 
@@ -2293,13 +2357,14 @@ contains
     type (hvcoord_t), intent(in) :: hvcoord
     type (element_t), intent(in) :: elem(:)
     integer, intent(in) :: nt, nets, nete
-    logical, intent(in) :: use_state_Q, q_adjustment
+    logical, intent(in) :: use_state_Q
     real (kind=real_kind), intent(in) :: q_f(:,:,:,:)
 
-    integer :: nf, nf2, ie, k, qi, ic, nchunk, qi0, nq, qic, b1, b2, cnt
+    integer :: nf, nf2, ie, k, qi, ic, nchunk, qi0, nq, qic, b1, b2, cnt, nerr
     real (kind=real_kind) :: dp(np,np,nlev), dp_fv(np*np,nlev), wg(np,np), &
          wf(np*np,1), mass(2,qsize), tol
 
+    nerr = 0
     nf = gfr%nphys
     nf2 = nf*nf
     nq = nrepro_vars/2
@@ -2325,19 +2390,11 @@ contains
                 else
                    wg = elem(ie)%derived%FQ(:,:,k,qi)
                 end if
-                if (q_adjustment) then
-                   global_shared_buf(ie,b1) = global_shared_buf(ie,b1) + &
-                        sum(elem(ie)%spheremp(:,:)*dp(:,:,k)*wg)
-                   global_shared_buf(ie,b2) = global_shared_buf(ie,b2) + &
-                        sum(gfr%fv_metdet(:nf2,ie)*gfr%w_ff(:nf2)* &
-                        dp_fv(:nf2,k)*q_f(:nf2,k,qi,ie))
-                else
-                   global_shared_buf(ie,b1) = global_shared_buf(ie,b1) + &
-                        sum(elem(ie)%spheremp(:,:)*wg)
-                   global_shared_buf(ie,b2) = global_shared_buf(ie,b2) + &
-                        sum(gfr%fv_metdet(:nf2,ie)*gfr%w_ff(:nf2)* &
-                        q_f(:nf2,k,qi,ie))                   
-                end if
+                global_shared_buf(ie,b1) = global_shared_buf(ie,b1) + &
+                     sum(elem(ie)%spheremp(:,:)*dp(:,:,k)*wg)
+                global_shared_buf(ie,b2) = global_shared_buf(ie,b2) + &
+                     sum(gfr%fv_metdet(:nf2,ie)*gfr%w_ff(:nf2)* &
+                     dp_fv(:nf2,k)*q_f(:nf2,k,qi,ie))
              end do
           end do
        end do
@@ -2352,24 +2409,19 @@ contains
        end do
     end do
     tol = 10*eps
-    if (.not. q_adjustment) then
-       ! In the case of Q tendencies, cancellation can lead to arbitrarily large
-       ! errors in the tendencies. We have no control over that, so just loosen
-       ! the tolerance a little and likely warn more often.
-       tol = 1.e3_real_kind*tol
-    end if
     if (hybrid%masterthread) then
        do qi = 1,qsize
           if (abs(mass(2,qi) - mass(1,qi)) > tol*abs(mass(1,qi))) then
+             nerr = nerr + 1
              write (iulog,'(a,l2,i3,es24.16,es12.4)') 'gfr> mass err', &
                   use_state_Q, qi, mass(1,qi), &
                   abs(mass(2,qi) - mass(1,qi))/maxval(abs(mass(1:2,qi)))
           end if
        end do
     end if
-  end subroutine check_global_properties
+  end function check_global_properties
 
-  subroutine check_g2f_mixing_ratio(gfr, hybrid, ie, qi, elem, dp, dp_fv, q_g, q_f)
+  function check_g2f_mixing_ratio(gfr, hybrid, ie, qi, elem, dp, dp_fv, q_g, q_f) result(nerr)
     ! Check that gfr_g2f_mixing_ratio found a property-preserving
     ! solution.
 
@@ -2382,8 +2434,9 @@ contains
     real(kind=real_kind), intent(in) :: dp(:,:,:), dp_fv(:,:), q_g(:,:,:), q_f(:,:)
 
     real(kind=real_kind) :: qmin_f, qmin_g, qmax_f, qmax_g, mass_f, mass_g, den
-    integer :: q, k, nf, nf2
+    integer :: q, k, nf, nf2, nerr
 
+    nerr = 0
     nf = gfr%nphys
     nf2 = nf*nf
     do k = 1,size(dp,3)
@@ -2397,15 +2450,17 @@ contains
        if (qmin_f < qmin_g - 10*eps*den .or. qmax_f > qmax_g + 10*eps*den) then
           write(iulog,*) 'gfr> g2f mixing ratio limits:', hybrid%par%rank, hybrid%ithr, ie, qi, k, &
                qmin_g, qmin_f-qmin_g, qmax_f-qmax_g, qmax_g, mass_f, mass_g, 'ERROR'
+          nerr = nerr + 1
        end if
        if (abs(mass_f - mass_g) > gfr%tolfac*20*eps*max(mass_f, mass_g)) then
           write(iulog,*) 'gfr> g2f mixing ratio mass:', hybrid%par%rank, hybrid%ithr, ie, qi, k, &
                qmin_g, qmax_g, mass_f, mass_g, 'ERROR'
+          nerr = nerr + 1
        end if
     end do
-  end subroutine check_g2f_mixing_ratio
+  end function check_g2f_mixing_ratio
 
-  subroutine check_f2g_mixing_ratio(gfr, hybrid, ie, qi, elem, qmin, qmax, dp, q0_g, q1_g)
+  function check_f2g_mixing_ratio(gfr, hybrid, ie, qi, elem, qmin, qmax, dp, q0_g, q1_g) result(nerr)
     ! Check that a property-preserving solution was found in the FV ->
     ! GLL direction.
 
@@ -2419,8 +2474,9 @@ contains
 
     real(kind=real_kind) :: qmin_f, qmin_g, qmax_f, qmax_g, mass_f, mass0, mass1, den, &
          wr(np,np)
-    integer :: q, k
+    integer :: q, k, nerr
 
+    nerr = 0
     do k = 1,size(dp,3)
        qmin_f = qmin(k)
        qmax_f = qmax(k)
@@ -2432,16 +2488,18 @@ contains
        if (qmin_g < qmin_f - 50*eps*den .or. qmax_g > qmax_f + 50*eps*den) then
           write(iulog,*) 'gfr> f2g mixing ratio limits:', hybrid%par%rank, hybrid%ithr, ie, qi, k, &
                qmin_f, qmin_g-qmin_f, qmax_g-qmax_f, qmax_f, mass0, mass1, 'ERROR'
+          nerr = nerr + 1
        end if
        den = sum(elem(ie)%spheremp*dp(:,:,k)*maxval(abs(q0_g(:,:,k))))
        if (abs(mass1 - mass0) > gfr%tolfac*20*eps*den) then
           write(iulog,*) 'gfr> f2g mixing ratio mass:', hybrid%par%rank, hybrid%ithr, ie, qi, k, &
                qmin_f, qmin_g, qmax_g, qmax_f, mass0, mass1, 'ERROR'
+          nerr = nerr + 1
        end if
     end do
-  end subroutine check_f2g_mixing_ratio
+  end function check_f2g_mixing_ratio
   
-  subroutine check_nonnegative(elem, nets, nete)
+  function check_nonnegative(elem, nets, nete) result(nerr)
     ! Check gfr_g_make_nonnegative.
 
     use kinds, only: iulog
@@ -2450,8 +2508,9 @@ contains
     integer, intent(in) :: nets, nete
 
     real(kind=real_kind) :: wrk3(np,np,1), mass0, mass1, rd
-    integer :: ie, i, j, sign
+    integer :: ie, i, j, sign, nerr
 
+    nerr = 0
     do ie = nets,nete
        sign = 1
        do j = 1,np
@@ -2466,16 +2525,17 @@ contains
        rd = (mass1 - mass0)/mass0
        if (rd /= rd .or. rd > 20*eps .or. any(wrk3(:,:,1) < zero)) then
           write(iulog,*) 'gfr> nonnegative', ie, rd, mass0, mass1, wrk3(:,:,1), 'ERROR'
+          nerr = nerr + 1
        end if
     end do
-  end subroutine check_nonnegative
+  end function check_nonnegative
 
   subroutine check_areas(par, gfr, elem, nets, nete)
     ! Check global area
 
     use kinds, only: iulog
     use parallel_mod, only: parallel_t, global_shared_buf, global_shared_sum
-    use physical_constants, only: dd_pi
+    use physical_constants, only: dd_pi, Lx, Ly
     ! Can't use wrap_repro_sum because this routine needs to support
     ! unit testing in an already threaded region.
 #ifdef CAM
@@ -2490,7 +2550,7 @@ contains
     integer, intent(in) :: nets, nete
 
     integer :: ie, i, j, nf
-    real(kind=real_kind) :: area, sphere_area
+    real(kind=real_kind) :: area, area_true, re
 
     nf = gfr%nphys
     do ie = nets,nete
@@ -2505,20 +2565,29 @@ contains
        global_shared_buf(ie,3) = sum(elem(ie)%spheremp)
     end do
     call repro_sum(global_shared_buf, global_shared_sum, nelemd, nelemd, 3, commid=par%comm)
-    sphere_area = 4*dd_pi
+    if (gfr%is_planar) then
+       area_true = Lx*Ly
+    else
+       area_true = 4*dd_pi
+    end if
     if (par%masterproc) then
        write(iulog,*) 'gfr> area fv raw', global_shared_sum(1), &
-            abs(global_shared_sum(1) - sphere_area)/sphere_area
+            abs(global_shared_sum(1) - area_true)/area_true
+       ! fv vs gll
+       re = abs(global_shared_sum(2) - global_shared_sum(3))/global_shared_sum(3)
        write(iulog,*) 'gfr> area fv adj', &
-            abs(global_shared_sum(2) - sphere_area)/sphere_area, &
-            abs(global_shared_sum(2) - global_shared_sum(3))/global_shared_sum(3)
+            abs(global_shared_sum(2) - area_true)/area_true, re
+       if (re > 2*eps) then
+          write(iulog,*) 'gfr> check_areas ERROR'
+          gfr%check_ok = .false.
+       end if
        write(iulog,*) 'gfr> area gll   ', &
-            abs(global_shared_sum(3) - sphere_area)/sphere_area
+            abs(global_shared_sum(3) - area_true)/area_true
     end if
     deallocate(gfr%check_areas)
   end subroutine check_areas
 
-  subroutine check(par, dom_mt, gfr, elem, verbose)
+  function check(par, dom_mt, gfr, elem, verbose) result(nerr)
     ! Run a bunch of unit tests.
 
     use kinds, only: iulog
@@ -2549,8 +2618,9 @@ contains
 
     ! Purposely construct our own hybrid object to test gfr_hybrid_create.
     type (hybrid_t) :: hybrid
-    integer :: nets, nete
+    integer :: nets, nete, nerr, ic
 
+    nerr = 0
     if (.not. par%dynproc) return
 
     nf = gfr%nphys
@@ -2577,19 +2647,28 @@ contains
        a = sum(elem(ie)%metdet * gfr%w_gg)
        b = sum(gfr%fv_metdet(:nf2,ie) * gfr%w_ff(:nf2))
        rd = abs(b - a)/abs(a)
-       if (rd /= rd .or. rd > 10*eps) write(iulog,*) 'gfr> area', ie, a, b, rd
+       if (rd /= rd .or. rd > 10*eps) then
+          nerr = nerr + 1
+          write(iulog,*) 'gfr> area', ie, a, b, rd
+       end if
 
        ! Check FV geometry.
        f0(:nf2) = gfr%D_f(:,1,1,ie)*gfr%D_f(:,2,2,ie) - &
             gfr%D_f(:,1,2,ie)*gfr%D_f(:,2,1,ie)
        rd = maxval(abs(f0(:nf2)) - gfr%fv_metdet(:nf2,ie))/ &
             maxval(gfr%fv_metdet(:nf2,ie))
-       if (rd > 10*eps) write(iulog,*) 'gfr> D', ie, rd
+       if (rd > 10*eps) then
+          nerr = nerr + 1
+          write(iulog,*) 'gfr> D', ie, rd
+       end if
        f0(:nf2) = gfr%Dinv_f(:,1,1,ie)*gfr%Dinv_f(:,2,2,ie) - &
             gfr%Dinv_f(:,1,2,ie)*gfr%Dinv_f(:,2,1,ie)
        rd = maxval(abs(f0(:nf2)) - one/gfr%fv_metdet(:nf2,ie))/ &
             maxval(one/gfr%fv_metdet(:nf2,ie))
-       if (rd > 10*eps) write(iulog,*) 'gfr> Dinv', ie, rd
+       if (rd > 10*eps) then
+          nerr = nerr + 1
+          write(iulog,*) 'gfr> Dinv', ie, rd
+       end if
 
        ! Check that FV -> GLL -> FV recovers the original FV values exactly
        ! (with no DSS and no limiter).
@@ -2607,10 +2686,12 @@ contains
        a = sum(wf(:nf2)*abs(f1(:nf2) - f0(:nf2)))
        b = sum(wf(:nf2)*abs(f0(:nf2)))
        rd = a/b
-       if (rd /= rd .or. rd > 10*eps) &
-            write(iulog,*) 'gfr> recover', ie, a, b, rd, gfr%fv_metdet(:nf2,ie)
+       if (rd /= rd .or. rd > 10*eps) then
+          nerr = nerr + 1
+          write(iulog,*) 'gfr> recover', ie, a, b, rd, gfr%fv_metdet(:nf2,ie)
+       end if
     end do
-    call check_nonnegative(elem, nets, nete)
+    nerr = nerr + check_nonnegative(elem, nets, nete)
 
     ! For convergence testing. Run this testing routine with a sequence of ne
     ! values and plot log l2 error vs log ne.
@@ -2633,7 +2714,7 @@ contains
                 qmax = maxval(elem(ie)%state%Q(:,:,1,1))
                 wf(:nf2) = Qdp_fv(:nf2,ie)/ps_v_fv(:nf2,ie)
                 f0(:nf2) = gfr%w_ff(:nf2)*gfr%fv_metdet(:nf2,ie)
-                call limiter1_clip_and_sum(nf, f0, qmin, qmax, ps_v_fv(:,ie), wf)
+                call limiter1_clip_and_sum(nf2, f0, qmin, qmax, ps_v_fv(:,ie), wf)
                 Qdp_fv(:nf2,ie) = wf(:nf2)*ps_v_fv(:nf2,ie)
              end if
           end do
@@ -2665,7 +2746,7 @@ contains
                      Qdp_fv(:,ie), elem(ie)%state%Q(:,:,1,1))
                 elem(ie)%state%Q(:,:,1,1) = elem(ie)%state%Q(:,:,1,1)/elem(ie)%state%ps_v(:,:,1)
                 if (limit) then
-                   call limiter_clip_and_sum(np, elem(ie)%spheremp, & ! same as w_gg*gll_metdet
+                   call limiter_clip_and_sum(elem(ie)%spheremp, & ! same as w_gg*gll_metdet
                         qmins(1,1,ie), qmaxs(1,1,ie), elem(ie)%state%ps_v(:,:,1), &
                         elem(ie)%state%Q(:,:,1,1))
                 end if
@@ -2695,7 +2776,7 @@ contains
                    call gfr_pg1_g_reconstruct_scalar_dp(gfr, ie, elem(ie)%metdet, &
                         elem(ie)%state%ps_v(:,:,:1), elem(ie)%state%Q(:,:,:1,1))
                    if (limit) then
-                      call limiter_clip_and_sum(np, gfr%w_gg*elem(ie)%metdet, qmins(1,1,ie), &
+                      call limiter_clip_and_sum(gfr%w_gg*elem(ie)%metdet, qmins(1,1,ie), &
                            qmaxs(1,1,ie), elem(ie)%state%ps_v(:,:,1), elem(ie)%state%Q(:,:,1,1))
                    end if
                 end do
@@ -2707,21 +2788,22 @@ contains
        qmax = -two
        qmin1 = two
        qmax1 = -two
+       ic = 2
        do ie = nets, nete
           wg = gfr%w_gg(:,:)*elem(ie)%metdet(:,:)
           ! L2 on q. Might switch to q*ps_v.
           global_shared_buf(ie,1) = &
-               sum(wg*(elem(ie)%state%Q(:,:,1,1) - elem(ie)%state%Q(:,:,1,2))**2)
+               sum(wg*(elem(ie)%state%Q(:,:,1,1) - elem(ie)%state%Q(:,:,1,ic))**2)
           global_shared_buf(ie,2) = &
-               sum(wg*elem(ie)%state%Q(:,:,1,2)**2)
+               sum(wg*elem(ie)%state%Q(:,:,1,ic)**2)
           ! Mass conservation.
           wg = wg*elem(ie)%state%ps_v(:,:,1)
-          global_shared_buf(ie,3) = sum(wg*elem(ie)%state%Q(:,:,1,2))
+          global_shared_buf(ie,3) = sum(wg*elem(ie)%state%Q(:,:,1,ic))
           global_shared_buf(ie,4) = sum(wg*elem(ie)%state%Q(:,:,1,1))
           qmin = min(qmin, minval(elem(ie) %state%Q(:,:,1,1)))
-          qmin1 = min(qmin1, minval(elem(ie)%state%Q(:,:,1,2)))
+          qmin1 = min(qmin1, minval(elem(ie)%state%Q(:,:,1,ic)))
           qmax = max(qmax, maxval(elem(ie)%state%Q(:,:,1,1)))
-          qmax1 = max(qmax1, maxval(elem(ie)%state%Q(:,:,1,2)))
+          qmax1 = max(qmax1, maxval(elem(ie)%state%Q(:,:,1,ic)))
        end do
        call wrap_repro_sum(nvars=4, comm=hybrid%par%comm)
        qmin = ParallelMin(qmin, hybrid)
@@ -2734,24 +2816,33 @@ contains
           write(iulog, '(a,es12.4)') 'gfr> l2  ', rd
           rd = abs(global_shared_sum(4) - global_shared_sum(3))/global_shared_sum(3)
           msg = ''
-          if (rd > 10*eps) msg = ' ERROR'
+          if (rd > 10*eps) then
+             nerr = nerr + 1
+             msg = ' ERROR'
+          end if
           write(iulog, '(a,es11.3,a8)') 'gfr> mass', rd, msg
           msg = ''
-          if (limit .and. (qmin < qmin1 - 5*eps .or. qmax > qmax1 + 5*eps)) msg = ' ERROR'
+          if (limit .and. (qmin < qmin1 - 5*eps .or. qmax > qmax1 + 5*eps)) then
+             nerr = nerr + 1
+             msg = ' ERROR'
+          end if
           write(iulog, '(a,es11.3,es11.3,a8)') 'gfr> limit', min(zero, qmin - qmin1), &
                max(zero, qmax - qmax1), msg
        end if
     end do
     deallocate(Qdp_fv, ps_v_fv, qmins, qmaxs)
-  end subroutine check
+    if (.not. gfr%check_ok) nerr = nerr + 1
+  end function check
 
-  subroutine test_sphere2ref()
+  function test_sphere2ref() result(nerr)
     use coordinate_systems_mod, only: cartesian3D_t
     use kinds, only: iulog
 
     type (cartesian3D_t) :: corners(4), sphere
     real (real_kind) :: refin(2), refout(2), err
     integer :: i, j, n, nerr
+
+    nerr = 0
 
     corners(1)%x =  0.24; corners(1)%y = -0.7; corners(1)%z = 0.3; call normalizecart(corners(1))
     corners(2)%x =  0.44; corners(2)%y =  0.5; corners(2)%z = 0.4; call normalizecart(corners(2))
@@ -2767,7 +2858,7 @@ contains
           call ref2sphere(corners, refin(1), refin(2), sphere)
           call sphere2ref(corners, sphere, refout(1), refout(2))
           err = abs(refin(1) - refout(1)) + abs(refin(2) - refout(2))
-          if (err > 10*eps .or. &
+          if (err > 15*eps .or. &
                maxval(abs(refout)) > 1 + 5*eps .or. &
                any(refout /= refout)) then
              write(iulog,*) refin(1), refin(2)
@@ -2817,9 +2908,9 @@ contains
       end do
       s = s/sqrt(sum(s**2))
     end subroutine ref2spherea
-  end subroutine test_sphere2ref
+  end function test_sphere2ref
 
-  subroutine gfr_test(hybrid, dom_mt, hvcoord, deriv, elem)
+  function gfr_test(hybrid, dom_mt, hvcoord, deriv, elem) result(nerr)
     ! Driver for check subroutine.
 
     use domain_mod, only: domain1d_t
@@ -2832,11 +2923,11 @@ contains
     type (element_t), intent(inout) :: elem(:)
     type (hvcoord_t) , intent(in) :: hvcoord
 
-    integer :: nphys, bi
+    integer :: nphys, bi, nerr
     logical :: boost_pg1
 
-    if (hybrid%masterthread) call test_sphere2ref()
-
+    nerr = 0    
+    if (hybrid%masterthread) nerr = nerr + test_sphere2ref()
     do nphys = 1, np
        do bi = 1,2
           if (nphys > 1 .and. bi > 1) exit
@@ -2846,7 +2937,7 @@ contains
           if (hybrid%ithr == 0) call gfr_init(hybrid%par, elem, nphys, 2, boost_pg1)
           !$omp barrier
 
-          call check(hybrid%par, dom_mt, gfr, elem, .false.)
+          nerr = nerr + check(hybrid%par, dom_mt, gfr, elem, .false.)
 
           ! This is meant to be called after threading ends.
           !$omp barrier
@@ -2854,5 +2945,5 @@ contains
           !$omp barrier
        end do
     end do
-  end subroutine gfr_test
+  end function gfr_test
 end module gllfvremap_mod

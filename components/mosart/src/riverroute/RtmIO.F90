@@ -111,7 +111,7 @@ module RtmIO
   integer,parameter,private :: debug = 0             ! local debug level
 
   integer , parameter  , public  :: max_string_len = 256     ! length of strings
-  real(r8), parameter  , public  :: fillvalue = 1.e36_r8     ! fill value for netcdf fields
+  real(r8), parameter  , public  :: fillvalue = 1.e20_r8     ! fill value for netcdf fields
 
   integer, public :: io_type
 
@@ -853,7 +853,6 @@ contains
     integer :: dimid(5)       ! dimension ids
     integer :: varid          ! variable id
     integer :: itmp           ! temporary
-    character(len=256) :: str ! temporary
     character(len=*),parameter :: subname='ncd_defvar_bygrid' ! subroutine name
     !-----------------------------------------------------------------------
 
@@ -1282,8 +1281,8 @@ contains
           end do
           start(1) = 1
           start(2) = nt
-          status = pio_put_var(ncid, varid, start=start, count=count, &
-               ival=tmpString)
+          status = pio_put_var(ncid, varid, start, count, &
+               tmpString)
           deallocate(tmpString)
        else
           status = pio_put_var(ncid, varid, data )

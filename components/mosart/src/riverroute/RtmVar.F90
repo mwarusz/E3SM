@@ -13,7 +13,7 @@ module RtmVar
 
   real(r8), public, parameter :: secspday = SHR_CONST_CDAY  ! Seconds per day
   integer,  public, parameter :: isecspday= secspday        ! Integer seconds per day
-  real(r8), public, parameter :: spval    = 1.e36_r8        ! special value for real data
+  real(r8), public, parameter :: spval    = 1.e20_r8        ! special value for real data
   integer , public, parameter :: ispval   = -9999           ! special value for int data
   real(r8) :: re = SHR_CONST_REARTH*0.001_r8                ! radius of earth (km)
   logical , public :: barrier_timers                        ! barrier timers
@@ -29,13 +29,16 @@ module RtmVar
                                                        ! by default this is not allowed
   logical, public :: wrmflag = .false.                 ! water management model flag
   logical, public :: inundflag = .false.               ! inundation model flag
+  logical, public :: use_lnd_rof_two_way = .false.     ! land river two way coupling flag
   logical, public :: sediflag = .false.                ! sediment model flag
   logical, public :: heatflag = .false.                ! heat model flag
+  logical, public :: use_ocn_rof_two_way = .false.     ! ocean river two way coupling flag
   logical, public :: rstraflag = .false.               ! reservoir stratification module flag
   real,    public :: rinittemp = 283.15_r8             ! initial reservoir temperature
-  integer, public :: ngeom   = 50        			   ! Reservoir depth layers to calculate depth-area-storage relationship
-  integer, public :: nlayers = 30        			   ! Maximum number of reservoir layers for stratification
+  integer, public :: ngeom   = 50                      ! Reservoir depth layers to calculate depth-area-storage relationship
+  integer, public :: nlayers = 30                      ! Maximum number of reservoir layers for stratification
   logical, public :: noland = .false.                  ! true => no valid land points -- do NOT run
+  logical, public :: data_bgc_fluxes_to_ocean_flag = .false.! read in and send BGC fluxes to ocean flag
   character(len=32) , public :: decomp_option          ! decomp option
   character(len=32) , public :: smat_option            ! smatrix multiply option (opt, Xonly, Yonly)
                                                        ! opt   = XandY in MCT
@@ -44,7 +47,7 @@ module RtmVar
   character(len=256), public :: hostname = ' '         ! Hostname of machine running on
   character(len=256), public :: username = ' '         ! username of user running program
   character(len=256), public :: version  = " "         ! version of program
-  character(len=256), public :: conventions = "CF-1.0" ! dataset conventions
+  character(len=256), public :: conventions = "CF-1.7" ! dataset conventions
   character(len=256), public :: source   = "MOSART in E3SM" ! description of this source
 
   ! Unit Numbers
@@ -59,6 +62,7 @@ module RtmVar
   character(len=256), public :: nrevsn_rtm   = ' '   ! restart data file name for branch run
   character(len=256), public :: finidat_rtm  = ' '   ! initial conditions file name
   character(len=256), public :: frivinp_rtm  = ' '   ! RTM input data file name
+  character(len=256), public :: frivinp_mesh  = ' '   ! mesh input data file name
   logical,            public :: ice_runoff = .true.  ! true => runoff is split into liquid and ice, 
                                                      ! otherwise just liquid
   ! Rtm grid size

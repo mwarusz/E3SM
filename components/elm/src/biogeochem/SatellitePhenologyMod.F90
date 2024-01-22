@@ -2,8 +2,8 @@ module SatellitePhenologyMod
 
   !-----------------------------------------------------------------------
   ! !DESCRIPTION:
-  ! CLM Satelitte Phenology model (SP) ecosystem dynamics (phenology, vegetation). 
-  ! Allow some subroutines to be used by the CLM Carbon Nitrogen model (CLMCN) 
+  ! CLM Satelitte Phenology model (SP) ecosystem dynamics (phenology, vegetation).
+  ! Allow some subroutines to be used by the CLM Carbon Nitrogen model (CLMCN)
   ! so that DryDeposition code can get estimates of LAI differences between months.
   !
   ! !USES:
@@ -15,14 +15,14 @@ module SatellitePhenologyMod
   use shr_log_mod     , only : errMsg => shr_log_errMsg
   use decompMod       , only : bounds_type
   use abortutils      , only : endrun
-  use clm_varctl      , only : scmlat,scmlon,single_column
-  use clm_varctl      , only : iulog, use_lai_streams
-  use clm_varcon      , only : grlnd
+  use elm_varctl      , only : scmlat,scmlon,single_column
+  use elm_varctl      , only : iulog, use_lai_streams
+  use elm_varcon      , only : grlnd
   use controlMod      , only : NLFilename
   use decompMod       , only : gsmap_lnd_gdc2glo
   use domainMod       , only : ldomain
   use fileutils       , only : getavu, relavu
-  use VegetationType       , only : veg_pp                
+  use VegetationType       , only : veg_pp
   use CanopyStateType , only : canopystate_type
   use WaterstateType  , only : waterstate_type
   use ColumnDataType  , only : col_ws
@@ -31,6 +31,8 @@ module SatellitePhenologyMod
   use spmdMod         , only : mpicom, comp_id
   use mct_mod
   use ncdio_pio   
+  use topounit_varcon , only : max_topounits
+  use GridcellType    , only : grc_pp
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -60,7 +62,7 @@ module SatellitePhenologyMod
   !-----------------------------------------------------------------------
 
 contains
-  
+
   !-----------------------------------------------------------------------
   !
   ! lai_init
@@ -72,12 +74,12 @@ contains
     !
     !
     ! !USES:
-    use clm_varctl       , only : inst_name
-    use clm_time_manager , only : get_calendar
+    use elm_varctl       , only : inst_name
+    use elm_time_manager , only : get_calendar
     use ncdio_pio        , only : pio_subsystem
     use shr_pio_mod      , only : shr_pio_getiotype
-    use clm_nlUtilsMod   , only : find_nlgroup_name
-    use ndepStreamMod    , only : clm_domain_mct
+    use elm_nlUtilsMod   , only : find_nlgroup_name
+    use ndepStreamMod    , only : elm_domain_mct
     use histFileMod      , only : hist_addfld1d
     use shr_stream_mod   , only : shr_stream_file_null
     use shr_string_mod   , only : shr_string_listCreateField
@@ -90,10 +92,10 @@ contains
     integer            :: i                          ! index
     integer            :: stream_year_first_lai      ! first year in Lai stream to use
     integer            :: stream_year_last_lai       ! last year in Lai stream to use
-    integer            :: model_year_align_lai       ! align stream_year_first_lai with 
+    integer            :: model_year_align_lai       ! align stream_year_first_lai with
     integer            :: nu_nml                     ! unit for namelist file
     integer            :: nml_error                  ! namelist i/o error flag
-    type(mct_ggrid)    :: dom_clm                    ! domain information 
+    type(mct_ggrid)    :: dom_elm                    ! domain information
     character(len=CL)  :: stream_fldFileName_lai     ! lai stream filename to read
     character(len=CL)  :: lai_mapalgo = 'bilinear'   ! Mapping alogrithm
 
@@ -143,14 +145,14 @@ contains
 
        write(iulog,*) ' '
        write(iulog,*) 'lai_stream settings:'
-       write(iulog,*) '  stream_year_first_lai  = ',stream_year_first_lai  
-       write(iulog,*) '  stream_year_last_lai   = ',stream_year_last_lai   
-       write(iulog,*) '  model_year_align_lai   = ',model_year_align_lai   
+       write(iulog,*) '  stream_year_first_lai  = ',stream_year_first_lai
+       write(iulog,*) '  stream_year_last_lai   = ',stream_year_last_lai
+       write(iulog,*) '  model_year_align_lai   = ',model_year_align_lai
        write(iulog,*) '  stream_fldFileName_lai = ',trim(stream_fldFileName_lai)
 
     endif
 
-    call clm_domain_mct (bounds, dom_clm)
+    call elm_domain_mct (bounds, dom_elm)
 
     !
     ! create the field list for these lai fields...use in shr_strdata_create
@@ -158,10 +160,10 @@ contains
     fldList = shr_string_listCreateField( numLaiFields, laiString )
 
     call shr_strdata_create(sdat_lai,name="laidyn",    &
-         pio_subsystem=pio_subsystem,                  & 
+         pio_subsystem=pio_subsystem,                  &
          pio_iotype=shr_pio_getiotype(inst_name),      &
          mpicom=mpicom, compid=comp_id,                &
-         gsmap=gsmap_lnd_gdc2glo, ggrid=dom_clm,       &
+         gsmap=gsmap_lnd_gdc2glo, ggrid=dom_elm,       &
          nxg=ldomain%ni, nyg=ldomain%nj,               &
          yearFirst=stream_year_first_lai,              &
          yearLast=stream_year_last_lai,                &
@@ -171,7 +173,7 @@ contains
          domFileName=trim(stream_fldFileName_lai),  &
          domTvarName='time',                           &
          domXvarName='lon' ,                           &
-         domYvarName='lat' ,                           &  
+         domYvarName='lat' ,                           &
          domAreaName='area',                           &
          domMaskName='mask',                           &
          filePath='',                                  &
@@ -199,12 +201,12 @@ contains
     ! Interpolate data stream information for Lai.
     !
     ! !USES:
-    use clm_time_manager, only : get_curr_date
+    use elm_time_manager, only : get_curr_date
     use pftvarcon       , only : noveg
     !
     ! !ARGUMENTS:
     implicit none
-    type(bounds_type)      , intent(in)    :: bounds                          
+    type(bounds_type)      , intent(in)    :: bounds
     type(canopystate_type) , intent(inout) :: canopystate_vars
     !
     ! !LOCAL VARIABLES:
@@ -262,7 +264,7 @@ contains
     use shr_infnan_mod, only : nan => shr_infnan_nan, assignment(=)
     !
     ! !ARGUMENTS:
-    type(bounds_type), intent(in) :: bounds  
+    type(bounds_type), intent(in) :: bounds
     !
     ! !LOCAL VARIABLES:
     integer :: ier    ! error code
@@ -294,7 +296,7 @@ contains
   end subroutine SatellitePhenologyInit
 
   !-----------------------------------------------------------------------
-  subroutine SatellitePhenology(bounds, num_nolakep, filter_nolakep, &
+  subroutine SatellitePhenology(bounds, num_filter, filter, &
        waterstate_vars, canopystate_vars)
     !
     ! !DESCRIPTION:
@@ -302,12 +304,13 @@ contains
     ! Calculates leaf areas (tlai, elai),  stem areas (tsai, esai) and height (htop).
     !
     ! !USES:
-    use pftvarcon, only : noveg, nbrdlf_dcd_brl_shrub
+    use pftvarcon,  only : noveg, nbrdlf_dcd_brl_shrub
+    use elm_varctl, only : use_fates_sp
     !
     ! !ARGUMENTS:
-    type(bounds_type)      , intent(in)    :: bounds                          
-    integer                , intent(in)    :: num_nolakep                               ! number of column non-lake points in pft filter
-    integer                , intent(in)    :: filter_nolakep(bounds%endp-bounds%begp+1) ! patch filter for non-lake points
+    type(bounds_type)      , intent(in)    :: bounds
+    integer                , intent(in)    :: num_filter                        ! number of column points in filter
+    integer                , intent(in)    :: filter(bounds%endp-bounds%begp+1) ! patch filter
     type(waterstate_type)  , intent(in)    :: waterstate_vars
     type(canopystate_type) , intent(inout) :: canopystate_vars
     !
@@ -318,14 +321,14 @@ contains
     !-----------------------------------------------------------------------
 
     associate(                                                           &
-         frac_sno           => col_ws%frac_sno   ,          & ! Input:  [real(r8) (:) ] fraction of ground covered by snow (0 to 1)       
-         snow_depth         => col_ws%snow_depth ,          & ! Input:  [real(r8) (:) ] snow height (m)                                                       
-         tlai               => canopystate_vars%tlai_patch    ,          & ! Output: [real(r8) (:) ] one-sided leaf area index, no burying by snow 
+         frac_sno           => col_ws%frac_sno   ,          & ! Input:  [real(r8) (:) ] fraction of ground covered by snow (0 to 1)
+         snow_depth         => col_ws%snow_depth ,          & ! Input:  [real(r8) (:) ] snow height (m)
+         tlai               => canopystate_vars%tlai_patch    ,          & ! Output: [real(r8) (:) ] one-sided leaf area index, no burying by snow
          tsai               => canopystate_vars%tsai_patch    ,          & ! Output: [real(r8) (:) ] one-sided stem area index, no burying by snow
          elai               => canopystate_vars%elai_patch    ,          & ! Output: [real(r8) (:) ] one-sided leaf area index with burying by snow
          esai               => canopystate_vars%esai_patch    ,          & ! Output: [real(r8) (:) ] one-sided stem area index with burying by snow
-         htop               => canopystate_vars%htop_patch    ,          & ! Output: [real(r8) (:) ] canopy top (m)                           
-         hbot               => canopystate_vars%hbot_patch    ,          & ! Output: [real(r8) (:) ] canopy bottom (m)                           
+         htop               => canopystate_vars%htop_patch    ,          & ! Output: [real(r8) (:) ] canopy top (m)
+         hbot               => canopystate_vars%hbot_patch    ,          & ! Output: [real(r8) (:) ] canopy bottom (m)
          frac_veg_nosno_alb => canopystate_vars%frac_veg_nosno_alb_patch & ! Output: [integer  (:) ] fraction of vegetation not covered by snow (0 OR 1) [-]
          )
 
@@ -333,8 +336,8 @@ contains
          call lai_interp(bounds, canopystate_vars)
       endif
 
-      do fp = 1, num_nolakep
-         p = filter_nolakep(fp)
+      do fp = 1, num_filter
+         p = filter(fp)
          c = veg_pp%column(p)
 
          ! need to update elai and esai only every albedo time step so do not
@@ -366,7 +369,7 @@ contains
          ! problems associated with very small lai and sai.
 
          ! snow burial fraction for short vegetation (e.g. grasses) as in
-         ! Wang and Zeng, 2007. 
+         ! Wang and Zeng, 2007.
 
          if (veg_pp%itype(p) > noveg .and. veg_pp%itype(p) <= nbrdlf_dcd_brl_shrub ) then
             ol = min( max(snow_depth(c)-hbot(p), 0._r8), htop(p)-hbot(p))
@@ -377,18 +380,23 @@ contains
          endif
 
          ! area weight by snow covered fraction
+         if (.not.use_fates_sp) then
+            ! Do not set these in FATES_SP mode as they turn on the 'vegsol' filter and also
+            ! are duplicated by the FATES variables (in the FATES IFP indexing space)
 
-         elai(p) = max(tlai(p)*(1.0_r8 - frac_sno(c)) + tlai(p)*fb*frac_sno(c), 0.0_r8)
-         esai(p) = max(tsai(p)*(1.0_r8 - frac_sno(c)) + tsai(p)*fb*frac_sno(c), 0.0_r8)
-         if (elai(p) < 0.05_r8) elai(p) = 0._r8
-         if (esai(p) < 0.05_r8) esai(p) = 0._r8
+            elai(p) = max(tlai(p)*(1.0_r8 - frac_sno(c)) + tlai(p)*fb*frac_sno(c), 0.0_r8)
+            esai(p) = max(tsai(p)*(1.0_r8 - frac_sno(c)) + tsai(p)*fb*frac_sno(c), 0.0_r8)
+            if (elai(p) < 0.05_r8) elai(p) = 0._r8
+            if (esai(p) < 0.05_r8) esai(p) = 0._r8
 
-         ! Fraction of vegetation free of snow
+            ! Fraction of vegetation free of snow
 
-         if ((elai(p) + esai(p)) >= 0.05_r8) then
-            frac_veg_nosno_alb(p) = 1
-         else
-            frac_veg_nosno_alb(p) = 0
+            if ((elai(p) + esai(p)) >= 0.05_r8) then
+               frac_veg_nosno_alb(p) = 1
+            else
+               frac_veg_nosno_alb(p) = 0
+            end if
+
          end if
 
       end do ! end of patch loop
@@ -404,11 +412,11 @@ contains
     ! Determine if 2 new months of data are to be read.
     !
     ! !USES:
-    use clm_varctl      , only : fsurdat
-    use clm_time_manager, only : get_curr_date, get_step_size, get_nstep
+    use elm_varctl      , only : fsurdat
+    use elm_time_manager, only : get_curr_date, get_step_size, get_nstep
     !
     ! !ARGUMENTS:
-    type(bounds_type), intent(in) :: bounds  
+    type(bounds_type), intent(in) :: bounds
     type(canopystate_type), intent(inout) :: canopystate_vars
     !
     ! !LOCAL VARIABLES:
@@ -458,24 +466,24 @@ contains
     ! read 12 months of veg data for dry deposition
     !
     ! !USES:
-    use clm_varpar  , only : numpft
+    use elm_varpar  , only : numpft
     use pftvarcon   , only : noveg
     use domainMod   , only : ldomain
     use fileutils   , only : getfil
-    use clm_varctl  , only : fsurdat
+    use elm_varctl  , only : fsurdat
     use shr_scam_mod, only : shr_scam_getCloseLatLon
     !
     ! !ARGUMENTS:
-    type(bounds_type), intent(in) :: bounds  
+    type(bounds_type), intent(in) :: bounds
     type(canopystate_type), intent(inout) :: canopystate_vars
     !
     ! !LOCAL VARIABLES:
     type(file_desc_t) :: ncid             ! netcdf id
     real(r8), pointer :: annlai(:,:)      ! 12 months of monthly lai from input data set 
-    real(r8), pointer :: mlai(:,:)        ! lai read from input files
+    real(r8), pointer :: mlai(:,:,:)        ! lai read from input files
     real(r8):: closelat,closelon          ! single column vars
     integer :: ier                        ! error code
-    integer :: g,k,l,m,n,p                ! indices
+    integer :: g,k,l,m,n,p,t,ti,topi                ! indices
     integer :: ni,nj,ns                   ! indices
     integer :: dimid,varid                ! input netCDF id's
     integer :: ntim                       ! number of input data time samples
@@ -488,13 +496,13 @@ contains
     character(len=32) :: subname = 'readAnnualVegetation'
     !-----------------------------------------------------------------------
 
-    annlai    => canopystate_vars%annlai_patch 
+    annlai    => canopystate_vars%annlai_patch
 
     ! Determine necessary indices
 
-    allocate(mlai(bounds%begg:bounds%endg,0:numpft), stat=ier)
+    allocate(mlai(bounds%begg:bounds%endg,1:max_topounits, 0:numpft), stat=ier)
     if (ier /= 0) then
-       write(iulog,*)subname, 'allocation error ' 
+       write(iulog,*)subname, 'allocation error '
        call endrun(msg=errMsg(__FILE__, __LINE__))
     end if
 
@@ -531,16 +539,19 @@ contains
 
        do p = bounds%begp,bounds%endp
           g =veg_pp%gridcell(p)
+          t = veg_pp%topounit(p)
+          topi = grc_pp%topi(g)
+          ti = t - topi + 1
           if (veg_pp%itype(p) /= noveg) then     !! vegetated pft
              do l = 0, numpft
                 if (l == veg_pp%itype(p)) then
-                   annlai(k,p) = mlai(g,l)
+                   annlai(k,p) = mlai(g,ti,l)
                 end if
              end do
           else                       !! non-vegetated pft
              annlai(k,p) = 0._r8
           end if
-       end do   ! end of loop over patches  
+       end do   ! end of loop over patches
 
     enddo ! months loop
 
@@ -558,16 +569,16 @@ contains
     ! Read monthly vegetation data for two consec. months.
     !
     ! !USES:
-    use clm_varpar       , only : numpft
+    use elm_varpar       , only : numpft
     use pftvarcon        , only : noveg
     use fileutils        , only : getfil
     use spmdMod          , only : masterproc, mpicom, MPI_REAL8, MPI_INTEGER
     use shr_scam_mod     , only : shr_scam_getCloseLatLon
-    use clm_time_manager , only : get_nstep
+    use elm_time_manager , only : get_nstep
     use netcdf
     !
     ! !ARGUMENTS:
-    type(bounds_type) , intent(in) :: bounds  
+    type(bounds_type) , intent(in) :: bounds
     character(len=*)  , intent(in) :: fveg      ! file with monthly vegetation data
     integer           , intent(in) :: months(2) ! months to be interpolated (1 to 12)
     type(canopystate_type), intent(inout) :: canopystate_vars
@@ -575,7 +586,7 @@ contains
     ! !LOCAL VARIABLES:
     character(len=256) :: locfn           ! local file name
     type(file_desc_t)  :: ncid            ! netcdf id
-    integer :: g,n,k,l,m,p,ni,nj,ns       ! indices
+    integer :: g,n,k,l,m,p,ni,nj,ns,t,ti,topi       ! indices
     integer :: dimid,varid                ! input netCDF id's
     integer :: ntim                       ! number of input data time samples
     integer :: nlon_i                     ! number of input data longitudes
@@ -585,20 +596,20 @@ contains
     integer :: closelatidx,closelonidx
     real(r8):: closelat,closelon
     logical :: readvar
-    real(r8), pointer :: mlai(:,:)        ! lai read from input files
-    real(r8), pointer :: msai(:,:)        ! sai read from input files
-    real(r8), pointer :: mhgtt(:,:)       ! top vegetation height
-    real(r8), pointer :: mhgtb(:,:)       ! bottom vegetation height
+    real(r8), pointer :: mlai(:,:,:)        ! lai read from input files
+    real(r8), pointer :: msai(:,:,:)        ! sai read from input files
+    real(r8), pointer :: mhgtt(:,:,:)       ! top vegetation height
+    real(r8), pointer :: mhgtb(:,:,:)       ! bottom vegetation height
     character(len=32) :: subname = 'readMonthlyVegetation'
     !-----------------------------------------------------------------------
 
     ! Determine necessary indices
 
     allocate(&
-         mlai(bounds%begg:bounds%endg,0:numpft), &
-         msai(bounds%begg:bounds%endg,0:numpft), &
-         mhgtt(bounds%begg:bounds%endg,0:numpft), &
-         mhgtb(bounds%begg:bounds%endg,0:numpft), &
+         mlai(bounds%begg:bounds%endg,1:max_topounits,0:numpft), &
+         msai(bounds%begg:bounds%endg,1:max_topounits,0:numpft), &
+         mhgtt(bounds%begg:bounds%endg,1:max_topounits,0:numpft), &
+         mhgtb(bounds%begg:bounds%endg,1:max_topounits,0:numpft), &
          stat=ier)
     if (ier /= 0) then
        write(iulog,*)subname, 'allocation big error '
@@ -642,13 +653,16 @@ contains
 
        do p = bounds%begp,bounds%endp
           g =veg_pp%gridcell(p)
+          t = veg_pp%topounit(p)
+          topi = grc_pp%topi(g)
+          ti = t - topi + 1
           if (veg_pp%itype(p) /= noveg) then     ! vegetated pft
              do l = 0, numpft
                 if (l == veg_pp%itype(p)) then
-                   mlai2t(p,k) = mlai(g,l)
-                   msai2t(p,k) = msai(g,l)
-                   mhvt2t(p,k) = mhgtt(g,l)
-                   mhvb2t(p,k) = mhgtb(g,l)
+                   mlai2t(p,k) = mlai(g,ti,l)
+                   msai2t(p,k) = msai(g,ti,l)
+                   mhvt2t(p,k) = mhgtt(g,ti,l)
+                   mhvb2t(p,k) = mhgtb(g,ti,l)
                 end if
              end do
           else                        ! non-vegetated pft

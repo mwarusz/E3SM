@@ -78,6 +78,10 @@ module camsrfexch
      real(r8), allocatable :: dstdry3(:)  ! dry deposition of dust (bin3)
      real(r8), allocatable :: dstwet4(:)  ! wet deposition of dust (bin4)
      real(r8), allocatable :: dstdry4(:)  ! dry deposition of dust (bin4)
+     real(r8), allocatable :: wsresp(:)   ! first-order response of low-level wind to surface fluxes
+     real(r8), allocatable :: tau_est(:)  ! stress estimated to be in equilibrium with ubot/vbot
+     real(r8), allocatable :: ugust(:)    ! gustiness value
+     real(r8), allocatable :: uovern(:)       ! ratio of wind speed/brunt vaisalla frequency  
   end type cam_out_t 
 
 !---------------------------------------------------------------------------
@@ -94,11 +98,13 @@ module camsrfexch
      real(r8), allocatable :: lwup(:)       ! longwave up radiative flux
      real(r8), allocatable :: lhf(:)        ! latent heat flux
      real(r8), allocatable :: shf(:)        ! sensible heat flux
+     real(r8), allocatable :: h2otemp(:)    ! water temperature heat flux from ocean
      real(r8), allocatable :: wsx(:)        ! surface u-stress (N)
      real(r8), allocatable :: wsy(:)        ! surface v-stress (N)
      real(r8), allocatable :: tref(:)       ! ref height surface air temp
      real(r8), allocatable :: qref(:)       ! ref height specific humidity 
      real(r8), allocatable :: u10(:)        ! 10m wind speed
+     real(r8), allocatable :: u10withgusts(:) ! 10m wind speed with gustiness
      real(r8), allocatable :: ts(:)         ! merged surface temp 
      real(r8), allocatable :: sst(:)        ! sea surface temp
      real(r8), allocatable :: snowhland(:)  ! snow depth (liquid water equivalent) over land
@@ -196,6 +202,9 @@ CONTAINS
        allocate (cam_in(c)%shf(pcols), stat=ierror)
        if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error shf')
 
+       allocate (cam_in(c)%h2otemp(pcols), stat=ierror)
+       if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error h2otemp')
+
        allocate (cam_in(c)%wsx(pcols), stat=ierror)
        if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error wsx')
 
@@ -210,6 +219,9 @@ CONTAINS
 
        allocate (cam_in(c)%u10(pcols), stat=ierror)
        if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error u10')
+
+       allocate (cam_in(c)%u10withgusts(pcols), stat=ierror)
+       if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error u10withgusts')
 
        allocate (cam_in(c)%ts(pcols), stat=ierror)
        if ( ierror /= 0 ) call endrun('HUB2ATM_ALLOC error: allocation error ts')
@@ -294,11 +306,13 @@ CONTAINS
        cam_in(c)%lwup     (:) = 0._r8
        cam_in(c)%lhf      (:) = 0._r8
        cam_in(c)%shf      (:) = 0._r8
+       cam_in(c)%h2otemp  (:) = 0._r8
        cam_in(c)%wsx      (:) = 0._r8
        cam_in(c)%wsy      (:) = 0._r8
        cam_in(c)%tref     (:) = 0._r8
        cam_in(c)%qref     (:) = 0._r8
        cam_in(c)%u10      (:) = 0._r8
+       cam_in(c)%u10withgusts(:) = 0._r8
        cam_in(c)%ts       (:) = 0._r8
        cam_in(c)%sst      (:) = 0._r8
        cam_in(c)%snowhland(:) = 0._r8
@@ -478,6 +492,18 @@ CONTAINS
 
        allocate (cam_out(c)%dstdry4(pcols), stat=ierror)
        if ( ierror /= 0 ) call endrun('ATM2HUB_ALLOC error: allocation error dstdry4')
+
+       allocate (cam_out(c)%wsresp(pcols), stat=ierror)
+       if ( ierror /= 0 ) call endrun('ATM2HUB_ALLOC error: allocation error wsresp')
+
+       allocate (cam_out(c)%tau_est(pcols), stat=ierror)
+       if ( ierror /= 0 ) call endrun('ATM2HUB_ALLOC error: allocation error tau_est')
+
+       allocate (cam_out(c)%ugust(pcols), stat=ierror)
+       if ( ierror /= 0 ) call endrun('ATM2HUB_ALLOC error: allocation error ugust')
+       
+       allocate (cam_out(c)%uovern(pcols), stat=ierror)
+       if ( ierror /= 0 ) call endrun('ATM2HUB_ALLOC error: allocation error uovern')
     enddo  
 
     do c = begchunk,endchunk
@@ -518,6 +544,10 @@ CONTAINS
        cam_out(c)%dstwet3(:)  = 0._r8
        cam_out(c)%dstdry4(:)  = 0._r8
        cam_out(c)%dstwet4(:)  = 0._r8
+       cam_out(c)%wsresp(:)   = 0._r8
+       cam_out(c)%tau_est(:)  = 0._r8
+       cam_out(c)%ugust(:)    = 0._r8
+       cam_out(c)%uovern(:)   = 0._r8
     end do
 
   end subroutine atm2hub_alloc
@@ -562,6 +592,10 @@ CONTAINS
           deallocate(cam_out(c)%dstdry3)
           deallocate(cam_out(c)%dstwet4)
           deallocate(cam_out(c)%dstdry4)
+          deallocate(cam_out(c)%wsresp)
+          deallocate(cam_out(c)%tau_est)
+          deallocate(cam_out(c)%ugust)
+          deallocate(cam_out(c)%uovern)
        enddo  
 
        deallocate(cam_out)
@@ -582,11 +616,13 @@ CONTAINS
           deallocate(cam_in(c)%lwup)
           deallocate(cam_in(c)%lhf)
           deallocate(cam_in(c)%shf)
+          deallocate(cam_in(c)%h2otemp)
           deallocate(cam_in(c)%wsx)
           deallocate(cam_in(c)%wsy)
           deallocate(cam_in(c)%tref)
           deallocate(cam_in(c)%qref)
           deallocate(cam_in(c)%u10)
+          deallocate(cam_in(c)%u10withgusts)
           deallocate(cam_in(c)%ts)
           deallocate(cam_in(c)%sst)
           deallocate(cam_in(c)%snowhland)
@@ -628,6 +664,7 @@ CONTAINS
              deallocate(cam_in(c)%depvel)
              nullify(cam_in(c)%depvel)
           end if
+          
        enddo
 
        deallocate(cam_in)
@@ -659,6 +696,7 @@ subroutine cam_export(state,cam_out,pbuf)
    use constituents,     only: pcnst
    use cam_control_mod,  only: rair
    use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc
+   use phys_control,     only: phys_getopts
    implicit none
 
    !------------------------------Arguments--------------------------------
@@ -678,8 +716,9 @@ subroutine cam_export(state,cam_out,pbuf)
    integer :: ncol
    integer :: prec_dp_idx, snow_dp_idx, prec_sh_idx, snow_sh_idx
    integer :: prec_sed_idx,snow_sed_idx,prec_pcw_idx,snow_pcw_idx
-   integer :: vmag_gust_idx
+   integer :: vmag_gust_idx, wsresp_idx, tau_est_idx
    real(r8) :: umb(pcols), vmb(pcols),vmag(pcols)
+   logical :: linearize_pbl_winds ! Send wsresp and tau_est to coupler.
 
    real(r8), pointer :: prec_dp(:)                 ! total precipitation   from ZM convection
    real(r8), pointer :: snow_dp(:)                 ! snow from ZM   convection
@@ -690,11 +729,15 @@ subroutine cam_export(state,cam_out,pbuf)
    real(r8), pointer :: prec_pcw(:)                ! total precipitation   from Hack convection
    real(r8), pointer :: snow_pcw(:)                ! snow from Hack   convection
    real(r8), pointer :: vmag_gust(:)
+   real(r8), pointer :: wsresp(:)                  ! First-order response of wind to surface stress
+   real(r8), pointer :: tau_est(:)                 ! Estimated stress in equilibrium with ubot/vbot
 
    !-----------------------------------------------------------------------
 
    lchnk = state%lchnk
    ncol  = state%ncol
+
+   call phys_getopts(linearize_pbl_winds_out=linearize_pbl_winds)
 
    prec_dp_idx = pbuf_get_index('PREC_DP')
    snow_dp_idx = pbuf_get_index('SNOW_DP')
@@ -716,19 +759,28 @@ subroutine cam_export(state,cam_out,pbuf)
    call pbuf_get_field(pbuf, snow_pcw_idx, snow_pcw)
    call pbuf_get_field(pbuf, vmag_gust_idx, vmag_gust)
 
+   if (linearize_pbl_winds) then
+      wsresp_idx = pbuf_get_index('wsresp')
+      tau_est_idx = pbuf_get_index('tau_est')
+      call pbuf_get_field(pbuf, wsresp_idx, wsresp)
+      call pbuf_get_field(pbuf, tau_est_idx, tau_est)
+   end if
+
 !PMA adds gustiness to surface scheme c20181128
 
    do i=1,ncol
-      umb(i)           = state%u(i,pver)
-      vmb(i)           = state%v(i,pver)
-      vmag(i)          = max(1.e-5_r8,sqrt( umb(i)**2._r8 + vmb(i)**2._r8))
+      cam_out%ubot(i)  = state%u(i,pver)
+      cam_out%vbot(i)  = state%v(i,pver)
+      cam_out%ugust(i) = vmag_gust(i)
       cam_out%tbot(i)  = state%t(i,pver)
       cam_out%thbot(i) = state%t(i,pver) * state%exner(i,pver)
       cam_out%zbot(i)  = state%zm(i,pver)
-      cam_out%ubot(i)  = state%u(i,pver) * ((vmag_gust(i)+vmag(i))/vmag(i))
-      cam_out%vbot(i)  = state%v(i,pver) * ((vmag_gust(i)+vmag(i))/vmag(i))
       cam_out%pbot(i)  = state%pmid(i,pver)
       cam_out%rho(i)   = cam_out%pbot(i)/(rair*cam_out%tbot(i))
+      if (linearize_pbl_winds) then
+         cam_out%wsresp(i)= max(wsresp(i), 0._r8)
+         cam_out%tau_est(i)= tau_est(i)
+      end if
       psm1(i,lchnk)    = state%ps(i)
       srfrpdel(i,lchnk)= state%rpdel(i,pver)
    end do

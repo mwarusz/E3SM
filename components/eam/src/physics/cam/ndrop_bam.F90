@@ -67,6 +67,11 @@ real(r8), allocatable :: num_to_mass_aer(:)
 integer :: naer_all      ! number of aerosols affecting climate
 integer :: idxsul   = -1 ! index in aerosol list for sulfate
 
+! Both microp_aero_init and zm_conv_init can call ndrop_bam_init.  Use this
+! logical so that it only gets called once.
+logical :: ndrop_bam_init_done = .false.
+
+
 !===============================================================================
 contains
 !===============================================================================
@@ -83,6 +88,8 @@ subroutine ndrop_bam_init
    real(r8) :: surften       ! surface tension of water w/respect to air (N/m)
    real(r8) :: arg
    !-------------------------------------------------------------------------------
+
+   if (ndrop_bam_init_done) return
 
    ! Access the physical properties of the bulk aerosols that are affecting the climate
    ! by using routines from the rad_constituents module.
@@ -126,12 +133,12 @@ subroutine ndrop_bam_init
       end if
    end if
 
-   call addfld ('CCN1',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.02%')
-   call addfld ('CCN2',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.05%')
-   call addfld ('CCN3',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.1%')
-   call addfld ('CCN4',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.2%')
-   call addfld ('CCN5',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.5%')
-   call addfld ('CCN6',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=1.0%')
+   call addfld ('CCN1',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=0.02%')
+   call addfld ('CCN2',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=0.05%')
+   call addfld ('CCN3',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=0.1%')
+   call addfld ('CCN4',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=0.2%')
+   call addfld ('CCN5',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=0.5%')
+   call addfld ('CCN6',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=1.0%')
 
    call add_default('CCN3', 1, ' ')
 
@@ -198,6 +205,8 @@ subroutine ndrop_bam_init
       enddo
 
    end do
+
+   ndrop_bam_init_done = .true.
 
 end subroutine ndrop_bam_init
 

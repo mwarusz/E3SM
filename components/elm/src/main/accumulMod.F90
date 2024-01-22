@@ -21,7 +21,7 @@ module accumulMod
   ! !USES:
   use shr_kind_mod, only: r8 => shr_kind_r8
   use shr_sys_mod , only: shr_sys_abort
-  use clm_varctl  , only: iulog
+  use elm_varctl  , only: iulog
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -86,7 +86,7 @@ contains
     !
     ! !USES:
     use shr_const_mod, only: SHR_CONST_CDAY
-    use clm_time_manager, only : get_step_size
+    use elm_time_manager, only : get_step_size
     use decompMod, only : get_proc_bounds, get_proc_global
     !
     ! !ARGUMENTS:
@@ -250,7 +250,7 @@ contains
     ! is assigned to  indicate the time average is not yet valid.
     !
     ! !USES:
-    use clm_varcon, only : spval, ispval
+    use elm_varcon, only : spval, ispval
     !
     ! !ARGUMENTS:
     implicit none
@@ -311,7 +311,7 @@ contains
     ! is assigned to  indicate the time average is not yet valid.
     !
     ! !USES:
-    use clm_varcon, only : spval
+    use elm_varcon, only : spval
     !
     ! !ARGUMENTS:
     implicit none
@@ -576,7 +576,7 @@ contains
     ! Read/write accumulation restart data
     !
     ! !USES:
-    use clm_varcon      , only : ispval
+    use elm_varcon      , only : ispval
     use restUtilMod     , only : restartvar
     use ncdio_pio       , only : file_desc_t, ncd_double, ncd_int
     !

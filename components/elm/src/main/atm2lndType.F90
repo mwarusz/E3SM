@@ -9,9 +9,9 @@ module atm2lndType
   use shr_infnan_mod, only : nan => shr_infnan_nan, assignment(=)
   use shr_log_mod   , only : errMsg => shr_log_errMsg
   use shr_megan_mod , only : shr_megan_mechcomps_n
-  use clm_varpar    , only : numrad, ndst, nlevgrnd !ndst = number of dust bins.
-  use clm_varcon    , only : rair, grav, cpair, hfus, tfrz, spval
-  use clm_varctl    , only : iulog, use_c13, use_cn, use_lch4, use_fates
+  use elm_varpar    , only : numrad, ndst, nlevgrnd !ndst = number of dust bins.
+  use elm_varcon    , only : rair, grav, cpair, hfus, tfrz, spval
+  use elm_varctl    , only : iulog, use_c13, use_cn, use_lch4, use_fates, use_fan
   use seq_drydep_mod, only : n_drydep, drydep_method, DD_XLND
   use decompMod     , only : bounds_type
   use abortutils    , only : endrun
@@ -87,6 +87,11 @@ module atm2lndType
      real(r8), pointer :: forc_po2_grc                  (:)   => null() ! O2 partial pressure (Pa)
      real(r8), pointer :: forc_aer_grc                  (:,:) => null() ! aerosol deposition array
      real(r8), pointer :: forc_pch4_grc                 (:)   => null() ! CH4 partial pressure (Pa)
+     real(r8), pointer :: forc_ndep_mgrz_grc            (:)   => null() ! FAN nitrogen deposition (manure) rate (gN/m2/s)
+     real(r8), pointer :: forc_ndep_past_grc            (:)   => null() ! FAN nitrogen deposition (fertilizer) rate (gN/m2/s)
+     real(r8), pointer :: forc_ndep_urea_grc            (:)   => null() ! FAN nitrogen deposition, urea fertilizer fraction
+     real(r8), pointer :: forc_ndep_nitr_grc            (:)   => null() ! FAN nitrogen deposition, nitrate fertilizer fraction
+     real(r8), pointer :: forc_soilph_grc               (:)   => null() ! FAN soil pH
 
      real(r8), pointer :: forc_t_not_downscaled_grc     (:)   => null() ! not downscaled atm temperature (Kelvin)       
      real(r8), pointer :: forc_th_not_downscaled_grc    (:)   => null() ! not downscaled atm potential temperature (Kelvin)    
@@ -113,7 +118,9 @@ module atm2lndType
      real(r8), pointer :: volrmch_grc                   (:)   => null() ! rof volr main channel (m3)
      real(r8), pointer :: supply_grc                    (:)   => null() ! rof volr supply (mm/s)
      real(r8), pointer :: deficit_grc                   (:)   => null() ! rof volr deficit (mm/s)
-	 
+     real(r8), pointer :: h2orof_grc                    (:)   => null() ! rof floodplain inundation volume [m3]
+     real(r8), pointer :: frac_h2orof_grc               (:)   => null() ! rof floodplain inundation fraction [-]
+ 
      ! anomaly forcing
      real(r8), pointer :: af_precip_grc                 (:)   => null() ! anomaly forcing 
      real(r8), pointer :: af_uwind_grc                  (:)   => null() ! anomaly forcing 
@@ -268,6 +275,8 @@ contains
     allocate(this%volrmch_grc                   (begg:endg))        ; this%volrmch_grc                   (:)   = ival
     allocate(this%supply_grc                    (begg:endg))        ; this%supply_grc                    (:)   = ival
     allocate(this%deficit_grc                   (begg:endg))        ; this%deficit_grc                   (:)   = ival
+    allocate(this%h2orof_grc                    (begg:endg))        ; this%h2orof_grc                    (:)   = ival
+    allocate(this%frac_h2orof_grc               (begg:endg))        ; this%frac_h2orof_grc               (:)   = ival
 
     ! anomaly forcing
     allocate(this%bc_precip_grc                 (begg:endg))        ; this%bc_precip_grc                 (:)   = ival
@@ -294,6 +303,13 @@ contains
     end if
     allocate(this%t_mo_patch                    (begp:endp))        ; this%t_mo_patch               (:)   = nan
     allocate(this%t_mo_min_patch                (begp:endp))        ; this%t_mo_min_patch           (:)   = spval ! TODO - initialize this elsewhere
+    if ( use_fan ) then
+       allocate(this%forc_ndep_mgrz_grc         (begg:endg))        ; this%forc_ndep_mgrz_grc            (:)   = ival
+       allocate(this%forc_ndep_past_grc         (begg:endg))        ; this%forc_ndep_past_grc            (:)   = ival
+       allocate(this%forc_ndep_urea_grc         (begg:endg))        ; this%forc_ndep_urea_grc            (:)   = ival
+       allocate(this%forc_ndep_nitr_grc         (begg:endg))        ; this%forc_ndep_nitr_grc            (:)   = ival
+       allocate(this%forc_soilph_grc            (begg:endg))        ; this%forc_soilph_grc               (:)   = ival
+    end if
 
   end subroutine InitAllocate
 
@@ -329,7 +345,7 @@ contains
     call hist_addfld1d (fname='VOLRMCH',  units='m3',  &
          avgflag='A', long_name='river channel main channel water storage', &
          ptr_lnd=this%volrmch_grc)
-		 
+
     this%supply_grc(begg:endg) = spval
     call hist_addfld1d (fname='SUPPLY',  units='mm/s',  &
          avgflag='A', long_name='runoff supply for land use', &
@@ -339,6 +355,17 @@ contains
     call hist_addfld1d (fname='DEFICIT',  units='mm/s',  &
          avgflag='A', long_name='runoff supply deficit', &
          ptr_lnd=this%deficit_grc)
+
+    this%h2orof_grc(begg:endg) = spval
+    call hist_addfld1d(fname='H2OROF',  units='mm',             &
+         avgflag='A', long_name='floodplain inundation volume', &
+         ptr_lnd=this%h2orof_grc, default='inactive')
+
+    this%frac_h2orof_grc(begg:endg) = spval
+    call hist_addfld1d(fname='FRAC_H2OROF',  units='1',           &
+         avgflag='A', long_name='floodplain inundation fraction', &
+         ptr_lnd=this%frac_h2orof_grc, default='inactive')
+
 
 !    this%forc_wind_grc(begg:endg) = spval
 !    call hist_addfld1d (fname='WIND', units='m/s',  &
@@ -453,22 +480,22 @@ contains
 
     ! Time averaged quantities
     this%fsi24_patch(begp:endp) = spval
-    call hist_addfld1d (fname='FSI24', units='K',  &
+    call hist_addfld1d (fname='FSI24', units='W/m2',  &
          avgflag='A', long_name='indirect radiation (last 24hrs)', &
          ptr_patch=this%fsi24_patch, default='inactive')
 
     this%fsi240_patch(begp:endp) = spval
-    call hist_addfld1d (fname='FSI240', units='K',  &
+    call hist_addfld1d (fname='FSI240', units='W/m2',  &
          avgflag='A', long_name='indirect radiation (last 240hrs)', &
          ptr_patch=this%fsi240_patch, default='inactive')
 
     this%fsd24_patch(begp:endp) = spval
-    call hist_addfld1d (fname='FSD24', units='K',  &
+    call hist_addfld1d (fname='FSD24', units='W/m2',  &
          avgflag='A', long_name='direct radiation (last 24hrs)', &
          ptr_patch=this%fsd24_patch, default='inactive')
 
     this%fsd240_patch(begp:endp) = spval
-    call hist_addfld1d (fname='FSD240', units='K',  &
+    call hist_addfld1d (fname='FSD240', units='W/m2',  &
          avgflag='A', long_name='direct radiation (last 240hrs)', &
          ptr_patch=this%fsd240_patch, default='inactive')
 
@@ -483,7 +510,7 @@ contains
     ! restart file for restart or branch runs
     !
     ! !USES 
-    use clm_varcon  , only : spval
+    use elm_varcon  , only : spval
     use accumulMod  , only : init_accum_field
     !
     ! !ARGUMENTS:
@@ -549,7 +576,7 @@ contains
     !
     ! !USES 
     use accumulMod       , only : extract_accum_field
-    use clm_time_manager , only : get_nstep
+    use elm_time_manager , only : get_nstep
     !
     ! !ARGUMENTS:
     class(atm2lnd_type) :: this
@@ -614,7 +641,7 @@ contains
   subroutine UpdateAccVars (this, bounds)
     !
     ! USES
-    use clm_time_manager, only : get_nstep
+    use elm_time_manager, only : get_nstep
     use accumulMod      , only : update_accum_field, extract_accum_field
     !
     ! !ARGUMENTS:

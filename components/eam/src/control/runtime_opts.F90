@@ -28,7 +28,6 @@ use constituents,    only: pcnst, readtrace
 use tracers,         only: tracers_flag
 use time_manager,    only: dtime
 use filenames,       only: ncdata, bnd_topo, &
-                           absems_data, &
                            caseid, &
                            brnch_retain_casename
 use dycore,          only: dycore_is
@@ -63,8 +62,6 @@ character(len=SHR_KIND_CL), private :: nlfilename = 'atm_in' ! Namelist filename
 !
 ! bnd_topo             Path and filename of topography dataset
 ! 
-! absems_data          Dataset with absorption and emissivity factors.
-!
 ! dtime = nnnn,        Model time step in seconds. Default is dycore dependent.
 ! 
 ! nlvdry = nn,         Number of layers over which to do dry
@@ -173,30 +170,35 @@ logical :: pbuf_global_allocate       ! allocate all buffers as global (default:
 
 ! Conservation checks
 
-logical            :: print_energy_errors ! switch for diagnostic output from check_energy module
+logical            :: print_energy_errors    ! switch for diagnostic output from check_energy module
+logical            :: print_additional_diagn ! switch for more diagnostic output
 
 ! SCM Options
 logical  :: single_column
 real(r8) :: scmlat,scmlon
-real(r8) :: scm_relaxation_low
-real(r8) :: scm_relaxation_high
+real(r8) :: iop_nudge_tq_low
+real(r8) :: iop_nudge_tq_high
+real(r8) :: iop_nudge_tscale
+real(r8) :: iop_perturb_high
 integer, parameter :: max_chars = 128
 character(len=max_chars) iopfile
-character(len=200) :: scm_clubb_iop_name
 logical  :: scm_iop_srf_prop
-logical  :: scm_relaxation
+logical  :: iop_dosubsidence
+logical  :: iop_nudge_tq
+logical  :: iop_nudge_uv
 logical  :: scm_diurnal_avg
-logical  :: scm_crm_mode
 logical  :: scm_observed_aero
-logical  :: swrad_off
-logical  :: lwrad_off
 logical  :: precip_off
+logical  :: scm_multcols
+logical  :: dp_crm
+logical  :: scm_zero_non_iop_tracers
 
 contains
 
 !=======================================================================
 
-  subroutine read_namelist(single_column_in, scmlon_in, scmlat_in, nlfilename_in )
+  subroutine read_namelist(single_column_in, scmlon_in, scmlat_in, scm_multcols_in,&
+                           nlfilename_in )
 
    !----------------------------------------------------------------------- 
    ! 
@@ -234,12 +236,12 @@ contains
    use cam_restart,      only: restart_defaultopts, restart_setopts, restart_printopts
    use co2_cycle,        only: co2_cycle_readnl
    use shr_string_mod,   only: shr_string_toUpper
-   use scamMod,          only: scam_setopts,scam_default_opts
+   use iop_data_mod,     only: iop_setopts,iop_default_opts
 
    ! Some modules read their own namelist input.
    use spmd_utils,          only: spmd_utils_readnl
    use physconst,           only: physconst_readnl
-   use phys_control,        only: phys_ctl_readnl
+   use phys_control,        only: phys_ctl_readnl, set_additional_diagn_in_phys_control
    use wv_saturation,       only: wv_sat_readnl
    use ref_pres,            only: ref_pres_readnl
    use cam3_aero_data,      only: cam3_aero_data_readnl
@@ -250,7 +252,6 @@ contains
    use subcol,              only: subcol_readnl
    use cloud_fraction,      only: cldfrc_readnl
    use cldfrc2m,            only: cldfrc2m_readnl
-   use unicon_cam,          only: unicon_cam_readnl
    use cldwat,              only: cldwat_readnl
    use zm_conv,             only: zmconv_readnl
    use hk_conv,             only: hkconv_readnl
@@ -264,6 +265,7 @@ contains
    use radiation_data,      only: rad_data_readnl
    use modal_aer_opt,       only: modal_aer_opt_readnl
    use clubb_intr,          only: clubb_readnl
+   use shoc_intr,           only: shoc_readnl
    use chemistry,           only: chem_readnl
    use lin_strat_chem,      only: linoz_readnl
    use prescribed_volcaero, only: prescribed_volcaero_readnl
@@ -274,6 +276,7 @@ contains
    use prescribed_ozone,    only: prescribed_ozone_readnl
    use prescribed_aero,     only: prescribed_aero_readnl
    use prescribed_ghg,      only: prescribed_ghg_readnl
+   use read_spa_data,       only: spa_readnl
    use aircraft_emit,       only: aircraft_emit_readnl
    use cospsimulator_intr,  only: cospsimulator_intr_readnl
    use sat_hist,            only: sat_hist_readnl
@@ -288,10 +291,15 @@ contains
    use metdata,             only: metdata_readnl
 #endif
    use radiation,           only: radiation_readnl
+   use conditional_diag,    only: cnd_diag_readnl
+#if defined(MMF_SAMXX) || defined(MMF_PAM)
+   use prescribed_macv2,    only: prescribed_macv2_readnl
+#endif
 
 !---------------------------Arguments-----------------------------------
 
    logical , intent(in), optional :: single_column_in 
+   logical , intent(in), optional :: scm_multcols_in
    real(r8), intent(in), optional :: scmlon_in
    real(r8), intent(in), optional :: scmlat_in
    character(len=*)    , optional :: nlfilename_in
@@ -317,7 +325,6 @@ contains
    !            it is not supported.
    namelist /cam_inparm/ ncdata, bnd_topo, &
                      cam_branch_file  , &
-                     absems_data, &
                      dtime, &
                      nlvdry,  &
                      pertlim ,&
@@ -342,13 +349,14 @@ contains
    namelist /cam_inparm/ pbuf_global_allocate
 
    ! conservation checks
-   namelist /cam_inparm/ print_energy_errors
+   namelist /cam_inparm/ print_energy_errors, print_additional_diagn
 
-   ! scam
-   namelist /cam_inparm/ iopfile,scm_iop_srf_prop,scm_relaxation, &
-                         scm_relaxation_low, scm_relaxation_high, &
-                         scm_diurnal_avg,scm_crm_mode,scm_clubb_iop_name, &
-                         scm_observed_aero,swrad_off,lwrad_off, precip_off
+   ! IOP
+    namelist /cam_inparm/ iopfile, scm_iop_srf_prop, iop_nudge_tq, iop_nudge_uv, &
+                         iop_nudge_tq_low, iop_nudge_tq_high, iop_nudge_tscale, &
+                         scm_observed_aero, precip_off, &
+                         scm_zero_non_iop_tracers, iop_perturb_high, dp_crm, &
+                         iop_dosubsidence, scm_zero_non_iop_tracers
 
 !-----------------------------------------------------------------------
 
@@ -385,23 +393,26 @@ contains
 
    ! conservation
    call check_energy_defaultopts( &
-      print_energy_errors_out = print_energy_errors )
+      print_energy_errors_out = print_energy_errors, &
+      print_additional_diagn_out  = print_additional_diagn )
 
-   ! Set default options for single column model
+   ! Set default options for single column or doubly periodic CRM mode
    if (present(single_column_in)) then
-      call scam_default_opts(scmlat_out=scmlat,scmlon_out=scmlon, &
+      call iop_default_opts(scmlat_out=scmlat,scmlon_out=scmlon, &
         single_column_out=single_column, &
         scm_iop_srf_prop_out=scm_iop_srf_prop,&
-        scm_relaxation_out=scm_relaxation, &
-        scm_relaxation_low_out=scm_relaxation_low, &
-        scm_relaxation_high_out=scm_relaxation_high, &
-        scm_diurnal_avg_out=scm_diurnal_avg, &
-        scm_crm_mode_out=scm_crm_mode, &
+        iop_nudge_tq_out=iop_nudge_tq, &
+        iop_nudge_uv_out=iop_nudge_uv, &
+        iop_nudge_tq_low_out=iop_nudge_tq_low, &
+        iop_nudge_tq_high_out=iop_nudge_tq_high, &
+        iop_nudge_tscale_out=iop_nudge_tscale, &
         scm_observed_aero_out=scm_observed_aero, &
-        swrad_off_out=swrad_off, &
-        lwrad_off_out=lwrad_off, &
         precip_off_out=precip_off, &
-        scm_clubb_iop_name_out=scm_clubb_iop_name)
+        iop_dosubsidence_out=iop_dosubsidence, &
+        iop_perturb_high_out=iop_perturb_high, &
+        scm_multcols_out=scm_multcols, &
+        dp_crm_out=dp_crm, &
+        scm_zero_non_iop_tracers_out=scm_zero_non_iop_tracers)
    end if
 
    ! Read in the cam_inparm namelist from input filename
@@ -467,27 +478,33 @@ contains
 
    ! conservation
    call check_energy_setopts( &
-      print_energy_errors_in = print_energy_errors )
+      print_energy_errors_in = print_energy_errors, &
+      print_additional_diagn_in = print_additional_diagn )
 
-   ! Set runtime options for single column mode
+   call set_additional_diagn_in_phys_control(print_additional_diagn)
+
+   ! Set runtime options for single column or doubly periodic CRM mode 
    if (present(single_column_in) .and. present(scmlon_in) .and. present(scmlat_in)) then 
       if (single_column_in) then
          single_column = single_column_in
          scmlon = scmlon_in
          scmlat = scmlat_in
-         call scam_setopts( scmlat_in=scmlat,scmlon_in=scmlon, &
+         scm_multcols = scm_multcols_in
+         call iop_setopts( scmlat_in=scmlat,scmlon_in=scmlon, &
                             iopfile_in=iopfile,single_column_in=single_column,&
                             scm_iop_srf_prop_in=scm_iop_srf_prop,&
-                            scm_relaxation_in=scm_relaxation, &
-                            scm_relaxation_low_in=scm_relaxation_low, &
-                            scm_relaxation_high_in=scm_relaxation_high, &
-                            scm_diurnal_avg_in=scm_diurnal_avg, &
-                            scm_crm_mode_in=scm_crm_mode, &
+			    iop_dosubsidence_in=iop_dosubsidence,&
+                            iop_nudge_tq_in=iop_nudge_tq, &
+                            iop_nudge_uv_in=iop_nudge_uv, &
+                            iop_nudge_tq_low_in=iop_nudge_tq_low, &
+                            iop_nudge_tq_high_in=iop_nudge_tq_high, &
+                            iop_nudge_tscale_in=iop_nudge_tscale, &
+			    iop_perturb_high_in=iop_perturb_high, &
                             scm_observed_aero_in=scm_observed_aero, &
-                            swrad_off_in=swrad_off, &
-                            lwrad_off_in=lwrad_off, &
                             precip_off_in=precip_off, &
-                            scm_clubb_iop_name_in=scm_clubb_iop_name)
+                            scm_multcols_in=scm_multcols,&
+                            dp_crm_in=dp_crm,&
+                            scm_zero_non_iop_tracers_in=scm_zero_non_iop_tracers)
       end if
    endif
 
@@ -515,10 +532,10 @@ contains
    call microp_driver_readnl(nlfilename)
    call microp_aero_readnl(nlfilename)
    call clubb_readnl(nlfilename)
+   call shoc_readnl(nlfilename)
    call subcol_readnl(nlfilename)
    call cldfrc_readnl(nlfilename)
    call cldfrc2m_readnl(nlfilename)
-   call unicon_cam_readnl(nlfilename)
    call zmconv_readnl(nlfilename)
    call cldwat_readnl(nlfilename)
    call hkconv_readnl(nlfilename)
@@ -540,6 +557,7 @@ contains
    call aerodep_flx_readnl(nlfilename)
    call prescribed_ozone_readnl(nlfilename)
    call prescribed_aero_readnl(nlfilename)
+   call spa_readnl(nlfilename)
    call prescribed_ghg_readnl(nlfilename)
    call co2_cycle_readnl(nlfilename)
    call aircraft_emit_readnl(nlfilename)
@@ -552,9 +570,14 @@ contains
 #if ( defined OFFLINE_DYN )
    call metdata_readnl(nlfilename)
 #endif
+   call cnd_diag_readnl(nlfilename)
 
    ! Read radiation namelist
    call radiation_readnl(nlfilename, dtime_in=dtime)
+
+#if defined(MMF_SAMXX) || defined(MMF_PAM)
+   call prescribed_macv2_readnl(nlfilename)
+#endif
 
    ! Print cam_inparm input variables to standard output
    if (masterproc) then
@@ -572,7 +595,6 @@ contains
          write(iulog,*) 'Initial dataset is: ',trim(ncdata)
       end if
       write(iulog,*)'Topography dataset is: ', trim(bnd_topo)
-      write(iulog,*)'Time-invariant (absorption/emissivity) factor dataset is: ', trim(absems_data)
 
       ! Type of run
       write(iulog,*)'Run type flag (NSREST) 0=initial, 1=restart, 3=branch ',nsrest
@@ -672,7 +694,6 @@ subroutine distnl
    call mpibcast (ctitle  ,len(ctitle),mpichar,0,mpicom)
    call mpibcast (ncdata  ,len(ncdata) ,mpichar,0,mpicom)
    call mpibcast (bnd_topo  ,len(bnd_topo) ,mpichar,0,mpicom)
-   call mpibcast (absems_data,len(absems_data),mpichar,0,mpicom)
    call mpibcast (cam_branch_file  ,len(cam_branch_file) ,mpichar,0,mpicom)
 
    call mpibcast (indirect     , 1 ,mpilog, 0,mpicom)
@@ -697,7 +718,8 @@ subroutine distnl
    call mpibcast (pbuf_global_allocate, 1, mpilog, 0, mpicom)
 
    ! Conservation
-   call mpibcast (print_energy_errors, 1, mpilog, 0, mpicom)
+   call mpibcast (print_energy_errors,    1, mpilog, 0, mpicom)
+   call mpibcast (print_additional_diagn, 1, mpilog, 0, mpicom)
 
 end subroutine distnl
 #endif

@@ -10,8 +10,8 @@ module derivative_mod_base
   use quadrature_mod, only : quadrature_t, gauss, gausslobatto,legendre, jacobi
   use parallel_mod,   only : abortmp
   use element_mod,    only : element_t
-  use control_mod,    only : hypervis_scaling, hypervis_power
-  use physical_constants, only : rrearth
+  use control_mod,    only : hypervis_scaling
+  use physical_constants, only : scale_factor_inv, laplacian_rigid_factor
 
 implicit none
 private
@@ -84,7 +84,6 @@ private
 !  public  :: laplace_eta
   public  :: laplace_z
   public  :: element_boundary_integral
-  public  :: edge_flux_u_cg
   public  :: limiter_optim_iter_full
   public  :: limiter_clip_and_sum
 
@@ -441,8 +440,8 @@ contains
              dsdx00 = dsdx00 + deriv%Dvv(i,l  )*s(i,j  )
              dsdy00 = dsdy00 + deriv%Dvv(i,l  )*s(j  ,i)
           end do
-          v1(l  ,j  ) = dsdx00*rrearth
-          v2(j  ,l  ) = dsdy00*rrearth
+          v1(l  ,j  ) = dsdx00*scale_factor_inv
+          v2(j  ,l  ) = dsdy00*scale_factor_inv
        end do
     end do
     ! convert covarient to latlon
@@ -512,8 +511,8 @@ contains
     ! convert contra -> latlon 
     do j=1,np
        do i=1,np
-          ds(i,j,1)=(elem%D(i,j,1,1)*dscontra(i,j,1) + elem%D(i,j,1,2)*dscontra(i,j,2))*rrearth
-          ds(i,j,2)=(elem%D(i,j,2,1)*dscontra(i,j,1) + elem%D(i,j,2,2)*dscontra(i,j,2))*rrearth
+          ds(i,j,1)=(elem%D(i,j,1,1)*dscontra(i,j,1) + elem%D(i,j,1,2)*dscontra(i,j,2))*scale_factor_inv
+          ds(i,j,2)=(elem%D(i,j,2,1)*dscontra(i,j,1) + elem%D(i,j,2,2)*dscontra(i,j,2))*scale_factor_inv
        enddo
     enddo
     end function curl_sphere_wk_testcov
@@ -578,8 +577,8 @@ contains
     ! convert contra -> latlon 
     do j=1,np
        do i=1,np
-          ds(i,j,1)=(elem%D(i,j,1,1)*dscontra(i,j,1) + elem%D(i,j,1,2)*dscontra(i,j,2)) *rrearth
-          ds(i,j,2)=(elem%D(i,j,2,1)*dscontra(i,j,1) + elem%D(i,j,2,2)*dscontra(i,j,2)) *rrearth
+          ds(i,j,1)=(elem%D(i,j,1,1)*dscontra(i,j,1) + elem%D(i,j,1,2)*dscontra(i,j,2)) *scale_factor_inv
+          ds(i,j,2)=(elem%D(i,j,2,1)*dscontra(i,j,1) + elem%D(i,j,2,2)*dscontra(i,j,2)) *scale_factor_inv
        enddo
     enddo
 
@@ -626,9 +625,9 @@ contains
 !DIR$ UNROLL(NP)
           do j=1,np
              ! phi(m)_x  sum over first index, second index fixed at n
-             dscov(m,n,1)=dscov(m,n,1)-(elem%mp(j,n)*elem%metdet(m,n)*s(j,n)*deriv%Dvv(m,j) )*rrearth
+             dscov(m,n,1)=dscov(m,n,1)-(elem%mp(j,n)*elem%metdet(m,n)*s(j,n)*deriv%Dvv(m,j) )*scale_factor_inv
              ! phi(n)_y  sum over second index, 1st index fixed at m
-             dscov(m,n,2)=dscov(m,n,2)-(elem%mp(m,j)*elem%metdet(m,n)*s(m,j)*deriv%Dvv(n,j) )*rrearth
+             dscov(m,n,2)=dscov(m,n,2)-(elem%mp(m,j)*elem%metdet(m,n)*s(m,j)*deriv%Dvv(n,j) )*scale_factor_inv
           enddo
        enddo
     enddo
@@ -767,8 +766,8 @@ contains
              dsdx00 = dsdx00 + deriv%Dvv(i,l  )*s(i,j  )
              dsdy00 = dsdy00 + deriv%Dvv(i,l  )*s(j  ,i)
           end do
-          v2(l  ,j  ) = -dsdx00*rrearth
-          v1(j  ,l  ) =  dsdy00*rrearth
+          v2(l  ,j  ) = -dsdx00*scale_factor_inv
+          v1(j  ,l  ) =  dsdy00*scale_factor_inv
        end do
     end do
     ! convert contra -> latlon *and* divide by jacobian
@@ -828,7 +827,7 @@ contains
           do j=1,np
              div(m,n)=div(m,n)-(elem%spheremp(j,n)*vtemp(j,n,1)*deriv%Dvv(m,j) &
                               +elem%spheremp(m,j)*vtemp(m,j,2)*deriv%Dvv(n,j)) &
-                              * rrearth
+                              * scale_factor_inv
           enddo
 
 #if 0
@@ -890,123 +889,27 @@ contains
     result=0
     j=1
     do i=1,np
-       result(i,j)=result(i,j)-deriv%Mvv_twt(i,i)*elem%metdet(i,j)*ucontra(i,j,2)*rrearth
+       result(i,j)=result(i,j)-deriv%Mvv_twt(i,i)*elem%metdet(i,j)*ucontra(i,j,2)*scale_factor_inv
     enddo
     
     j=np
     do i=1,np
-       result(i,j)=result(i,j)+deriv%Mvv_twt(i,i)*elem%metdet(i,j)*ucontra(i,j,2)*rrearth
+       result(i,j)=result(i,j)+deriv%Mvv_twt(i,i)*elem%metdet(i,j)*ucontra(i,j,2)*scale_factor_inv
     enddo
     
     i=1
     do j=1,np
-       result(i,j)=result(i,j)-deriv%Mvv_twt(j,j)*elem%metdet(i,j)*ucontra(i,j,1)*rrearth
+       result(i,j)=result(i,j)-deriv%Mvv_twt(j,j)*elem%metdet(i,j)*ucontra(i,j,1)*scale_factor_inv
     enddo
     
     i=np
     do j=1,np
-       result(i,j)=result(i,j)+deriv%Mvv_twt(j,j)*elem%metdet(i,j)*ucontra(i,j,1)*rrearth
+       result(i,j)=result(i,j)+deriv%Mvv_twt(j,j)*elem%metdet(i,j)*ucontra(i,j,1)*scale_factor_inv
     enddo
   end function element_boundary_integral
 
 
 
-  function edge_flux_u_cg( v,p,pedges, deriv, elem, u_is_contra) result(result)
-!
-!
-!   input:  v = velocity in contra or lat-lon coordinates (CONTINUIOUS)
-!           p      = scalar on this element
-!           pedges = scalar edge data from neighbor elements
-!
-!   ouput:  result(i,j) = contour integral of PHI_ij * pstar * v dot normal
-!           where PHI_ij = cardinal function at i,j GLL point 
-!           pstar = centered or other flux
-!
-    real(kind=real_kind), intent(in) :: v(np,np,2) 
-    real(kind=real_kind), intent(in) :: p(np,np) 
-    real(kind=real_kind), intent(in) :: pedges(0:np+1,0:np+1) 
-    type (derivative_t), intent(in) :: deriv
-    type (element_t), intent(in) :: elem
-    real(kind=real_kind) :: result(np,np)
-    logical :: u_is_contra
-
-    ! Local
-    real(kind=real_kind) :: ucontra(np,np,2)  ! in lat-lon coordinates
-    real(kind=real_kind) :: flux,pstar
-    integer i,j
-
-
-    result=0
-
-
-    if (u_is_contra) then
-       ucontra=v
-    else
-       ! latlon->contra
-       do j=1,np
-          do i=1,np
-             ucontra(i,j,1)=(elem%Dinv(i,j,1,1)*v(i,j,1) + elem%Dinv(i,j,1,2)*v(i,j,2))
-             ucontra(i,j,2)=(elem%Dinv(i,j,2,1)*v(i,j,1) + elem%Dinv(i,j,2,2)*v(i,j,2))
-          enddo
-       enddo
-    endif
-#if 0
-    ! centered
-    do i=1,np
-       j=1
-       pstar=(pedges(i,0) + p(i,j) ) /2
-       flux = -pstar*ucontra(i,j,2)*( deriv%Mvv_twt(i,i)*elem%metdet(i,j)*rrearth)
-       result(i,j)=result(i,j)+flux
-       
-       j=np
-       pstar=(pedges(i   ,np+1) + p(i,j) ) /2
-       flux = pstar*ucontra(i,j,2)* ( deriv%Mvv_twt(i,i)*elem%metdet(i,j)*rrearth)
-       result(i,j)=result(i,j)+flux
-    enddo
-    
-    do j=1,np
-       i=1
-       pstar=(pedges(0   ,j   ) + p(i,j) )/2
-       flux = -pstar*ucontra(i,j,1)* ( deriv%Mvv_twt(j,j)*elem%metdet(i,j)*rrearth)
-       result(i,j)=result(i,j)+flux
-       
-       i=np  
-       pstar=(pedges(np+1,j   ) + p(i,j) ) /2
-       flux = pstar*ucontra(i,j,1)* ( deriv%Mvv_twt(j,j)*elem%metdet(i,j)*rrearth)
-       result(i,j)=result(i,j)+flux
-    end do
-#else
-    ! upwind
-    do i=1,np
-       j=1
-       pstar=p(i,j)
-       if (ucontra(i,j,2)>0) pstar=pedges(i,0)
-       flux = -pstar*ucontra(i,j,2)*( deriv%Mvv_twt(i,i)*elem%metdet(i,j)*rrearth)
-       result(i,j)=result(i,j)+flux
-       
-       j=np
-       pstar=p(i,j)
-       if (ucontra(i,j,2)<0) pstar=pedges(i,np+1)
-       flux = pstar*ucontra(i,j,2)* ( deriv%Mvv_twt(i,i)*elem%metdet(i,j)*rrearth)
-       result(i,j)=result(i,j)+flux
-    enddo
-    
-    do j=1,np
-       i=1
-       pstar=p(i,j)
-       if (ucontra(i,j,1)>0) pstar=pedges(0,j)
-       flux = -pstar*ucontra(i,j,1)* ( deriv%Mvv_twt(j,j)*elem%metdet(i,j)*rrearth)
-       result(i,j)=result(i,j)+flux
-       
-       i=np  
-       pstar=p(i,j)
-       if (ucontra(i,j,1)<0) pstar=pedges(np+1,j)
-       flux = pstar*ucontra(i,j,1)* ( deriv%Mvv_twt(j,j)*elem%metdet(i,j)*rrearth)
-       result(i,j)=result(i,j)+flux
-    end do
-#endif    
-
-  end function edge_flux_u_cg
 
     
 !DIR$ ATTRIBUTES FORCEINLINE :: vorticity_sphere
@@ -1057,7 +960,7 @@ contains
 
     do j=1,np
        do i=1,np
-          vort(i,j)=(vort(i,j)-vtemp(i,j))*(elem%rmetdet(i,j)*rrearth)
+          vort(i,j)=(vort(i,j)-vtemp(i,j))*(elem%rmetdet(i,j)*scale_factor_inv)
        end do
     end do
 
@@ -1111,7 +1014,7 @@ contains
 
       do j=1,np
          do i=1,np 
-          vort(i,j)=(vort(i,j)-vtemp(i,j))*(elem%rmetdet(i,j)*rrearth)
+          vort(i,j)=(vort(i,j)-vtemp(i,j))*(elem%rmetdet(i,j)*scale_factor_inv)
          end do 
       end do 
      
@@ -1163,7 +1066,7 @@ contains
        end do
     end do
 
-    div(:,:)=(div(:,:)+vvtemp(:,:))*(elem%rmetdet(:,:)*rrearth)
+    div(:,:)=(div(:,:)+vvtemp(:,:))*(elem%rmetdet(:,:)*scale_factor_inv)
     
   end function divergence_sphere
 
@@ -1189,17 +1092,11 @@ contains
     grads=gradient_sphere(s,deriv,elem%Dinv)
  
     if (var_coef) then
-       if (hypervis_power/=0 ) then
-          ! scalar viscosity with variable coefficient
-          grads(:,:,1) = grads(:,:,1)*elem%variable_hyperviscosity(:,:)
-          grads(:,:,2) = grads(:,:,2)*elem%variable_hyperviscosity(:,:)
-       else if (hypervis_scaling /=0 ) then
+       if (hypervis_scaling /=0 ) then
           ! tensor hv, (3)
           oldgrads=grads
           do j=1,np
              do i=1,np
-!JMD                grads(i,j,1) = sum(oldgrads(i,j,:)*elem%tensorVisc(i,j,1,:))
-!JMD                grads(i,j,2) = sum(oldgrads(i,j,:)*elem%tensorVisc(i,j,2,:))
                 grads(i,j,1) = oldgrads(i,j,1)*elem%tensorVisc(i,j,1,1) + &
                                oldgrads(i,j,2)*elem%tensorVisc(i,j,1,2)
                 grads(i,j,2) = oldgrads(i,j,1)*elem%tensorVisc(i,j,2,1) + &
@@ -1294,8 +1191,8 @@ contains
 #define UNDAMPRRCART
 #ifdef UNDAMPRRCART
     ! add in correction so we dont damp rigid rotation
-    laplace(:,:,1)=laplace(:,:,1) + 2*elem%spheremp(:,:)*v(:,:,1)*(rrearth**2)
-    laplace(:,:,2)=laplace(:,:,2) + 2*elem%spheremp(:,:)*v(:,:,2)*(rrearth**2)
+    laplace(:,:,1)=laplace(:,:,1) + 2*elem%spheremp(:,:)*v(:,:,1)*(laplacian_rigid_factor**2)
+    laplace(:,:,2)=laplace(:,:,2) + 2*elem%spheremp(:,:)*v(:,:,2)*(laplacian_rigid_factor**2)
 #endif
   end function vlaplace_sphere_wk_cartesian
 
@@ -1326,12 +1223,6 @@ contains
     div=divergence_sphere(v,deriv,elem)
     vor=vorticity_sphere(v,deriv,elem)
 
-    if (var_coef .and. hypervis_power/=0 ) then
-          ! scalar viscosity with variable coefficient
-          div = div*elem%variable_hyperviscosity(:,:)
-          vor = vor*elem%variable_hyperviscosity(:,:)
-    endif
-
     if (present(nu_ratio)) div = nu_ratio*div
 
     laplace = gradient_sphere_wk_testcov(div,deriv,elem) - &
@@ -1340,10 +1231,11 @@ contains
     do n=1,np
        do m=1,np
           ! add in correction so we dont damp rigid rotation
+
 #define UNDAMPRR
 #ifdef UNDAMPRR
-          laplace(m,n,1)=laplace(m,n,1) + 2*elem%spheremp(m,n)*v(m,n,1)*(rrearth**2)
-          laplace(m,n,2)=laplace(m,n,2) + 2*elem%spheremp(m,n)*v(m,n,2)*(rrearth**2)
+          laplace(m,n,1)=laplace(m,n,1) + 2*elem%spheremp(m,n)*v(m,n,1)*(laplacian_rigid_factor**2)
+          laplace(m,n,2)=laplace(m,n,2) + 2*elem%spheremp(m,n)*v(m,n,2)*(laplacian_rigid_factor**2)
 #endif
        enddo
     enddo
@@ -1542,10 +1434,10 @@ contains
     flux_l(:,:) = MATMUL(boundary_interp_matrix(:,1,:),lr)
     flux_r(:,:) = MATMUL(boundary_interp_matrix(:,2,:),lr)
 
-    fluxes(:,:,1) = -flux_b(:,:)*rrearth
-    fluxes(:,:,2) =  flux_r(:,:)*rrearth
-    fluxes(:,:,3) =  flux_t(:,:)*rrearth
-    fluxes(:,:,4) = -flux_l(:,:)*rrearth
+    fluxes(:,:,1) = -flux_b(:,:)*scale_factor_inv
+    fluxes(:,:,2) =  flux_r(:,:)*scale_factor_inv
+    fluxes(:,:,3) =  flux_t(:,:)*scale_factor_inv
+    fluxes(:,:,4) = -flux_l(:,:)*scale_factor_inv
 
   end function subcell_div_fluxes
 
@@ -1577,7 +1469,7 @@ contains
        div(i,j,2) = -SUM(elem%spheremp(i,:)*v(i,:,2)*deriv%Dvv(j,:))
     end do
     end do
-    div = div * rrearth
+    div = div * scale_factor_inv
 
     div(:,:,1) = div(:,:,1) / elem%spheremp(:,:)
     div(:,:,2) = div(:,:,2) / elem%spheremp(:,:)

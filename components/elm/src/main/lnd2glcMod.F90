@@ -19,17 +19,15 @@ module lnd2glcMod
   use shr_log_mod     , only : errMsg => shr_log_errMsg
   use decompMod       , only : get_proc_bounds, bounds_type
   use domainMod       , only : ldomain
-  use clm_varpar      , only : maxpatch_glcmec
-  use clm_varctl      , only : iulog
-  use clm_varcon      , only : spval, tfrz, namec
+  use elm_varpar      , only : maxpatch_glcmec
+  use elm_varctl      , only : iulog
+  use elm_varcon      , only : spval, tfrz, namec
   use column_varcon   , only : col_itype_to_icemec_class
   use landunit_varcon , only : istice_mec, istsoil
   use abortutils      , only : endrun
-  use WaterFluxType   , only : waterflux_type
-  use TemperatureType , only : temperature_type
   use LandunitType    , only : lun_pp                
   use ColumnType      , only : col_pp
-  use ColumnDataType  , only : col_es, col_wf  
+  use ColumnDataType  , only : col_es, col_wf
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -52,7 +50,7 @@ module lnd2glcMod
   end type lnd2glc_type
 
   ! !PUBLIC MEMBER FUNCTIONS:
-  
+
   ! The following is public simply to support unit testing, and should not generally be
   ! called from outside this module.
   !
@@ -67,11 +65,11 @@ contains
   subroutine Init(this, bounds)
 
     class(lnd2glc_type) :: this
-    type(bounds_type), intent(in) :: bounds  
+    type(bounds_type), intent(in) :: bounds
 
     call this%InitAllocate(bounds)
     call this%InitHistory(bounds)
-    
+
   end subroutine Init
 
   !------------------------------------------------------------------------
@@ -81,15 +79,15 @@ contains
     ! Initialize land variables required by glc
     !
     ! !USES:
-    use clm_varcon , only : spval
+    use elm_varcon , only : spval
     use histFileMod, only : hist_addfld1d
     !
     ! !ARGUMENTS:
     class(lnd2glc_type) :: this
-    type(bounds_type), intent(in) :: bounds  
+    type(bounds_type), intent(in) :: bounds
     !
     ! !LOCAL VARIABLES:
-    integer :: begg,endg 
+    integer :: begg,endg
     !------------------------------------------------------------------------
 
     begg = bounds%begg; endg = bounds%endg
@@ -104,11 +102,11 @@ contains
   subroutine InitHistory(this, bounds)
     !
     ! !USES:
-    use histFileMod, only : hist_addfld1d,hist_addfld2d 
+    use histFileMod, only : hist_addfld1d,hist_addfld2d
     !
     ! !ARGUMENTS:
     class(lnd2glc_type) :: this
-    type(bounds_type), intent(in) :: bounds  
+    type(bounds_type), intent(in) :: bounds
     !
     ! !LOCAL VARIABLES:
     real(r8), pointer :: data2dptr(:,:)
@@ -144,19 +142,16 @@ contains
 
 
   !------------------------------------------------------------------------------
-  subroutine update_lnd2glc(this, bounds, num_do_smb_c, filter_do_smb_c, &
-       temperature_vars, waterflux_vars, init)
+  subroutine update_lnd2glc(this, bounds, num_do_smb_c, filter_do_smb_c,  init)
     !
     ! !DESCRIPTION:
     ! Assign values to lnd2glc+
     !
     ! !ARGUMENTS:
     class(lnd2glc_type)    , intent(inout) :: this
-    type(bounds_type)      , intent(in)    :: bounds  
+    type(bounds_type)      , intent(in)    :: bounds
     integer                , intent(in)    :: num_do_smb_c       ! number of columns in filter_do_smb_c
     integer                , intent(in)    :: filter_do_smb_c(:) ! column filter: columns where smb calculations are performed
-    type(temperature_type) , intent(in)    :: temperature_vars
-    type(waterflux_type)   , intent(in)    :: waterflux_vars
     logical                , intent(in)    :: init               ! if true=>only set a subset of fields
     !
     ! !LOCAL VARIABLES:
@@ -171,8 +166,8 @@ contains
 
     this%qice_grc(bounds%begg : bounds%endg, :) = 0._r8
     this%tsrf_grc(bounds%begg : bounds%endg, :) = tfrz
-    this%topo_grc(bounds%begg : bounds%endg, :) = 0._r8     
-  
+    this%topo_grc(bounds%begg : bounds%endg, :) = 0._r8
+
     ! Fill the lnd->glc data on the clm grid
 
     allocate(fields_assigned(bounds%begg:bounds%endg, 0:maxpatch_glcmec))
@@ -181,9 +176,9 @@ contains
     do fc = 1, num_do_smb_c
       c = filter_do_smb_c(fc)
       l = col_pp%landunit(c)
-      g = col_pp%gridcell(c) 
+      g = col_pp%gridcell(c)
 
-      ! Set vertical index and a flux normalization, based on whether the column in question is glacier or vegetated.  
+      ! Set vertical index and a flux normalization, based on whether the column in question is glacier or vegetated.
       if (lun_pp%itype(l) == istice_mec) then
          n = col_itype_to_icemec_class(col_pp%itype(c))
          flux_normalization = 1.0_r8
@@ -207,7 +202,7 @@ contains
          write(iulog,*) 'One possible cause is having multiple columns in the istsoil landunit,'
          write(iulog,*) 'which this routine cannot handle.'
          write(iulog,*) 'g, n = ', g, n
-         call endrun(decomp_index=c, clmlevel=namec, msg=errMsg(__FILE__, __LINE__))
+         call endrun(decomp_index=c, elmlevel=namec, msg=errMsg(__FILE__, __LINE__))
       end if
 
       ! Send surface temperature, topography, and SMB flux (qice) to coupler.
@@ -230,7 +225,7 @@ contains
     end do
 
     deallocate(fields_assigned)
-                
+
   end subroutine update_lnd2glc
 
   !-----------------------------------------------------------------------
@@ -284,7 +279,7 @@ contains
     !-----------------------------------------------------------------------
 
     t = col_pp%topounit(c)
-    
+
     area_glacier = get_landunit_weight(t, istice_mec)
 
     if (abs(area_glacier - 1.0_r8) < tol) then
@@ -299,4 +294,3 @@ contains
   end function bareland_normalization
 
 end module lnd2glcMod
-

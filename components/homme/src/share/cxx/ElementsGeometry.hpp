@@ -41,9 +41,23 @@ public:
   ExecViewManaged<Real * [2][2][NP][NP]> m_d;
   ExecViewManaged<Real * [2][2][NP][NP]> m_dinv;
 
+  // (x,y,z) points of GLL nodes
+  ExecViewManaged<Real * [NP][NP][3]> m_sphere_cart;
+  // (lat,lon)
+  ExecViewManaged<Real * [NP][NP][2]> m_sphere_latlon;
+
   ElementsGeometry() : m_num_elems(0) {}
 
-  void init (const int num_elems, const bool consthv, const bool alloc_gradphis);
+  Real m_scale_factor, m_laplacian_rigid_factor;
+
+  void init (const int num_elems, const bool consthv, const bool alloc_gradphis,
+             // Usually, scale_factor is rearth for sphere-Earth problems and 1
+             // for planar problems. Usually, laplacian_rigid_factor is 1/rearth
+             // for the sphere and 0 for the plane. If laplacian_rigid_factor is
+             // not passed as an argument, it defaults to 1/scale_factor.
+             const Real scale_factor, const Real laplacian_rigid_factor=-1,
+             // Allocate some arrays needed by SL transport.
+             const bool alloc_sphere_coords=false);
 
   void randomize (const int seed);
 
@@ -55,13 +69,15 @@ public:
                       CF90Ptr& D, CF90Ptr& Dinv, CF90Ptr& fcor,
                       CF90Ptr& spheremp, CF90Ptr& rspheremp,
                       CF90Ptr& metdet, CF90Ptr& metinv,
-                      CF90Ptr& phis, CF90Ptr& tensorvisc,
-                      CF90Ptr& vec_sph2cart, const bool consthv);
+                      CF90Ptr& tensorvisc,
+                      CF90Ptr& vec_sph2cart, const bool consthv,
+                      const Real* sphere_cart = nullptr, const Real* sphere_latlon = nullptr);
 
+  void set_phis (const int ie, CF90Ptr& phis);
 
 private:
   bool m_consthv;
-  int m_num_elems;
+  int  m_num_elems;
 };
 
 } // Homme

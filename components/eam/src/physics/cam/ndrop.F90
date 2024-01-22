@@ -15,6 +15,8 @@ use spmd_utils,       only: masterproc
 use ppgrid,           only: pcols, pver, pverp
 use physconst,        only: pi, rhoh2o, mwh2o, r_universal, rh2o, &
                             gravit, latvap, cpair, rair
+use physconst,        only: epsilo
+use activate_drop_mam, only: actdrop_mam_init, actdrop_mam_calc
 use constituents,     only: pcnst, cnst_get_ind
 use physics_types,    only: physics_state, physics_ptend, physics_ptend_init
 use physics_buffer,   only: physics_buffer_desc, pbuf_get_index, pbuf_get_field
@@ -258,19 +260,26 @@ subroutine ndrop_init
       end do
    end do
 
-   call addfld('CCN1',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.02%')
-   call addfld('CCN2',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.05%')
-   call addfld('CCN3',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.1%')
-   call addfld('CCN4',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.2%')
-   call addfld('CCN5',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=0.5%')
-   call addfld('CCN6',(/ 'lev' /), 'A','#/cm3','CCN concentration at S=1.0%')
+   ! convective microphysics
+   call actdrop_mam_init( &
+      iulog, pi, rair, r_universal, rh2o,   &
+      rhoh2o, mwh2o, epsilo, latvap, cpair, &
+      gravit, ntot_amode, sigmag_amode)
+
+
+   call addfld('CCN1',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=0.02%')
+   call addfld('CCN2',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=0.05%')
+   call addfld('CCN3',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=0.1%')
+   call addfld('CCN4',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=0.2%')
+   call addfld('CCN5',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=0.5%')
+   call addfld('CCN6',(/ 'lev' /), 'A','1/cm3','CCN concentration at S=1.0%')
 
 
    call addfld('WTKE', (/ 'lev' /), 'A', 'm/s', 'Standard deviation of updraft velocity')
-   call addfld('NDROPMIX', (/ 'lev' /), 'A', '#/kg/s', 'Droplet number mixing')
-   call addfld('NDROPSRC', (/ 'lev' /), 'A', '#/kg/s', 'Droplet number source')
-   call addfld('NDROPSNK', (/ 'lev' /), 'A', '#/kg/s', 'Droplet number loss by microphysics')
-   call addfld('NDROPCOL', horiz_only,    'A', '#/m2', 'Column droplet number')
+   call addfld('NDROPMIX', (/ 'lev' /), 'A', '1/kg/s', 'Droplet number mixing')
+   call addfld('NDROPSRC', (/ 'lev' /), 'A', '1/kg/s', 'Droplet number source')
+   call addfld('NDROPSNK', (/ 'lev' /), 'A', '1/kg/s', 'Droplet number loss by microphysics')
+   call addfld('NDROPCOL', horiz_only,    'A', '1/m2', 'Column droplet number')
 
    ! set the add_default fields  
    if (history_amwg) then
@@ -516,6 +525,10 @@ subroutine dropmixnuc( &
       ! no aerosol tendencies
       call physics_ptend_init(ptend, state%psetcols, 'ndrop')
    end if
+
+   !initialize variables to zero
+   ndropmix(:,:) = 0._r8
+   nsource(:,:) = 0._r8
 
    ! overall_main_i_loop
    do i = 1, ncol

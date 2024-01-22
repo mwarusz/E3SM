@@ -11,7 +11,7 @@ module RunoffMod
 ! !USES:
   use shr_kind_mod, only : r8 => shr_kind_r8
   use mct_mod
-  use RtmVar         , only : iulog, spval, heatflag
+  use RtmVar         , only : iulog, spval, heatflag, data_bgc_fluxes_to_ocean_flag
   use rof_cpl_indices, only : nt_rtm
 
 ! !PUBLIC TYPES:
@@ -59,6 +59,10 @@ module RunoffMod
      !    - local
      integer           :: begr,endr        ! local start/stop indices
      integer           :: lnumr            ! local number of cells
+     integer , pointer :: iDown(:)         ! downstream index, local index
+     integer , pointer :: nUp(:)           ! number of upstream units, maximum 8
+     integer , pointer :: nUp_dstrm(:)      ! number of units flowing into the downstream units, maximum 8
+     integer , pointer :: iUp(:,:)         ! indices of upstream units, local
 
      !    - local
      real(r8), pointer :: runofflnd(:,:)   ! runoff masked for land (m3 H2O/s)
@@ -72,18 +76,36 @@ module RunoffMod
      real(r8), pointer :: inundffunit(:)   ! Inundation  water volume (m3) 
      real(r8), pointer :: inundwf(:)       ! Inundation floodplain water volume (m3)
      real(r8), pointer :: inundhf(:)       ! Inundation floodplain water depth (m)
-     real(r8), pointer :: inundff(:)       ! Inundation floodplain water area fraction (no unit) added by Tian Dec 2017
+     real(r8), pointer :: inundff(:)       ! Inundation floodplain water area fraction (no unit)
+     real(r8), pointer :: concDIN(:)       ! Concentration of river outflow DIN (kg-N/kg-water)
+     real(r8), pointer :: concDIP(:)       ! Concentration of river outflow DIP (kg-P/kg-water)
+     real(r8), pointer :: concDON(:)       ! Concentration of river outflow DON (kg-N/kg-water)
+     real(r8), pointer :: concDOP(:)       ! Concentration of river outflow DOP (kg-P/kg-water)
+     real(r8), pointer :: concDOC(:)       ! Concentration of river outflow DOC (kg-C/kg-water)
+     real(r8), pointer :: concPP(:)        ! Concentration of river outflow PP (kg-P/kg-water)
+     real(r8), pointer :: concDSi(:)       ! Concentration of river outflow DSi (kg-Si/kg-water)
+     real(r8), pointer :: concPOC(:)       ! Concentration of river outflow POC (kg-C/kg-water)
+     real(r8), pointer :: concPN(:)        ! Concentration of river outflow PN (kg-N/kg-water)
+     real(r8), pointer :: concDIC(:)       ! Concentration of river outflow DIC (kg-C/kg-water)
+     real(r8), pointer :: concFe(:)        ! Concentration of river outflow Fe (kg-Fe/kg-water)
 
      !    - restarts
      real(r8), pointer :: wh(:,:)          ! MOSART hillslope surface water storage (m)
      real(r8), pointer :: wt(:,:)          ! MOSART sub-network water storage (m3)
      real(r8), pointer :: wr(:,:)          ! MOSART main channel water storage (m3)
+     real(r8), pointer :: mr(:,:)          ! MOSART channel area
+     real(r8), pointer :: yr(:,:)          ! MOSART channel water depth
+     real(r8), pointer :: pr(:,:)          ! MOSART channel wetted p
+     real(r8), pointer :: rr(:,:)          ! MOSART channel hydraulic r
      real(r8), pointer :: erout(:,:)       ! MOSART flow out of the main channel, instantaneous (m3/s) (negative is out)
      real(r8), pointer :: Tqsur(:)         ! MOSART hillslope surface runoff water temperature (K)
      real(r8), pointer :: Tqsub(:)         ! MOSART hillslope subsurface runoff water temperature (K)
      real(r8), pointer :: Tt(:)            ! MOSART sub-network water temperature (K)
      real(r8), pointer :: Tr(:)            ! MOSART main channel water temperature (K)
      real(r8), pointer :: Ha_rout(:)       ! MOSART heat flux out of the main channel, instantaneous (Watt)
+     real(r8), pointer :: wt_al(:,:)       ! MOSART sub-network channel active layer storage (kg for mud and sand sediment)
+     real(r8), pointer :: wr_al(:,:)       ! MOSART main channel active layer storage (kg for mud and sand sediment)
+     real(r8), pointer :: wres(:,:)        ! MOSART reservoir storage (m3 for water, kg for mud and sand sediment)
 
      ! inputs
      real(r8), pointer :: qsur(:,:)        ! coupler surface forcing [m3/s]
@@ -96,25 +118,41 @@ module RunoffMod
      real(r8), pointer :: flood(:)         ! coupler return flood water sent back to clm [m3/s]
      real(r8), pointer :: runoff(:,:)      ! coupler return mosart basin derived flow [m3/s]
      real(r8), pointer :: direct(:,:)      ! coupler return direct flow [m3/s]
+     real(r8), pointer :: inundinf(:)      ! coupler return drainage from floodplain inundation  [mm/s]
 
      !    - history (currently needed)
      real(r8), pointer :: runofflnd_nt1(:)
      real(r8), pointer :: runofflnd_nt2(:)
+     real(r8), pointer :: runofflnd_nt3(:)
+     real(r8), pointer :: runofflnd_nt4(:)
      real(r8), pointer :: runoffocn_nt1(:)
      real(r8), pointer :: runoffocn_nt2(:)
+     real(r8), pointer :: runoffocn_nt3(:)
+     real(r8), pointer :: runoffocn_nt4(:)
      real(r8), pointer :: runofftot_nt1(:)
      real(r8), pointer :: runofftot_nt2(:)
+     real(r8), pointer :: runofftot_nt3(:)
+     real(r8), pointer :: runofftot_nt4(:)
      real(r8), pointer :: runoffdir_nt1(:)
      real(r8), pointer :: runoffdir_nt2(:)
+     real(r8), pointer :: runoffdir_nt3(:)
+     real(r8), pointer :: runoffdir_nt4(:)
      real(r8), pointer :: dvolrdtlnd_nt1(:)
      real(r8), pointer :: dvolrdtlnd_nt2(:)
+     real(r8), pointer :: dvolrdtlnd_nt3(:)
+     real(r8), pointer :: dvolrdtlnd_nt4(:)
      real(r8), pointer :: dvolrdtocn_nt1(:)
      real(r8), pointer :: dvolrdtocn_nt2(:)
      real(r8), pointer :: wr_nt1(:)
+     real(r8), pointer :: dvolrdtocn_nt3(:)
+     real(r8), pointer :: dvolrdtocn_nt4(:)
      real(r8), pointer :: volr_nt1(:)
      real(r8), pointer :: volr_nt2(:)
+     real(r8), pointer :: volr_nt3(:)
+     real(r8), pointer :: volr_nt4(:)
      real(r8), pointer :: qsur_nt1(:)
      real(r8), pointer :: qsur_nt2(:)
+     real(r8), pointer :: qsur_nt3(:)
      real(r8), pointer :: qsub_nt1(:)
      real(r8), pointer :: qsub_nt2(:)
      real(r8), pointer :: qgwl_nt1(:)
@@ -136,6 +174,9 @@ module RunoffMod
      real(r8), pointer :: templand_Tqsub_nt2(:)
      real(r8), pointer :: templand_Ttrib_nt2(:)
      real(r8), pointer :: templand_Tchanr_nt2(:)
+
+     real(r8), pointer :: ssh(:)
+     real(r8), pointer :: yr_nt1(:)
      
   end type runoff_flow
 
@@ -152,11 +193,12 @@ module RunoffMod
                                   ! i.e., if the time step of the incoming runoff data is 3-hr, and num_dt is set to 10, 
                                   ! then deltaT = 3*3600/10 = 1080 seconds
      real(r8) :: DeltaT           ! Time step in seconds 
+     real(r8) :: coupling_period  ! couping period of rof in seconds
      integer  :: DLevelH2R        ! The base number of channel routing sub-time-steps within one hillslope routing step. 
                                   ! Usually channel routing requires small time steps than hillslope routing.
      integer  :: DLevelR          ! The number of channel routing sub-time-steps at a higher level within one channel routing step at a lower level. 
      integer  :: Restart          ! flag, Restart=1 means starting from the state of last run, =0 means starting from model-inset initial state.
-     integer  :: RoutingMethod    ! Flag for routing methods. 1 --> variable storage method from SWAT model; 2 --> Muskingum method?  ( 1 -- Kinematic wave method; 4 -- Diffusion wave method. --Inund. )
+     integer  :: RoutingMethod    ! Flag for routing methods. 1 --> Kinematic wave routing method; 2 --> Diffusion wave method.
      integer  :: RoutingFlag      ! Flag for whether including hillslope and sub-network routing. 1--> include routing through hillslope, sub-network and main channel; 0--> main channel routing only.
  
      character(len=100) :: baseName    ! name of the case study, e.g., columbia
@@ -222,7 +264,10 @@ module RunoffMod
      real(r8), pointer :: rlenTotal(:) ! length of all reaches, [m]
      real(r8), pointer :: Gxr(:)       ! drainage density within the cell, [1/m]
      real(r8), pointer :: frac(:)      ! fraction of cell included in the study area, [-]
+     real(r8), pointer :: domainfrac(:)! fraction of cell included in the study area from domain file, [-]
      logical , pointer :: euler_calc(:)! flag for calculating tracers in euler
+     integer , pointer :: ocn_rof_coupling_ID(:)  ! ocn rof 2-way coupling ID, 0=off, 1=on
+     real(r8), pointer :: vdatum_conversion(:)    ! ocn rof 2-way coupling vertical datum conversion
 
      ! hillslope properties
      real(r8), pointer :: nh(:)        ! manning's roughness of the hillslope (channel network excluded) 
@@ -248,16 +293,21 @@ module RunoffMod
      integer , pointer :: dnID(:)      ! IDs of the downstream units, corresponding to the subbasin ID in the input table
      integer , pointer :: nUp(:)       ! number of upstream units, maximum 8
      integer , pointer :: iUp(:,:)     ! IDs of upstream units, corresponding to the subbasin ID in the input table
-  
+
      integer , pointer :: indexDown(:) ! indices of the downstream units in the ID array. sometimes subbasins IDs may not be continuous
+     integer , pointer :: iDown(:)     ! indices of the downstream units, local
+     integer , pointer :: nUp_dstrm(:)       ! number of upstream units, maximum 8
   
      integer , pointer :: numDT_r(:)   ! for a main reach, the number of sub-time-steps needed for numerical stability
      integer , pointer :: numDT_t(:)   ! for a subnetwork reach, the number of sub-time-steps needed for numerical stability
      real(r8), pointer :: phi_r(:)     ! the indicator used to define numDT_r
      real(r8), pointer :: phi_t(:)     ! the indicator used to define numDT_t
-   
      real(r8), pointer :: rlen_dstrm(:)  ! Length of downstream channel (m).
      real(r8), pointer :: rslp_dstrm(:)  ! Bed slope of downstream channel (dimensionless).
+
+!#ifdef INCLUDE_INUND   
+     !real(r8), pointer :: rlen_dstrm(:)  ! Length of downstream channel (m).
+     !real(r8), pointer :: rslp_dstrm(:)  ! Bed slope of downstream channel (dimensionless).
      real(r8), pointer :: wr_bf(:)       ! Water volume in the bankfull channel (i.e., channel storage capacity) (m^3).
   
      ! --------------------------------- 
@@ -311,6 +361,8 @@ module RunoffMod
      real(r8), pointer :: ehout(:,:)   ! overland flow from hillslope into the sub-channel, [m/s]          ( Note: outflow is negative. --Inund. )
      real(r8), pointer :: asat(:,:)    ! saturated area fraction from hillslope, [-]
      real(r8), pointer :: esat(:,:)    ! evaporation from saturated area fraction at hillslope, [m/s]
+     real(r8), pointer :: ehexchange(:,:)    ! net influx from hillslope (soil) storage into overland flow, e.g., soil erosion [kg/s], or runoff re-infiltration [m/s]
+     real(r8), pointer :: ehexch_avg(:,:)    ! net influx from hillslope (soil) storage into overland flow, e.g., soil erosion [kg/s], or runoff re-infiltration [m/s], average
 
      ! subnetwork channel
      !! states
@@ -323,11 +375,16 @@ module RunoffMod
      real(r8), pointer :: pt(:,:)      ! wetness perimeter, [m]
      real(r8), pointer :: vt(:,:)      ! flow velocity, [m/s]
      real(r8), pointer :: tt(:,:)      ! mean travel time of the water within the channel, [s]
+     real(r8), pointer :: conc_t(:,:)  ! MOSART sub-network concentration of tracers such as sediment, C,N,P (kg/m**3)
+     real(r8), pointer :: wt_al(:,:)   ! MOSART sub-network channel active layer storage (kg for mud and sand sediment)
+     real(r8), pointer :: dwt_al(:,:)   ! change of MOSART sub-network channel active layer storage (kg for mud and sand sediment)
      !! fluxes
      real(r8), pointer :: tevap(:,:)   ! evaporation, [m/s]
      real(r8), pointer :: etin(:,:)    ! lateral inflow from hillslope, including surface and subsurface runoff generation components, [m3/s]
      real(r8), pointer :: etout(:,:)   ! discharge from sub-network into the main reach, [m3/s]          ( Note: outflow is negative. --Inund. )
      real(r8), pointer :: qdem(:,:)    ! irrigation demand [m/s] !added by Yuna 1/29/2018
+     real(r8), pointer :: etexchange(:,:)    ! net influx from channel bank storage into channel, e.g., sediment erosion/deposition [kg/s], or groundwater/river water exchange [m/s]
+     real(r8), pointer :: etexch_avg(:,:)    ! net influx from channel bank storage into channel, e.g., sediment erosion/deposition [kg/s], or groundwater/river water exchange [m/s], average
 
      ! main channel
      !! states
@@ -340,6 +397,14 @@ module RunoffMod
      real(r8), pointer :: pr(:,:)      ! wetness perimeter, [m]
      real(r8), pointer :: vr(:,:)      ! flow velocity, [m/s]
      real(r8), pointer :: tr(:,:)      ! mean travel time of the water within the channel, [s]
+     real(r8), pointer :: conc_r(:,:)  ! MOSART main channel concentration of tracers such as sediment, C,N,P (kg/m**3)
+     real(r8), pointer :: wr_al(:,:)   ! MOSART main channel active layer storage (kg for mud and sand sediment)
+     real(r8), pointer :: dwr_al(:,:)   ! change of MOSART main channel active layer storage (kg for mud and sand sediment)
+     real(r8), pointer :: rslp_energy(:)! energy slope of channel water surface [-]
+     real(r8), pointer :: wr_dstrm(:,:)  ! Downstream-channel water volume  (to constrain large upward flow from downstream channel to current channel ) (m^3 or kg).
+     real(r8), pointer :: yr_dstrm(:)  ! Downstream-channel water depth (m).
+     real(r8), pointer :: conc_r_dstrm(:,:) ! Downstream-channel concentration of BGC fluxes (kg/m**3).
+
      !! exchange fluxes
      real(r8), pointer :: erlg(:,:)    ! evaporation, [m/s]
      real(r8), pointer :: erlateral(:,:) ! lateral flow from hillslope, including surface and subsurface runoff generation components, [m3/s]
@@ -356,6 +421,9 @@ module RunoffMod
      real(r8), pointer :: erin1(:,:)   ! inflow from upstream links during previous step, used for Muskingum method, [m3/s]
      real(r8), pointer :: erin2(:,:)   ! inflow from upstream links during current step, used for Muskingum method, [m3/s]
      real(r8), pointer :: ergwl(:,:)   ! flux item for the adjustment of water balance residual in glacie, wetlands and lakes dynamics [m3/s]
+     real(r8), pointer :: erexchange(:,:)    ! net influx from channel bank storage into channel, e.g., sediment erosion/deposition [kg/s], or groundwater/river water exchange [m/s]
+     real(r8), pointer :: erexch_avg(:,:)    ! net influx from channel bank storage into channel, e.g., sediment erosion/deposition [kg/s], or groundwater/river water exchange [m/s], average
+     real(r8), pointer :: erin_dstrm(:,:)    ! total riverine inflow into the downstream link[m3/s]
 
      !! for Runge-Kutta algorithm
      real(r8), pointer :: wrtemp(:,:)  ! temporary storage item, for 4th order Runge-Kutta  algorithm;
@@ -497,6 +565,10 @@ contains
              rtmCTL%latc(begr:endr),              &
              rtmCTL%dsig(begr:endr),              &
              rtmCTL%rdsig(begr:endr),             &
+             rtmCTL%iDown(begr:endr),             &
+             rtmCTL%nUp(begr:endr),               &
+             rtmCTL%nUp_dstrm(begr:endr),         &
+             rtmCTL%iUp(begr:endr,8),             &
              rtmCTL%outletg(begr:endr),           &
              rtmCTL%routletg(begr:endr),          &
              rtmCTL%inundwf(begr:endr),           &
@@ -505,21 +577,28 @@ contains
              rtmCTL%inundffunit(begr:endr),       &
              rtmCTL%runofflnd_nt1(begr:endr),     &
              rtmCTL%runofflnd_nt2(begr:endr),     &
+             rtmCTL%runofflnd_nt3(begr:endr),     &
+             rtmCTL%runofflnd_nt4(begr:endr),     &
              rtmCTL%runoffocn_nt1(begr:endr),     &
              rtmCTL%runoffocn_nt2(begr:endr),     &
+             rtmCTL%runoffocn_nt3(begr:endr),     &
+             rtmCTL%runoffocn_nt4(begr:endr),     &
              rtmCTL%runofftot_nt1(begr:endr),     &
              rtmCTL%runofftot_nt2(begr:endr),     &
              rtmCTL%runoffdir_nt1(begr:endr),     &
              rtmCTL%runoffdir_nt2(begr:endr),     &
              rtmCTL%volr_nt1(begr:endr),          &
              rtmCTL%volr_nt2(begr:endr),          &
+             rtmCTL%volr_nt3(begr:endr),          &
+             rtmCTL%volr_nt4(begr:endr),          &
              rtmCTL%dvolrdtlnd_nt1(begr:endr),    &
              rtmCTL%dvolrdtlnd_nt2(begr:endr),    &
              rtmCTL%dvolrdtocn_nt1(begr:endr),    &
              rtmCTL%dvolrdtocn_nt2(begr:endr),    &
-             rtmCTL%wr_nt1(begr:endr),          &
+             rtmCTL%wr_nt1(begr:endr),            &
              rtmCTL%qsur_nt1(begr:endr),          &
              rtmCTL%qsur_nt2(begr:endr),          &
+             rtmCTL%qsur_nt3(begr:endr),          &
              rtmCTL%qsub_nt1(begr:endr),          &
              rtmCTL%qsub_nt2(begr:endr),          &
              rtmCTL%qgwl_nt1(begr:endr),          &
@@ -535,21 +614,52 @@ contains
              rtmCTL%fthresh(begr:endr),           &
              rtmCTL%flood(begr:endr),             &
              rtmCTL%direct(begr:endr,nt_rtm),     &
+             rtmCTL%inundinf(begr:endr),          &
              rtmCTL%wh(begr:endr,nt_rtm),         &
              rtmCTL%wt(begr:endr,nt_rtm),         &
              rtmCTL%wr(begr:endr,nt_rtm),         &
+             rtmCTL%mr(begr:endr,nt_rtm),         &
+             rtmCTL%yr(begr:endr,nt_rtm),         &
+             rtmCTL%pr(begr:endr,nt_rtm),         &
+             rtmCTL%rr(begr:endr,nt_rtm),         &
              rtmCTL%erout(begr:endr,nt_rtm),      &
              rtmCTL%qsur(begr:endr,nt_rtm),       & 
              rtmCTL%qsub(begr:endr,nt_rtm),       &
              rtmCTL%qgwl(begr:endr,nt_rtm),       &
              rtmCTL%qdto(begr:endr,nt_rtm),       &
              rtmCTL%qdem(begr:endr,nt_rtm),       & 
+             rtmCTL%yr_nt1(begr:endr),            &
+             rtmCTL%ssh(begr:endr),               &
              stat=ier)
     if (ier /= 0) then
        write(iulog,*)'Rtmini ERROR allocation of runoff local arrays'
        call shr_sys_abort
     end if
 
+    if (data_bgc_fluxes_to_ocean_flag) then
+      allocate(rtmCTL%concDIN(begr:endr),           &
+               rtmCTL%concDIP(begr:endr),           &
+               rtmCTL%concDON(begr:endr),           &
+               rtmCTL%concDOP(begr:endr),           &
+               rtmCTL%concDOC(begr:endr),           &
+               rtmCTL%concPP(begr:endr),            &
+               rtmCTL%concDSi(begr:endr),           &
+               rtmCTL%concPOC(begr:endr),           &
+               rtmCTL%concPN(begr:endr),            &
+               rtmCTL%concDIC(begr:endr),           &
+               rtmCTL%concFe(begr:endr),            &
+               stat=ier)
+      if (ier /= 0) then
+         write(iulog,*)'Rtmini ERROR allocation of BGC local arrays'
+         call shr_sys_abort
+      end if
+    end if
+
+    rtmCTL%iDown(:) = 0
+    rtmCTL%iUp(:,:) = 0
+    rtmCTL%nUp(:) = 0
+    rtmCTL%nUp_dstrm(:) = 0
+    
     rtmCTL%runoff(:,:)     = 0._r8
     rtmCTL%runofflnd(:,:)  = spval
     rtmCTL%runoffocn(:,:)  = spval
@@ -560,15 +670,32 @@ contains
     rtmCTL%volr(:,:)       = 0._r8
     rtmCTL%flood(:)        = 0._r8
     rtmCTL%direct(:,:)     = 0._r8
+    rtmCTL%inundinf(:)     = 0._r8
     rtmCTL%inundwf(:)      = 0._r8
     rtmCTL%inundhf(:)      = 0._r8
     rtmCTL%inundff(:)      = 0._r8
     rtmCTL%inundffunit(:)  = 0._r8
+    rtmCTL%wh(:,:)         = 0._r8
+    rtmCTL%wt(:,:)         = 0._r8
+    rtmCTL%wr(:,:)         = 0._r8
     rtmCTL%qsur(:,:)       = 0._r8
     rtmCTL%qsub(:,:)       = 0._r8
     rtmCTL%qgwl(:,:)       = 0._r8
     rtmCTL%qdto(:,:)       = 0._r8
     rtmCTL%qdem(:,:)       = 0._r8
+    if (data_bgc_fluxes_to_ocean_flag) then
+      rtmCTL%concDIN(:)      = 0._r8
+      rtmCTL%concDIP(:)      = 0._r8
+      rtmCTL%concDON(:)      = 0._r8
+      rtmCTL%concDOP(:)      = 0._r8
+      rtmCTL%concDOC(:)      = 0._r8
+      rtmCTL%concPP(:)       = 0._r8
+      rtmCTL%concDSi(:)      = 0._r8
+      rtmCTL%concPOC(:)      = 0._r8
+      rtmCTL%concPN(:)       = 0._r8
+      rtmCTL%concDIC(:)      = 0._r8
+      rtmCTL%concFe(:)       = 0._r8
+    end if
     
     if (heatflag) then
       allocate(rtmCTL%Tqsur(begr:endr),                 &

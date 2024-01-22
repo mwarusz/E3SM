@@ -22,7 +22,6 @@ subroutine initial_conds(dyn_in)
    ! routine read_inidat.
 
    use comsrf,        only: initialize_comsrf
-   use radae,         only: initialize_radbuffer
 #if (defined E3SM_SCM_REPLAY )
    use history_defaults, only: initialize_iop_history
 #endif
@@ -32,7 +31,8 @@ subroutine initial_conds(dyn_in)
    use inidat,        only: read_inidat
    use dyn_comp,      only: dyn_import_t
    use cam_pio_utils, only: clean_iodesc_list
-
+   use perf_mod,      only: t_startf, t_stopf
+   
    type(dyn_import_t),  intent(inout) :: dyn_in
 
    ! Local variables
@@ -42,18 +42,21 @@ subroutine initial_conds(dyn_in)
    ! Initialize buffer, comsrf, and radbuffer variables 
    ! (which must occur after the call to phys_grid_init)
    call initialize_comsrf
-   call initialize_radbuffer
 
 #if (defined E3SM_SCM_REPLAY )
    call initialize_iop_history
 #endif
 
    ! Read in initial data
+   call t_startf('read_inidat')
    fh_ini  => initial_file_get_id()
    fh_topo => topo_file_get_id()
    call read_inidat(fh_ini, fh_topo, dyn_in)
+   call t_stopf('read_inidat')
 
+   call t_startf('clean_iodesc_list')
    call clean_iodesc_list()
+   call t_stopf('clean_iodesc_list')
 
 end subroutine initial_conds
 

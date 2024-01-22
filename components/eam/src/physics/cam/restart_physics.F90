@@ -4,8 +4,7 @@ module restart_physics
   use spmd_utils,         only: masterproc
   use co2_cycle,          only: co2_transport
   use constituents,       only: pcnst
-  use radae,              only: abstot_3d, absnxt_3d, emstot_3d, initialize_radbuffer, ntoplw
-  use comsrf,             only: sgh, sgh30, landm, trefmxav, trefmnav, initialize_comsrf 
+  use comsrf,             only: sgh, sgh30, trefmxav, trefmnav, initialize_comsrf 
   use ioFileMod
   use cam_abortutils,     only: endrun
   use camsrfexch,         only: cam_in_t, cam_out_t
@@ -19,6 +18,7 @@ module restart_physics
                                 pio_put_var, pio_get_var
   use cospsimulator_intr, only: docosp
   use radiation,          only: cosp_cnt_init, cosp_cnt, rad_randn_seedrst, kiss_seed_num
+  use perf_mod,           only: t_startf, t_stopf
 
   implicit none
   private
@@ -28,7 +28,6 @@ module restart_physics
 !
   public :: write_restart_physics    ! Write the physics restart info out
   public :: read_restart_physics     ! Read the physics restart info in
-  public :: get_abs_restart_filepath ! Get the name of the restart filepath
   public :: init_restart_physics
 
 !
@@ -39,7 +38,7 @@ module restart_physics
 
     logical           :: pergro_mods = .false.
 
-    type(var_desc_t) :: trefmxav_desc, trefmnav_desc, flwds_desc, landm_desc, sgh_desc, &
+    type(var_desc_t) :: trefmxav_desc, trefmnav_desc, flwds_desc, sgh_desc, &
          sgh30_desc, solld_desc, co2prog_desc, co2diag_desc, sols_desc, soll_desc, &
          solsd_desc, emstot_desc, absnxt_desc(4)
 
@@ -51,6 +50,12 @@ module restart_physics
     type(var_desc_t), allocatable :: abstot_desc(:)
 
     type(var_desc_t) :: cospcnt_desc, rad_randn_seedrst_desc
+
+    type(var_desc_t),allocatable :: cnd_metric_desc(:)
+    type(var_desc_t),allocatable :: cnd_flag_desc(:)
+    type(var_desc_t),allocatable :: cnd_fld_val_desc(:,:,:)
+    type(var_desc_t),allocatable :: cnd_fld_inc_desc(:,:,:)
+    type(var_desc_t),allocatable :: cnd_fld_old_desc(:,:)
 
   CONTAINS
     subroutine init_restart_physics ( File, pbuf2d)
@@ -69,6 +74,7 @@ module restart_physics
     use subcol_utils,        only: is_subcol_on
     use subcol,              only: subcol_init_restart
     use phys_control,        only: phys_getopts
+    use conditional_diag_restart, only: cnd_diag_init_restart
 
     type(file_desc_t), intent(inout) :: file
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -105,6 +111,12 @@ module restart_physics
 
     call pbuf_init_restart(File, pbuf2d)
 
+    ! CondiDiag
+    call cnd_diag_init_restart( dimids, hdimcnt, pver, pver_id, pverp_id,            &! in
+                                File, cnd_metric_desc,  cnd_flag_desc,               &! inout
+                                cnd_fld_val_desc, cnd_fld_old_desc, cnd_fld_inc_desc )! inout
+
+    !-----
     if ( .not. adiabatic .and. .not. ideal_phys )then
        
        call chem_init_restart(File)
@@ -117,7 +129,6 @@ module restart_physics
 
        call cam_pio_def_dim(File, 'pcnst', pcnst, dimids(hdimcnt+1), existOK=.true.)
     
-       ierr = pio_def_var(File, 'LANDM',    pio_double, hdimids, landm_desc)
        ierr = pio_def_var(File, 'SGH',      pio_double, hdimids, sgh_desc)
        ierr = pio_def_var(File, 'SGH30',    pio_double, hdimids, sgh30_desc)
        ierr = pio_def_var(File, 'TREFMXAV', pio_double, hdimids, trefmxav_desc)
@@ -159,34 +170,6 @@ module restart_physics
 
     end if
 
-
-    if( radiation_do('aeres')  ) then
-       vsize = (pverp-ntoplw+1)
-       if(vsize/=pverp) then
-          ierr = pio_def_dim(File, 'lwcols', vsize, dimids(hdimcnt+1))
-       else
-          dimids(hdimcnt+1) = pverp_id
-       end if
-!
-! split this into vsize variables to avoid excessive memory usage in IO
-!
-       allocate(abstot_desc(ntoplw:pverp))
-       do i=ntoplw,pverp
-          write(pname,'(a,i3.3)') 'NAL_absorp',i
-          ierr = pio_def_var(File, trim(pname), pio_double, dimids(1:hdimcnt+1), abstot_desc(i))
-       end do
-	
-       dimids(hdimcnt+1) = pverp_id
-       ierr = pio_def_var(File, 'Emissivity', pio_double, dimids(1:hdimcnt+1), emstot_desc)
-
-       dimids(hdimcnt+1) = pver_id
-       do i=1,4
-          write(pname,'(a,i3.3)') 'NN_absorp',i
-          ierr = pio_def_var(File, pname, pio_double, dimids(1:hdimcnt+1), absnxt_desc(i))
-       end do
-
-
-    end if
     if (docosp) then
       ierr = pio_def_var(File, 'cosp_cnt_init', pio_int, cospcnt_desc)
     end if
@@ -203,7 +186,7 @@ module restart_physics
       
   end subroutine init_restart_physics
 
-  subroutine write_restart_physics (File, cam_in, cam_out, pbuf2d)
+  subroutine write_restart_physics (File, cam_in, cam_out, pbuf2d, phys_diag)
 
       !-----------------------------------------------------------------------
       use physics_buffer,      only: physics_buffer_desc, pbuf_write_restart
@@ -224,6 +207,8 @@ module restart_physics
       use pio,                 only: pio_write_darray
       use subcol_utils,        only: is_subcol_on
       use subcol,              only: subcol_write_restart
+      use conditional_diag,    only: cnd_diag_t
+      use conditional_diag_restart, only: cnd_diag_write_restart
       !
       ! Input arguments
       !
@@ -231,6 +216,7 @@ module restart_physics
       type(cam_in_t),    intent(in)    :: cam_in(begchunk:endchunk)
       type(cam_out_t),   intent(in)    :: cam_out(begchunk:endchunk)
       type(physics_buffer_desc), pointer        :: pbuf2d(:,:)
+      type(cnd_diag_t),          intent(in)     :: phys_diag(begchunk:endchunk)
       !
       ! Local workspace
       !
@@ -243,35 +229,63 @@ module restart_physics
       integer :: physgrid
       integer :: dims(3), gdims(3)
       integer :: nhdims
+      integer :: lchnk
+      integer :: chunk_ncols(begchunk:endchunk)
       !-----------------------------------------------------------------------
 
       ! Write grid vars
+      call t_startf("cam_grid_write_var")
       call cam_grid_write_var(File, phys_decomp)
+      call t_stopf("cam_grid_write_var")
 
       ! Physics buffer
       if (is_subcol_on()) then
          call subcol_write_restart(File)
       end if
 
+      call t_startf("pbuf_write_restart")
       call pbuf_write_restart(File, pbuf2d)
+      call t_stopf("pbuf_write_restart")
 
       physgrid = cam_grid_id('physgrid')
       call cam_grid_dimensions(physgrid, gdims(1:2), nhdims)
 
+      !---------------------------------------
+      ! CondiDiag
+
+      do lchnk = begchunk,endchunk
+         chunk_ncols(lchnk) = cam_out(lchnk)%ncol
+      end do
+
+      call cnd_diag_write_restart( phys_diag, begchunk, endchunk,        &! in
+                                   physgrid, gdims(1:nhdims), nhdims,    &! in
+                                   pcols, chunk_ncols, fillvalue,        &! in
+                                   File, cnd_metric_desc, cnd_flag_desc, &!  inout
+                                   cnd_fld_val_desc, cnd_fld_inc_desc,   &!  inout
+                                   cnd_fld_old_desc                      )
+      !------
+
       if ( .not. adiabatic .and. .not. ideal_phys )then
 
          ! data for chemistry
+         call t_startf("chem_write_restart")
          call chem_write_restart(File)
+         call t_stopf("chem_write_restart")
 
          call write_prescribed_ozone_restart(File)
          call write_prescribed_ghg_restart(File)
+
+         call t_startf("write_prescribed_aero_restart")
          call write_prescribed_aero_restart(File)
+         call t_stopf("write_prescribed_aero_restart")
+
+         call t_startf("write_prescribed_volcaero_restart")
          call write_prescribed_volcaero_restart(File)
+         call t_stopf("write_prescribed_volcaero_restart")
  
          do i=begchunk,endchunk
             ncol = cam_out(i)%ncol
             if(ncol<pcols) then
-               landm(ncol+1:pcols,i) = fillvalue
                sgh(ncol+1:pcols,i) = fillvalue
                sgh30(ncol+1:pcols,i) = fillvalue
 
@@ -282,11 +296,10 @@ module restart_physics
 
          ! Comsrf module variables (can following coup_csm definitions be removed?)
          ! This is a group of surface variables so can reuse dims
-         dims(1) = size(landm, 1) ! Should be pcols
-         dims(2) = size(landm, 2) ! Should be endchunk - begchunk + 1
+         dims(1) = size(sgh, 1) ! Should be pcols
+         dims(2) = size(sgh, 2) ! Should be endchunk - begchunk + 1
          call cam_grid_get_decomp(physgrid, dims(1:2), gdims(1:nhdims),          &
               pio_double, iodesc)
-         call pio_write_darray(File, landm_desc, iodesc, landm, ierr)
          call pio_write_darray(File, sgh_desc,   iodesc,   sgh, ierr)
          call pio_write_darray(File, sgh30_desc, iodesc, sgh30, ierr)
          
@@ -410,50 +423,6 @@ module restart_physics
          call pio_write_darray(File, shf_desc, iodesc, tmpfield, ierr)
 
       end if
-    !
-    !-----------------------------------------------------------------------
-    ! Write the abs/ems restart dataset if necessary    
-    !-----------------------------------------------------------------------
-    !
-
-    if ( radiation_do('aeres')  ) then
-         
-      do i = begchunk, endchunk
-        ncol = cam_out(i)%ncol
-        if(ncol < pcols) then
-          abstot_3d(ncol+1:pcols,:,:,i) = fillvalue
-          absnxt_3d(ncol+1:pcols,:,:,i) = fillvalue
-          emstot_3d(ncol+1:pcols,:,i) = fillvalue
-        end if
-      end do
-!      abstot_3d is written as a series of 3D variables
-      dims(1) = size(abstot_3d, 1) ! Should be pcols
-      dims(2) = size(abstot_3d, 2) ! Should be (pverp-ntoplw+1)
-      dims(3) = size(abstot_3d, 4) ! Should be endchunk - begchunk + 1
-      gdims(nhdims+1) = dims(2)
-      do i = ntoplw, pverp
-        call cam_grid_write_dist_array(File, physgrid, dims(1:3),             &
-             gdims(1:nhdims+1), abstot_3d(:,:,i,:), abstot_desc(i))
-      end do
-
-      dims(1) = size(emstot_3d, 1) ! Should be pcols
-      dims(2) = size(emstot_3d, 2) ! Should be pverp
-      dims(3) = size(emstot_3d, 3) ! Should be endchunk - begchunk + 1
-      gdims(nhdims+1) = dims(2)
-      call cam_grid_write_dist_array(File, physgrid, dims(1:3),               &
-           gdims(1:nhdims+1), emstot_3d, emstot_desc)
-
-      dims(1) = size(absnxt_3d, 1) ! Should be pcols
-      dims(2) = size(absnxt_3d, 2) ! Should be pver
-      dims(3) = size(absnxt_3d, 4) ! Should be endchunk - begchunk + 1
-      gdims(nhdims+1) = dims(2)
-      do i = 1, 4
-        call cam_grid_write_dist_array(File, physgrid, dims(1:3),             &
-             gdims(1:nhdims+1), absnxt_3d(:,:,i,:), absnxt_desc(i))
-      end do
-
-      deallocate(abstot_desc)
-    end if
 
       if (docosp) then
         ierr = pio_put_var(File, cospcnt_desc, (/cosp_cnt(begchunk)/))
@@ -484,7 +453,7 @@ module restart_physics
 
 !#######################################################################
 
-    subroutine read_restart_physics(File, cam_in, cam_out, pbuf2d)
+    subroutine read_restart_physics(File, cam_in, cam_out, pbuf2d, phys_diag)
 
      !-----------------------------------------------------------------------
      use physics_buffer,      only: physics_buffer_desc, pbuf_read_restart
@@ -502,6 +471,8 @@ module restart_physics
      use subcol_utils,        only: is_subcol_on
      use subcol,              only: subcol_read_restart
      use pio,                 only: pio_read_darray
+     use conditional_diag,    only: cnd_diag_t
+     use conditional_diag_restart, only: cnd_diag_read_restart
      !
      ! Arguments
      !
@@ -509,6 +480,7 @@ module restart_physics
      type(cam_in_t),            pointer :: cam_in(:)
      type(cam_out_t),           pointer :: cam_out(:)
      type(physics_buffer_desc), pointer :: pbuf2d(:,:)
+     type(cnd_diag_t),          pointer :: phys_diag(:)
      !
      ! Local workspace
      !
@@ -524,10 +496,9 @@ module restart_physics
      integer                  :: physgrid, astat
      !-----------------------------------------------------------------------
 
-     ! Allocate memory in physics buffer, buffer, comsrf, and radbuffer modules.
+     ! Allocate memory in physics buffer and comsrf modules.
      ! (This is done in subroutine initial_conds for an initial run.)
      call initialize_comsrf()
-     call initialize_radbuffer()
 
      ! Physics buffer
 
@@ -536,8 +507,13 @@ module restart_physics
         call subcol_read_restart(File)
      end if
 
+     call t_startf("pbuf_read_restart")
      call pbuf_read_restart(File, pbuf2d)
+     call t_stopf("pbuf_read_restart")
 
+     !-------------------------------
+     ! grid and dimension sizes
+     !-------------------------------
      csize=endchunk-begchunk+1
      dims(1) = pcols
      dims(2) = csize
@@ -554,21 +530,35 @@ module restart_physics
      
      call cam_grid_get_decomp(physgrid, dims(1:2), gdims(1:nhdims), pio_double, &
           iodesc)
+
+     !-----------------------------------------------------------------------
+     ! CondiDiag
+     !-----------------------------------------------------------------------
+     call cnd_diag_read_restart( phys_diag, begchunk, endchunk,     &! in
+                                 physgrid, gdims(1:nhdims), nhdims, &! in
+                                 pcols, fillvalue, File             )! inout
+
+     !-----------------------------------------------------------------------
+     ! Miscellaneous fields
+     !-----------------------------------------------------------------------
      if ( .not. adiabatic .and. .not. ideal_phys )then
 
         ! data for chemistry
+        call t_startf ('chem_read_restart')
         call chem_read_restart(File)
+        call t_stopf ('chem_read_restart')
 
         call read_prescribed_ozone_restart(File)
         call read_prescribed_ghg_restart(File)
+
+        call t_startf ('read_prescribed_aero_restart')
         call read_prescribed_aero_restart(File)
+        call t_stopf ('read_prescribed_aero_restart')
+
         call read_prescribed_volcaero_restart(File)
 
         allocate(tmpfield2(pcols, begchunk:endchunk))
         tmpfield2 = fillvalue
-
-        ierr = pio_inq_varid(File, 'LANDM', vardesc)
-        call pio_read_darray(File, vardesc, iodesc, landm, ierr)
 
         ierr = pio_inq_varid(File, 'SGH', vardesc)
         call pio_read_darray(File, vardesc, iodesc, sgh, ierr)
@@ -706,11 +696,28 @@ module restart_physics
 
         ! Reading the CFLX* components from the restart is optional for
         ! backwards compatibility.  These fields were not needed for an
-        ! exact restart until the UNICON scheme was added.  More generally,
-        ! these components are only needed if they are not handled by the
-        ! coupling layer restart (the ".rs." file), and if the values are
-        ! used in the tphysbc physics before the tphysac code has a chance
-        ! to update the values that are coming from boundary datasets.
+        ! exact restart until the UNICON scheme was added, which has been 
+        ! removed. More generally, these components are only needed if they 
+        ! are not handled by the coupling layer restart (the ".rs." file), 
+        ! and if the values are used in the tphysbc physics before the 
+        ! tphysac code has a chance to update the values that are 
+        ! coming from boundary datasets.
+
+       ! +++ Update from 2022-09 +++
+       ! For some of the new process coupling options in EAM, some of the constituents'
+       ! cam_in%cflx are used not in tphysac but in the tphysbc call of the next time step. 
+       ! This means for an exact restart, we also need to write out cam_in%cflx(:,2:)
+       ! and then read them back in. Because the present subroutine is called before 
+       ! the atm_import subroutine in cpl/atm_import_export.F90, the following
+       ! initialize was moved from atm_import to here to avoid incorrectly zeroing out 
+       ! the values read from restart files
+       !
+       do c= begchunk, endchunk
+          cam_in(c)%cflx(:,2:) = 0._r8
+       end do
+       !
+       ! === Update from 2022-09 ===
+
         do m = 1, pcnst
 
            write(num,'(i4.4)') m
@@ -756,50 +763,6 @@ module restart_physics
 
      end if
 
-     !
-     !-----------------------------------------------------------------------
-     ! Read the abs/ems restart dataset if necessary    
-     !-----------------------------------------------------------------------
-     !
-     if ( radiation_do('aeres')  ) then
-        !!XXgoldyXX: This hack should be replaced with the PIO interface
-        !err_handling = File%iosystem%error_handling !! Hack
-        call pio_seterrorhandling( File, PIO_BCAST_ERROR, err_handling)
-        ierr = pio_inq_varid(File, 'Emissivity', vardesc)
-        call pio_seterrorhandling( File, err_handling)
-        if(ierr/=PIO_NOERR) then
-           if(masterproc) write(iulog,*) 'Warning: Emissivity variable not found on restart file.'
-           return
-        end if
-
-        dims(1) = pcols
-        dims(2) = pverp
-        dims(3) = csize
-        gdims(nhdims+1) = dims(2)
-        call cam_grid_read_dist_array(File, physgrid, dims(1:3),           &
-             gdims(1:nhdims+1), emstot_3d, vardesc)
-        
-        vsize = pverp-ntoplw+1
-        dims(2) = vsize
-        gdims(nhdims+1) = dims(2)
-        
-        do i=ntoplw,pverp
-           write(pname,'(a,i3.3)') 'NAL_absorp',i
-           ierr = pio_inq_varid(File, trim(pname), vardesc)
-           call cam_grid_read_dist_array(File, physgrid, dims(1:3),           &
-                gdims(1:nhdims+1), abstot_3d(:,:,i,:), vardesc)
-        end do
-
-        dims(2) = pver
-        gdims(nhdims+1) = dims(2)
-        do i=1,4
-           write(pname,'(a,i3.3)') 'NN_absorp',i
-           ierr = pio_inq_varid(File, trim(pname), vardesc)
-           call cam_grid_read_dist_array(File, physgrid, dims(1:3),           &
-                gdims(1:nhdims+1), absnxt_3d(:,:,i,:), vardesc)
-        end do
-     end if
-
      if (docosp) then
         !!XXgoldyXX: This hack should be replaced with the PIO interface
         !err_handling = File%iosystem%error_handling !! Hack
@@ -835,12 +798,5 @@ module restart_physics
 
    end subroutine read_restart_physics
 
-
-   character(len=256) function get_abs_restart_filepath ( )
-     !	
-     ! Return the full filepath to the abs-ems restart file
-     !	
-     get_abs_restart_filepath = pname
-   end function get_abs_restart_filepath
 
  end module restart_physics

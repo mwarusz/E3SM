@@ -17,7 +17,7 @@
           An abbreviation of the fortran declaration for the variable.
       Valid declarations are:
 
-          char*n  
+          char*n
           integer
           logical
           real
@@ -31,7 +31,7 @@
      input_pathname
           Only include this attribute to indicate that the variable
           contains the pathname of an input dataset that resides in the
-          CESM inputdata directory tree.  
+          CESM inputdata directory tree.
 
       The recognized values are "abs" to indicate that an absolute
           pathname is required, or "rel:var_name" to indicate that the
@@ -64,7 +64,7 @@ Default: Defined in namelist_defaults.xml
 	category="seaice_model" group="seaice_model">
 Selection of the type of calendar that should be used in the simulation.
 
-Valid values: 'gregorian', 'gregorian_noleap'
+Valid values: 'gregorian', 'noleap'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -288,6 +288,14 @@ Valid values: Any positive integer.
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_nFloeCategories" type="integer"
+	category="dimensions" group="dimensions">
+The number of floe size categories to use.
+
+Valid values: Any positive integer.
+Default: Defined in namelist_defaults.xml
+</entry>
+
 <entry id="config_nIceLayers" type="integer"
 	category="dimensions" group="dimensions">
 The number of ice layers in the vertical direction to use.
@@ -307,11 +315,19 @@ Default: Defined in namelist_defaults.xml
 
 <!-- initialize -->
 
+<entry id="config_earth_radius" type="real"
+	category="initialize" group="initialize">
+Earth radius in m
+
+Valid values: Any positive real number.
+Default: Defined in namelist_defaults.xml
+</entry>
+
 <entry id="config_initial_condition_type" type="char*1024"
 	category="initialize" group="initialize">
 Initial condition type for sea ice state.
 
-Valid values: 'restart', 'uniform', 'circle', 'square' or 'uniform_interior'
+Valid values: 'restart', 'uniform', 'circle', 'square', 'uniform_interior' or 'uniform_1D'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -422,7 +438,7 @@ Valid values: true or .false
 Default: Defined in namelist_defaults.xml
 </entry>
 
-<entry id="config_use_column_package" type="logical"
+<entry id="config_use_column_physics" type="logical"
 	category="use_sections" group="use_sections">
 If true perform calculations from the column physics package.
 
@@ -453,7 +469,7 @@ Default: Defined in namelist_defaults.xml
 	category="forcing" group="forcing">
 Atmospheric forcing type.
 
-Valid values: 'CORE'
+Valid values: 'CORE' or 'ISPOL'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -461,7 +477,7 @@ Default: Defined in namelist_defaults.xml
 	category="forcing" group="forcing">
 Forcing time to use at the simulation start time
 
-Valid values: 'YYYY-MM-DD_HH:MM:SS
+Valid values: 'YYYY-MM-DD_HH:MM:SS'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -469,7 +485,7 @@ Default: Defined in namelist_defaults.xml
 	category="forcing" group="forcing">
 Start time for the forcing cycle.
 
-Valid values: 'YYYY-MM-DD_HH:MM:SS
+Valid values: 'YYYY-MM-DD_HH:MM:SS'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -477,7 +493,7 @@ Default: Defined in namelist_defaults.xml
 	category="forcing" group="forcing">
 Duration of the forcing cycle.
 
-Valid values: 'YYYY-MM-DD_HH:MM:SS
+Valid values: 'YYYY-MM-DD_HH:MM:SS'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -493,15 +509,31 @@ Default: Defined in namelist_defaults.xml
 	category="forcing" group="forcing">
 Sea surface temperature ocean forcing type.
 
-Valid values: 'ncar'
+Valid values: 'ncar' or 'ISPOL'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_forcing_bgc_type" type="char*1024"
+	category="forcing" group="forcing">
+Ocean biogeochemistry forcing type.
+
+Valid values: 'ISPOL'
 Default: Defined in namelist_defaults.xml
 </entry>
 
 <entry id="config_update_ocean_fluxes" type="logical"
 	category="forcing" group="forcing">
-
+Include frazil ice fluxes in ocean flux fields.
 
 Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_frazil_coupling_type" type="char*1024"
+	category="forcing" group="forcing">
+Type of frazil ice coupling.
+
+Valid values: 'external', 'internal', 'fresh_ice_correction'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -514,34 +546,10 @@ Default: Defined in namelist_defaults.xml
 </entry>
 
 
-<!-- unit_test -->
-
-<entry id="config_perform_unit_test" type="logical"
-	category="unit_test" group="unit_test">
-If true perform a unit test.
-
-Valid values: true or false
-Default: Defined in namelist_defaults.xml
-</entry>
-
-<entry id="config_unit_test_type" type="char*1024"
-	category="unit_test" group="unit_test">
-Unit test type.
-
-Valid values: 'strain rate operator', 'stress divergence operator', or 'constitutive relationship'
-Default: Defined in namelist_defaults.xml
-</entry>
-
-<entry id="config_unit_test_subtype" type="char*1024"
-	category="unit_test" group="unit_test">
-Unit test subtype.
-
-Valid values: ('strain rate operator'): 'all', 'zero', 'zonal', 'meridonal', 'solid_body', 'sinusoidal1', or 'sinusoidal2', (stress divergence operator): 'all', 'zero', 'const11', 'const22', 'const12', 'test1', 'test2', 'test3', or 'test4'
-Default: Defined in namelist_defaults.xml
-</entry>
+<!-- testing -->
 
 <entry id="config_use_test_ice_shelf" type="logical"
-	category="unit_test" group="unit_test">
+	category="testing" group="testing">
 If true test add a test ice shelf to the ice shelf mask.
 
 Valid values: true or false
@@ -549,8 +557,40 @@ Default: Defined in namelist_defaults.xml
 </entry>
 
 <entry id="config_testing_system_test" type="logical"
-	category="unit_test" group="unit_test">
+	category="testing" group="testing">
 If true initialize variables that will fail the testing system tests.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_use_congelation_basal_melt" type="logical"
+	category="testing" group="testing">
+If true congelation and basal melt processes are active.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_use_lateral_melt" type="logical"
+	category="testing" group="testing">
+If true lateral melt process is active.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_use_latent_processes" type="logical"
+	category="testing" group="testing">
+If true latent heat processes are active.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_limit_air_temperatures" type="logical"
+	category="testing" group="testing">
+If true limit air temperatures above
 
 Valid values: true or false
 Default: Defined in namelist_defaults.xml
@@ -591,11 +631,27 @@ Valid values: Any positive integer.
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_strain_scheme" type="char*1024"
+	category="velocity_solver" group="velocity_solver">
+Choice of stress divergence scheme to use in the velocity solver.
+
+Valid values: 'weak', or 'variational'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_constitutive_relation_type" type="char*1024"
+	category="velocity_solver" group="velocity_solver">
+Choice of constitutive relation to use in the velocity solver.
+
+Valid values: 'evp', 'evp_revised', 'linear', or 'none'
+Default: Defined in namelist_defaults.xml
+</entry>
+
 <entry id="config_stress_divergence_scheme" type="char*1024"
 	category="velocity_solver" group="velocity_solver">
 Choice of stress divergence scheme to use in the velocity solver.
 
-Valid values: 'weak' or 'variational'
+Valid values: 'weak', or 'variational'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -604,6 +660,14 @@ Default: Defined in namelist_defaults.xml
 Type of basis functions to use with the variational stress divergence scheme.
 
 Valid values: 'wachspress' or 'pwl'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_variational_denominator_type" type="char*1024"
+	category="velocity_solver" group="velocity_solver">
+Type of denominator in variational calculation.
+
+Valid values: 'original' or 'alternate'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -623,11 +687,19 @@ Valid values: 'trapezoidal': any positive integer, 'dunavant':1-10,12, 'fekete':
 Default: Defined in namelist_defaults.xml
 </entry>
 
-<entry id="config_revised_evp" type="logical"
+<entry id="config_calc_velocity_masks" type="logical"
 	category="velocity_solver" group="velocity_solver">
-If true use the revised EVP rheology (Bouillon et al., Ocean Modelling)
+Calculate velocity masks.
 
-Valid values: true or. false.
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_average_variational_strain" type="logical"
+	category="velocity_solver" group="velocity_solver">
+Average variational strains over vertex.
+
+Valid values: true or false
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -660,6 +732,30 @@ Default: Defined in namelist_defaults.xml
 If true calculate the sea surface tilt stress assuming currents are geostrophic.
 
 Valid values: true or. false.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_ocean_stress_type" type="char*1024"
+	category="velocity_solver" group="velocity_solver">
+Method for calculating ocean stress.
+
+Valid values: 'linear', or 'quadratic'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_use_special_boundaries_velocity" type="logical"
+	category="velocity_solver" group="velocity_solver">
+Use the special boundaries velocities option.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_use_special_boundaries_velocity_masks" type="logical"
+	category="velocity_solver" group="velocity_solver">
+Use the special boundaries velocity mask option.
+
+Valid values: true or false
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -708,6 +804,14 @@ Default: Defined in namelist_defaults.xml
 
 
 <!-- column_package -->
+
+<entry id="config_column_physics_type" type="char*1024"
+	category="column_package" group="column_package">
+Set column physics library.
+
+Valid values: 'icepack' and 'column_package'
+Default: Defined in namelist_defaults.xml
+</entry>
 
 <entry id="config_use_column_shortwave" type="logical"
 	category="column_package" group="column_package">
@@ -832,6 +936,22 @@ Valid values: true or false
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_use_special_boundaries_tracers" type="logical"
+	category="column_tracers" group="column_tracers">
+Modify tracers in given boundary cells.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_use_floe_size_distribution" type="logical"
+	category="column_tracers" group="column_tracers">
+Use floe size distribution. Requires Icepack column package.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
 
 <!-- biogeochemistry -->
 
@@ -904,6 +1024,14 @@ Default: Defined in namelist_defaults.xml
 Use the chlorophyll tracer (currently not implemented!)
 
 Valid values: false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_use_macromolecules" type="logical"
+	category="biogeochemistry" group="biogeochemistry">
+Use ocean macromolecule to determine DOC fractions in ice-ocean coupling
+
+Valid values: true or false
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -1189,7 +1317,7 @@ Default: Defined in namelist_defaults.xml
 
 <entry id="config_rapid_mobile_to_stationary_time" type="real"
 	category="biogeochemistry" group="biogeochemistry">
-Rapid adsorption timescale  
+Rapid adsorption timescale
 
 Valid values: zero or positive real number
 Default: Defined in namelist_defaults.xml
@@ -1207,7 +1335,7 @@ Default: Defined in namelist_defaults.xml
 	category="biogeochemistry" group="biogeochemistry">
 Maximum speed at which diatoms can move
 
-Valid values: zero or positive real number 
+Valid values: zero or positive real number
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -1661,7 +1789,7 @@ Default: Defined in namelist_defaults.xml
 
 <entry id="config_fraction_iron_remineralized" type="real"
 	category="biogeochemistry" group="biogeochemistry">
-Fraction of remineralized iron 
+Fraction of remineralized iron
 
 Valid values: zero or positive real less than or equal to 1
 Default: Defined in namelist_defaults.xml
@@ -2050,7 +2178,7 @@ Default: Defined in namelist_defaults.xml
 	category="shortwave" group="shortwave">
 Sea ice tuning parameter; +1 for 1sig increase in albedo.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2058,7 +2186,7 @@ Default: Defined in namelist_defaults.xml
 	category="shortwave" group="shortwave">
 Ponded ice tuning parameter; +1 for 1sig increase in albedo.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2066,7 +2194,7 @@ Default: Defined in namelist_defaults.xml
 	category="shortwave" group="shortwave">
 Snow tuning parameter; +1 for ~.01 change in broadband albedo.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2074,7 +2202,7 @@ Default: Defined in namelist_defaults.xml
 	category="shortwave" group="shortwave">
 Change in temperture for non-melt to melt snow grain radius change.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2082,7 +2210,7 @@ Default: Defined in namelist_defaults.xml
 	category="shortwave" group="shortwave">
 Maximum melting snow grain radius.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2090,7 +2218,31 @@ Default: Defined in namelist_defaults.xml
 	category="shortwave" group="shortwave">
 Algae absorption coefficient for 0.5 m thick layer.
 
-Valid values: 
+Valid values:
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_use_shortwave_redistribution" type="logical"
+	category="shortwave" group="shortwave">
+Redistribute shortwave from layers near the melting temperature to the surface.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_shortwave_redistribution_fraction" type="real"
+	category="shortwave" group="shortwave">
+Fraction of shortwave moved from a layer near the melting temperature to the surface.
+
+Valid values: fraction between 0 and 1
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_shortwave_redistribution_threshold" type="real"
+	category="shortwave" group="shortwave">
+Temperature threshold for moving shortwave to the surface.
+
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2101,7 +2253,7 @@ Default: Defined in namelist_defaults.xml
 	category="snow" group="snow">
 Use a snow redistribution scheme
 
-Valid values: '30percent (30% rule, precip only)','30percentsw (30% rulewith shortwave)','ITDsd (Lecomte PhD, 2014)','ITDrdg (like ITDsd but use level/ridged ice)','default or none (none)'
+Valid values: 'bulk', 'ITDrdg', 'none'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2153,9 +2305,25 @@ Valid values: positive real
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_snow_redistribution_factor" type="real"
+	category="snow" group="snow">
+snow loss factor for wind redistribution
+
+Valid values: positive real less than or equal to 1
+Default: Defined in namelist_defaults.xml
+</entry>
+
 <entry id="config_max_dry_snow_radius" type="real"
 	category="snow" group="snow">
 maximum dry metamorphism snow grain radius
+
+Valid values: positive real
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_snow_thermal_conductivity" type="real"
+	category="snow" group="snow">
+thermal conductivity of snow
 
 Valid values: positive real
 Default: Defined in namelist_defaults.xml
@@ -2168,7 +2336,7 @@ Default: Defined in namelist_defaults.xml
 	category="meltponds" group="meltponds">
 Snow depth for transition to bare sea ice.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2180,11 +2348,11 @@ Valid values: 'cesm' or 'hlid'
 Default: Defined in namelist_defaults.xml
 </entry>
 
-<entry id="config_pond_flushing_timescale" type="real"
+<entry id="config_pond_flushing_factor" type="real"
 	category="meltponds" group="meltponds">
-Alter e-folding time scale for flushing.?????
+Alters e-folding time scale for flushing with BL99 thermodynamics.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2208,7 +2376,7 @@ Default: Defined in namelist_defaults.xml
 	category="meltponds" group="meltponds">
 Ratio of pond depth to pond fraction.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2216,7 +2384,7 @@ Default: Defined in namelist_defaults.xml
 	category="meltponds" group="meltponds">
 Tapering parameter for snow on pond ice.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2224,7 +2392,7 @@ Default: Defined in namelist_defaults.xml
 	category="meltponds" group="meltponds">
 Critical parameter for pond ice thickness.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2235,7 +2403,7 @@ Default: Defined in namelist_defaults.xml
 	category="thermodynamics" group="thermodynamics">
 Vertical themodynamics type.
 
-Valid values: 'zero layer', 'BL99', or 'mushy'
+Valid values: 'BL99', or 'mushy'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2287,6 +2455,14 @@ Valid values: Any real number between 0 and 1.
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_macro_drainage_timescale" type="real"
+	category="thermodynamics" group="thermodynamics">
+Timescale for macroscopic drainage.
+
+Valid values: Any positive real number.
+Default: Defined in namelist_defaults.xml
+</entry>
+
 <entry id="config_congelation_ice_porosity" type="real"
 	category="thermodynamics" group="thermodynamics">
 Liquid fraction of congelation ice.
@@ -2311,6 +2487,25 @@ Default: Defined in namelist_defaults.xml
 Type of ice thickness category bounds.
 
 Valid values: 'single category', 'original', 'new', 'WMO', or 'asymptotic'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+
+<!-- floesize -->
+
+<entry id="config_floeshape" type="real"
+	category="floesize" group="floesize">
+Floe shape constant (noncircularity).
+
+Valid values: Any real number between 0 and pi/4.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_floediam" type="real"
+	category="floesize" group="floesize">
+Effective floe diameter for lateral melt in m.
+
+Valid values: Any real number.
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2341,11 +2536,11 @@ Valid values: 'Hibler80' or 'exponential'
 Default: Defined in namelist_defaults.xml
 </entry>
 
-<entry id="config_ridiging_efolding_scale" type="real"
+<entry id="config_ridging_efolding_scale" type="real"
 	category="ridging" group="ridging">
 E-folding scale of ridged ice (krdg_redist = 1)
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2353,7 +2548,7 @@ Default: Defined in namelist_defaults.xml
 	category="ridging" group="ridging">
 Ratio of ridging work to PE change in ridging (kstrength = 1)
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2364,7 +2559,7 @@ Default: Defined in namelist_defaults.xml
 	category="atmosphere" group="atmosphere">
 Atmosphere boundary method.
 
-Valid values: 'ccsm3' or 'constant'
+Valid values: 'similarity' or 'constant' or 'mixed'
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2419,11 +2614,19 @@ Valid values: true or false
 Default: Defined in namelist_defaults.xml
 </entry>
 
+<entry id="config_ocean_mixed_layer_type" type="char*1024"
+	category="ocean" group="ocean">
+Type of mixed layer slab ocean model to use
+
+Valid values: 'cice', or 'e3sm'
+Default: Defined in namelist_defaults.xml
+</entry>
+
 <entry id="config_min_friction_velocity" type="real"
 	category="ocean" group="ocean">
 Minimum friction velocity for ice-ocean heat flux.
 
-Valid values: 
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2451,19 +2654,27 @@ Valid values: 'free' or 'non-free'
 Default: Defined in namelist_defaults.xml
 </entry>
 
-<entry id="config_couple_biogeochemistry_fields" type="logical"
-	category="ocean" group="ocean">
-
-
-Valid values: true or false
-Default: Defined in namelist_defaults.xml
-</entry>
-
 <entry id="config_use_data_icebergs" type="logical"
 	category="ocean" group="ocean">
 Use data iceberg meltwater forcing
 
 Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_salt_flux_coupling_type" type="char*1024"
+	category="ocean" group="ocean">
+Type of salt flux to ocean method
+
+Valid values: 'constant' or 'prognostic'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_ice_ocean_drag_coefficient" type="real"
+	category="ocean" group="ocean">
+Neutral ice-ocean drag coefficient
+
+Valid values:
 Default: Defined in namelist_defaults.xml
 </entry>
 
@@ -2672,6 +2883,49 @@ Default: Defined in namelist_defaults.xml
 </entry>
 
 
+<!-- AM_thicknesses -->
+
+<entry id="config_AM_thicknesses_enable" type="logical"
+	category="AM_thicknesses" group="AM_thicknesses">
+If true, ocean analysis member thicknesses is called.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_thicknesses_compute_interval" type="char*1024"
+	category="AM_thicknesses" group="AM_thicknesses">
+Timestamp determining how often analysis member computation should be performed.
+
+Valid values: Any valid time stamp, 'dt', or 'output_interval'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_thicknesses_output_stream" type="char*1024"
+	category="AM_thicknesses" group="AM_thicknesses">
+Name of the stream that the thicknesses analysis member should be tied to.
+
+Valid values: Any existing stream name or 'none'
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_thicknesses_compute_on_startup" type="logical"
+	category="AM_thicknesses" group="AM_thicknesses">
+Logical flag determining if an analysis member computation occurs on start-up.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_thicknesses_write_on_startup" type="logical"
+	category="AM_thicknesses" group="AM_thicknesses">
+Logical flag determining if an analysis member write occurs on start-up.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+
 <!-- AM_regionalStatistics -->
 
 <entry id="config_AM_regionalStatistics_enable" type="logical"
@@ -2811,6 +3065,30 @@ Default: Defined in namelist_defaults.xml
 <entry id="config_AM_conservationCheck_write_to_logfile" type="logical"
 	category="AM_conservationCheck" group="AM_conservationCheck">
 Logical flag determining if the conservation check is written to the log file.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_conservationCheck_restart_stream" type="char*1024"
+	category="AM_conservationCheck" group="AM_conservationCheck">
+Name of the restart stream the analysis member will use to initialize itself if restart is enabled.
+
+Valid values: A restart stream with state of the conservation check.
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_conservationCheck_carbon_failure_abort" type="logical"
+	category="AM_conservationCheck" group="AM_conservationCheck">
+If true, abort if carbon conservation fails bounds check.
+
+Valid values: true or false
+Default: Defined in namelist_defaults.xml
+</entry>
+
+<entry id="config_AM_conservationCheck_include_ocean" type="logical"
+	category="AM_conservationCheck" group="AM_conservationCheck">
+Include slab ocean in conservation calculation.
 
 Valid values: true or false
 Default: Defined in namelist_defaults.xml

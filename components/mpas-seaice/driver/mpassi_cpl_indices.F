@@ -11,6 +11,7 @@ module mpassi_cpl_indices
   ! ice -> drv
 
   integer :: index_i2x_Si_ifrac        ! fractional ice coverage wrt ocean
+  integer :: index_i2x_Si_ithick       ! ice thickness (m)
   integer :: index_i2x_Si_snowh        ! snow height (m)
   integer :: index_i2x_Si_t            ! temperature                     
   integer :: index_i2x_Si_bpress       ! basal pressure                  
@@ -21,6 +22,7 @@ module mpassi_cpl_indices
   integer :: index_i2x_Si_anidr        ! albedo: visible, diffuse        
   integer :: index_i2x_Si_anidf        ! albedo: near ir, diffuse        
   integer :: index_i2x_Si_u10          ! 10m wind
+  integer :: index_i2x_Si_u10withgusts ! 10m wind root-mean-square magnitude with gustiness
   integer :: index_i2x_Faii_lwup       ! upward longwave heat flux  
   integer :: index_i2x_Faii_lat        ! latent          heat flux  
   integer :: index_i2x_Faii_sen        ! sensible        heat flux      
@@ -70,7 +72,6 @@ module mpassi_cpl_indices
   integer :: index_x2i_Sa_u            ! bottom atm level zon wind
   integer :: index_x2i_Sa_v            ! bottom atm level mer wind
   integer :: index_x2i_Sa_tbot         ! bottom atm level temp
-  integer :: index_x2i_Sa_pbot         ! bottom atm level pressure
   integer :: index_x2i_Sa_ptem         ! bottom atm level pot temp
   integer :: index_x2i_Sa_shum         ! bottom atm level spec hum
   integer :: index_x2i_Sa_dens         ! bottom atm level air den
@@ -84,9 +85,8 @@ module mpassi_cpl_indices
   integer :: index_x2i_Faxa_swndf      ! sw: nir diffuse downward
   integer :: index_x2i_Faxa_swvdf      ! sw: vis diffuse downward
   integer :: index_x2i_Faxa_swnet      ! sw: net
-  integer :: index_x2i_Fioo_meltp      ! ocn melt heat  
-  integer :: index_x2i_Fioo_frazil     ! ocn frazil ice formation 
   integer :: index_x2i_Fioo_q          ! ocn freezing melting potential
+  integer :: index_x2i_Fioo_frazil     ! ocn frazil ice formation 
   integer :: index_x2i_Faxa_bcphidry   ! flux: Black Carbon hydrophilic dry deposition
   integer :: index_x2i_Faxa_bcphodry   ! flux: Black Carbon hydrophobic dry deposition
   integer :: index_x2i_Faxa_bcphiwet   ! flux: Black Carbon hydrophilic wet deposition
@@ -147,12 +147,14 @@ contains
     index_i2x_Si_tref       = mct_avect_indexra(i2x,'Si_tref')
     index_i2x_Si_qref       = mct_avect_indexra(i2x,'Si_qref')
     index_i2x_Si_ifrac      = mct_avect_indexra(i2x,'Si_ifrac')
+    index_i2x_Si_ithick     = mct_avect_indexra(i2x,'Si_ithick')
     index_i2x_Si_avsdr      = mct_avect_indexra(i2x,'Si_avsdr')
     index_i2x_Si_anidr      = mct_avect_indexra(i2x,'Si_anidr')
     index_i2x_Si_avsdf      = mct_avect_indexra(i2x,'Si_avsdf')
     index_i2x_Si_anidf      = mct_avect_indexra(i2x,'Si_anidf')
     index_i2x_Si_snowh      = mct_avect_indexra(i2x,'Si_snowh')
     index_i2x_Si_u10        = mct_avect_indexra(i2x,'Si_u10')
+    index_i2x_Si_u10withgusts = mct_avect_indexra(i2x,'Si_u10withgusts')
     index_i2x_Faii_taux     = mct_avect_indexra(i2x,'Faii_taux')
     index_i2x_Faii_tauy     = mct_avect_indexra(i2x,'Faii_tauy')
     index_i2x_Faii_lat      = mct_avect_indexra(i2x,'Faii_lat')
@@ -199,7 +201,6 @@ contains
     index_x2i_Sa_v          = mct_avect_indexra(x2i,'Sa_v')
     index_x2i_Sa_tbot       = mct_avect_indexra(x2i,'Sa_tbot')
     index_x2i_Sa_ptem       = mct_avect_indexra(x2i,'Sa_ptem')
-    index_x2i_Sa_pbot       = mct_avect_indexra(x2i,'Sa_pbot')
     index_x2i_Sa_shum       = mct_avect_indexra(x2i,'Sa_shum')
     index_x2i_Sa_dens       = mct_avect_indexra(x2i,'Sa_dens')
     index_x2i_So_dhdx       = mct_avect_indexra(x2i,'So_dhdx')
@@ -211,9 +212,8 @@ contains
     index_x2i_Faxa_swvdr    = mct_avect_indexra(x2i,'Faxa_swvdr')
     index_x2i_Faxa_swndf    = mct_avect_indexra(x2i,'Faxa_swndf')
     index_x2i_Faxa_swvdf    = mct_avect_indexra(x2i,'Faxa_swvdf')
-    index_x2i_Fioo_meltp    = mct_avect_indexra(x2i,'Fioo_meltp')
-    index_x2i_Fioo_frazil   = mct_avect_indexra(x2i,'Fioo_frazil')
     index_x2i_Fioo_q        = mct_avect_indexra(x2i,'Fioo_q')
+    index_x2i_Fioo_frazil   = mct_avect_indexra(x2i,'Fioo_frazil')
     index_x2i_Faxa_bcphidry = mct_avect_indexra(x2i,'Faxa_bcphidry')
     index_x2i_Faxa_bcphodry = mct_avect_indexra(x2i,'Faxa_bcphodry')
     index_x2i_Faxa_bcphiwet = mct_avect_indexra(x2i,'Faxa_bcphiwet')

@@ -68,21 +68,31 @@ module control_mod
   ! Default values make qsplit and rsplit control the time steps.
   integer, public :: dt_remap_factor = -1, dt_tracer_factor = -1
 
+  integer, public :: prim_step_type = -1 ! 1 = old code for EUL, 2 = prim_run_flexible for SL
+                                          ! -1 means it wasn't set, error
+
   integer, public :: LFTfreq=0            ! leapfrog-trapazoidal frequency (shallow water only)
                                           ! interspace a lf-trapazoidal step every LFTfreq leapfrogs    
                                           ! 0 = disabled
 
-! vert_remap_q_alg:   -1  remap without monotone filter, used for some test cases
-!                      0  default value, Zerroukat monotonic splines
-!                      1  PPM vertical remap with mirroring at the boundaries
-!                         (solid wall bc's, high-order throughout)
-!                      2  PPM vertical remap without mirroring at the boundaries
-!                         (no bc's enforced, first-order at two cells bordering top and bottom boundaries)
- integer, public :: vert_remap_q_alg = 0
+! vert_remap_q_alg:   -1  PPM remap without monotone filter, used for some test cases
+!                      0  Zerroukat monotonic splines
+!                      1  PPM vertical remap with constant extension at the boundaries
+!                     10  PPM with linear extrapolation at boundaries, with column limiter
+!                     11  PPM with unlimited linear extrapolation at boundaries
+ integer, public :: vert_remap_q_alg = 0    ! tracers
+ integer, public :: vert_remap_u_alg = -2   ! remap for dynamics. default -2 means inherit vert_remap_q_alg
 
 ! advect theta 0: conservation form 
 !              1: expanded divergence form (less noisy, non-conservative)
  integer, public :: theta_advect_form = 0
+ real (kind=real_kind), public :: vtheta_thresh = 100.d0  ! threshold for virtual potential temperature minimum limiter
+ real (kind=real_kind), public :: dp3d_thresh   = 0.125d0 ! threshold for dp3d minimum limiter
+
+ integer, public :: pgrad_correction  = 0   ! 1=turn on theta model pressure gradient correction
+ integer, public :: hv_ref_profiles   = 0   ! 1=turn on theta model HV reference profiles
+ integer, public :: hv_theta_correction=0   ! 1=use HV on p-surface approximation for theta
+ real (kind=real_kind), public :: hv_theta_thresh=.025d0  ! d(theta)/dp max threshold for HV correction term
 
  integer, public :: cubed_sphere_map = -1  ! -1 = chosen at run time
                                            !  0 = equi-angle Gnomonic (default)
@@ -109,18 +119,22 @@ module control_mod
                                                             ! Use (3) if zoltan2 is enabled.
 
   integer              , public :: partmethod     ! partition methods
-  character(len=MAX_STRING_LEN)    , public :: topology       ! options: "cube" is supported
-  character(len=MAX_STRING_LEN)    , public :: test_case      ! options: if cube: "swtc1","swtc2",or "swtc6"  
-  integer              , public :: tasknum
+  character(len=MAX_STRING_LEN)    , public :: topology = "cube"       ! options: "cube", "plane"
+  character(len=MAX_STRING_LEN)    , public :: geometry = "sphere"      ! options: "sphere", "plane"
+  character(len=MAX_STRING_LEN)    , public :: test_case
+  !most tests don't have forcing
+  logical                          , public :: test_with_forcing = .false. 
   integer              , public :: statefreq      ! output frequency of synopsis of system state (steps)
   integer              , public :: restartfreq
   integer              , public :: runtype 
   integer              , public :: timerdetail 
   integer              , public :: numnodes 
-  logical              , public :: uselapi
   character(len=MAX_STRING_LEN)    , public :: restartfile 
   character(len=MAX_STRING_LEN)    , public :: restartdir
 
+  ! flag used for "slice" planar tests (no variation in y-dir)
+  logical, public :: planar_slice
+  
 ! namelist variable set to dry,notdry,moist
 ! internally the code should use logical "use_moisture"
   character(len=MAX_STRING_LEN)    , public :: moisture  
@@ -136,19 +150,16 @@ module control_mod
 
   character(len=MAX_STRING_LEN)    ,public  :: vfile_int=""   ! vertical formulation (ecmwf,ccm1)
   character(len=MAX_STRING_LEN)    ,public  :: vfile_mid=""   ! vertical grid spacing (equal,unequal)
-  character(len=MAX_STRING_LEN)    ,public  :: vform = ""     ! vertical coordinate system (sigma,hybrid)
   integer,                          public  :: vanalytic = 0  ! if 1, test initializes vertical coords
   real (kind=real_kind),            public  :: vtop = 0.1     ! top coordinate level for analytic vcoords
 
-  integer              , public :: fine_ne = -1               ! set for refined exodus meshes (variable viscosity)
-  real (kind=real_kind), public :: max_hypervis_courant = 1d99! upper bound for Courant number
-                                                              ! (only used for variable viscosity, recommend 1.9 in namelist)
   real (kind=real_kind), public :: nu      = 7.0D5            ! viscosity (momentum equ)
   real (kind=real_kind), public :: nu_div  = -1               ! viscsoity (momentum equ, div component)
   real (kind=real_kind), public :: nu_s    = -1               ! default = nu   T equ. viscosity
   real (kind=real_kind), public :: nu_q    = -1               ! default = nu   tracer viscosity
   real (kind=real_kind), public :: nu_p    = -1               ! default = nu   ps equ. viscosity
   real (kind=real_kind), public :: nu_top  = 0.0D5            ! top-of-the-model viscosity
+  real (kind=real_kind), public :: tom_sponge_start=0         ! start of sponge layer, in hPa
 
   integer, public :: hypervis_subcycle=1                      ! number of subcycles for hyper viscsosity timestep
   integer, public :: hypervis_subcycle_tom=0                  ! number of subcycles for TOM diffusion
@@ -156,31 +167,23 @@ module control_mod
                                                               !   >1  apply timesplit from hyperviscosity
   integer, public :: hypervis_subcycle_q=1                    ! number of subcycles for hyper viscsosity timestep on TRACERS
   integer, public :: hypervis_order=0                         ! laplace**hypervis_order.  0=not used  1=regular viscosity, 2=grad**4
-  integer, public :: psurf_vis = 0                            ! 0 = use laplace on eta surfaces
-                                                              ! 1 = use (approx.) laplace on p surfaces
 
-  real (kind=real_kind), public :: hypervis_power=0           ! if not 0, use variable hyperviscosity based on element area
   real (kind=real_kind), public :: hypervis_scaling=0         ! use tensor hyperviscosity
 
   !three types of hyper viscosity are supported right now:
   ! (1) const hv:    nu * del^2 del^2
-  ! (2) scalar hv:   nu(lat,lon) * del^2 del^2
-  ! (3) tensor hv,   nu * ( \div * tensor * \grad ) * del^2
+  ! (2) tensor hv,   nu * ( \div * tensor * \grad ) * del^2
   !
-  ! (1) default:  hypervis_power=0, hypervis_scaling=0
-  ! (2) Original version for var-res grids. (M. Levy)
-  !            scalar coefficient within each element
-  !            hypervisc_scaling=0
-  !            set hypervis_power>0 and set fine_ne, max_hypervis_courant
-  ! (3) tensor HV var-res grids 
+  ! (1) hypervis_scaling=0
+  ! (2) tensor HV var-res grids  
   !            tensor within each element:
-  !            set hypervis_scaling > 0 (typical values would be 3.2 or 4.0)
-  !            hypervis_power=0
+  !            set hypervis_scaling > 0 (typical values would be 3.0)
   !            (\div * tensor * \grad) operator uses cartesian laplace
   !
 
   ! hyperviscosity parameters used for smoothing topography
-  integer, public :: smooth_phis_numcycle = 0   ! 0 = disable
+  integer, public :: smooth_phis_numcycle = -1   ! -1 = disable
+  integer, public :: smooth_phis_p2filt = -1     ! -1 = disable
   real (kind=real_kind), public :: smooth_phis_nudt = 0
 
   integer, public :: prescribed_wind=0    ! fix the velocities?
@@ -200,6 +203,8 @@ module control_mod
   ! Physgrid parameters
   integer, public :: se_fv_phys_remap_alg = 1
 
+  ! Hommexx-specific parameters
+  integer, public :: internal_diagnostics_level = 0
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -247,11 +252,30 @@ module control_mod
   real (kind=real_kind), public :: dcmip16_mu_q    = -1       ! additional uniform viscosity (scalar tracers); -1 implies it defaults to dcmip16_mu_s value
   real (kind=real_kind), public :: interp_lon0     = 0.0d0
 
+!PLANAR
+  real (kind=real_kind), private, parameter :: tol_zero=1e-10 !tolerance to determine if lx,ly,sx,sy are set
+
+  real (kind=real_kind), public :: bubble_T0 = 270.0       !bubble ref state
+  real (kind=real_kind), public :: bubble_dT = 0.5         !bubble dTheta
+  real (kind=real_kind), public :: bubble_xycenter = 0.0   !bubble xy position
+  real (kind=real_kind), public :: bubble_zcenter = 3000.0 !bubble z position
+  real (kind=real_kind), public :: bubble_ztop = 10000.0   !bubble z top
+  real (kind=real_kind), public :: bubble_xyradius = 2000.0!bubble radius along x or y axis
+  real (kind=real_kind), public :: bubble_zradius = 1500.0 !bubble radius along z axis
+  logical,               public :: bubble_cosine  = .TRUE. !bubble uniform or cosine
+  logical,               public :: bubble_moist  = .FALSE.    ! 
+  real (kind=real_kind), public :: bubble_moist_drh = 0.0     !bubble dRH parameter
+  real (kind=real_kind), public :: bubble_rh_background = 0.0 !bubble RH parameter
+  integer,               public :: bubble_prec_type = 0       !0 kessler, 1 rj
+  logical,               protected :: case_planar_bubble = .FALSE.
+
+  public :: set_planar_defaults
+
 contains
 
   function timestep_make_parameters_consistent(par, rsplit, qsplit, &
        dt_remap_factor, dt_tracer_factor, tstep, dtime, nsplit, nstep_factor, &
-       abort, silent) result(status)
+       abrtf, silent) result(status)
 
     ! Current and future development require a more flexibility in
     ! specifying time steps. This routine analyzes the settings and
@@ -283,7 +307,7 @@ contains
     integer, intent(inout) :: &
          ! Physics-dynamics coupling time step.
          dtime
-    logical, intent(in), optional :: abort, silent
+    logical, intent(in), optional :: abrtf, silent
     integer :: status
 
     real(kind=real_kind), parameter :: &
@@ -294,7 +318,7 @@ contains
     logical :: abort_in, silent_in
 
     abort_in = .true.
-    if (present(abort)) abort_in = abort
+    if (present(abrtf)) abort_in = abrtf
     silent_in = .false.
     if (present(silent)) silent_in = silent
 
@@ -308,21 +332,21 @@ contains
   end function timestep_make_parameters_consistent
 
   function timestep_make_subcycle_parameters_consistent(par, rsplit, qsplit, &
-       dt_remap_factor, dt_tracer_factor, abort, silent) result(status)
+       dt_remap_factor, dt_tracer_factor, abrtf, silent) result(status)
 
     use parallel_mod, only: abortmp, parallel_t
     use kinds, only: iulog
 
     type (parallel_t), intent(in) :: par
     integer, intent(inout) :: rsplit, qsplit, dt_remap_factor, dt_tracer_factor
-    logical, intent(in), optional :: abort, silent
+    logical, intent(in), optional :: abrtf, silent
     integer :: status
 
     integer :: qsplit_prev, rsplit_prev
     logical :: split_specified, factor_specified, split_is_master, abort_in, silent_in
 
     abort_in = .true.
-    if (present(abort)) abort_in = abort
+    if (present(abrtf)) abort_in = abrtf
     silent_in = .false.
     if (present(silent)) silent_in = silent
 
@@ -395,7 +419,7 @@ contains
   end function timestep_make_subcycle_parameters_consistent
 
   function timestep_make_eam_parameters_consistent(par, dt_remap_factor, dt_tracer_factor, &
-       nsplit, nstep_factor, tstep, dtime, abort, silent) result(status)
+       nsplit, nstep_factor, tstep, dtime, abrtf, silent) result(status)
 
     use parallel_mod, only: abortmp, parallel_t
     use kinds, only: iulog
@@ -406,7 +430,7 @@ contains
     integer, intent(out) :: nstep_factor
     real(kind=real_kind), intent(inout) :: tstep
     integer, intent(inout) :: dtime
-    logical, intent(in), optional :: abort, silent
+    logical, intent(in), optional :: abrtf, silent
     integer :: status
 
     real(kind=real_kind), parameter :: &
@@ -419,7 +443,7 @@ contains
     logical :: abort_in, silent_in
 
     abort_in = .true.
-    if (present(abort)) abort_in = abort
+    if (present(abrtf)) abort_in = abrtf
     silent_in = .false.
     if (present(silent)) silent_in = silent
 
@@ -451,16 +475,19 @@ contains
           nstep_factor = dt_max_factor*nsplit
           if (abs(nsplit_real - nsplit) > divisible_tol*nsplit_real) then
              if (par%masterproc .and. .not. silent_in) then
-                write(iulog,'(a,es11.4,a,i7,a,es11.4,a)') &
+                write(iulog,'(a,es11.4,a,i7,a,es11.4,a,i2,a,i2,a,i2,a)') &
                      'nsplit was computed as ', nsplit_real, ' based on dtime ', dtime, &
-                     ' and tstep ', tstep, ', which is outside the divisibility tolerance. Set &
-                     &tstep so that it divides dtime.'
+                     ', tstep ', tstep, &
+                     ', and dt_max_factor = max(dt_remap_factor, dt_tracer_factor) = max(', &
+                     dt_remap_factor, ',', dt_tracer_factor, ') =', dt_max_factor, &
+                     ', which is outside the divisibility tolerance. &
+                     &Set tstep, dt_remap_factor, and dt_tracer_factor so that &
+                     &tstep and dt_max_factor*tstep divide dtime.'
              end if
              if (abort_in) call abortmp('timestep_make_parameters_consistent: divisibility error')
              return
           end if
        else
-          print *,'um>',par%rank,par%masterproc,silent_in,nsplit,dtime,tstep
           if (par%masterproc .and. .not. silent_in) then
              write(iulog,*) 'If dtime is set to >0, then either nsplit or tstep must be >0.'
           end if
@@ -607,5 +634,80 @@ contains
     if (par%masterproc .and. nerr > 0) &
          write(iulog,'(a,i2)') 'test_timestep_make_parameters_consistent nerr', nerr
   end subroutine test_timestep_make_parameters_consistent
+
+
+subroutine set_planar_defaults()
+
+use physical_constants, only: Lx, Ly, Sx, Sy
+ 
+!since defaults here depend on test, they cannot be set before ctl_nl is read, unlike some other parameters, bubble_*, etc.        
+!if true, most likely lx,ly,sx,sy weren't set in ctl_nl
+    if (      abs(lx).le.tol_zero .and. abs(ly).le.tol_zero &
+        .and. abs(sx).le.tol_zero .and. abs(sy).le.tol_zero )then
+    if (test_case == "planar_dbl_vrtx") then
+      Lx = 5000.0D0 * 1000.0D0
+      Ly = 5000.0D0 * 1000.0D0
+      Sx = 0.0D0
+      Sy = 0.0D0
+    else if (test_case == "planar_hydro_gravity_wave") then
+       Lx = 6000.0D0 * 1000.0D0
+       Ly = 6000.0D0 * 1000.0D0
+       Sx = -3000.0D0 * 1000.0D0
+       Sy = -3000.0D0 * 1000.0D0
+    else if (test_case == "planar_nonhydro_gravity_wave") then
+       Lx = 300.0D0 * 1000.0D0
+       Ly = 300.0D0 * 1000.0D0
+       Sx = -150.0D0 * 1000.0D0
+       Sy = -150.0D0 * 1000.0D0
+    else if (test_case == "planar_hydro_mtn_wave") then
+       Lx = 240.0D0 * 1000.0D0
+       Ly = 240.0D0 * 1000.0D0
+       Sx = 0.0D0 * 1000.0D0
+       Sy = 0.0D0 * 1000.0D0
+    else if (test_case == "planar_nonhydro_mtn_wave") then
+       Lx = 144.0D0 * 1000.0D0
+       Ly = 144.0D0 * 1000.0D0
+       Sx = 0.0D0 * 1000.0D0
+       Sy = 0.0D0 * 1000.0D0
+    else if (test_case == "planar_schar_mtn_wave") then
+       Lx = 100.0D0 * 1000.0D0
+       Ly = 100.0D0 * 1000.0D0
+       Sx = 0.0D0 * 1000.0D0
+       Sy = 0.0D0 * 1000.0D0
+    else if (test_case == "planar_density_current" .OR. test_case == "planar_moist_density_current") then
+       Lx = 51.2D0 * 1000.0D0
+       Ly = 51.2D0 * 1000.0D0
+       Sx = -25.6D0 * 1000.0D0
+       Sy = -25.6D0 * 1000.0D0
+    else if (test_case == "planar_rising_bubble" .or. test_case == "planar_rising_bubble_pg2") then
+       Lx = 2.0D0 * 10000.0D0
+       Ly = 2.0D0 * 10000.0D0
+       Sx = -10000.0D0
+       Sy = -10000.0D0
+! THESE ARE WRONG AND NEED TO BE FIXED WHEN THESE CASES ARE ACTUALLY IMPLEMENTED....
+!else if (test_case == "planar_baroclinic_instab" .OR. test_case == "planar_moist_baroclinic_instab") then
+!       Lx = 5000.0D0 * 1000.0D0
+!       Ly = 5000.0D0 * 1000.0D0
+!       Sx = 0.0D0
+!       Sy = 0.0D0
+!    else if (test_case == "planar_tropical_cyclone") then
+!       Lx = 5000.0D0 * 1000.0D0
+!       Ly = 5000.0D0 * 1000.0D0
+!       Sx = 0.0D0
+!       Sy = 0.0D0
+!    else if (test_case == "planar_supercell") then
+!       Lx = 5000.0D0 * 1000.0D0
+!       Ly = 5000.0D0 * 1000.0D0
+!       Sx = 0.0D0
+!       Sy = 0.0D0
+
+    endif
+    endif !if lx,ly,sx,sy are not set in nl
+
+    if (test_case == "planar_rising_bubble" .or. test_case == "planar_rising_bubble_pg2") then
+       case_planar_bubble = .TRUE.
+    end if
+
+end subroutine set_planar_defaults
 
 end module control_mod

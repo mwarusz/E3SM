@@ -26,7 +26,9 @@ program prim_main
 #if (defined MODEL_THETA_L && defined ARKODE)
   use arkode_mod,       only: calc_nonlinear_stats, finalize_nonlinear_stats
 #endif
+#ifdef HOMME_ENABLE_COMPOSE
   use compose_test_mod, only: compose_test
+#endif
   use test_mod,         only: print_test_results
 
 #ifdef PIO_INTERP
@@ -145,7 +147,13 @@ program prim_main
 
   ! this should really be called from test_mod.F90, but it has be be called outside
   ! the threaded region
-  if (infilenames(1)/='') call pio_read_phis(elem,hybrid%par)
+  if (infilenames(1)/='') then
+     if (index(infilenames(1),"np4pg")==0) then
+        call pio_read_phis(elem,hybrid%par,"PHIS")
+     else
+        call pio_read_phis(elem,hybrid%par,"PHIS_d")
+     endif
+  endif
 
   if(par%masterproc) print *,"Primitive Equation Initialization..."
 #if (defined HORIZ_OPENMP)
@@ -214,7 +222,9 @@ program prim_main
 #endif
   endif
 
+#ifdef HOMME_ENABLE_COMPOSE
   call compose_test(par, hvcoord, dom_mt, elem)
+#endif
 
   if(par%masterproc) print *,"Entering main timestepping loop"
   call t_startf('prim_main_loop')

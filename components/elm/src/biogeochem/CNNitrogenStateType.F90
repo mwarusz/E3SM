@@ -5,12 +5,12 @@ module CNNitrogenStateType
   use shr_kind_mod           , only : r8 => shr_kind_r8
   use shr_infnan_mod         , only : nan => shr_infnan_nan, assignment(=)
   use shr_log_mod            , only : errMsg => shr_log_errMsg
-  use clm_varpar             , only : ndecomp_cascade_transitions, ndecomp_pools, nlevcan
-  use clm_varpar             , only : nlevdecomp_full, nlevdecomp, crop_prog
-  use clm_varcon             , only : spval, ispval, dzsoi_decomp, zisoi
+  use elm_varpar             , only : ndecomp_cascade_transitions, ndecomp_pools, nlevcan
+  use elm_varpar             , only : nlevdecomp_full, nlevdecomp, crop_prog
+  use elm_varcon             , only : spval, ispval, dzsoi_decomp, zisoi
   use landunit_varcon        , only : istcrop, istsoil 
-  use clm_varctl             , only : use_nitrif_denitrif, use_vertsoilc, use_century_decomp
-  use clm_varctl             , only : iulog, override_bgc_restart_mismatch_dump, spinup_state
+  use elm_varctl             , only : use_vertsoilc, use_century_decomp, use_fan
+  use elm_varctl             , only : iulog, override_bgc_restart_mismatch_dump, spinup_state
   use decompMod              , only : bounds_type
   use pftvarcon              , only : npcropmin, nstor
   use CNDecompCascadeConType , only : decomp_cascade_con
@@ -20,8 +20,8 @@ module CNNitrogenStateType
   use LandunitType           , only : lun_pp                
   use ColumnType             , only : col_pp                
   use VegetationType         , only : veg_pp
-  use clm_varctl             , only : use_pflotran, pf_cmode
-  use clm_varctl             , only : nu_com, use_crop
+  use elm_varctl             , only : use_pflotran, pf_cmode
+  use elm_varctl             , only : nu_com, use_crop
   use dynPatchStateUpdaterMod, only : patch_state_updater_type               
   use SpeciesMod           , only : CN_SPECIES_N
   ! 
@@ -189,6 +189,34 @@ module CNNitrogenStateType
     
      real(r8), pointer :: plmr_ptlai_z                              (:,:)
      real(r8), pointer :: plmr_pleafn_z                             (:,:)
+
+     !FAN
+     real(r8), pointer :: tan_g1_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool G1
+     real(r8), pointer :: tan_g2_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool G2 
+     real(r8), pointer :: tan_g3_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool G2      
+     real(r8), pointer :: tan_s0_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool S0
+     real(r8), pointer :: tan_s1_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool S1
+     real(r8), pointer :: tan_s2_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool S2 
+     real(r8), pointer :: tan_s3_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool S3 
+     real(r8), pointer :: tan_f1_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool F1
+     real(r8), pointer :: tan_f2_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool F2
+     real(r8), pointer :: tan_f3_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool F3
+     real(r8), pointer :: tan_f4_col(:)                        ! col (gN/m2) total ammoniacal N in FAN pool F4
+     
+     real(r8), pointer :: fert_u1_col(:)                       ! col (gN/m2) total urea N in FAN pool U1
+     real(r8), pointer :: fert_u2_col(:)                       ! col (gN/m2) total urea N in FAN pool U2
+     
+     real(r8), pointer :: manure_u_grz_col(:)                  ! col (gN/m2) unavailable organic N, grazing
+     real(r8), pointer :: manure_a_grz_col(:)                  ! col (gN/m2) available organic N, grazing
+     real(r8), pointer :: manure_r_grz_col(:)                  ! col (gN/m2) resistant organic N, grazing
+
+     real(r8), pointer :: manure_u_app_col(:)                  ! col (gN/m2) unavailable organic N, application
+     real(r8), pointer :: manure_a_app_col(:)                  ! col (gN/m2) available organic N, application
+     real(r8), pointer :: manure_r_app_col(:)                  ! col (gN/m2) resistant organic N, application
+
+     real(r8), pointer :: manure_n_stored_col(:)               ! col (gN/m2) manure N in storage
+     real(r8), pointer :: manure_tan_stored_col(:)             ! col (gN/m2) manure TAN in storage
+     real(r8), pointer :: fan_grz_fract_col(:)                 ! col unitless fraction of animals grazing
 
    contains
 
@@ -388,6 +416,34 @@ contains
 
     allocate(this%plant_nbuffer_col(begc:endc));this%plant_nbuffer_col(:) = nan
 
+    if (use_fan) then
+       allocate(this%tan_g1_col(begc:endc))  ; this%tan_g1_col(:) = nan
+       allocate(this%tan_g2_col(begc:endc))  ; this%tan_g2_col(:) = nan
+       allocate(this%tan_g3_col(begc:endc))  ; this%tan_g3_col(:) = nan
+       allocate(this%tan_s0_col(begc:endc))  ; this%tan_s0_col(:) = nan
+       allocate(this%tan_s1_col(begc:endc))  ; this%tan_s1_col(:) = nan
+       allocate(this%tan_s2_col(begc:endc))  ; this%tan_s2_col(:) = nan
+       allocate(this%tan_s3_col(begc:endc))  ; this%tan_s3_col(:) = nan
+       allocate(this%tan_f1_col(begc:endc))  ; this%tan_f1_col(:) = nan
+       allocate(this%tan_f2_col(begc:endc))  ; this%tan_f2_col(:) = nan
+       allocate(this%tan_f3_col(begc:endc))  ; this%tan_f3_col(:) = nan
+       allocate(this%tan_f4_col(begc:endc))  ; this%tan_f4_col(:) = nan
+       allocate(this%fert_u1_col(begc:endc)) ; this%fert_u1_col(:) = nan
+       allocate(this%fert_u2_col(begc:endc)) ; this%fert_u2_col(:) = nan
+
+       allocate(this%manure_u_grz_col(begc:endc)) ; this%manure_u_grz_col(:) = nan
+       allocate(this%manure_a_grz_col(begc:endc)) ; this%manure_a_grz_col(:) = nan
+       allocate(this%manure_r_grz_col(begc:endc)) ; this%manure_r_grz_col(:) = nan
+
+       allocate(this%manure_u_app_col(begc:endc)) ; this%manure_u_app_col(:) = nan
+       allocate(this%manure_a_app_col(begc:endc)) ; this%manure_a_app_col(:) = nan
+       allocate(this%manure_r_app_col(begc:endc)) ; this%manure_r_app_col(:) = nan
+
+       allocate(this%manure_n_stored_col(begc:endc))   ; this%manure_n_stored_col(:) = nan
+       allocate(this%manure_tan_stored_col(begc:endc)) ; this%manure_tan_stored_col(:) = nan
+       allocate(this%fan_grz_fract_col(begc:endc))     ; this%fan_grz_fract_col(:) = nan
+    end if
+
   end subroutine InitAllocate
 
   !------------------------------------------------------------------------
@@ -397,8 +453,8 @@ contains
     ! add history fields for all CN variables, always set as default='inactive'
     !
     ! !USES:
-    use clm_varpar , only : ndecomp_cascade_transitions, ndecomp_pools
-    use clm_varpar , only : nlevdecomp, nlevdecomp_full,crop_prog, nlevgrnd
+    use elm_varpar , only : ndecomp_cascade_transitions, ndecomp_pools
+    use elm_varpar , only : nlevdecomp, nlevdecomp_full,crop_prog, nlevgrnd
     use histFileMod, only : hist_addfld1d, hist_addfld2d, hist_addfld_decomp 
     use decompMod  , only : bounds_type
     !
@@ -444,7 +500,7 @@ contains
     ! Initializes time varying variables used only in coupled carbon-nitrogen mode (CN):
     !
     ! !USES:
-    use clm_varpar     , only : crop_prog
+    use elm_varpar     , only : crop_prog
     use decompMod      , only : bounds_type
     use pftvarcon      , only : noveg, npcropmin
     !
@@ -604,20 +660,20 @@ contains
              this%decomp_npools_col(c,k)    = decomp_cpools_col(c,k)    / decomp_cascade_con%initial_cn_ratio(k)
              this%decomp_npools_1m_col(c,k) = decomp_cpools_1m_col(c,k) / decomp_cascade_con%initial_cn_ratio(k)
           end do
-          if (use_nitrif_denitrif .or. (use_pflotran .and. pf_cmode)) then
-             do j = 1, nlevdecomp_full
-                this%smin_nh4_vr_col(c,j) = 0._r8
-                this%smin_no3_vr_col(c,j) = 0._r8
-                if(use_pflotran .and. pf_cmode) then
-                    this%smin_nh4sorb_vr_col(c,j) = 0._r8
-                end if
-             end do
-             this%smin_nh4_col(c) = 0._r8
-             this%smin_no3_col(c) = 0._r8
+
+          do j = 1, nlevdecomp_full
+             this%smin_nh4_vr_col(c,j) = 0._r8
+             this%smin_no3_vr_col(c,j) = 0._r8
              if(use_pflotran .and. pf_cmode) then
-                this%smin_nh4sorb_col(c) = 0._r8
+                this%smin_nh4sorb_vr_col(c,j) = 0._r8
              end if
+          end do
+          this%smin_nh4_col(c) = 0._r8
+          this%smin_no3_col(c) = 0._r8
+          if(use_pflotran .and. pf_cmode) then
+             this%smin_nh4sorb_col(c) = 0._r8
           end if
+
           this%totlitn_col(c)    = 0._r8
           this%totsomn_col(c)    = 0._r8
           this%totlitn_1m_col(c) = 0._r8
@@ -633,6 +689,36 @@ contains
           this%prod100n_col(c)      = 0._r8
           this%totprodn_col(c)      = 0._r8
        end if
+
+       if ( use_fan ) then
+          this%tan_g1_col(c) = 0.0_r8
+          this%tan_g2_col(c) = 0.0_r8
+          this%tan_g3_col(c) = 0.0_r8
+          this%tan_s0_col(c) = 0.0_r8
+          this%tan_s1_col(c) = 0.0_r8
+          this%tan_s2_col(c) = 0.0_r8
+          this%tan_s3_col(c) = 0.0_r8
+          this%tan_f1_col(c) = 0.0_r8
+          this%tan_f2_col(c) = 0.0_r8
+          this%tan_f3_col(c) = 0.0_r8
+          this%tan_f4_col(c) = 0.0_r8
+          this%fert_u2_col(c) = 0.0_r8
+          this%fert_u1_col(c) = 0.0_r8
+          
+          this%manure_u_grz_col(c) = 0.0_r8
+          this%manure_a_grz_col(c) = 0.0_r8
+          this%manure_r_grz_col(c) = 0.0_r8
+          
+          this%manure_u_app_col(c) = 0.0_r8
+          this%manure_a_app_col(c) = 0.0_r8
+          this%manure_r_app_col(c) = 0.0_r8
+          
+          this%manure_tan_stored_col(c) = 0.0_r8
+          this%fan_grz_fract_col(c) = 0.0_r8
+          this%manure_n_stored_col(c) = 0.0_r8
+          
+       end if
+
     end do
 
     ! now loop through special filters and explicitly set the variables that
@@ -669,8 +755,8 @@ contains
     !
     ! !USES:
     use shr_infnan_mod      , only : isnan => shr_infnan_isnan, nan => shr_infnan_nan, assignment(=)
-    use clm_time_manager    , only : is_restart, get_nstep
-    use clm_varctl          , only : spinup_mortality_factor
+    use elm_time_manager    , only : is_restart, get_nstep
+    use elm_varctl          , only : spinup_mortality_factor
     use CNStateType         , only : cnstate_type
     use restUtilMod
     use ncdio_pio
@@ -796,13 +882,13 @@ contains
        this%sminn_col(i)       = value_column
        this%ntrunc_col(i)      = value_column
        this%cwdn_col(i)        = value_column
-       if (use_nitrif_denitrif .or. (use_pflotran .and. pf_cmode)) then
-          this%smin_no3_col(i) = value_column
-          this%smin_nh4_col(i) = value_column
-          if(use_pflotran .and. pf_cmode) then
-             this%smin_nh4sorb_col(i) = value_column
-          end if
+
+       this%smin_no3_col(i) = value_column
+       this%smin_nh4_col(i) = value_column
+       if(use_pflotran .and. pf_cmode) then
+          this%smin_nh4sorb_col(i) = value_column
        end if
+
        this%totlitn_col(i)     = value_column
        this%totsomn_col(i)     = value_column
        this%totecosysn_col(i)  = value_column
@@ -816,12 +902,10 @@ contains
           i = filter_column(fi)
           this%sminn_vr_col(i,j)       = value_column
           this%ntrunc_vr_col(i,j)      = value_column
-          if (use_nitrif_denitrif  .or. (use_pflotran .and. pf_cmode)) then
-             this%smin_no3_vr_col(i,j) = value_column
-             this%smin_nh4_vr_col(i,j) = value_column
-             if(use_pflotran .and. pf_cmode) then
-               this%smin_nh4sorb_vr_col(i,j) = value_column
-             end if
+          this%smin_no3_vr_col(i,j) = value_column
+          this%smin_nh4_vr_col(i,j) = value_column
+          if(use_pflotran .and. pf_cmode) then
+             this%smin_nh4sorb_vr_col(i,j) = value_column
           end if
        end do
     end do
@@ -874,10 +958,9 @@ contains
   subroutine Summary(this, bounds, num_soilc, filter_soilc, num_soilp, filter_soilp)
     !
     ! !USES:
-    use clm_varpar    , only: nlevdecomp,ndecomp_cascade_transitions,ndecomp_pools
-    use clm_varctl    , only: use_nitrif_denitrif
+    use elm_varpar    , only: nlevdecomp,ndecomp_cascade_transitions,ndecomp_pools
     use subgridAveMod , only: p2c
-    use clm_varpar    , only: nlevdecomp_full
+    use elm_varpar    , only: nlevdecomp_full
     !
     ! !ARGUMENTS:
     class (nitrogenstate_type) :: this
@@ -967,34 +1050,31 @@ contains
    nlev = nlevdecomp
    if (use_pflotran .and. pf_cmode) nlev = nlevdecomp_full
 
-   if (use_nitrif_denitrif .or. (use_pflotran .and. pf_cmode)) then
+   do fc = 1,num_soilc
+      c = filter_soilc(fc)
+      this%smin_no3_col(c) = 0._r8
+      this%smin_nh4_col(c) = 0._r8
+      if(use_pflotran .and. pf_cmode) then
+         this%smin_nh4sorb_col(c) = 0._r8
+      end if
+   end do
+   do j = 1, nlev
       do fc = 1,num_soilc
          c = filter_soilc(fc)
-         this%smin_no3_col(c) = 0._r8
-         this%smin_nh4_col(c) = 0._r8
+         this%smin_no3_col(c) = &
+              this%smin_no3_col(c) + &
+              this%smin_no3_vr_col(c,j) * dzsoi_decomp(j)
+         
+         this%smin_nh4_col(c) = &
+              this%smin_nh4_col(c) + &
+              this%smin_nh4_vr_col(c,j) * dzsoi_decomp(j)
          if(use_pflotran .and. pf_cmode) then
-            this%smin_nh4sorb_col(c) = 0._r8
-         end if
-      end do
-      do j = 1, nlev
-         do fc = 1,num_soilc
-            c = filter_soilc(fc)
-            this%smin_no3_col(c) = &
-                 this%smin_no3_col(c) + &
-                 this%smin_no3_vr_col(c,j) * dzsoi_decomp(j)
-            
-            this%smin_nh4_col(c) = &
-                 this%smin_nh4_col(c) + &
-                 this%smin_nh4_vr_col(c,j) * dzsoi_decomp(j)
-            if(use_pflotran .and. pf_cmode) then
-               this%smin_nh4sorb_col(c) = &
+            this%smin_nh4sorb_col(c) = &
                  this%smin_nh4sorb_col(c) + &
                  this%smin_nh4sorb_vr_col(c,j) * dzsoi_decomp(j)
-            end if
-          end do 
-       end do
-
-    end if
+         end if
+      end do
+   end do
 
    ! vertically integrate each of the decomposing N pools
    do l = 1, ndecomp_pools

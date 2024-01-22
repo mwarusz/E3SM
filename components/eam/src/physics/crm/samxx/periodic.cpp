@@ -2,9 +2,10 @@
 #include "periodic.h"
 
 void periodic(int flag) {
-  auto &w     = ::w;
-  auto &sstxy = ::sstxy;
-  auto &ncrms = ::ncrms;
+  YAKL_SCOPE( w       , :: w );
+  YAKL_SCOPE( sstxy   , :: sstxy );
+  YAKL_SCOPE( ncrms   , :: ncrms );
+  YAKL_SCOPE( use_ESMT, :: use_ESMT );
 
   if (flag == 0) {
     bound_exchange(u,nzm,1,1,1,1, 1);
@@ -65,6 +66,10 @@ void periodic(int flag) {
         bound_exchange(micro_field,i,nzm,3,3,3,3, 4);
       }
     }
+    if (use_ESMT) {
+      bound_exchange(u_esmt, nzm, 3, 3, 3, 3, 4);
+      bound_exchange(v_esmt, nzm, 3, 3, 3, 3, 4);
+    }
   }
 
   if (flag == 3) {
@@ -79,6 +84,10 @@ void periodic(int flag) {
       if ( i==index_water_vapor || (docloud && flag_precip(i)!=1) || (doprecip && flag_precip(i)==1)) {
           bound_exchange(micro_field,i,nzm,1,1,1,1, 4);
       }
+    }
+    if (use_ESMT) {
+      bound_exchange(u_esmt, nzm, 1, 1, 1, 1, 4);
+      bound_exchange(v_esmt, nzm, 1, 1, 1, 1, 4);
     }
   }
 

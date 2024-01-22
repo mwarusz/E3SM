@@ -11,11 +11,12 @@ module CropType
   use spmdMod             , only : masterproc
   use abortutils          , only : endrun
   use decompMod           , only : bounds_type
-  use clm_varcon          , only : spval
-  use clm_varpar          , only : crop_prog
-  use clm_varctl          , only : iulog, use_crop
+  use elm_varcon          , only : spval
+  use elm_varpar          , only : crop_prog
+  use elm_varctl          , only : iulog, use_crop
   use ColumnDataType      , only : col_es
   use VegetationDataType  , only : veg_es
+  use GridcellType        , only : grc_pp
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -38,7 +39,7 @@ module CropType
      logical , pointer :: cropplant_patch         (:)   ! patch Flag, true if planted
      integer , pointer :: harvdate_patch          (:)   ! patch harvest date
      real(r8), pointer :: fertnitro_patch         (:)   ! patch fertilizer nitrogen
-
+     real(r8), pointer :: fertphosp_patch         (:)   ! patch fertilizer phosphorus
      real(r8), pointer :: gddplant_patch          (:)   ! patch accum gdd past planting date for crop       (ddays)
      real(r8), pointer :: gddtsoi_patch           (:)   ! patch growing degree-days from planting (top two soil layers) (ddays)
      real(r8), pointer :: crpyld_patch            (:)   ! patch crop yield (bu/acre)
@@ -78,6 +79,7 @@ module CropType
 
      procedure, private :: InitAllocate 
      procedure, private :: InitHistory
+     procedure, private :: InitCold
      procedure, private, nopass :: checkDates
 
   end type crop_type
@@ -102,6 +104,7 @@ contains
 
     if (crop_prog) then
        call this%InitHistory(bounds)
+       call this%InitCold(bounds) 
     end if
 
   end subroutine Init
@@ -126,6 +129,7 @@ contains
     allocate(this%cropplant_patch        (begp:endp)) ; this%cropplant_patch        (:) = .false.
     allocate(this%harvdate_patch         (begp:endp)) ; this%harvdate_patch         (:) = huge(1) 
     allocate(this%fertnitro_patch        (begp:endp)) ; this%fertnitro_patch        (:) = spval
+    allocate(this%fertphosp_patch        (begp:endp)) ; this%fertphosp_patch        (:) = spval
     allocate(this%gddplant_patch         (begp:endp)) ; this%gddplant_patch         (:) = spval
     allocate(this%gddtsoi_patch          (begp:endp)) ; this%gddtsoi_patch          (:) = spval
     allocate(this%crpyld_patch           (begp:endp)) ; this%crpyld_patch           (:) = spval
@@ -170,6 +174,16 @@ contains
     
     begp = bounds%begp; endp = bounds%endp
 
+    this%fertnitro_patch(begp:endp) = spval
+    call hist_addfld1d (fname='FERTNITRO', units='gN/m2/yr', &
+         avgflag='A', long_name='Nitrogen fertilizer for each crop', &
+         ptr_patch=this%fertnitro_patch, default='inactive')
+
+    this%fertphosp_patch(begp:endp) = spval
+    call hist_addfld1d (fname='FERTPHOSP', units='gP/m2/yr', &
+         avgflag='A', long_name='Phosphorus fertilizer for each crop', &
+         ptr_patch=this%fertphosp_patch, default='inactive')
+
     this%gddplant_patch(begp:endp) = spval
     call hist_addfld1d (fname='GDDPLANT', units='ddays', &
          avgflag='A', long_name='Accumulated growing degree days past planting date for crop', &
@@ -191,17 +205,17 @@ contains
          ptr_patch=this%dmyield_patch)
 
     this%cvt_patch(begp:endp) = spval
-    call hist_addfld1d (fname='CVT', units='none', &
+    call hist_addfld1d (fname='CVT', units='1', &
          avgflag='X', long_name='Temperature Coefficient of Variance', &
          ptr_patch=this%cvt_patch, default = 'inactive')
 
     this%cvp_patch(begp:endp) = spval
-    call hist_addfld1d (fname='CVP', units='none', &
+    call hist_addfld1d (fname='CVP', units='1', &
          avgflag='X', long_name='Precipitation Coefficient of Variance', &
          ptr_patch=this%cvp_patch, default = 'inactive')
 
     this%plantmonth_patch(begp:endp) = spval
-    call hist_addfld1d (fname='PLANTMONTH', units='none', &
+    call hist_addfld1d (fname='PLANTMONTH', units='1', &
          avgflag='X', long_name='Month of planting', &
          ptr_patch=this%plantmonth_patch)
 
@@ -248,30 +262,65 @@ contains
     this%p2ETo_patch(begp:endp,:) = spval
     call hist_addfld2d (fname='P2ETO', units='mm', type2d='month', &
          avgflag='A', long_name='Precipitation:Evapotranspiration ratio', &
-         ptr_patch=this%p2ETo_patch)
+         ptr_patch=this%p2ETo_patch, default = 'inactive')
 
     this%p2ETo_bar_patch(begp:endp,:) = spval
     call hist_addfld2d (fname='P2ETO_bar', units='mm', type2d='month', &
          avgflag='A', long_name='EWMA Precipitation:Evapotranspiration ratio', &
-         ptr_patch=this%p2ETo_bar_patch)
+         ptr_patch=this%p2ETo_bar_patch, default = 'inactive')
 
     this%prev_p2ETo_bar_patch(begp:endp,:) = spval
     call hist_addfld2d (fname='PREV_P2ETO_bar', units='mm', type2d='month', &
          avgflag='A', long_name='Previous EWMA Precipitation:Evapotranspirationratio', &
-         ptr_patch=this%prev_p2ETo_bar_patch)
+         ptr_patch=this%prev_p2ETo_bar_patch, default = 'inactive')
 
     this%P2E_rm_patch(begp:endp,:) = spval
     call hist_addfld2d (fname='P2E_rm', units='mm', type2d='month', &
          avgflag='A', long_name='Precipitation:Evapotranspiration ratio 4-month sum', &
-         ptr_patch=this%P2E_rm_patch)
+         ptr_patch=this%P2E_rm_patch, default = 'inactive')
 
     this%ETo_patch(begp:endp,:) = spval
     call hist_addfld2d (fname='ETO', units='mm', type2d='month', &
          avgflag='A', long_name='Reference Evapotranspiration', &
-         ptr_patch=this%ETo_patch)
+         ptr_patch=this%ETo_patch, default = 'inactive')
 
   end subroutine InitHistory
 
+
+    !-----------------------------------------------------------------------
+  subroutine InitCold(this, bounds)
+    ! !USES:
+    use LandunitType,    only : lun_pp
+    use landunit_varcon, only : istcrop
+    use VegetationType,  only : veg_pp
+    use GridcellType,    only : grc_pp
+    use elm_varsur,      only : fert_cft, fert_p_cft
+    ! !ARGUMENTS:
+    class(crop_type),  intent(inout) :: this
+    type(bounds_type), intent(in) :: bounds
+    !
+    ! !LOCAL VARIABLES:
+    integer :: t, c, l, g, p, m, topi, ti ! indices
+
+    character(len=*), parameter :: subname = 'InitCold'
+    if (use_crop) then
+       do p= bounds%begp,bounds%endp
+          g = veg_pp%gridcell(p)
+          l = veg_pp%landunit(p)
+          c = veg_pp%column(p)
+          t = veg_pp%topounit(p)
+          topi = grc_pp%topi(g)
+
+          if (lun_pp%itype(l) == istcrop) then
+             ti = t - topi + 1
+             m  = veg_pp%itype(p)
+             this%fertnitro_patch(p) = fert_cft(g,ti,m)
+             this%fertphosp_patch(p) = fert_p_cft(g,ti,m)
+          end if
+       end do
+    end if
+
+  end subroutine InitCold
 
     !-----------------------------------------------------------------------
   subroutine InitAccBuffer (this, bounds)
@@ -324,7 +373,7 @@ contains
     !
     ! !USES:
     use accumulMod       , only : extract_accum_field
-    use clm_time_manager , only : get_nstep
+    use elm_time_manager , only : get_nstep
     !
     ! !ARGUMENTS:
     class(crop_type),  intent(inout) :: this
@@ -482,17 +531,17 @@ contains
        end if
        call restartvar(ncid=ncid, flag=flag, varname='cvt', xtype=ncd_double,  &
             dim1name='pft', &
-            long_name='temperature coefficient of variance', units='unitless', &
+            long_name='temperature coefficient of variance', units='1', &
             interpinic_flag='interp', readvar=readvar, data=this%cvt_patch)
 
        call restartvar(ncid=ncid, flag=flag, varname='cvp', xtype=ncd_double,  &
             dim1name='pft', &
-            long_name='precipitation coefficient of variance', units='unitless', &
+            long_name='precipitation coefficient of variance', units='1', &
             interpinic_flag='interp', readvar=readvar, data=this%cvp_patch)
 
        call restartvar(ncid=ncid, flag=flag, varname='plantmonth', xtype=ncd_double,  &
             dim1name='pft', &
-            long_name='Month of planting', units='unitless', &
+            long_name='Month of planting', units='1', &
             interpinic_flag='interp', readvar=readvar, data=this%plantmonth_patch)
 
        ptr2d => this%xt_patch(:,:)
@@ -540,13 +589,13 @@ contains
        ptr2d => this%p2ETo_bar_patch(:,:)
        call restartvar(ncid=ncid, flag=flag, varname='p2ETo_bar', xtype=ncd_double, &
             dim1name='pft',dim2name='month', switchdim=.true., &
-            long_name='ewma P:PET', units='none', &
+            long_name='ewma P:PET', units='1', &
             interpinic_flag='interp', readvar=readvar, data=ptr2d)
 
        ptr2d => this%prev_p2ETo_bar_patch(:,:)
        call restartvar(ncid=ncid, flag=flag, varname='prev_p2ETo_bar', xtype=ncd_double, &
             dim1name='pft',dim2name='month', switchdim=.true., &
-            long_name='previous ewma P:PET', units='none', &
+            long_name='previous ewma P:PET', units='1', &
             interpinic_flag='interp', readvar=readvar, data=ptr2d)
 
        ptr2d => this%P2E_rm_patch(:,:)
@@ -576,7 +625,7 @@ contains
     ! !USES:
     use accumulMod       , only : update_accum_field, extract_accum_field, accumResetVal
     use shr_const_mod    , only : SHR_CONST_CDAY, SHR_CONST_TKFRZ
-    use clm_time_manager , only : get_step_size, get_nstep
+    use elm_time_manager , only : get_step_size, get_nstep
     use pftvarcon        , only : nwcereal, nwcerealirrig, mxtmp, baset
     use TemperatureType  , only : temperature_type
     use VegetationType   , only : veg_pp                
@@ -665,7 +714,7 @@ contains
     ! This routine should be called every time step
     !
     ! !USES:
-    use clm_time_manager , only : get_curr_date, is_first_step
+    use elm_time_manager , only : get_curr_date, is_first_step
     !
     ! !ARGUMENTS:
     class(crop_type) :: this
@@ -711,9 +760,9 @@ contains
     ! messes up these bits of saved information.
     !
     ! !ARGUMENTS:
-    use clm_time_manager, only : get_driver_start_ymd, get_start_date
-    use clm_varctl      , only : iulog
-    use clm_varctl      , only : nsrest, nsrBranch, nsrStartup
+    use elm_time_manager, only : get_driver_start_ymd, get_start_date
+    use elm_varctl      , only : iulog
+    use elm_varctl      , only : nsrest, nsrBranch, nsrStartup
     !
     ! !LOCAL VARIABLES:
     integer :: stymd       ! Start date YYYYMMDD from driver

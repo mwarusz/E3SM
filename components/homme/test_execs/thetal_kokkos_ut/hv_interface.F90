@@ -22,6 +22,8 @@ contains
     use edge_mod_base, only: initEdgeBuffer, edge_g
     use element_state, only: nlev_tom, nu_scale_top
     use geometry_interface_mod, only: par, elem
+    use physical_constants,     only: scale_factor, scale_factor_inv, laplacian_rigid_factor, rearth, rrearth
+
     !
     ! Inputs
     !
@@ -34,7 +36,10 @@ contains
     !
     integer :: ie
 
-
+    scale_factor = rearth
+    scale_factor_inv = rrearth
+    laplacian_rigid_factor = rrearth
+    
     call init_f90(ne, hyai, hybi, hyam, hybm, dvv, mp, ps0)
 
     ! There are 4 scalar fields (dp,theta,phi,w) and 1 vector field (v)
@@ -131,6 +136,7 @@ contains
                                   dp_ref_ptr, theta_ref_ptr, phi_ref_ptr,      &
                                   v_ptr,w_ptr,vtheta_ptr,dp_ptr,phinh_ptr) bind(c)
     use control_mod,            only: hypervis_scaling, theta_hydrostatic_mode
+    use control_mod,            only: hypervis_subcycle_tom
     use prim_advance_mod,       only: advance_hypervis
     use geometry_interface_mod, only: elem, hybrid
     use dimensions_mod,         only: nelemd
@@ -159,6 +165,7 @@ contains
     real (kind=real_kind), pointer :: phi_ref   (:,:,:,:)
 
     hypervis_scaling = hv_scaling
+    hypervis_subcycle_tom = 0
     theta_hydrostatic_mode = hydrostatic
 
     call c_f_pointer(v_ptr,      v,      [np,np,2,nlev,  timelevels, nelemd])

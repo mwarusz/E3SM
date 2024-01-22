@@ -6,7 +6,7 @@ module MEGANFactorsMod
   ! !USES:
   use shr_kind_mod, only : r8 => shr_kind_r8
   use abortutils,   only : endrun
-  use clm_varctl,   only : iulog
+  use elm_varctl,   only : iulog
   use shr_log_mod,  only : errMsg => shr_log_errMsg
   !
   implicit none
@@ -268,16 +268,16 @@ contains
     integer :: i
 
     integer, parameter :: tbl_max_idx = 15  ! 2**N - 1
-    integer, parameter :: gen_hash_key_offset = z'000053db'
+    integer, parameter :: gen_hash_key_offset = int(z'000053db')
     integer, dimension(0:tbl_max_idx) :: tbl_gen_hash_key =  (/61,59,53,47,43,41,37,31,29,23,17,13,11,7,3,1/)
 
     hash = gen_hash_key_offset
 
-    if ( len(string) /= 19 ) then
+    if ( len_trim(string) /= 19 ) then
        !
        ! Process arbitrary string length.
        !
-       do i = 1, len(string)
+       do i = 1, len_trim(string)
           hash = ieor(hash , (ichar(string(i:i)) * tbl_gen_hash_key(iand(i-1,tbl_max_idx))))
        end do
     else
@@ -287,7 +287,7 @@ contains
        do i = 1, tbl_max_idx+1
           hash = ieor(hash , ichar(string(i:i))   * tbl_gen_hash_key(i-1)) 
        end do
-       do i = tbl_max_idx+2, len(string)
+       do i = tbl_max_idx+2, len_trim(string)
           hash = ieor(hash , ichar(string(i:i))   * tbl_gen_hash_key(i-tbl_max_idx-2)) 
        end do
     end if

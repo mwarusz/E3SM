@@ -102,6 +102,15 @@ CONTAINS
     use cam_control_mod,  only: moist_physics
     use cam_abortutils,   only : endrun
 
+#ifdef HAVE_MOAB
+    use seq_comm_mct,      only: MHID, MHFID  ! id of homme moab coarse and fine applications
+    use seq_comm_mct,      only: ATMID
+    use seq_comm_mct,      only: mhpgid       ! id of pgx moab application
+    use semoab_mod,        only: create_moab_meshes
+    use iMOAB, only : iMOAB_RegisterApplication
+    use iso_c_binding 
+#endif
+
     ! PARAMETERS:
     type(file_desc_t),   intent(in)  :: fh       ! PIO file handle for initial or restart file
     character(len=*),    intent(in)  :: NLFileName
@@ -111,6 +120,18 @@ CONTAINS
     integer :: neltmp(3), ierr, nstep_factor
     integer :: npes_se
     integer :: npes_se_stride
+
+#ifdef KOKKOS_TARGET
+#if defined(HORIZ_OPENMP) || defined(COLUMN_OPENMP)
+    call endrun( 'in this EAM configuration, kokkos dycore does not run with threads yet')
+#endif
+#endif
+
+#ifdef HAVE_MOAB
+    integer :: ATM_ID1
+    character*32  appname
+#endif
+
 
     !----------------------------------------------------------------------
 
@@ -132,7 +153,9 @@ CONTAINS
     if (use_moisture) moisture='wet'
 
     ! Initialize hybrid coordinate arrays.
+    call t_startf('hycoef_init')
     call hycoef_init(fh)
+    call t_stopf('hycoef_init')
 
     ! Initialize physics grid reference pressures (needed by initialize_radbuffer)
     call ref_pres_init()
@@ -145,8 +168,54 @@ CONTAINS
     nthreads = omp_get_max_threads()
 #endif
 
+
+#ifdef HAVE_MOAB
+       appname="HM_COARSE"//C_NULL_CHAR
+       if (fv_nphys > 0 ) then ! in this case HM_COARSE will not be used for transfers ...
+        ATM_ID1 = 120 ! 
+       else
+        ATM_ID1 = ATMID(1) ! first atmosphere instance; it should be 5
+       endif
+       ierr = iMOAB_RegisterApplication(appname, par%comm, ATM_ID1, MHID)
+       if (ierr > 0 )  &
+           call endrun('Error: cannot register moab app')
+       if(par%masterproc) then
+           write(iulog,*) " "
+           write(iulog,*) "register MOAB app:", trim(appname), "  MHID=", MHID
+           write(iulog,*) " "
+       endif
+       appname="HM_FINE"//C_NULL_CHAR
+       ATM_ID1 = 119 ! this number should not conflict with other components IDs; how do we know?
+       ierr = iMOAB_RegisterApplication(appname, par%comm, ATM_ID1, MHFID)
+       if (ierr > 0 )  &
+           call endrun('Error: cannot register moab app for fine mesh')
+       if(par%masterproc) then
+           write(iulog,*) " "
+           write(iulog,*) "register MOAB app:", trim(appname), "  MHFID=", MHFID
+           write(iulog,*) " "
+       endif
+       if ( fv_nphys > 0 ) then
+         appname="HM_PGX"//C_NULL_CHAR
+         ATM_ID1 =  ATMID(1) ! this number should not conflict with other components IDs; how do we know?
+         !  
+         ! in this case, we reuse the main atm id, mhid will not be used for intersection anymore
+         ! still, need to be careful
+         ierr = iMOAB_RegisterApplication(appname, par%comm, ATM_ID1, mhpgid)
+         if (ierr > 0 )  &
+             call endrun('Error: cannot register moab app for fine mesh')
+         if(par%masterproc) then
+             write(iulog,*) " "
+             write(iulog,*) "register MOAB app:", trim(appname), "  MHPGID=", mhpgid
+             write(iulog,*) " "
+         endif
+       endif
+
+#endif
+
     if(par%dynproc) then
+       call t_startf('prim_init1')
        call prim_init1(elem,par,dom_mt,TimeLevel)
+       call t_stopf('prim_init1')
 
        dyn_in%elem => elem
        dyn_out%elem => elem
@@ -199,6 +268,9 @@ CONTAINS
       call fv_physgrid_init()
     end if
 
+#ifdef HAVE_MOAB
+    call create_moab_meshes(par, elem)
+#endif
     ! Define the CAM grids (this has to be after dycore spinup).
     ! Physics-grid will be defined later by phys_grid_init
     call define_cam_grids()
@@ -225,7 +297,7 @@ CONTAINS
     use time_mod,         only: time_at
     use control_mod,      only: runtype
     use cam_control_mod,  only: aqua_planet, ideal_phys, adiabatic
-    use comsrf,           only: landm, sgh, sgh30
+    use comsrf,           only: sgh, sgh30
     use cam_instance,     only: inst_index
     use element_ops,      only: set_thermostate
 
@@ -274,7 +346,7 @@ CONTAINS
 
                 elem(ie)%state%q(:,:,:,:)=0.0_r8
 
-                temperature(:,:,:)=0.0_r8
+                temperature(:,:,:)=300.0_r8
                 ps=ps0
                 call set_thermostate(elem(ie),ps,temperature,hvcoord)
 
@@ -284,7 +356,6 @@ CONTAINS
           do ie=nets,nete
              elem(ie)%state%phis(:,:)=0.0_r8
           end do
-          if(allocated(landm)) landm=0.0_r8
           if(allocated(sgh)) sgh=0.0_r8
           if(allocated(sgh30)) sgh30=0.0_r8
        end if
@@ -304,7 +375,11 @@ CONTAINS
           ! new run, scale mass to value given in namelist, if needed
           call prim_set_mass(elem, TimeLevel,hybrid,hvcoord,nets,nete)
        endif
+
+       call t_startf('prim_init2')
        call prim_init2(elem,hybrid,nets,nete, TimeLevel, hvcoord)
+       call t_stopf('prim_init2')
+
 #ifdef HORIZ_OPENMP
        !$OMP END PARALLEL 
 #endif
@@ -321,8 +396,8 @@ CONTAINS
   subroutine dyn_run( dyn_state, rc )
 
     ! !USES:
-    use scamMod,          only: single_column, use_3dfrc
-    use se_single_column_mod, only: apply_SC_forcing
+    use iop_data_mod,     only: single_column, dp_crm, use_3dfrc
+    use se_iop_intr_mod,  only: apply_iop_forcing
     use parallel_mod,     only : par
     use prim_driver_mod,  only: prim_run_subcycle
     use dimensions_mod,   only : nlev
@@ -339,6 +414,7 @@ CONTAINS
     integer ::  n
     integer :: nets, nete, ithr
     integer :: ie
+    logical :: single_column_in, do_prim_run
 
     ! !DESCRIPTION:
     !
@@ -357,18 +433,41 @@ CONTAINS
        nete=dom_mt(ithr)%end
        hybrid = hybrid_create(par,ithr,hthreads)
 
-       if (.not. use_3dfrc) then
+       do_prim_run = .true. ! Always do prim_run_subcycle
+                            ! Unless turned off by SCM for specific cases
+
+       single_column_in = single_column
+       
+       ! if doubly period CRM mode we want dycore to operate in non-SCM mode,
+       !   (typically the single_column flag is true in this case
+       !   because we need to take advantage of SCM infrastructure and forcing)
+       !   thus turn this switch to false for dycore input.  NOTE that
+       !   dycore in SCM mode means that only the large scale vertical 
+       !   advection is computed (i.e. no horizontal communication)
+       if (dp_crm) then
+         single_column_in = .false.
+       endif
+       
+       ! if true SCM mode (NOT DP-CRM mode) do not call
+       !   dynamical core if 3D forcing is prescribed
+       !   (since large scale vertical advection is accounted for
+       !   in that forcing)
+       if (single_column .and. .not. dp_crm) then
+         if (use_3dfrc) do_prim_run = .false.
+       endif
+       
+       if (do_prim_run) then
          do n=1,se_nsplit
            ! forward-in-time RK, with subcycling
-           call t_startf("prim_run_sybcycle")
+           call t_startf('prim_run_subcycle')
            call prim_run_subcycle(dyn_state%elem,hybrid,nets,nete,&
-               tstep, single_column, TimeLevel, hvcoord, n)
-           call t_stopf("prim_run_sybcycle")
+               tstep, single_column_in, TimeLevel, hvcoord, n)
+           call t_stopf('prim_run_subcycle')
          end do
        endif
 
        if (single_column) then
-         call apply_SC_forcing(dyn_state%elem,hvcoord,TimeLevel,3,.false.,nets,nete)
+         call apply_iop_forcing(dyn_state%elem,hvcoord,hybrid,TimeLevel,3,.false.,nets,nete)
        endif
 
 #ifdef HORIZ_OPENMP

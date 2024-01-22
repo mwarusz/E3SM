@@ -3,15 +3,15 @@
 #include "vars.h"
 
 void kurant () {
-  auto &w     = ::w;
-  auto &u     = ::u;
-  auto &v     = ::v;
-  auto &dt    = ::dt;
-  auto &dx    = ::dx;
-  auto &dy    = ::dy;
-  auto &dz    = ::dz;
-  auto &adzw  = ::adzw;
-  auto &ncrms = ::ncrms;
+  YAKL_SCOPE( w     , ::w );
+  YAKL_SCOPE( u     , ::u );
+  YAKL_SCOPE( v     , ::v );
+  YAKL_SCOPE( dt    , ::dt );
+  YAKL_SCOPE( dx    , ::dx );
+  YAKL_SCOPE( dy    , ::dy );
+  YAKL_SCOPE( dz    , ::dz );
+  YAKL_SCOPE( adzw  , ::adzw );
+  YAKL_SCOPE( ncrms , ::ncrms );
 
   int constexpr max_ncycle = 4;
   real cfl;
@@ -57,8 +57,9 @@ void kurant () {
   real cfl_loc = pmax(tmpMax.data());
   cfl = max(cfl,cfl_loc);
 
+
   if(cfl != cfl) {
-    std::cout << "kurant() - cfl is NaN.";
+    std::cout << "\nkurant() - cfl is NaN." << std::endl;
     finalize();
     exit(-1);
   }
@@ -67,8 +68,12 @@ void kurant () {
 
   ncycle = max(ncycle,max(1,static_cast<int>(ceil(cfl/0.7))));
 
+#ifdef MMF_FIXED_SUBCYCLE
+  ncycle = max_ncycle;
+#endif
+
   if(ncycle > max_ncycle) {
-    std::cout << "kurant() - the number of cycles exceeded 4.";
+    std::cout << "\nkurant() - the number of cycles exceeded max_ncycle = "<< max_ncycle << std::endl;
     exit(-1);
   }
 }

@@ -29,7 +29,6 @@ module radiation_data
        lndfrc_fldn    = 'rad_lndfrc      ' , &
        icefrc_fldn    = 'rad_icefrc      ' , &
        snowh_fldn     = 'rad_snowh       ' , &
-       landm_fldn     = 'rad_landm       ' , &
        asdir_fldn     = 'rad_asdir       ' , &
        asdif_fldn     = 'rad_asdif       ' , &
        aldir_fldn     = 'rad_aldir       ' , &
@@ -73,8 +72,10 @@ module radiation_data
   integer          :: rad_data_histfile_num = 2
   character(len=1) :: rad_data_avgflag = 'A'
 
-  ! MG microphys check
+
+  ! MG or P3 microphys check
   logical, public :: mg_microphys
+  logical, public :: p3_microphys
 
 contains
 
@@ -138,6 +139,7 @@ contains
    
     call phys_getopts(microp_scheme_out=microp_scheme)
     mg_microphys =  (trim(microp_scheme) == 'MG')
+    p3_microphys =  (trim(microp_scheme) == 'P3')
 
     cld_ifld    = pbuf_get_index('CLD')
     concld_ifld = pbuf_get_index('CONCLD')
@@ -152,6 +154,13 @@ contains
        iclwp_ifld    = pbuf_get_index('ICLWP')
        icswp_ifld    = pbuf_get_index('ICSWP')
        cldfsnow_ifld = pbuf_get_index('CLDFSNOW')
+    elseif (p3_microphys) then
+
+       dei_ifld      = pbuf_get_index('DEI')
+       mu_ifld       = pbuf_get_index('MU')
+       lambdac_ifld  = pbuf_get_index('LAMBDAC')
+       iciwp_ifld    = pbuf_get_index('ICIWP')
+       iclwp_ifld    = pbuf_get_index('ICLWP')
     endif
 
     call addfld (lndfrc_fldn, horiz_only,    rad_data_avgflag, 'fraction',&
@@ -160,8 +169,6 @@ contains
          'radiation input: ice fraction')
     call addfld (snowh_fldn,        horiz_only,    rad_data_avgflag,  'm',&
          'radiation input: water equivalent snow depth')
-    call addfld (landm_fldn,     horiz_only,    rad_data_avgflag,  'none',&
-         'radiation input: land mask: ocean(0), continent(1), transition(0-1)')
 
     call addfld (asdir_fldn,        horiz_only,    rad_data_avgflag,  '1',&
          'radiation input: short wave direct albedo', flag_xyfill=.true.)
@@ -234,12 +241,22 @@ contains
             'radiation input: In-cloud snow water path')
        call addfld (cldfsnow_fldn, (/ 'lev' /), rad_data_avgflag, 'fraction',&
             'radiation input: cloud liquid drops + snow')
+    elseif (p3_microphys) then
+       call addfld (dei_fldn,   (/ 'lev' /), rad_data_avgflag,    'micron',&
+            'radiation input: effective ice partical diameter')
+       call addfld (mu_fldn,        (/ 'lev' /), rad_data_avgflag,     ' ',&
+            'radiation input: ice gamma parameter for optics (radiation)')
+       call addfld (lambdac_fldn,        (/ 'lev' /), rad_data_avgflag,' ',&
+            'radiation input: slope of droplet distribution for optics (radiation)')
+       call addfld (iciwp_fldn,    (/ 'lev' /), rad_data_avgflag,  'kg/m2',&
+            'radiation input: In-cloud ice water path')
+       call addfld (iclwp_fldn,    (/ 'lev' /), rad_data_avgflag,  'kg/m2',&
+            'radiation input: In-cloud liquid water path')
     endif
 
     call add_default (lndfrc_fldn,    rad_data_histfile_num, ' ')
     call add_default (icefrc_fldn,    rad_data_histfile_num, ' ')
     call add_default (snowh_fldn,     rad_data_histfile_num, ' ')
-    call add_default (landm_fldn,     rad_data_histfile_num, ' ')
     call add_default (asdir_fldn,     rad_data_histfile_num, ' ')
     call add_default (asdif_fldn,     rad_data_histfile_num, ' ')
     call add_default (aldir_fldn,     rad_data_histfile_num, ' ')
@@ -277,6 +294,12 @@ contains
        call add_default (iclwp_fldn,     rad_data_histfile_num, ' ')
        call add_default (icswp_fldn,     rad_data_histfile_num, ' ')
        call add_default (cldfsnow_fldn,  rad_data_histfile_num, ' ')
+    elseif (p3_microphys) then
+       call add_default (dei_fldn,       rad_data_histfile_num, ' ')
+       call add_default (mu_fldn,        rad_data_histfile_num, ' ')
+       call add_default (lambdac_fldn,   rad_data_histfile_num, ' ')
+       call add_default (iciwp_fldn,     rad_data_histfile_num, ' ')
+       call add_default (iclwp_fldn,     rad_data_histfile_num, ' ')
     endif
 
     ! rad constituents
@@ -318,7 +341,7 @@ contains
 
   !================================================================================================
   !================================================================================================
-  subroutine output_rad_data(  pbuf, state, cam_in, landm, coszen )
+  subroutine output_rad_data(  pbuf, state, cam_in, coszen )
 
     use physics_types,    only: physics_state
     use camsrfexch,       only: cam_in_t     
@@ -330,7 +353,6 @@ contains
     
     type(physics_state), intent(in), target :: state
     type(cam_in_t),      intent(in) :: cam_in
-    real(r8),            intent(in) :: landm(pcols)
     real(r8),            intent(in) :: coszen(pcols)
 
     ! Local variables
@@ -373,7 +395,6 @@ contains
     call outfld(lndfrc_fldn, cam_in%landfrac,  pcols, lchnk)
     call outfld(icefrc_fldn, cam_in%icefrac,   pcols, lchnk)
     call outfld(snowh_fldn,  cam_in%snowhland, pcols, lchnk)
-    call outfld(landm_fldn,  landm,            pcols, lchnk)
     call outfld(temp_fldn,   state%t,               pcols, lchnk   )
     call outfld(pdel_fldn,   state%pdel,            pcols, lchnk   )
     call outfld(pdeldry_fldn,state%pdeldry,         pcols, lchnk   )
@@ -437,6 +458,23 @@ contains
 
        call pbuf_get_field(pbuf,  cldfsnow_ifld, ptr, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
        call outfld(cldfsnow_fldn, ptr, pcols, lchnk   )
+
+    elseif (p3_microphys) then
+
+       call pbuf_get_field(pbuf,  dei_ifld, ptr     )
+       call outfld(dei_fldn,      ptr, pcols, lchnk   )       
+
+       call pbuf_get_field(pbuf,  mu_ifld, ptr      )
+       call outfld(mu_fldn,       ptr, pcols, lchnk   ) 
+
+       call pbuf_get_field(pbuf,  lambdac_ifld, ptr )
+       call outfld(lambdac_fldn,  ptr, pcols, lchnk   )       
+
+       call pbuf_get_field(pbuf,  iciwp_ifld, ptr   )
+       call outfld(iciwp_fldn,    ptr, pcols, lchnk   )       
+
+       call pbuf_get_field(pbuf,  iclwp_ifld, ptr   )
+       call outfld(iclwp_fldn,    ptr, pcols, lchnk   )       
 
     endif
 

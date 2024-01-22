@@ -35,6 +35,7 @@ module constituents
   public cnst_read_iv         ! query whether constituent initial values are read from initial file
   public cnst_chk_dim         ! check that number of constituents added equals dimensions (pcnst)
   public cnst_cam_outfld      ! Returns true if default CAM output was specified in the cnst_add calls.
+  public setup_moist_indices  ! sets indices for 4 water forms
 
 ! Public data
 
@@ -45,6 +46,9 @@ module constituents
 
 ! Namelist variables
   logical, public :: readtrace = .true.             ! true => obtain initial tracer data from IC file
+
+!water form indices
+  integer, public, protected :: icldice = -1, icldliq = -1, irain = -1, isnow = -1
 
 !
 ! Constants for each tracer
@@ -215,7 +219,7 @@ CONTAINS
 
 !==============================================================================
 
-  subroutine cnst_get_ind (name, ind, abort)
+  subroutine cnst_get_ind (name, ind, abrtf)
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: Get the index of a constituent 
@@ -226,7 +230,7 @@ CONTAINS
 !
     character(len=*),  intent(in)  :: name  ! constituent name
     integer,           intent(out) :: ind   ! global constituent index (in q array)
-    logical, optional, intent(in)  :: abort ! optional flag controlling abort
+    logical, optional, intent(in)  :: abrtf ! optional flag controlling abort
 
 !---------------------------Local workspace-----------------------------
     integer :: m                                   ! tracer index
@@ -243,7 +247,7 @@ CONTAINS
 
 ! Unrecognized name
     abort_on_error = .true.
-    if ( present(abort) ) abort_on_error = abort
+    if ( present(abrtf) ) abort_on_error = abrtf
 
     if ( abort_on_error ) then
        write(iulog,*) 'CNST_GET_IND, name:', name,  ' not found in list:', cnst_name(:)
@@ -434,5 +438,19 @@ function cnst_cam_outfld(m)
 end function cnst_cam_outfld
 
 !==============================================================================
+
+
+subroutine setup_moist_indices()
+
+   implicit none
+
+   call cnst_get_ind('CLDICE', icldice, abrtf=.false.)
+   call cnst_get_ind('CLDLIQ', icldliq, abrtf=.false.)
+   call cnst_get_ind('RAINQM', irain, abrtf=.false.)
+   call cnst_get_ind('SNOWQM', isnow, abrtf=.false.)
+
+ end subroutine setup_moist_indices
+
+
 
 end module constituents

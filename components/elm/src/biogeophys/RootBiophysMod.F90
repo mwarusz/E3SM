@@ -87,7 +87,7 @@ contains
     use shr_log_mod    , only : errMsg => shr_log_errMsg   
     use decompMod      , only : bounds_type
     use pftvarcon      , only : noveg, roota_par, rootb_par  !these pars shall be moved to here and set as private in the future
-    use clm_varctl     , only : use_var_soil_thick
+    use elm_varctl     , only : use_var_soil_thick
     use VegetationType , only : veg_pp
     use ColumnType     , only : col_pp
     !
@@ -127,6 +127,7 @@ contains
           end do
           rootfr(p,ubj) = .5_r8*( exp(-roota_par(veg_pp%itype(p)) * col_pp%zi(c,ubj-1))  &
                + exp(-rootb_par(veg_pp%itype(p)) * col_pp%zi(c,ubj-1)) )
+          totrootfr = totrootfr + rootfr(p, ubj)
 
           ! Adjust layer root fractions if nlev2bed < nlevsoi
           if (use_var_soil_thick .and. nlevbed < ubj) then

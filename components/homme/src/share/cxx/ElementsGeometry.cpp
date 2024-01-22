@@ -16,13 +16,19 @@
 
 namespace Homme {
 
-void ElementsGeometry::init(const int num_elems, const bool consthv, const bool alloc_gradphis) {
+void ElementsGeometry::init(const int num_elems, const bool consthv, const bool alloc_gradphis,
+                            const Real scale_factor, const Real laplacian_rigid_factor,
+                            const bool alloc_sphere_coords) {
   // Sanity check
   assert (num_elems>0);
 
   m_num_elems = num_elems;
   m_consthv   = consthv;
 
+  assert(scale_factor > 0);
+  m_scale_factor = scale_factor;
+  m_laplacian_rigid_factor = laplacian_rigid_factor < 0 ? 1/scale_factor : laplacian_rigid_factor;
+  
   // Coriolis force
   m_fcor = ExecViewManaged<Real * [NP][NP]>("FCOR", m_num_elems);
 
@@ -36,8 +42,8 @@ void ElementsGeometry::init(const int num_elems, const bool consthv, const bool 
 
   if(!consthv){
     m_tensorvisc   = ExecViewManaged<Real * [2][2][NP][NP]>("TENSORVISC",   m_num_elems);
-    m_vec_sph2cart = ExecViewManaged<Real * [2][3][NP][NP]>("VEC_SPH2CART", m_num_elems);
   }
+  m_vec_sph2cart = ExecViewManaged<Real * [2][3][NP][NP]>("VEC_SPH2CART", m_num_elems);
 
   m_phis     = ExecViewManaged<Real *    [NP][NP]>("PHIS",          m_num_elems);
 
@@ -48,14 +54,20 @@ void ElementsGeometry::init(const int num_elems, const bool consthv, const bool 
   if (alloc_gradphis) {
     m_gradphis = decltype(m_gradphis) ("gradient of geopotential at surface", m_num_elems);
   }
+
+  if (alloc_sphere_coords) {
+    m_sphere_cart = ExecViewManaged<Real * [NP][NP][3]>("sphere_cart", m_num_elems);
+    m_sphere_latlon = ExecViewManaged<Real * [NP][NP][2]>("sphere_latlon", m_num_elems);
+  }
 }
 
 void ElementsGeometry::
 set_elem_data (const int ie,
                CF90Ptr& D, CF90Ptr& Dinv, CF90Ptr& fcor,
                CF90Ptr& spheremp, CF90Ptr& rspheremp,
-               CF90Ptr& metdet, CF90Ptr& metinv, CF90Ptr& phis,
-               CF90Ptr& tensorvisc, CF90Ptr& vec_sph2cart, const bool consthv) {
+               CF90Ptr& metdet, CF90Ptr& metinv,
+               CF90Ptr& tensorvisc, CF90Ptr& vec_sph2cart, const bool consthv,
+               const Real* sphere_cart, const Real* sphere_latlon) {
   // Check geometry was inited
   assert (m_num_elems>0);
 
@@ -74,7 +86,6 @@ set_elem_data (const int ie,
   ScalarView::HostMirror h_metdet    = Kokkos::create_mirror_view(Homme::subview(m_metdet,ie));
   ScalarView::HostMirror h_spheremp  = Kokkos::create_mirror_view(Homme::subview(m_spheremp,ie));
   ScalarView::HostMirror h_rspheremp = Kokkos::create_mirror_view(Homme::subview(m_rspheremp,ie));
-  ScalarView::HostMirror h_phis      = Kokkos::create_mirror_view(Homme::subview(m_phis,ie));
   TensorView::HostMirror h_metinv    = Kokkos::create_mirror_view(Homme::subview(m_metinv,ie));
   TensorView::HostMirror h_d         = Kokkos::create_mirror_view(Homme::subview(m_d,ie));
   TensorView::HostMirror h_dinv      = Kokkos::create_mirror_view(Homme::subview(m_dinv,ie));
@@ -83,14 +94,13 @@ set_elem_data (const int ie,
   Tensor23View::HostMirror h_vec_sph2cart;
   if( !consthv ){
     h_tensorvisc   = Kokkos::create_mirror_view(Homme::subview(m_tensorvisc,ie));
-    h_vec_sph2cart = Kokkos::create_mirror_view(Homme::subview(m_vec_sph2cart,ie));
   }
+  h_vec_sph2cart = Kokkos::create_mirror_view(Homme::subview(m_vec_sph2cart,ie));
 
   ScalarViewF90 h_fcor_f90         (fcor);
   ScalarViewF90 h_metdet_f90       (metdet);
   ScalarViewF90 h_spheremp_f90     (spheremp);
   ScalarViewF90 h_rspheremp_f90    (rspheremp);
-  ScalarViewF90 h_phis_f90         (phis);
   TensorViewF90 h_metinv_f90       (metinv);
   TensorViewF90 h_d_f90            (D);
   TensorViewF90 h_dinv_f90         (Dinv);
@@ -104,7 +114,6 @@ set_elem_data (const int ie,
       h_spheremp  (igp, jgp) = h_spheremp_f90  (igp,jgp);
       h_rspheremp (igp, jgp) = h_rspheremp_f90 (igp,jgp);
       h_metdet    (igp, jgp) = h_metdet_f90    (igp,jgp);
-      h_phis      (igp, jgp) = h_phis_f90      (igp,jgp);
     }
   }
 
@@ -131,29 +140,60 @@ set_elem_data (const int ie,
         }
       }
     }
-    for (int idim = 0; idim < 2; ++idim) {
-      for (int jdim = 0; jdim < 3; ++jdim) {
-        for (int igp = 0; igp < NP; ++igp) {
-          for (int jgp = 0; jgp < NP; ++jgp) {
-            h_vec_sph2cart (idim,jdim,igp,jgp) = h_vec_sph2cart_f90 (idim,jdim,igp,jgp);
-          }
+  }//end if consthv
+  for (int idim = 0; idim < 2; ++idim) {
+    for (int jdim = 0; jdim < 3; ++jdim) {
+      for (int igp = 0; igp < NP; ++igp) {
+        for (int jgp = 0; jgp < NP; ++jgp) {
+          h_vec_sph2cart (idim,jdim,igp,jgp) = h_vec_sph2cart_f90 (idim,jdim,igp,jgp);
         }
       }
     }
-  }//end if consthv
+  }
 
   Kokkos::deep_copy(Homme::subview(m_fcor,ie), h_fcor);
   Kokkos::deep_copy(Homme::subview(m_metinv,ie), h_metinv);
   Kokkos::deep_copy(Homme::subview(m_metdet,ie), h_metdet);
   Kokkos::deep_copy(Homme::subview(m_spheremp,ie), h_spheremp);
   Kokkos::deep_copy(Homme::subview(m_rspheremp,ie), h_rspheremp);
-  Kokkos::deep_copy(Homme::subview(m_phis,ie), h_phis);
   Kokkos::deep_copy(Homme::subview(m_d,ie), h_d);
   Kokkos::deep_copy(Homme::subview(m_dinv,ie), h_dinv);
   if( !consthv ) {
     Kokkos::deep_copy(Homme::subview(m_tensorvisc,ie), h_tensorvisc);
-    Kokkos::deep_copy(Homme::subview(m_vec_sph2cart,ie), h_vec_sph2cart);
   }
+  Kokkos::deep_copy(Homme::subview(m_vec_sph2cart,ie), h_vec_sph2cart);
+
+  if (sphere_cart && m_sphere_cart.size() != 0) {
+    const auto fsc = HostViewUnmanaged<const Real [NP][NP][3]>(sphere_cart);
+    Kokkos::deep_copy(Homme::subview(m_sphere_cart, ie), fsc);
+  }
+  if (sphere_latlon && m_sphere_latlon.size() != 0) {
+    const auto fsl = HostViewUnmanaged<const Real [NP][NP][2]>(sphere_latlon);
+    Kokkos::deep_copy(Homme::subview(m_sphere_latlon, ie), fsl);
+  }
+}
+
+void ElementsGeometry::
+set_phis (const int ie, CF90Ptr& phis) {
+  // Check geometry was inited
+  assert (m_num_elems>0);
+
+  // Check input
+  assert (ie>=0 && ie<m_num_elems);
+
+  using ScalarView    = ExecViewUnmanaged<Real [NP][NP]>;
+  using ScalarViewF90 = HostViewUnmanaged<const Real [NP][NP]>;
+
+  ScalarViewF90           h_phis_f90 (phis);
+  ScalarView::HostMirror  h_phis = Kokkos::create_mirror_view(Homme::subview(m_phis,ie));
+
+  for (int igp = 0; igp < NP; ++igp) {
+    for (int jgp = 0; jgp < NP; ++jgp) {
+      h_phis (igp, jgp) = h_phis_f90 (igp,jgp);
+    }
+  }
+
+  Kokkos::deep_copy(Homme::subview(m_phis,ie), h_phis);
 }
 
 void ElementsGeometry::randomize(const int seed) {
