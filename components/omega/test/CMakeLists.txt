@@ -187,7 +187,7 @@ target_link_libraries(${_TestHaloName} ${OMEGA_LIB_NAME} spdlog yakl parmetis me
 
 add_test(
   NAME HALO_TEST
-  COMMAND ${MPI_EXEC} -n 8 -- ./${_TestHaloName}
+  COMMAND ${MPI_EXEC} -n 2 -- ./${_TestHaloName}
 )
 
 ################
