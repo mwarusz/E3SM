@@ -1,0 +1,5 @@
+set(OMEGA_CIME_MACHINE "workmac" CACHE STRING "")
+set(OMEGA_BUILD_TEST ON CACHE BOOL "")
+set(OMEGA_GKLIB_ROOT "/Users/mwarusz/omega/gklib" CACHE STRING "")
+set(OMEGA_METIS_ROOT "/Users/mwarusz/omega/metis" CACHE STRING "")
+set(OMEGA_PARMETIS_ROOT "/Users/mwarusz/omega/parmetis" CACHE STRING "")
