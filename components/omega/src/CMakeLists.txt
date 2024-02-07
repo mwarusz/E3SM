@@ -43,6 +43,8 @@ if(GKlib_FOUND)
     target_link_libraries(${OMEGA_LIB_NAME} gklib)
 endif()
 
+yakl_process_target(${OMEGA_LIB_NAME})
+
 # build Omega executable
 if(OMEGA_BUILD_EXECUTABLE)
 
