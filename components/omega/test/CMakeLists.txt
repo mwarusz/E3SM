@@ -1,6 +1,52 @@
 # Omega Unit Tests
 
 ##################
+# Test meshes
+##################
+
+include(FetchContent)
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+
+FetchContent_Declare(
+  QU240Mesh
+  URL      https://web.lcrc.anl.gov/public/e3sm/inputdata/ocn/mpas-o/oQU240/ocean.QU.240km.151209.nc
+  URL_HASH SHA256=a3758f88ceff3d91e86dba7922f6dd7d5672157b4793ef78214624ab8b2724ae
+  DOWNLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR}/meshes
+  DOWNLOAD_NO_EXTRACT TRUE
+)
+
+FetchContent_Declare(
+  PlanarMesh
+  URL      https://gist.github.com/mwarusz/f8caf260398dbe140d2102ec46a41268/raw/e3c29afbadc835797604369114321d93fd69886d/PlanarPeriodic48x48.nc
+  URL_HASH SHA256=fbe73f796fcad0fcd0ea2df6f9deb40108755464c5fa3f802719372548833b44
+  DOWNLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR}/meshes
+  DOWNLOAD_NO_EXTRACT TRUE
+)
+
+FetchContent_MakeAvailable(QU240Mesh PlanarMesh)
+
+add_test(NAME SetupQU240Mesh
+  COMMAND ${CMAKE_COMMAND} -E create_symlink
+    ${CMAKE_CURRENT_BINARY_DIR}/meshes/ocean.QU.240km.151209.nc
+    ${CMAKE_CURRENT_BINARY_DIR}/OmegaMesh.nc)
+set_tests_properties(SetupQU240Mesh PROPERTIES FIXTURES_SETUP QU240Fixture)
+
+add_test(NAME CleanupQU240Mesh
+  COMMAND ${CMAKE_COMMAND} -E rm ${CMAKE_CURRENT_BINARY_DIR}/OmegaMesh.nc)
+set_tests_properties(CleanupQU240Mesh PROPERTIES FIXTURES_CLEANUP QU240Fixture)
+
+add_test(NAME SetupPlanarMesh
+  COMMAND ${CMAKE_COMMAND} -E create_symlink
+    ${CMAKE_CURRENT_BINARY_DIR}/meshes/PlanarPeriodic48x48.nc
+    ${CMAKE_CURRENT_BINARY_DIR}/OmegaMesh.nc)
+set_tests_properties(SetupPlanarMesh PROPERTIES FIXTURES_SETUP PlanarFixture)
+set_tests_properties(SetupPlanarMesh PROPERTIES DEPENDS CleanupQU240Mesh)
+
+add_test(NAME CleanupPlanarMesh
+  COMMAND ${CMAKE_COMMAND} -E rm ${CMAKE_CURRENT_BINARY_DIR}/OmegaMesh.nc)
+set_tests_properties(CleanupPlanarMesh PROPERTIES FIXTURES_CLEANUP PlanarFixture)
+
+##################
 # Data type test
 ##################
 
@@ -159,6 +205,7 @@ add_test(
   NAME DECOMP_TEST
   COMMAND ${MPI_EXEC} -n 8 -- ./${_TestDecompName}
 )
+set_tests_properties(DECOMP_TEST PROPERTIES FIXTURES_REQUIRED QU240Fixture)
 
 ##################
 # Halo test
@@ -189,6 +236,7 @@ add_test(
   NAME HALO_TEST
   COMMAND ${MPI_EXEC} -n 8 -- ./${_TestHaloName}
 )
+set_tests_properties(HALO_TEST PROPERTIES FIXTURES_REQUIRED QU240Fixture)
 
 ################
 # HorzMesh test
@@ -220,6 +268,7 @@ add_test(
   NAME HORZMESH_TEST
   COMMAND ${MPI_EXEC} -n 8 -- ./${_TestHorzMeshName}
 )
+set_tests_properties(HORZMESH_TEST PROPERTIES FIXTURES_REQUIRED QU240Fixture)
 
 ################
 # Operators test
@@ -257,6 +306,7 @@ add_test(
   NAME OPERATORS_TEST
   COMMAND ${MPI_EXEC} -n 2 -- ./${_TestOperatorsName}
 )
+set_tests_properties(OPERATORS_TEST PROPERTIES FIXTURES_REQUIRED PlanarFixture)
 yakl_process_target(${_TestOperatorsName})
 
 #############
@@ -297,6 +347,7 @@ add_test(
   NAME IO_TEST
   COMMAND ${MPI_EXEC} -n 8 -- ./${_TestIOName}
 )
+set_tests_properties(IO_TEST PROPERTIES FIXTURES_REQUIRED QU240Fixture)
 
 ##################
 # Config test
