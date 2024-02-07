@@ -221,6 +221,44 @@ add_test(
   COMMAND ${MPI_EXEC} -n 8 -- ./${_TestHorzMeshName}
 )
 
+################
+# Operators test
+################
+
+set(_TestOperatorsName testOperators.exe)
+
+# Add broadcast test
+add_executable(${_TestOperatorsName} ocn/OperatorsTest.cpp)
+
+target_include_directories(
+  ${_TestOperatorsName}
+  PRIVATE
+  ${OMEGA_SOURCE_DIR}/src/base
+  ${OMEGA_SOURCE_DIR}/src/infra
+  ${OMEGA_SOURCE_DIR}/src/ocn
+  ${Parmetis_INCLUDE_DIRS}
+)
+
+target_compile_options(
+  ${_TestOperatorsName}
+  PRIVATE
+  ${OMEGA_CXX_FLAGS}
+)
+
+target_link_options(
+  ${_TestOperatorsName}
+  PRIVATE
+  ${OMEGA_LINK_OPTIONS}
+)
+
+target_link_libraries(${_TestOperatorsName} ${OMEGA_LIB_NAME} spdlog yakl parmetis metis pioc)
+
+add_test(
+  NAME OPERATORS_TEST
+  COMMAND ${MPI_EXEC} -n 2 -- ./${_TestOperatorsName}
+)
+yakl_process_target(${_TestOperatorsName})
+
 #############
 # IO test
 #############
@@ -357,6 +395,7 @@ set_tests_properties(
   DECOMP_TEST
   HALO_TEST
   HORZMESH_TEST
+  OPERATORS_TEST
   IO_TEST
   METADATA_TEST
   PROPERTIES FAIL_REGULAR_EXPRESSION "FAIL" PASS_REGULAR_EXPRESSION "PASS"
