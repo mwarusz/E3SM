@@ -259,10 +259,17 @@ target_include_directories(
 target_compile_options(
   ${_TestHorzMeshName}
   PRIVATE
+  ${OMEGA_CXX_FLAGS}
+)
+
+target_link_options(
+  ${_TestHorzMeshName}
+  PRIVATE
   ${OMEGA_LINK_OPTIONS}
 )
 
 target_link_libraries(${_TestHorzMeshName} ${OMEGA_LIB_NAME} spdlog yakl parmetis metis pioc)
+yakl_process_target(${_TestHorzMeshName})
 
 add_test(
   NAME HORZMESH_TEST

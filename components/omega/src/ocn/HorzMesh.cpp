@@ -512,6 +512,10 @@ void HorzMesh::readCoriolis() {
 void HorzMesh::computeEdgeSign() {
 
    EdgeSignOnCell = Array2DR8("EdgeSignOnCell", NCellsSize, MaxEdges);
+   YAKL_SCOPE(EdgeSignOnCell, this->EdgeSignOnCell);
+   YAKL_SCOPE(NEdgesOnCell, this->NEdgesOnCell);
+   YAKL_SCOPE(EdgesOnCell, this->EdgesOnCell);
+   YAKL_SCOPE(CellsOnEdge, this->CellsOnEdge);
    yakl::c::parallel_for(
        yakl::c::SimpleBounds<1>(NCellsAll), YAKL_LAMBDA(int Cell) {
           for (int i = 0; i < NEdgesOnCell(Cell); i++) {
@@ -529,6 +533,10 @@ void HorzMesh::computeEdgeSign() {
 
    EdgeSignOnVertex =
        Array2DR8("EdgeSignOnVertex", NVerticesSize, VertexDegree);
+   YAKL_SCOPE(EdgeSignOnVertex, this->EdgeSignOnVertex);
+   YAKL_SCOPE(EdgesOnVertex, this->EdgesOnVertex);
+   YAKL_SCOPE(VerticesOnEdge, this->VerticesOnEdge);
+   YAKL_SCOPE(VertexDegree, this->VertexDegree);
    yakl::c::parallel_for(
        yakl::c::SimpleBounds<1>(NVerticesAll), YAKL_LAMBDA(int Vertex) {
           for (int i = 0; i < VertexDegree; i++) {

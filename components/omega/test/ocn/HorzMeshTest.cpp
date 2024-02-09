@@ -629,7 +629,7 @@ int main(int argc, char *argv[]) {
             break;
          }
       }
-      if (abs(Mesh->EdgeSignOnVertex(Vertex1, iEdge1) - 1.0) > tol) {
+      if (abs(Mesh->EdgeSignOnVertexH(Vertex1, iEdge1) - 1.0) > tol) {
          count++;
       }
    }
