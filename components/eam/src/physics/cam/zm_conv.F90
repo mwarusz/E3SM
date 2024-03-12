@@ -330,7 +330,8 @@ subroutine zm_convr(lchnk   ,ncol    , &
                     t_star  ,q_star, dcape,   &
                     aero    ,qi      ,dif     ,dnlf    ,dnif    , & 
                     dsf     ,dnsf    ,sprd    ,rice    ,frz     , &
-                    mudpcu  ,lambdadpcu, microp_st, wuc)
+                    mudpcu  ,lambdadpcu, microp_st, wuc, &
+                    msetrans)
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -500,6 +501,7 @@ subroutine zm_convr(lchnk   ,ncol    , &
    real(r8), intent(inout),optional :: wuc(pcols,pver) ! vertical velocity from ZMmp
 ! move these vars from local storage to output so that convective
 ! transports can be done in outside of conv_cam.
+   real(r8), intent(out) :: msetrans(pcols,pver)
    real(r8), intent(out) :: mu(pcols,pver)
    real(r8), intent(out) :: eu(pcols,pver)
    real(r8), intent(out) :: du(pcols,pver)
@@ -1007,7 +1009,7 @@ subroutine zm_convr(lchnk   ,ncol    , &
                landfracg, tpertg, &  
                aero    ,qhat ,lambdadpcug,mudpcug ,sprdg   ,frzg ,  &
                qldeg   ,qideg   ,qsdeg   ,ncdeg   ,nideg   ,nsdeg,  &
-               dsfmg   ,dsfng   ,loc_microp_st )   
+               dsfmg   ,dsfng   ,loc_microp_st, msetrans )   
 
 
 !
@@ -1087,7 +1089,7 @@ subroutine zm_convr(lchnk   ,ncol    , &
          pflxg(i,k+1)= pflxg(i,k+1)*mb(i)*100._r8/grav
          sprdg(i,k)  = sprdg(i,k)*mb(i)
          frzg(i,k)   = frzg(i,k)*mb(i)
-
+         msetrans(i,k)  = msetrans   (i,k)*mb(i)
 
          if ( zm_microp .and. mb(i).eq.0._r8) then
             qlg (i,k) = 0._r8
@@ -2746,7 +2748,7 @@ subroutine cldprp(lchnk   , &
                   landfrac,tpertg  , &
                   aero    ,qhat ,lambdadpcu ,mudpcu  ,sprd   ,frz1 , &
                   qcde    ,qide   ,qsde     ,ncde    ,nide   ,nsde , &
-                  dsfm    ,dsfn   ,loc_microp_st )
+                  dsfm    ,dsfn   ,loc_microp_st, msetrans)
 
 !----------------------------------------------------------------------- 
 ! 
@@ -2816,6 +2818,7 @@ subroutine cldprp(lchnk   , &
    real(r8), intent(out) :: hsat(pcols,pver)     ! sat moist stat energy of env
    real(r8), intent(out) :: mc(pcols,pver)       ! net mass flux
    real(r8), intent(out) :: md(pcols,pver)       ! downdraft mass flux
+   real(r8), intent(out) :: msetrans(pcols,pver)
    real(r8), intent(out) :: mu(pcols,pver)       ! updraft mass flux
    real(r8), intent(out) :: pflx(pcols,pverp)    ! precipitation flux thru layer
    real(r8), intent(out) :: qd(pcols,pver)       ! spec humidity of downdraft
@@ -3742,6 +3745,12 @@ subroutine cldprp(lchnk   , &
    do k = msg + 1,pver
       do i = 1,il2g
          mc(i,k) = mu(i,k) + md(i,k)
+      end do
+   end do
+
+   do k = msg + 1,pver
+      do i = 1,il2g
+         msetrans(i,k) = mu(i,k) * (hu(i, k) - hmn(i, k)) + md(i,k) * (hd(i, k) - hmn(i, k))
       end do
    end do
 !
