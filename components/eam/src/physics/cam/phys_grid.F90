@@ -413,6 +413,9 @@ contains
     real(r8), dimension(:), allocatable :: clon_d   ! lon (radians) from dynamics columns
     real(r8), dimension(:), allocatable :: lat_d    ! lat from dynamics columns
     real(r8), dimension(:), allocatable :: lon_d    ! lon from dynamics columns
+    real(r8), dimension(:), allocatable :: x_d   ! x from dynamics columns
+    real(r8), dimension(:), allocatable :: y_d   ! y from dynamics columns
+    real(r8), dimension(:), allocatable :: z_d   ! z from dynamics columns
     real(r8) :: clat_p_tmp
     real(r8) :: clon_p_tmp
 
@@ -482,13 +485,23 @@ contains
     allocate( lat_d(1:ngcols) )
     allocate( lon_d(1:ngcols) )
     allocate( cdex(1:ngcols) )
+    allocate( x_d(1:ngcols) )
+    allocate( y_d(1:ngcols) )
+    allocate( z_d(1:ngcols) )
     clat_d = 100000.0_r8
     clon_d = 100000.0_r8
+
+    x_d = 12345678912345.0_r8
+    y_d = 12345678912345.0_r8
+    z_d = 12345678912345.0_r8
     if (single_column) then
       lat_d = scmlat
       lon_d = scmlon
       clat_d = scmlat * deg2rad
       clon_d = scmlon * deg2rad
+      if (scm_multcols) then
+        call get_horiz_grid_d(ngcols, x_out=x_d, y_out=y_d, z_out=z_d)
+      endif
     else
       call get_horiz_grid_d(ngcols, clat_d_out=clat_d, clon_d_out=clon_d, lat_d_out=lat_d, lon_d_out=lon_d)
     endif

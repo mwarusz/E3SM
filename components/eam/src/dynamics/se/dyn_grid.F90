@@ -91,6 +91,7 @@ module dyn_grid
   public :: fv_physgrid_init, fv_physgrid_final
   public :: compute_global_area
   public :: compute_global_coords
+  public :: compute_global_cart_coords
 
   integer(kind=iMap), pointer :: fdofP_local(:,:) => null()
 
@@ -502,7 +503,8 @@ contains
   !=================================================================================================
   !
   subroutine get_horiz_grid_d(nxy,clat_d_out,clon_d_out,area_d_out, &
-                              wght_d_out,lat_d_out,lon_d_out,cost_d_out)
+                              wght_d_out,lat_d_out,lon_d_out,cost_d_out, &
+                              x_out, y_out, z_out)
     !--------------------------------------------------------------------------- 
     ! Purpose: Return latitude and longitude (in radians), column surface
     !          area (in radians squared) and surface integration weights
@@ -521,12 +523,18 @@ contains
     real(r8), intent(out),         optional :: lat_d_out(:)  ! column degree latitudes
     real(r8), intent(out),         optional :: lon_d_out(:)  ! column degree longitudes
     real(r8), intent(out),        optional :: cost_d_out(:) ! column cost
+    real(r8), intent(out),         optional :: x_out(:) ! column x
+    real(r8), intent(out),         optional :: y_out(:) ! column y
+    real(r8), intent(out),         optional :: z_out(:) ! column z
     !----------------------------Local-Variables--------------------------------
     real(r8), pointer :: area_d(:)
     real(r8), allocatable :: lat_d_rad_temp(:)
     real(r8), allocatable :: lon_d_rad_temp(:)
     real(r8), allocatable :: lat_d_deg_temp(:)
     real(r8), allocatable :: lon_d_deg_temp(:)
+    real(r8), allocatable :: x_temp(:)
+    real(r8), allocatable :: y_temp(:)
+    real(r8), allocatable :: z_temp(:)
     integer :: i
     !---------------------------------------------------------------------------
     ! Check that nxy is correct
@@ -591,6 +599,21 @@ contains
       deallocate( lat_d_deg_temp )
       deallocate( lon_d_deg_temp )
 
+    end if
+    if ( present(x_out) .or. present(y_out) .or. present(z_out)) then
+      allocate( x_temp(nxy) )
+      allocate( y_temp(nxy) )
+      allocate( z_temp(nxy) )
+      
+      call compute_global_cart_coords(x_temp, y_temp, z_temp)
+      
+      if (present(x_out)) x_out = x_temp
+      if (present(y_out)) y_out = y_temp
+      if (present(z_out)) z_out = z_temp
+      
+      deallocate( x_temp )
+      deallocate( y_temp )
+      deallocate( z_temp )
     end if
     !---------------------------------------------------------------------------
     ! just a placeholder until a mechanism for cost_d_out is implemented
@@ -1199,6 +1222,173 @@ contains
     end if ! fv_nphys > 0
 
   end subroutine compute_global_coords
+  
+  subroutine compute_global_cart_coords(x_out, y_out, z_out)
+    use dof_mod,                only: UniqueCoords, UniquePoints
+    use gllfvremap_mod,         only: gfr_f_get_latlon, gfr_f_get_cartesian3d
+    use coordinate_systems_mod, only: cartesian3D_t
+    !------------------------------Arguments------------------------------------
+    real(r8),           intent(out) :: x_out(:)                ! m 
+    real(r8),           intent(out) :: y_out(:)                ! m 
+    real(r8),           intent(out) :: z_out(:)                ! m 
+    !----------------------------Local-Variables--------------------------------
+    real(r8), allocatable     :: rbuf(:)
+    integer,  dimension(npes) :: displace  ! MPI data displacement for gathering
+    integer,  dimension(npes) :: recvcnts  ! MPI send buffer count for gathering
+    integer,  allocatable     :: col_id_global(:)
+    integer,  allocatable     :: col_id_local(:)
+    real(r8), allocatable     :: x_local(:)
+    real(r8), allocatable     :: y_local(:)
+    real(r8), allocatable     :: z_local(:)
+    type (cartesian3D_t) :: p
+    integer  :: ncol_fv_gbl, ncol_fv_lcl
+    integer  :: ie, sb, eb, j, i, ip, fv_cnt, icol, c
+    integer  :: ierr
+    integer  :: ibuf
+    !---------------------------------------------------------------------------
+    if (masterproc) then
+      write(iulog,*) 'INFO: Non-scalable action: Computing global coords in SE dycore.'
+    end if
+
+    if (fv_nphys > 0) then
+
+      ncol_fv_gbl = fv_nphys*fv_nphys*nelem
+      ncol_fv_lcl = fv_nphys*fv_nphys*nelemd
+      allocate(rbuf(ncol_fv_gbl))
+      allocate(col_id_local(ncol_fv_lcl))
+      allocate(col_id_global(ncol_fv_gbl))
+      allocate(x_local(ncol_fv_lcl))
+      allocate(y_local(ncol_fv_lcl))
+      allocate(z_local(ncol_fv_lcl))
+
+      ! calculate coordinates for local blocks
+      icol = 1
+      do ie = 1,nelemd
+        do j = 1,fv_nphys
+          do i = 1,fv_nphys
+            call gfr_f_get_cartesian3d(ie, i, j, p)
+            x_local(icol) = p%x
+            y_local(icol) = p%y
+            z_local(icol) = p%z
+            icol = icol+1
+          end do ! i
+        end do ! j
+      end do ! ie
+
+      ! gather send buffer count as local cell count
+      recvcnts(:) = 0
+      call mpi_allgather(ncol_fv_lcl, 1, mpi_integer, recvcnts, 1, mpi_integer, mpicom, ierr)
+
+      ! determine displacement for MPI gather
+      displace(1) = 0
+      do ip = 2,npes
+        displace(ip) = displace(ip-1) + recvcnts(ip-1)
+      end do
+
+      ! Check to make sure we counted correctly
+      if (masterproc) then
+        if ( displace(npes) + recvcnts(npes) /= ncol_fv_gbl ) then
+          call endrun('compute_global_coords: bad MPI displace array size')
+        end if
+      end if
+
+      ! gather element IDs for sorting
+      col_id_global(:) = -1
+      icol = 1
+      do ie = 1,nelemd
+        fv_cnt = 1
+        do j = 1,fv_nphys
+          do i = 1,fv_nphys
+            col_id_local(icol) = (elem(ie)%GlobalId-1)*fv_nphys*fv_nphys + fv_cnt
+            fv_cnt = fv_cnt+1
+            icol = icol+1
+          end do
+        end do
+      end do
+      call mpi_allgatherv( col_id_local(1:ncol_fv_lcl), recvcnts(iam+1), mpi_integer, col_id_global, &
+                           recvcnts(:), displace(:), mpi_integer, mpicom, ierr)
+
+      ! Gather global x
+      call mpi_allgatherv( x_local(:), recvcnts(iam+1), mpi_real8, rbuf, &
+                           recvcnts(:), displace(:), mpi_real8, mpicom, ierr)
+      
+      ! sort x according to global element ID
+      do icol = 1,ncol_fv_gbl
+        x_out( col_id_global(icol) ) = rbuf(icol)
+      end do
+
+      ! Gather global y
+      call mpi_allgatherv( y_local(:), recvcnts(iam+1), mpi_real8, rbuf, &
+                           recvcnts(:), displace(:), mpi_real8, mpicom, ierr)
+      
+      ! sort y according to global element ID
+      do icol = 1,ncol_fv_gbl
+        y_out( col_id_global(icol) ) = rbuf(icol)
+      end do
+      
+      ! Gather global z
+      call mpi_allgatherv( z_local(:), recvcnts(iam+1), mpi_real8, rbuf, &
+                           recvcnts(:), displace(:), mpi_real8, mpicom, ierr)
+      
+      ! sort y according to global element ID
+      do icol = 1,ncol_fv_gbl
+        z_out( col_id_global(icol) ) = rbuf(icol)
+      end do
+
+      ! Deallocate stuff
+      deallocate(rbuf)
+      deallocate(x_local)
+      deallocate(y_local)
+      deallocate(z_local)
+      deallocate(col_id_local)
+      deallocate(col_id_global)
+
+    else ! physics is on GLL grid
+
+      allocate(rbuf(ngcols_d))
+
+      x_out(:) = -iam
+      y_out(:) = -iam
+      ! TODO how to get z ? (MWARUSZ) 
+      z_out(:) = 0
+
+      do ie = 1, nelemdmax
+        if(ie <= nelemd) then
+          displace(iam+1) = elem(ie)%idxp%UniquePtOffset-1
+          eb = displace(iam+1) + elem(ie)%idxp%NumUniquePts
+          recvcnts(iam+1) = elem(ie)%idxP%NumUniquePts
+          call UniqueCoords(elem(ie)%idxP, elem(ie)%spherep,                    &
+               x_out(displace(iam+1)+1:eb),                                       &
+               y_out(displace(iam+1)+1:eb))
+        else
+          displace(iam+1) = 0
+          recvcnts(iam+1) = 0
+        end if
+        ibuf = displace(iam+1)
+        call mpi_allgather(ibuf, 1, mpi_integer, displace, &
+             1, mpi_integer, mpicom, ierr)
+
+        ibuf = recvcnts(iam+1)
+        call mpi_allgather(ibuf, 1, mpi_integer, recvcnts, &
+             1, mpi_integer, mpicom, ierr)
+
+        sb = displace(iam+1) + 1
+        eb = displace(iam+1) + recvcnts(iam+1)
+
+        rbuf(1:recvcnts(iam+1)) = x_out(sb:eb)
+        call mpi_allgatherv(rbuf, recvcnts(iam+1), mpi_real8, x_out,            &
+               recvcnts(:), displace(:), mpi_real8, mpicom, ierr)
+
+        rbuf(1:recvcnts(iam+1)) = y_out(sb:eb)
+        call mpi_allgatherv(rbuf, recvcnts(iam+1), mpi_real8, y_out,            &
+               recvcnts(:), displace(:), mpi_real8, mpicom, ierr)
+      end do
+      
+      deallocate(rbuf)
+
+    end if ! fv_nphys > 0
+
+  end subroutine compute_global_cart_coords
   !
   !=================================================================================================
   !
