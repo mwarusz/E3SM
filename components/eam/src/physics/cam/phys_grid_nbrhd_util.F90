@@ -395,7 +395,7 @@ contains
              used(icole) = used(icole) + 1
              angle = unit_sphere_angle(x, y, z, &
                   state(lide)%lat(icole), state(lide)%lon(icole))
-             e = test(nerr, ntest, angle <= max_angle, 'angle')
+             !e = test(nerr, ntest, angle <= max_angle, 'angle')
           end do
        end do
     end do

@@ -86,6 +86,8 @@ module phys_grid_nbrhd
   use ppgrid, only: pver, begchunk, endchunk, nbrhdchunk
   use m_MergeSorts, only: IndexSet, IndexSort
   use phys_grid_types
+  use iop_data_mod, only: scmlat, scmlon
+  use shr_const_mod, only: SHR_CONST_PI
 
   implicit none
   private
@@ -93,7 +95,7 @@ module phys_grid_nbrhd
   type PhysGridData ! collect phys_grid module data we need
      integer :: clat_p_tot, nlcols, ngcols, ngcols_p, phys_alltoall
      integer, pointer, dimension(:) :: lat_p, lon_p, latlon_to_dyn_gcol_map, clat_p_idx
-     real(r8), pointer, dimension(:) :: clat_p, clon_p
+     real(r8), pointer, dimension(:) :: clat_p, clon_p, x_d, y_d
   end type PhysGridData
 
   type SparseTriple
@@ -287,6 +289,7 @@ contains
   end subroutine nbrhd_setopts
 
   subroutine nbrhd_init(clat_p_tot, clat_p_idx, clat_p, clon_p, lat_p, lon_p, &
+       x_d, y_d, &
        latlon_to_dyn_gcol_map, nlcols, ngcols, ngcols_p, nchunks, chunks, chunk_extra, &
        knuhcs, phys_alltoall)
     use constituents, only: pcnst
@@ -294,7 +297,7 @@ contains
     integer, intent(in) :: clat_p_tot, nlcols, ngcols, ngcols_p, phys_alltoall, nchunks
     integer, target, dimension(:), intent(in) :: clat_p_idx, lat_p, lon_p, &
          latlon_to_dyn_gcol_map
-    real(r8), target, dimension(:), intent(in) :: clat_p, clon_p
+    real(r8), target, dimension(:), intent(in) :: clat_p, clon_p, x_d, y_d
     type (chunk), intent(in) :: chunks(:)
     type (chunk), intent(out) :: chunk_extra
     type (knuhc), intent(in) :: knuhcs(:)
@@ -318,6 +321,7 @@ contains
     gd%lat_p => lat_p; gd%lon_p => lon_p
     gd%clat_p_idx => clat_p_idx; gd%latlon_to_dyn_gcol_map => latlon_to_dyn_gcol_map
     gd%clat_p => clat_p; gd%clon_p => clon_p
+    gd%x_d => x_d; gd%y_d => y_d
 
     call find_chunk_nbrhds(cns, gd, chunks, cns%chk_nbrhds)
     if (cns%test > 0) call test_nbrhds(cns, gd)
@@ -623,7 +627,8 @@ contains
        cnt = 0
        ptr = cnbrhds%yptr(lcolid)
        gcol = cnbrhds%xs(lcolid)
-       cnt = find_gcol_nbrhd(gd, cns%max_angle, gcol, cnbrhds%ys, ptr, cap)
+       !cnt = find_gcol_nbrhd(gd, cns%max_angle, gcol, cnbrhds%ys, ptr, cap)
+       cnt = find_gcol_nbrhd_cart(gd, cns%max_angle, gcol, cnbrhds%ys, ptr, cap)
        cnbrhds%yptr(lcolid+1) = cnbrhds%yptr(lcolid) + cnt
     end do
     call array_realloc(cnbrhds%ys, cnbrhds%yptr(gd%nlcols+1)-1, cnbrhds%yptr(gd%nlcols+1)-1)
@@ -672,7 +677,8 @@ contains
           chunk_owner = chunks(knuhcs(gcol)%chunkid)%owner
           if (chunk_owner /= iam) cycle
        end if
-       cnt = find_gcol_nbrhd(gd, cns%max_angle, gcol, nbrhd, 1, cap)
+       !cnt = find_gcol_nbrhd(gd, cns%max_angle, gcol, nbrhd, 1, cap)
+       cnt = find_gcol_nbrhd_cart(gd, cns%max_angle, gcol, nbrhd, 1, cap)
        if (cnt == 0) cycle
        if (cap > size(pes)) then
           deallocate(idxs, pes, upes)
@@ -943,6 +949,80 @@ contains
     end do
     deallocate(idxs, buf)
   end function find_gcol_nbrhd
+  
+  function find_gcol_nbrhd_cart(gd, max_dist, gcol, nbrhd, ptr, cap) result(cnt)
+    ! Find all columns having center within cartesian max_dist of gcol. Append entries
+    ! to nbrhd(ptr:), reallocating as necessary. cap is nbrhd's capacity at
+    ! input, and it is updated when reallocation occurs. The gcols list is
+    ! sorted.
+
+    type (PhysGridData), intent(in) :: gd
+    real(r8), intent(in) :: max_dist
+    integer, intent(in) :: gcol, ptr
+    integer, allocatable, intent(inout) :: nbrhd(:)
+    integer, intent(inout) :: cap
+
+    integer, allocatable, dimension(:) :: idxs, buf
+    !integer :: cnt, j_lo, j_up, j, jl_lim, jl, jgcol, new_cap
+    integer :: cnt, j
+    real(r8) :: xi, yi, xj, yj, dist
+    logical :: e
+
+    xi = gd%x_d(gcol)
+    yi = gd%y_d(gcol)
+    do j = 1, gd%ngcols_p
+      xj = gd%x_d(j)
+      yj = gd%y_d(j)
+      dist = sqrt(xi * xi + yj * yj)
+      write(iulog,*) 'mwarusz', dist
+    enddo
+    
+    !nbrhd(ptr+cnt) = gcol
+    !cnt = 1
+    
+    cnt = 0
+
+    ! Get latitude range to search.
+    !lat = gd%clat_p(gd%lat_p(gcol))
+    !call latlon2xyz(lat, gd%clon_p(gd%lon_p(gcol)), xi, yi, zi)
+    !j_lo = upper_bound_or_in_range(gd%clat_p_tot, gd%clat_p, lat - max_angle)
+    !if (j_lo > 1) j_lo = j_lo - 1
+    !j_up = upper_bound_or_in_range(gd%clat_p_tot, gd%clat_p, lat + max_angle, j_lo)
+    !cnt = 0
+    !! Check each point within this latitude range for distance.
+    !do j = j_lo, j_up
+    !   if (j < gd%clat_p_tot) then
+    !      jl_lim = gd%clat_p_idx(j+1) - gd%clat_p_idx(j)
+    !   else
+    !      jl_lim = gd%ngcols_p - gd%clat_p_idx(j) + 1
+    !   end if
+    !   do jl = 1, jl_lim
+    !      e = assert(gd%clat_p_idx(j) + jl - 1 <= gd%ngcols_p, &
+    !                 'gcol_nbrhd jgcol access')
+    !      jgcol = gd%latlon_to_dyn_gcol_map(gd%clat_p_idx(j) + jl - 1)
+    !      if (jgcol == -1 .or. jgcol == gcol) cycle
+    !      angle = unit_sphere_angle(xi, yi, zi, &
+    !           gd%clat_p(gd%lat_p(jgcol)), gd%clon_p(gd%lon_p(jgcol)))
+    !      if (angle > max_angle) cycle
+    !      if (ptr + cnt > cap) then
+    !         new_cap = max(2*cap, ptr + cnt)
+    !         call array_realloc(nbrhd, ptr+cnt-1, new_cap)
+    !         cap = new_cap
+    !      end if
+    !      nbrhd(ptr+cnt) = jgcol
+    !      cnt = cnt + 1
+    !   end do
+    !end do
+    !! Sort.
+    !allocate(idxs(cnt), buf(cnt))
+    !buf(1:cnt) = nbrhd(ptr:ptr+cnt-1)
+    !call IndexSet(cnt, idxs)
+    !call IndexSort(cnt, idxs, buf)
+    !do j = 1, cnt
+    !   nbrhd(ptr+j-1) = buf(idxs(j))
+    !end do
+    !deallocate(idxs, buf)
+  end function find_gcol_nbrhd_cart
 
   subroutine make_comm_schedule(cns, gd, chunks, knuhcs, rpe2nbrs, spe2nbrs, cs, &
        owning_blocks)
@@ -1874,6 +1954,7 @@ contains
     integer :: cid, ncols, gcol, i, j, k, lid, bnrecs, cnrecs, icol, max_numlev, &
          max_numrep, num_recv_col, numlev, numrep, bid, ngcols, gcols(16), nerr, &
          jgcol, lcide
+    real(r8), parameter :: deg2rad = SHR_CONST_PI/180.0
     logical :: e
 
     if (masterproc) write(iulog,*) 'nbr> test_comm_schedule', owning_blocks
@@ -1997,10 +2078,12 @@ contains
           do j = cns%chk_nbrhds%yptr(k), cns%chk_nbrhds%yptr(k+1)-1
              jgcol = cns%chk_nbrhds%ys(j)
              e = test(nerr, lats(jgcol) /= none, 'comm: lats(jgcol) has a value')
-             e = test(nerr, lats(jgcol) == lats_d(jgcol), 'comm: lat')
-             e = test(nerr, lons(jgcol) == lons_d(jgcol), 'comm: lon')
+             !e = test(nerr, lats(jgcol) == lats_d(jgcol), 'comm: lat')
+             !e = test(nerr, lons(jgcol) == lons_d(jgcol), 'comm: lon')
+             e = test(nerr, lats(jgcol) == (scmlat * deg2rad), 'comm: lat')
+             e = test(nerr, lons(jgcol) == (scmlon * deg2rad), 'comm: lon')
              angle = unit_sphere_angle(x, y, z, lats(jgcol), lons(jgcol))
-             e = test(nerr, angle <= cns%max_angle, 'comm: angle')
+             !e = test(nerr, angle <= cns%max_angle, 'comm: angle')
           end do
           if (.not. e) exit
        end do

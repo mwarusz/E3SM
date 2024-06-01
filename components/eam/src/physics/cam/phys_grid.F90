@@ -527,6 +527,7 @@ contains
        endif
     enddo
 
+
     ! sort over longitude and identify unique longitude coordinates
     call IndexSet(ngcols,cdex)
     call IndexSort(ngcols,cdex,clon_d,descend=.false.)
@@ -558,6 +559,7 @@ contains
        endif
     enddo
     clon_p_cnt(clon_p_tot) = (ngcols_p+1)-pre_i
+    
 
     ! sort over latitude and identify unique latitude coordinates
     call IndexSet(ngcols,cdex)
@@ -950,6 +952,7 @@ contains
 
     if (use_nbrhd) then
        call nbrhd_init(clat_p_tot, clat_p_idx, clat_p, clon_p, lat_p, lon_p, &
+            x_d, y_d, &
             latlon_to_dyn_gcol_map, gs_col_num(iam), ngcols, ngcols_p, &
             nchunks, chunks(1:nchunks), chunks(nchunks+1), knuhcs, phys_alltoall)
     end if
