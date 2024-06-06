@@ -40,10 +40,10 @@ module controlMod
   use UrbanParamsType         , only: urban_hac, urban_traffic
   use FrictionVelocityMod     , only: implicit_stress, atm_gustiness, force_land_gustiness
   use elm_varcon              , only: h2osno_max
-  use elm_varctl              , only: use_dynroot, use_fan, fan_mode, fan_to_bgc_veg
+  use elm_varctl              , only: use_fan, fan_mode, fan_to_bgc_veg
   use FanMod                  , only: nh4_ads_coef
   use AllocationMod         , only: nu_com_phosphatase,nu_com_nfix
-  use elm_varctl              , only: nu_com, use_var_soil_thick
+  use elm_varctl              , only: use_var_soil_thick
   use elm_varctl              , only: use_lake_wat_storage
   use seq_drydep_mod          , only: drydep_method, DD_XLND, n_drydep
   use elm_varctl              , only: forest_fert_exp
@@ -53,7 +53,6 @@ module controlMod
   use elm_varctl              , only: startdate_add_temperature, startdate_add_co2
   use elm_varctl              , only: add_temperature, add_co2
   use elm_varctl              , only: const_climate_hist
-  use elm_varctl              , only: use_top_solar_rad
   use elm_varctl              , only: snow_shape, snicar_atm_type, use_dust_snow_internal_mixing
 
   !
