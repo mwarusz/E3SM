@@ -440,7 +440,7 @@ Physics grid decomposition options.
 Default: 0 for unstructured grid dycores, 1 for lat/lon grid dycores
 </entry>
 
-<entry id="phys_nbrhd_degrees" type="real"  category="perf_dp_coup"
+<entry id="phys_nbrhd_cutoff" type="real"  category="perf_dp_coup"
        group="cam_inparm" valid_values="">
 Neighborhood radius in degrees. For physics column i, any physics column j such
 that angle(lat_i, lon_i, lat_j, lon_j) <= phys_nbrhd_degrees is included in the

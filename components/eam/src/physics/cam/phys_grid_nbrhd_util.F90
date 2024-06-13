@@ -377,7 +377,7 @@ contains
     end do
 
     ! Check neighborhoods.
-    max_angle = nbrhd_get_option_angle()
+    max_angle = nbrhd_get_option_cutoff()
     lide = endchunk+nbrhdchunk
     allocate(icols(128), used(state(lide)%ncol))
     used(:) = 0

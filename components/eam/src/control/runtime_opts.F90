@@ -130,9 +130,13 @@ logical :: phys_chnk_cost_write
 !
 ! Physics column neighborhood options
 !
-! Maximum angle in degrees between a column and a neighbor, measured at column
-! centers, the (lat,lon) from physics_state.
-real(r8) :: phys_nbrhd_degrees
+! Cutoff value that determines neighborhood
+! On a sphere:
+!    Maximum angle in degrees between a column and a neighbor, measured at column
+!    centers, the (lat,lon) from physics_state.
+! On a plane:
+!    Maximum horizontal distance in km between a column and a neighbour.
+real(r8) :: phys_nbrhd_cutoff
 ! Number of constituents to communicate, 1:phys_nbrhd_pcnst, with
 ! phys_nbrhd_pcnst <= pcnst.
 integer  :: phys_nbrhd_pcnst
@@ -342,7 +346,7 @@ contains
                      phys_chnk_per_thd, phys_chnk_cost_write
 
    ! physics column neighborhood
-   namelist /cam_inparm/ phys_nbrhd_degrees, phys_nbrhd_pcnst, &
+   namelist /cam_inparm/ phys_nbrhd_cutoff, phys_nbrhd_pcnst, &
                          phys_nbrhd_verbose, phys_nbrhd_test
 
    ! physics buffer
@@ -386,7 +390,7 @@ contains
       phys_chnk_cost_write_out=phys_chnk_cost_write )
 
    call nbrhd_defaultopts( &
-      phys_nbrhd_degrees_out = phys_nbrhd_degrees, &
+      phys_nbrhd_cutoff_out = phys_nbrhd_cutoff, &
       phys_nbrhd_pcnst_out   = phys_nbrhd_pcnst,   &
       phys_nbrhd_verbose_out = phys_nbrhd_verbose, &
       phys_nbrhd_test_out    = phys_nbrhd_test)
@@ -469,13 +473,6 @@ contains
        phys_chnk_per_thd_in   =phys_chnk_per_thd,   &
        phys_chnk_cost_write_in=phys_chnk_cost_write )
 
-   ! physics column neighborhood
-   call nbrhd_setopts( &
-       phys_nbrhd_degrees_in = phys_nbrhd_degrees, &
-       phys_nbrhd_pcnst_in   = phys_nbrhd_pcnst,   &
-       phys_nbrhd_verbose_in = phys_nbrhd_verbose, &
-       phys_nbrhd_test_in    = phys_nbrhd_test)
-
    ! conservation
    call check_energy_setopts( &
       print_energy_errors_in = print_energy_errors, &
@@ -507,6 +504,14 @@ contains
                             scm_zero_non_iop_tracers_in=scm_zero_non_iop_tracers)
       end if
    endif
+   
+   ! physics column neighborhood
+   call nbrhd_setopts( &
+       phys_nbrhd_cutoff_in = phys_nbrhd_cutoff, &
+       phys_nbrhd_pcnst_in   = phys_nbrhd_pcnst,   &
+       phys_nbrhd_verbose_in = phys_nbrhd_verbose, &
+       phys_nbrhd_test_in    = phys_nbrhd_test)
+
 
    ! Call subroutines for modules to read their own namelist.
    ! In some cases namelist default values may depend on settings from
@@ -709,7 +714,7 @@ subroutine distnl
    call mpibcast (phys_chnk_cost_write,1,mpilog,0,mpicom)
 
    ! physics column neighborhood
-   call mpibcast (phys_nbrhd_degrees, 1, mpir8 , 0, mpicom)
+   call mpibcast (phys_nbrhd_cutoff, 1, mpir8 , 0, mpicom)
    call mpibcast (phys_nbrhd_pcnst  , 1, mpiint, 0, mpicom)
    call mpibcast (phys_nbrhd_verbose, 1, mpiint, 0, mpicom)
    call mpibcast (phys_nbrhd_test   , 1, mpiint, 0, mpicom)
