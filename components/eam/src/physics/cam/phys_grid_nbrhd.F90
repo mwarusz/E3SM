@@ -956,6 +956,8 @@ contains
     ! input, and it is updated when reallocation occurs. The gcols list is
     ! sorted.
 
+    use physical_constants, only: Lx, Ly
+
     type (PhysGridData), intent(in) :: gd
     real(r8), intent(in) :: max_dist
     integer, intent(in) :: gcol, ptr
@@ -963,65 +965,33 @@ contains
     integer, intent(inout) :: cap
 
     integer, allocatable, dimension(:) :: idxs, buf
-    !integer :: cnt, j_lo, j_up, j, jl_lim, jl, jgcol, new_cap
-    integer :: cnt, j
-    real(r8) :: xi, yi, xj, yj, dist
+    integer :: cnt, jgcol, new_cap
+    real(r8) :: xi, yi, dx, dy, dist
     logical :: e
+
+    cnt = 0
 
     xi = gd%x_d(gcol)
     yi = gd%y_d(gcol)
-    do j = 1, gd%ngcols_p
-      xj = gd%x_d(j)
-      yj = gd%y_d(j)
-      dist = sqrt(xi * xi + yj * yj)
-      write(iulog,*) 'mwarusz', dist
+    do jgcol = 1, gd%ngcols_p
+      dx = abs(gd%x_d(jgcol) - xi)
+      if (dx > (Lx / 2)) dx = Lx - dx
+      dy = abs(gd%y_d(jgcol) - yi)
+      if (dy > (Ly / 2)) dy = Ly - dy
+      dist = sqrt(dx * dx + dy * dy)
+
+      if (jgcol == gcol .or. dist > max_dist) cycle
+
+      if (ptr + cnt > cap) then
+         new_cap = max(2*cap, ptr + cnt)
+         call array_realloc(nbrhd, ptr+cnt-1, new_cap)
+         cap = new_cap
+      end if
+
+      nbrhd(ptr+cnt) = jgcol
+      cnt = cnt + 1
     enddo
     
-    !nbrhd(ptr+cnt) = gcol
-    !cnt = 1
-    
-    cnt = 0
-
-    ! Get latitude range to search.
-    !lat = gd%clat_p(gd%lat_p(gcol))
-    !call latlon2xyz(lat, gd%clon_p(gd%lon_p(gcol)), xi, yi, zi)
-    !j_lo = upper_bound_or_in_range(gd%clat_p_tot, gd%clat_p, lat - max_angle)
-    !if (j_lo > 1) j_lo = j_lo - 1
-    !j_up = upper_bound_or_in_range(gd%clat_p_tot, gd%clat_p, lat + max_angle, j_lo)
-    !cnt = 0
-    !! Check each point within this latitude range for distance.
-    !do j = j_lo, j_up
-    !   if (j < gd%clat_p_tot) then
-    !      jl_lim = gd%clat_p_idx(j+1) - gd%clat_p_idx(j)
-    !   else
-    !      jl_lim = gd%ngcols_p - gd%clat_p_idx(j) + 1
-    !   end if
-    !   do jl = 1, jl_lim
-    !      e = assert(gd%clat_p_idx(j) + jl - 1 <= gd%ngcols_p, &
-    !                 'gcol_nbrhd jgcol access')
-    !      jgcol = gd%latlon_to_dyn_gcol_map(gd%clat_p_idx(j) + jl - 1)
-    !      if (jgcol == -1 .or. jgcol == gcol) cycle
-    !      angle = unit_sphere_angle(xi, yi, zi, &
-    !           gd%clat_p(gd%lat_p(jgcol)), gd%clon_p(gd%lon_p(jgcol)))
-    !      if (angle > max_angle) cycle
-    !      if (ptr + cnt > cap) then
-    !         new_cap = max(2*cap, ptr + cnt)
-    !         call array_realloc(nbrhd, ptr+cnt-1, new_cap)
-    !         cap = new_cap
-    !      end if
-    !      nbrhd(ptr+cnt) = jgcol
-    !      cnt = cnt + 1
-    !   end do
-    !end do
-    !! Sort.
-    !allocate(idxs(cnt), buf(cnt))
-    !buf(1:cnt) = nbrhd(ptr:ptr+cnt-1)
-    !call IndexSet(cnt, idxs)
-    !call IndexSort(cnt, idxs, buf)
-    !do j = 1, cnt
-    !   nbrhd(ptr+j-1) = buf(idxs(j))
-    !end do
-    !deallocate(idxs, buf)
   end function find_gcol_nbrhd_cart
 
   subroutine make_comm_schedule(cns, gd, chunks, knuhcs, rpe2nbrs, spe2nbrs, cs, &
