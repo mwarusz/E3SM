@@ -86,7 +86,7 @@ module phys_grid_nbrhd
   use ppgrid, only: pver, begchunk, endchunk, nbrhdchunk
   use m_MergeSorts, only: IndexSet, IndexSort
   use phys_grid_types
-  use iop_data_mod, only: scmlat, scmlon
+  use iop_data_mod, only: scmlat, scmlon, dp_crm
   use shr_const_mod, only: SHR_CONST_PI
 
   implicit none
@@ -627,8 +627,11 @@ contains
        cnt = 0
        ptr = cnbrhds%yptr(lcolid)
        gcol = cnbrhds%xs(lcolid)
-       !cnt = find_gcol_nbrhd(gd, cns%max_angle, gcol, cnbrhds%ys, ptr, cap)
-       cnt = find_gcol_nbrhd_cart(gd, cns%max_angle, gcol, cnbrhds%ys, ptr, cap)
+       if (dp_crm) then
+          cnt = find_gcol_nbrhd_cart(gd, cns%max_angle, gcol, cnbrhds%ys, ptr, cap)
+       else
+          cnt = find_gcol_nbrhd(gd, cns%max_angle, gcol, cnbrhds%ys, ptr, cap)
+       endif
        cnbrhds%yptr(lcolid+1) = cnbrhds%yptr(lcolid) + cnt
     end do
     call array_realloc(cnbrhds%ys, cnbrhds%yptr(gd%nlcols+1)-1, cnbrhds%yptr(gd%nlcols+1)-1)
@@ -677,8 +680,11 @@ contains
           chunk_owner = chunks(knuhcs(gcol)%chunkid)%owner
           if (chunk_owner /= iam) cycle
        end if
-       !cnt = find_gcol_nbrhd(gd, cns%max_angle, gcol, nbrhd, 1, cap)
-       cnt = find_gcol_nbrhd_cart(gd, cns%max_angle, gcol, nbrhd, 1, cap)
+       if (dp_crm) then
+          cnt = find_gcol_nbrhd_cart(gd, cns%max_angle, gcol, nbrhd, 1, cap)
+       else
+          cnt = find_gcol_nbrhd(gd, cns%max_angle, gcol, nbrhd, 1, cap)
+       endif
        if (cnt == 0) cycle
        if (cap > size(pes)) then
           deallocate(idxs, pes, upes)
