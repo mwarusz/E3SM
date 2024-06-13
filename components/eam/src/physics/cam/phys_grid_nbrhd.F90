@@ -153,7 +153,7 @@ module phys_grid_nbrhd
      integer :: verbose, test, pcnst, nchunks, extra_chunk_ncol
      ! Radian angle defining neighborhood. Defines max between a column center
      ! and column centers within its neighborhood.
-     real(r8) :: max_angle
+     real(r8) :: cutoff
      ! For each gcol in iam's chunks, the list of gcols in its neighborhood,
      ! excluding itself.
      type (SparseTriple) :: chk_nbrhds
@@ -198,7 +198,7 @@ module phys_grid_nbrhd
        nbrhd_get_nbrhd_size, &
        nbrhd_get_nbrhd, &
        ! Options
-       nbrhd_get_option_angle, &
+       nbrhd_get_option_cutoff, &
        nbrhd_get_option_pcnst, &
        nbrhd_get_option_test, &
        nbrhd_get_option_block_to_chunk_on, &
@@ -209,7 +209,7 @@ module phys_grid_nbrhd
 
 contains
 
-  subroutine nbrhd_defaultopts(phys_nbrhd_degrees_out, phys_nbrhd_pcnst_out, &
+  subroutine nbrhd_defaultopts(phys_nbrhd_cutoff_out, phys_nbrhd_pcnst_out, &
        phys_nbrhd_verbose_out, phys_nbrhd_test_out)
     use constituents, only: pcnst
     use dimensions_mod, only: ne
@@ -217,7 +217,7 @@ contains
     real(r8), optional, intent(out) :: &
          ! Maximum angle in degrees between a column and a neighbor, measured at
          ! column centers, the (lat,lon) from physics_state.
-         phys_nbrhd_degrees_out
+         phys_nbrhd_cutoff_out
     integer , optional, intent(out) :: &
          ! Number of constituents to communicate, 1:phys_nbrhd_pcnst,
          ! phys_nbrhd_pcnst <= pcnst.
@@ -228,41 +228,46 @@ contains
          phys_nbrhd_test_out
 
     ! Default the neighborhood diameter to 0 degrees, which means no nbrhd.
-    if (present(phys_nbrhd_degrees_out)) phys_nbrhd_degrees_out = 0
+    if (present(phys_nbrhd_cutoff_out)) phys_nbrhd_cutoff_out = 0
     if (present(phys_nbrhd_pcnst_out  )) phys_nbrhd_pcnst_out   = pcnst
     if (present(phys_nbrhd_verbose_out)) phys_nbrhd_verbose_out = 0
     if (present(phys_nbrhd_test_out   )) phys_nbrhd_test_out    = 0
   end subroutine nbrhd_defaultopts
 
-  subroutine nbrhd_setopts(phys_nbrhd_degrees_in, phys_nbrhd_pcnst_in, &
+  subroutine nbrhd_setopts(phys_nbrhd_cutoff_in, phys_nbrhd_pcnst_in, &
        phys_nbrhd_verbose_in, phys_nbrhd_test_in)
     use constituents, only: pcnst
     use shr_const_mod, only : pi => shr_const_pi
 
-    real(r8), optional, intent(in) :: phys_nbrhd_degrees_in
+    real(r8), optional, intent(in) :: phys_nbrhd_cutoff_in
     integer , optional, intent(in) :: phys_nbrhd_pcnst_in, phys_nbrhd_verbose_in, &
          phys_nbrhd_test_in
+    real(r8) :: cutoff_inv_conv
 
-    cns%max_angle = 0
+    cns%cutoff = 0
     cns%pcnst = pcnst
     cns%verbose = 0
     cns%test = 0
 
-    if (present(phys_nbrhd_degrees_in)) then
-       cns%max_angle = phys_nbrhd_degrees_in * (pi/180._r8)
-       if (cns%max_angle < 0) then
+    if (present(phys_nbrhd_cutoff_in)) then
+       if (dp_crm) then
+          cns%cutoff = phys_nbrhd_cutoff_in * 1e3
+       else
+          cns%cutoff = phys_nbrhd_cutoff_in * (pi/180._r8)
+       endif
+       if (cns%cutoff < 0) then
           if (masterproc) then
-             write(iulog,*) 'nbrhd_setopts: ERROR: phys_nbrhd_degrees=', &
-                  phys_nbrhd_degrees_in, &
+             write(iulog,*) 'nbrhd_setopts: ERROR: phys_nbrhd_cutoff=', &
+                  phys_nbrhd_cutoff_in, &
                   ' is out of range; must be >= 0; setting to 0'
           end if
-          cns%max_angle = 0
+          cns%cutoff = 0
        end if
     end if
 
-    if (cns%max_angle == 0) return
+    if (cns%cutoff == 0) return
 
-    if (cns%max_angle > 0) nbrhdchunk = 1
+    if (cns%cutoff > 0) nbrhdchunk = 1
 
     if (present(phys_nbrhd_pcnst_in)) then
        cns%pcnst = phys_nbrhd_pcnst_in
@@ -282,8 +287,13 @@ contains
     if (present(phys_nbrhd_test_in)) cns%test = max(0, phys_nbrhd_test_in)
 
     if (cns%verbose > 0 .and. masterproc) then
-       write(iulog,'(a,es13.4,a,i4,a,i2,a,i2)') 'nbr> nbrhd_setopts: angle', &
-            cns%max_angle * (180._r8/pi), ' degrees; pcnst', cns%pcnst, &
+       if (dp_crm) then
+          cutoff_inv_conv = cns%cutoff / 1e3
+       else
+          cutoff_inv_conv = cns%cutoff * (180._r8/pi)
+       endif
+       write(iulog,'(a,es13.4,a,i4,a,i2,a,i2)') 'nbr> nbrhd_setopts: cutoff', &
+            cutoff_inv_conv, ' degrees; pcnst', cns%pcnst, &
             '; verbosity', cns%verbose, '; test', cns%test
     end if
   end subroutine nbrhd_setopts
@@ -514,10 +524,10 @@ contains
                                      cns%c2n(lcid)%col(icol+1)-1)
   end subroutine nbrhd_get_nbrhd
 
-  function nbrhd_get_option_angle() result(angle)
-    real(r8) :: angle
-    angle = cns%max_angle
-  end function nbrhd_get_option_angle
+  function nbrhd_get_option_cutoff() result(cutoff)
+    real(r8) :: cutoff
+    cutoff = cns%cutoff
+  end function nbrhd_get_option_cutoff
 
   function nbrhd_get_option_pcnst() result(n)
     integer :: n
@@ -628,9 +638,9 @@ contains
        ptr = cnbrhds%yptr(lcolid)
        gcol = cnbrhds%xs(lcolid)
        if (dp_crm) then
-          cnt = find_gcol_nbrhd_cart(gd, cns%max_angle, gcol, cnbrhds%ys, ptr, cap)
+          cnt = find_gcol_nbrhd_cart(gd, cns%cutoff, gcol, cnbrhds%ys, ptr, cap)
        else
-          cnt = find_gcol_nbrhd(gd, cns%max_angle, gcol, cnbrhds%ys, ptr, cap)
+          cnt = find_gcol_nbrhd(gd, cns%cutoff, gcol, cnbrhds%ys, ptr, cap)
        endif
        cnbrhds%yptr(lcolid+1) = cnbrhds%yptr(lcolid) + cnt
     end do
@@ -681,9 +691,9 @@ contains
           if (chunk_owner /= iam) cycle
        end if
        if (dp_crm) then
-          cnt = find_gcol_nbrhd_cart(gd, cns%max_angle, gcol, nbrhd, 1, cap)
+          cnt = find_gcol_nbrhd_cart(gd, cns%cutoff, gcol, nbrhd, 1, cap)
        else
-          cnt = find_gcol_nbrhd(gd, cns%max_angle, gcol, nbrhd, 1, cap)
+          cnt = find_gcol_nbrhd(gd, cns%cutoff, gcol, nbrhd, 1, cap)
        endif
        if (cnt == 0) cycle
        if (cap > size(pes)) then
@@ -1854,7 +1864,7 @@ contains
        ! This chunk-owned column is not in a neighborhood of any other
        ! chunk-owned column. Check through brute force that this is correct.
        call latlon2xyz(gd%clat_p(gd%lat_p(gcol)), gd%clon_p(gd%lon_p(gcol)), x, y, z)
-       min_angle = 100*cns%max_angle
+       min_angle = 100*cns%cutoff
        do j = 1, nlcols
           if (j == i) cycle
           jgcol = cns%chk_nbrhds%xs(j)
@@ -1862,7 +1872,7 @@ contains
                gd%clat_p(gd%lat_p(jgcol)), gd%clon_p(gd%lon_p(jgcol)))
           min_angle = min(min_angle, angle)
        end do
-       e = assert(min_angle > cns%max_angle, 'test_nbrhds: angle')
+       e = assert(min_angle > cns%cutoff, 'test_nbrhds: angle')
     end do
   end subroutine test_nbrhds
 
@@ -2059,7 +2069,7 @@ contains
              e = test(nerr, lats(jgcol) == (scmlat * deg2rad), 'comm: lat')
              e = test(nerr, lons(jgcol) == (scmlon * deg2rad), 'comm: lon')
              angle = unit_sphere_angle(x, y, z, lats(jgcol), lons(jgcol))
-             !e = test(nerr, angle <= cns%max_angle, 'comm: angle')
+             !e = test(nerr, angle <= cns%cutoff, 'comm: angle')
           end do
           if (.not. e) exit
        end do
