@@ -630,7 +630,8 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
      rliq    ,rice    ,&
      ztodt   , &
      jctop   ,jcbot , &
-     state   ,ptend_all   ,landfrac,  pbuf, mu, eu, &
+     state   , state_nbrhd, &
+     ptend_all   ,landfrac,  pbuf, mu, eu, &
      du, md, ed, dp, dsubcld, jt, maxg, ideep, lengath) 
 
    use cam_history,   only: outfld
@@ -652,6 +653,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
 
    ! Arguments
    type(physics_state), target, intent(in ) :: state      ! Physics state variables
+   type(physics_state), target, intent(in ) :: state_nbrhd ! for column neighborhoods 
    type(physics_ptend), intent(out)   :: ptend_all      ! individual parameterization tendencies
    type(physics_buffer_desc), pointer :: pbuf(:)
 
@@ -792,7 +794,6 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
    real(r8) :: sprd(pcols,pver)
    real(r8) :: frz(pcols,pver)
    real(r8)  precz_snum(pcols)
-
 
    if (zm_microp) then
      allocate( &
@@ -1012,7 +1013,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
                     lengath ,ql      ,rliq  ,landfrac,  &
                     t_star, q_star, dcape, &  
                     aero(lchnk), qi, dif, dnlf, dnif, dsf, dnsf, sprd, rice, frz, mudpcu, &
-                    lambdadpcu,  microp_st, wuc, msetrans)
+                    lambdadpcu,  microp_st, wuc, msetrans, state_nbrhd)
 
    if (zm_microp) then
      dlftot(:ncol,:pver) = dlf(:ncol,:pver) + dif(:ncol,:pver) + dsf(:ncol,:pver)

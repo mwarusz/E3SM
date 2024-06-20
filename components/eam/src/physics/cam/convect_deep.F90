@@ -205,7 +205,8 @@ subroutine convect_deep_tend( &
      dlf     ,pflx    ,zdu      , &
      rliq    ,rice     , &
      ztodt   , &
-     state   ,ptend   ,landfrac ,pbuf, mu, eu, &
+     state   , state_nbrhd, &
+     ptend   ,landfrac ,pbuf, mu, eu, &
      du, md, ed, dp, dsubcld, jt, maxg, ideep,lengath ) 
 
 
@@ -221,6 +222,7 @@ subroutine convect_deep_tend( &
 
 ! Arguments
    type(physics_state), intent(in ) :: state   ! Physics state variables
+   type(physics_state), intent(in ) :: state_nbrhd   ! for column neighborhoods 
    type(physics_ptend), intent(out) :: ptend   ! individual parameterization tendencies
    
 
@@ -344,7 +346,8 @@ subroutine convect_deep_tend( &
           rliq    ,rice    , &
           ztodt   , &
           jctop, jcbot , &
-          state   ,ptend   ,landfrac, pbuf, mu, eu, &
+          state   , state_nbrhd, &
+          ptend   ,landfrac, pbuf, mu, eu, &
           du, md, ed, dp, dsubcld, jt, maxg, ideep, lengath)
      call t_stopf('zm_conv_tend')
 

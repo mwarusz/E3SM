@@ -2657,7 +2657,8 @@ end if
          dlf,        pflx,    zdu,       &
          rliq,       rice, &
          ztodt,   &
-         state,   ptend, cam_in%landfrac, pbuf, mu, eu, du, md, ed, dp,   &
+         state, state_nbrhd, &
+         ptend, cam_in%landfrac, pbuf, mu, eu, du, md, ed, dp,   &
          dsubcld, jt, maxg, ideep, lengath) 
     call t_stopf('convect_deep_tend')
 
