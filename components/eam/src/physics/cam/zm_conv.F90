@@ -355,7 +355,8 @@ subroutine zm_convr(lchnk   ,ncol    , &
    use time_manager, only: is_first_step 
 
    use physics_types, only: physics_state
-   use phys_grid_nbrhd,     only: nbrhd_get_nbrhd_size, nbrhd_get_nbrhd
+   use phys_grid_nbrhd,     only: nbrhd_get_nbrhd_size, nbrhd_get_nbrhd, &
+                                  nbrhd_get_option_cutoff
 !
 ! ************************ index of variables **********************
 !
@@ -667,6 +668,7 @@ subroutine zm_convr(lchnk   ,ncol    , &
    integer dcapemx(pcols)  ! launching level index saved from 1st call for CAPE calculation;  used in 2nd call when DCAPE-ULL active
 
    integer, parameter :: max_nbrhd_size = 100
+   logical :: use_nbrhd_avg
    type(physics_state), target, intent(in ) :: state_nbrhd ! for column neighborhoods 
    integer :: nbrhd_size, inbr
    integer :: icols(max_nbrhd_size)
@@ -686,6 +688,8 @@ subroutine zm_convr(lchnk   ,ncol    , &
 ! Set internal variable "msg" (convection limit) to "limcnv-1"
 !
    msg = limcnv - 1
+
+   use_nbrhd_avg = nbrhd_get_option_cutoff() .gt. 0
 !
 ! initialize necessary arrays.
 ! zero out variables not used in cam
@@ -817,33 +821,35 @@ subroutine zm_convr(lchnk   ,ncol    , &
    end do
   
    ! nbrhd
-   do i = 1,ncol
-    nbrhd_size = nbrhd_get_nbrhd_size(lchnk, i)
-    call nbrhd_get_nbrhd(lchnk, i, icols)
-      do ii = 1,nbrhd_size
-        inbr = icols(ii)
-         do k = 1,pver
-           nbrhd_q(i, ii, k) = state_nbrhd%q(inbr,k,1)
-           nbrhd_t(i, ii, k) = state_nbrhd%t(inbr,k)
-           nbrhd_z(i, ii, k) = state_nbrhd%phis(inbr)*rgrav + state_nbrhd%zm(inbr, k)
-           nbrhd_zf(i, ii, k) = state_nbrhd%phis(inbr)*rgrav + state_nbrhd%zi(inbr, k)
-           nbrhd_p(i, ii, k) = state_nbrhd%pmid(inbr,k)*0.01_r8
-           nbrhd_pf(i, ii, k) = state_nbrhd%pint(inbr,k)*0.01_r8
-         enddo
-         nbrhd_zf(i, ii, pver+1) = state_nbrhd%phis(inbr)*rgrav + state_nbrhd%zi(inbr, pver+1)
-         nbrhd_pf(i, ii, pver+1) = state_nbrhd%pint(inbr,pver+1)*0.01_r8
+   if (use_nbrhd_avg) then
+     do i = 1,ncol
+      nbrhd_size = nbrhd_get_nbrhd_size(lchnk, i)
+      call nbrhd_get_nbrhd(lchnk, i, icols)
+        do ii = 1,nbrhd_size
+          inbr = icols(ii)
+           do k = 1,pver
+             nbrhd_q(i, ii, k) = state_nbrhd%q(inbr,k,1)
+             nbrhd_t(i, ii, k) = state_nbrhd%t(inbr,k)
+             nbrhd_z(i, ii, k) = state_nbrhd%phis(inbr)*rgrav + state_nbrhd%zm(inbr, k)
+             nbrhd_zf(i, ii, k) = state_nbrhd%phis(inbr)*rgrav + state_nbrhd%zi(inbr, k)
+             nbrhd_p(i, ii, k) = state_nbrhd%pmid(inbr,k)*0.01_r8
+             nbrhd_pf(i, ii, k) = state_nbrhd%pint(inbr,k)*0.01_r8
+           enddo
+           nbrhd_zf(i, ii, pver+1) = state_nbrhd%phis(inbr)*rgrav + state_nbrhd%zi(inbr, pver+1)
+           nbrhd_pf(i, ii, pver+1) = state_nbrhd%pint(inbr,pver+1)*0.01_r8
 
-         ! TODO(mwarusz) calculate this !!!
-         nbrhd_pblt(i,ii) = pblt(i)
+           ! TODO(mwarusz) calculate this !!!
+           nbrhd_pblt(i,ii) = pblt(i)
 
-         !do k = pver - 1,msg + 1,-1
-         !   if (abs(nbrhd_z(i,ii,k)-nbrhd_zs(i,ii)-nbrhd_pblh(i,ii)) < &
-         !        (nbrhd_zf(i,ii,k)-nbrhd_zf(i,ii, k+1))*0.5_r8) then &
-         !     nbrhd_pblt(i,ii) = k
-         !   endif
-         !end do
+           !do k = pver - 1,msg + 1,-1
+           !   if (abs(nbrhd_z(i,ii,k)-nbrhd_zs(i,ii)-nbrhd_pblh(i,ii)) < &
+           !        (nbrhd_zf(i,ii,k)-nbrhd_zf(i,ii, k+1))*0.5_r8) then &
+           !     nbrhd_pblt(i,ii) = k
+           !   endif
+           !end do
+       enddo
      enddo
-   enddo
+   endif
 
    if( cam_physpkg_is('cam3')) then
 
@@ -866,30 +872,32 @@ subroutine zm_convr(lchnk   ,ncol    , &
       !    The differewnce of CAPE values from the two calls is DCAPE, based on the same launch level
 
          iclosure = .true.
-         do i = 1,ncol
-            nbrhd_size = nbrhd_get_nbrhd_size(lchnk, i)
-            call nbrhd_get_nbrhd(lchnk, i, icols)
-               do ii = 1,nbrhd_size
-                  inbr = icols(ii)
-                  call buoyan_dilute(lchnk   ,ncol    , &
-                           nbrhd_q(:,ii,:), &
-                           nbrhd_t(:,ii,:)       , &
-                           nbrhd_p(:,ii,:)       , &
-                           nbrhd_z(:,ii,:)       , &
-                           nbrhd_pf(:,ii,:)       , &
-                           tp      , &
-                           qstp    ,tl      ,rl      , &
-                           nbrhd_cape(:,ii)     , &
-                           nbrhd_pblt(:, ii)    , &
-                           lcl     ,lel     ,lon     ,maxi     , &
-                           rgas    ,grav    ,cpres   ,msg      , &
-                           tpert   ,iclosure                   )  
-               enddo
-               nbrhd_avg_cape(i) = 0.0_r8
-               do ii = 1,nbrhd_size
-                  nbrhd_avg_cape(i) = nbrhd_avg_cape(i) + nbrhd_cape(i, ii)
-               enddo
-         enddo
+         if (use_nbrhd_avg) then
+           do i = 1,ncol
+              nbrhd_size = nbrhd_get_nbrhd_size(lchnk, i)
+              call nbrhd_get_nbrhd(lchnk, i, icols)
+                 do ii = 1,nbrhd_size
+                    inbr = icols(ii)
+                    call buoyan_dilute(lchnk   ,ncol    , &
+                             nbrhd_q(:,ii,:), &
+                             nbrhd_t(:,ii,:)       , &
+                             nbrhd_p(:,ii,:)       , &
+                             nbrhd_z(:,ii,:)       , &
+                             nbrhd_pf(:,ii,:)       , &
+                             tp      , &
+                             qstp    ,tl      ,rl      , &
+                             nbrhd_cape(:,ii)     , &
+                             nbrhd_pblt(:, ii)    , &
+                             lcl     ,lel     ,lon     ,maxi     , &
+                             rgas    ,grav    ,cpres   ,msg      , &
+                             tpert   ,iclosure                   )  
+                 enddo
+                 nbrhd_avg_cape(i) = 0.0_r8
+                 do ii = 1,nbrhd_size
+                    nbrhd_avg_cape(i) = nbrhd_avg_cape(i) + nbrhd_cape(i, ii)
+                 enddo
+           enddo
+         endif
 
          call buoyan_dilute(lchnk   ,ncol    ,                   &! in
                   q       ,t       ,p       ,z       ,pf       , &! in
@@ -897,11 +905,13 @@ subroutine zm_convr(lchnk   ,ncol    , &
                   pblt    ,lcl     ,lel     ,lon     ,maxi     , &! pblt = in, others = out
                   rgas    ,grav    ,cpres   ,msg               , &! in
                   tpert   ,iclosure                            )  ! in
-          
-         do i = 1,ncol
-            nbrhd_avg_cape(i) = nbrhd_avg_cape(i) + cape(i)
-            nbrhd_avg_cape(i) = nbrhd_avg_cape(i) / (nbrhd_size + 1)
-         enddo
+         
+         if (use_nbrhd_avg) then
+           do i = 1,ncol
+              nbrhd_avg_cape(i) = nbrhd_avg_cape(i) + cape(i)
+              nbrhd_avg_cape(i) = nbrhd_avg_cape(i) / (nbrhd_size + 1)
+           enddo
+         endif
          
       if (trigdcape_ull .or. trig_dcape_only) then
          dcapemx(:ncol) = maxi(:ncol)
@@ -1022,8 +1032,11 @@ subroutine zm_convr(lchnk   ,ncol    , &
       zfg(i,pver+1) = zf(ideep(i),pver+1)
    end do
    do i = 1,lengath
-      !capeg(i) = cape(ideep(i))
-      capeg(i) = nbrhd_avg_cape(ideep(i))
+      if (use_nbrhd_avg) then
+         capeg(i) = nbrhd_avg_cape(ideep(i))
+      else
+         capeg(i) = cape(ideep(i))
+      endif
       lclg(i) = lcl(ideep(i))
       lelg(i) = lel(ideep(i))
       maxg(i) = maxi(ideep(i))
