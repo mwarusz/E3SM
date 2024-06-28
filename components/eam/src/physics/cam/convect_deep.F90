@@ -443,7 +443,7 @@ subroutine convect_deep_precompute(state, state_nbrhd, pbuf)
   case('ZM')
      call pbuf_get_field(pbuf, pblh_idx,  pblh)
      call pbuf_get_field(pbuf, tpert_idx, tpert)
-     call zm_conv_precompute(state, state_nbrhd, pblh, tpert, pbuf)
+     call zm_conv_precompute(state, state_nbrhd, pblh, tpert)
   end select 
 end subroutine convect_deep_precompute
 

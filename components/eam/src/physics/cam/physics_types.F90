@@ -129,7 +129,8 @@ module physics_types
           c_iflx_air, &! total time integrated aircraft carbon emissions
           c_iflx_sff, &! total time integrated surface fossil fuel carbon flux
           c_iflx_lnd, &! total time integrated surface land carbon flux
-          c_iflx_ocn   ! total time integrated surface ocean carbon flux
+          c_iflx_ocn, &! total time integrated surface ocean carbon flux
+          cape         ! CAPE
      integer :: count ! count of values with significant energy or water imbalances
      integer, dimension(:),allocatable           :: &
           latmapback, &! map from column to unique lat for that column
@@ -1427,6 +1428,7 @@ end subroutine physics_ptend_copy
        state_out%c_iflx_sff(i) = state_in%c_iflx_sff(i)
        state_out%c_iflx_lnd(i) = state_in%c_iflx_lnd(i)
        state_out%c_iflx_ocn(i) = state_in%c_iflx_ocn(i)
+       state_out%cape(i) = state_in%cape(i)
     end do
 
     do k = 1, pver
@@ -1848,6 +1850,9 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   
   allocate(state%cid(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%cid')
+  
+  allocate(state%cape(psetcols), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%cape')
 
   state%lat(:) = inf
   state%lon(:) = inf
@@ -1916,6 +1921,7 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   state%c_iflx_sff(:) = inf
   state%c_iflx_lnd(:) = inf
   state%c_iflx_ocn(:) = inf
+  state%cape(:) = inf
 
 end subroutine physics_state_alloc
 
@@ -2112,6 +2118,9 @@ subroutine physics_state_dealloc(state)
 
   deallocate(state%cid, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%cid')
+  
+  deallocate(state%cape, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%cape')
 
 end subroutine physics_state_dealloc
 
