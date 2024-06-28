@@ -1052,6 +1052,7 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out, phy
 #if ( defined OFFLINE_DYN )
      use metdata,       only: get_met_srf1
 #endif
+  use phys_grid_nbrhd_util, only: nbrhd_p_p_cape_coupling
 
     !
     ! Input arguments
@@ -1162,6 +1163,8 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out, phy
           phys_buffer_chunk => pbuf_get_chunk(pbuf2d, c)
           call tphysbc_precompute(phys_state(c), phys_state(c_nbrhd), phys_buffer_chunk)
        enddo
+
+       if (nbrhdchunk > 0) call nbrhd_p_p_cape_coupling(phys_state)
 
 !$OMP PARALLEL DO SCHEDULE(STATIC,1) &
 !$OMP PRIVATE (c, beg_chnk_cnt, phys_buffer_chunk, end_chnk_cnt, sysclock_rate, sysclock_max, chunk_cost)
