@@ -23,6 +23,7 @@ module phys_grid_nbrhd_util
        ! API
        nbrhd_d_p_coupling, &
        nbrhd_p_p_coupling, &
+       nbrhd_p_p_cape_coupling, &
        ! For testing
        nbrhd_test_api
   
@@ -404,6 +405,76 @@ contains
 
     if (nerr > 0) write(iulog,*) 'nbr> test_api FAIL', owning_blocks, nerr, ntest
   end subroutine test_api
+  
+  subroutine nbrhd_p_p_cape_coupling(state)
+
+    use perf_mod, only: t_startf, t_stopf
+
+    type (physics_state), intent(inout) :: state(begchunk:endchunk+nbrhdchunk)
+
+    real(r8), allocatable :: sbuf(:), rbuf(:)
+    integer, allocatable :: sptr(:,:), rptr(:)
+    integer :: rcdsz, snrecs, rnrecs, max_numlev, max_numrep, num_recv_col, &
+         numlev, numrep, lid, ncol, icol, j, k, p, lchnk, ptr, ierr
+
+    call t_startf('ppcopy_nbrhd')
+    rcdsz = 1
+    call nbrhd_chunk_to_chunk_sizes(snrecs, rnrecs, max_numlev, max_numrep, num_recv_col)
+    allocate(sbuf(rcdsz*snrecs), rbuf(rcdsz*rnrecs), stat=ierr)
+    if (ierr /= 0) then
+       call endrun('phys_grid_nbrhd_util::nbrhd_p_p_cape_coupling: alloc s,rbuf failed')
+    end if
+
+    allocate(sptr(0:max_numlev-1,max_numrep), stat=ierr)
+    if (ierr /= 0) then
+       call endrun('phys_grid_nbrhd_util::nbrhd_p_p_cape_coupling: alloc sptr failed')
+    end if
+    do lid = begchunk, endchunk
+       ncol = get_ncols_p(lid)
+       do icol = 1, ncol
+          call nbrhd_chunk_to_chunk_send_pters(lid, icol, rcdsz, numlev, numrep, sptr)
+          do j = 1, numrep
+             ptr = sptr(0,j)
+             sbuf(ptr+0) = state(lid)%cape(icol)
+          end do
+       end do
+    end do
+    deallocate(sptr)
+
+    call t_startf('nbrhd_chunk_to_chunk')
+    call nbrhd_transpose_chunk_to_chunk(rcdsz, sbuf, rbuf)
+    call t_stopf('nbrhd_chunk_to_chunk')
+
+    allocate(rptr(0:max_numlev-1), stat=ierr)
+    if (ierr /= 0) then
+       call endrun('phys_grid_nbrhd_util::nbrhd_p_p_cape_coupling: alloc rptr failed')
+    end if
+    lchnk = endchunk+nbrhdchunk
+    do icol = 1, num_recv_col
+       call nbrhd_chunk_to_chunk_recv_pters(icol, rcdsz, numlev, rptr)
+       ptr = rptr(0)
+       state(lchnk)%cape(icol) = rbuf(ptr+0)
+    end do
+    deallocate(rptr)
+
+    deallocate(sbuf, rbuf)
+
+    call nbrhd_copy_cape(state)
+    call t_stopf('ppcopy_nbrhd')
+  end subroutine nbrhd_p_p_cape_coupling
+  
+  subroutine nbrhd_copy_cape(state)
+    type (physics_state), intent(inout) :: state(begchunk:endchunk+nbrhdchunk)
+
+    integer (int_kind) :: n, i, lchnk, lchnke, icol, icole
+
+    lchnke = endchunk+nbrhdchunk
+    n = nbrhd_get_num_copies()
+    do i = 1, n
+       call nbrhd_get_copy_idxs(i, lchnk, icol, icole)
+       state(lchnke)%cape(icole) = state(lchnk)%cape(icol)
+    end do
+  end subroutine nbrhd_copy_cape
 
   function test(nerr, ntest, cond, message) result(out)
     integer, intent(inout) :: nerr, ntest
