@@ -1155,6 +1155,14 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out, phy
        call system_clock(count=beg_proc_cnt)
        
        c_nbrhd = endchunk+nbrhdchunk
+
+!$OMP PARALLEL DO SCHEDULE(STATIC,1) &
+!$OMP PRIVATE (c, phys_buffer_chunk)
+       do c=begchunk, endchunk
+          phys_buffer_chunk => pbuf_get_chunk(pbuf2d, c)
+          call tphysbc_precompute(phys_state(c), phys_state(c_nbrhd), phys_buffer_chunk)
+       enddo
+
 !$OMP PARALLEL DO SCHEDULE(STATIC,1) &
 !$OMP PRIVATE (c, beg_chnk_cnt, phys_buffer_chunk, end_chnk_cnt, sysclock_rate, sysclock_max, chunk_cost)
        do c=begchunk, endchunk
@@ -3272,5 +3280,18 @@ subroutine add_fld_default_calls()
   enddo
 
 end subroutine add_fld_default_calls
+
+subroutine tphysbc_precompute(state, state_nbrhd, pbuf)
+  use physics_buffer,  only : physics_buffer_desc, pbuf_get_field
+  use physics_types,   only: physics_state
+  use convect_deep,    only: convect_deep_precompute
+  implicit none
+  type(physics_state), intent(inout) :: state
+  type(physics_buffer_desc), pointer :: pbuf(:)
+  type(physics_state), intent(in)    :: state_nbrhd   ! for column neighborhoods
+
+  call convect_deep_precompute(state, state_nbrhd, pbuf) 
+
+end subroutine tphysbc_precompute
 
 end module physpkg

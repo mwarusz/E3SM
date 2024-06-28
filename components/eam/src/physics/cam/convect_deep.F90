@@ -27,6 +27,7 @@ module convect_deep
    public ::&
       convect_deep_register,           &! register fields in physics buffer
       convect_deep_init,               &! initialize donner_deep module
+      convect_deep_precompute,         &! precompute stuff
       convect_deep_tend,               &! return tendencies
       convect_deep_tend_2,             &! return tendencies
       deep_scheme_does_scav_trans             ! = .t. if scheme does scavenging and conv. transport
@@ -427,5 +428,23 @@ subroutine convect_deep_tend_2( state,  ptend,  ztodt, pbuf, mu, eu, &
 
 end subroutine convect_deep_tend_2
 
+subroutine convect_deep_precompute(state, state_nbrhd, pbuf)
+  use physics_buffer,  only : physics_buffer_desc, pbuf_get_field
+  use physics_types,   only: physics_state
+  use zm_conv_intr,    only: zm_conv_precompute
+  implicit none
+  type(physics_state), intent(inout) :: state
+  type(physics_state), intent(in)    :: state_nbrhd   ! for column neighborhoods
+  type(physics_buffer_desc), pointer :: pbuf(:)
+  real(r8), pointer :: pblh(:)                ! Planetary boundary layer height
+  real(r8), pointer :: tpert(:)               ! Thermal temperature excess 
+  
+  select case ( deep_scheme )
+  case('ZM')
+     call pbuf_get_field(pbuf, pblh_idx,  pblh)
+     call pbuf_get_field(pbuf, tpert_idx, tpert)
+     call zm_conv_precompute(state, state_nbrhd, pblh, tpert, pbuf)
+  end select 
+end subroutine convect_deep_precompute
 
 end module convect_deep

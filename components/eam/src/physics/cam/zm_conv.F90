@@ -34,6 +34,7 @@ module zm_conv
 ! PUBLIC: interfaces
 !
   public zmconv_readnl            ! read zmconv_nl namelist
+  public zm_compute_cape          ! cape computation
   public zm_convi                 ! ZM schemea
   public zm_convr                 ! ZM schemea
   public zm_conv_evap             ! evaporation of precip from ZM schemea
@@ -332,7 +333,7 @@ subroutine zm_convr(lchnk   ,ncol    , &
                     aero    ,qi      ,dif     ,dnlf    ,dnif    , & 
                     dsf     ,dnsf    ,sprd    ,rice    ,frz     , &
                     mudpcu  ,lambdadpcu, microp_st, wuc, &
-                    msetrans, state_nbrhd)
+                    msetrans, state_nbrhd, pcape)
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -681,6 +682,7 @@ subroutine zm_convr(lchnk   ,ncol    , &
    integer nbrhd_pblt(pcols, max_nbrhd_size)
    real(r8) nbrhd_cape(pcols, max_nbrhd_size)
    real(r8) nbrhd_avg_cape(pcols)
+   real(r8) pcape(pcols)
 
 !
 !--------------------------Data statements------------------------------
@@ -689,7 +691,8 @@ subroutine zm_convr(lchnk   ,ncol    , &
 !
    msg = limcnv - 1
 
-   use_nbrhd_avg = nbrhd_get_option_cutoff() .gt. 0
+   !use_nbrhd_avg = nbrhd_get_option_cutoff() .gt. 0
+   use_nbrhd_avg = .false.
 !
 ! initialize necessary arrays.
 ! zero out variables not used in cam
@@ -912,6 +915,10 @@ subroutine zm_convr(lchnk   ,ncol    , &
               nbrhd_avg_cape(i) = nbrhd_avg_cape(i) / (nbrhd_size + 1)
            enddo
          endif
+     
+         !do i = 1,ncol
+         !   write(iulog,*) 'MWARUSZ check: ', pcape(i) - cape(i)
+         !enddo
          
       if (trigdcape_ull .or. trig_dcape_only) then
          dcapemx(:ncol) = maxi(:ncol)
@@ -5547,5 +5554,74 @@ subroutine zm_microp_st_gb(microp_st,loc_microp_st,ideep,lengath)
     end do
 end subroutine zm_microp_st_gb
 
+subroutine zm_compute_cape(pcape, state, state_nbrhd, pblh, tpert)
+  use physics_buffer,  only : physics_buffer_desc, pbuf_get_field
+  use physics_types,   only: physics_state
+  implicit none
+  type(physics_state), intent(inout) :: state
+  type(physics_state), intent(in)    :: state_nbrhd   ! for column neighborhoods
+  real(r8), pointer :: pblh(:)                ! Planetary boundary layer height
+  real(r8), pointer :: tpert(:)               ! Thermal temperature excess 
+
+  real(r8) zs(pcols)
+  real(r8) t(pcols, pver)
+  real(r8) q(pcols, pver)
+  real(r8) z(pcols, pver)
+  real(r8) zf(pcols, pver+1)
+  real(r8) p(pcols, pver)
+  real(r8) pf(pcols, pver+1)
+  integer pblt(pcols)
+  real(r8) pcape(pcols)
+  
+  integer lon(pcols)                  ! w  index of onset level for deep convection.
+  integer maxi(pcols)                 ! w  index of level with largest moist static energy.
+  integer lcl(pcols)                  ! w  base level index of deep cumulus convection.
+  integer lel(pcols)                  ! w  index of highest theoretical convective plume.
+  real(r8) tp(pcols,pver)             ! w  grid slice of parcel temperatures.
+  real(r8) qstp(pcols,pver)           ! w  grid slice of parcel temp. saturation mixing ratio.
+  real(r8) tl(pcols)                  ! w  row of parcel temperature at lcl.
+
+  logical iclosure                    ! switch on sequence of call to buoyan_dilute to derive DCAPE
+
+  integer :: lchnk                   ! chunk identifier
+  integer :: ncol                    ! number of atmospheric columns
+  integer :: k, i
+  integer msg                      !  ic number of missing moisture levels at the top of model.
+
+  lchnk = state%lchnk
+  ncol  = state%ncol
+  msg = limcnv - 1
+
+  do i = 1,ncol
+     zs(i) = state%phis(i)*rgrav
+     zf(i, pver+1) = state%phis(i)*rgrav + state%zi(i, pver+1)
+     pf(i, pver+1) = state%pint(i,pver+1)*0.01_r8
+  enddo
+  do k = 1,pver
+     do i = 1,ncol
+        q(i, k) = state%q(i,k,1)
+        t(i, k) = state%t(i,k)
+        z(i, k) = zs(i) + state%zm(i, k)
+        zf(i, k) = zs(i) + state%zi(i, k)
+        p(i, k) = state%pmid(i,k)*0.01_r8
+        pf(i, k) = state%pint(i,k)*0.01_r8
+      enddo
+  enddo
+
+  do k = pver - 1,msg + 1,-1
+     do i = 1,ncol
+        if (abs(z(i,k)-zs(i)-pblh(i)) < (zf(i,k)-zf(i,k+1))*0.5_r8) pblt(i) = k
+     end do
+  end do
+
+  iclosure = .true.
+  call buoyan_dilute(lchnk   ,ncol    ,                   &! in
+           q       ,t       ,p       ,z       ,pf       , &! in
+           tp      ,qstp    ,tl      ,rl      ,pcape     , &! rl = in, others = out
+           pblt    ,lcl     ,lel     ,lon     ,maxi     , &! pblt = in, others = out
+           rgas    ,grav    ,cpres   ,msg               , &! in
+           tpert   ,iclosure                            )  ! in
+
+end subroutine zm_compute_cape
 
 end module zm_conv

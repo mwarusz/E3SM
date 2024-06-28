@@ -41,6 +41,7 @@ module zm_conv_intr
    public ::&
       zm_conv_register,           &! register fields in physics buffer
       zm_conv_init,               &! initialize donner_deep module
+      zm_conv_precompute,         &! precompute cape
       zm_conv_tend,               &! return tendencies
       zm_conv_tend_2               ! return tendencies
 
@@ -78,6 +79,8 @@ module zm_conv_intr
    integer  ::    lambdadpcu_idx   = 0
    integer  ::    mudpcu_idx       = 0
    integer  ::    icimrdp_idx      = 0
+   
+   integer  ::    pcape_idx      = 0
 
 
    logical :: old_snow  = .true.   ! set true to use old estimate of snow production in zm_conv_evap
@@ -148,6 +151,8 @@ subroutine zm_conv_register
       call pbuf_add_field('DSFZM', 'physpkg', dtype_r8, (/pcols,pver/), dsfzm_idx)
        
    end if
+  
+   call pbuf_add_field('PCAPE', 'physpkg', dtype_r8, (/pcols/), pcape_idx)
 
 ! Variables for dCAPE diagnosis and decomposition
 
@@ -794,6 +799,8 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
    real(r8) :: sprd(pcols,pver)
    real(r8) :: frz(pcols,pver)
    real(r8)  precz_snum(pcols)
+  
+   real(r8), pointer :: pcape(:)                ! precomputed cape
 
    if (zm_microp) then
      allocate( &
@@ -1002,6 +1009,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
 ! Begin with Zhang-McFarlane (1996) convection parameterization
 !
    call t_startf ('zm_convr')
+   call pbuf_get_field(pbuf, pcape_idx,  pcape)
    call zm_convr(   lchnk   ,ncol    , &
                     state%t       ,state%q(:,:,1)     ,prec    ,jctop   ,jcbot   , &
                     pblh    ,state%zm      ,state%phis    ,state%zi      ,ptend_loc%q(:,:,1)    , &
@@ -1013,7 +1021,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
                     lengath ,ql      ,rliq  ,landfrac,  &
                     t_star, q_star, dcape, &  
                     aero(lchnk), qi, dif, dnlf, dnif, dsf, dnsf, sprd, rice, frz, mudpcu, &
-                    lambdadpcu,  microp_st, wuc, msetrans, state_nbrhd)
+                    lambdadpcu,  microp_st, wuc, msetrans, state_nbrhd, pcape)
 
    if (zm_microp) then
      dlftot(:ncol,:pver) = dlf(:ncol,:pver) + dif(:ncol,:pver) + dsf(:ncol,:pver)
@@ -1723,6 +1731,22 @@ subroutine zm_conv_micro_outfld(microp_st, dlf, dif, dnlf, dnif, frz, lchnk, nco
  end subroutine zm_conv_micro_outfld
 !=========================================================================================
 
+subroutine zm_conv_precompute(state, state_nbrhd, pblh, tpert, pbuf)
+  use physics_buffer,  only : physics_buffer_desc, pbuf_get_field
+  use physics_types,   only: physics_state
+  use zm_conv,    only: zm_compute_cape
+  implicit none
+  type(physics_state), intent(inout) :: state
+  type(physics_state), intent(in)    :: state_nbrhd   ! for column neighborhoods
+  type(physics_buffer_desc), pointer :: pbuf(:)
+  real(r8), pointer :: pblh(:)                ! Planetary boundary layer height
+  real(r8), pointer :: tpert(:)               ! Thermal temperature excess 
+  real(r8), pointer :: pcape(:)                ! precomputed cape
+
+  call pbuf_get_field(pbuf, pcape_idx,  pcape)
+  call zm_compute_cape(pcape, state, state_nbrhd, pblh, tpert)
+
+end subroutine zm_conv_precompute
 
 
 end module zm_conv_intr
