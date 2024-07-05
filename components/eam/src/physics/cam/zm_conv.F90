@@ -333,7 +333,7 @@ subroutine zm_convr(lchnk   ,ncol    , &
                     aero    ,qi      ,dif     ,dnlf    ,dnif    , & 
                     dsf     ,dnsf    ,sprd    ,rice    ,frz     , &
                     mudpcu  ,lambdadpcu, microp_st, wuc, &
-                    msetrans, state_nbrhd, pcape)
+                    msetrans, state_nbrhd, nbrhd_avg_cape)
 !----------------------------------------------------------------------- 
 ! 
 ! Purpose: 
@@ -674,7 +674,6 @@ subroutine zm_convr(lchnk   ,ncol    , &
    integer :: nbrhd_size, inbr
    integer :: icols(max_nbrhd_size)
    real(r8) nbrhd_avg_cape(pcols)
-   real(r8) pcape(pcols)
 
 !
 !--------------------------Data statements------------------------------

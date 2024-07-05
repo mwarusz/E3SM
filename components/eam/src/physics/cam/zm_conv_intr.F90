@@ -207,6 +207,8 @@ subroutine zm_conv_init(pref_edge)
 ! Register fields with the output buffer
 !
     call addfld ('ZMMSETRANS',(/ 'lev' /), 'A','J/m2/s','ZM transport of MSE')
+    call addfld ('CAPE_ZM_AVG',horiz_only, 'A',   'J/kg', &
+      'Convectively available potential energy spatially averaged over a neighborhood')
 
     call addfld ('PRECZ',horiz_only,    'A','m/s','total precipitation from ZM convection')
     call addfld ('ZMDT',(/ 'lev' /), 'A','K/s','T tendency - Zhang-McFarlane moist convection')
@@ -756,6 +758,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
 
    ! history output fields
    real(r8) :: cape(pcols)        ! w  convective available potential energy.
+   real(r8) :: nbrhd_avg_cape(pcols)
    real(r8) :: mu_out(pcols,pver)
    real(r8) :: md_out(pcols,pver)
    real(r8) :: msetrans_out(pcols,pver)
@@ -1017,7 +1020,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
                     lengath ,ql      ,rliq  ,landfrac,  &
                     t_star, q_star, dcape, &  
                     aero(lchnk), qi, dif, dnlf, dnif, dsf, dnsf, sprd, rice, frz, mudpcu, &
-                    lambdadpcu,  microp_st, wuc, msetrans, state_nbrhd, state%cape)
+                    lambdadpcu,  microp_st, wuc, msetrans, state_nbrhd, nbrhd_avg_cape)
 
    if (zm_microp) then
      dlftot(:ncol,:pver) = dlf(:ncol,:pver) + dif(:ncol,:pver) + dsf(:ncol,:pver)
@@ -1165,6 +1168,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
 
    call outfld('DCAPE', dcape, pcols, lchnk)
    call outfld('CAPE_ZM', cape, pcols, lchnk)        ! RBN - CAPE output
+   call outfld('CAPE_ZM_AVG', nbrhd_avg_cape, pcols, lchnk)
 !
 ! Output fractional occurance of ZM convection
 !
