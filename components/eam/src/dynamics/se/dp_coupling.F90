@@ -286,7 +286,7 @@ CONTAINS
     end if ! local_dp_map
     call t_stopf('dpcopy')
 
-    if (nbrhdchunk > 0) call nbrhd_p_p_coupling(phys_state)
+    !if (nbrhdchunk > 0) call nbrhd_p_p_coupling(phys_state)
 
     call t_startf('derived_phys')
     call derived_phys(phys_state,phys_tend,pbuf2d)
@@ -295,7 +295,8 @@ CONTAINS
 !for theta there is no need to multiply omega_p by p
 #ifndef MODEL_THETA_L
     !$omp parallel do private (lchnk, ncols, ilyr, icol)
-    do lchnk = begchunk,endchunk+nbrhdchunk
+    !do lchnk = begchunk,endchunk+nbrhdchunk
+    do lchnk = begchunk,endchunk
       ncols = get_ncols_p(lchnk)
       do ilyr = 1,pver
         do icol = 1,ncols
@@ -543,7 +544,8 @@ CONTAINS
 
     ! Evaluate derived quantities
     !$omp parallel do private (lchnk, ncol, k, i, zvirv, pbuf_chnk, nbrhd_rairv, nbrhd_zvirv, ierr)
-    do lchnk = begchunk,endchunk+nbrhdchunk
+    !do lchnk = begchunk,endchunk+nbrhdchunk
+    do lchnk = begchunk,endchunk
       ncol = get_ncols_p(lchnk)
       do k = 1,nlev
         do i = 1,ncol
