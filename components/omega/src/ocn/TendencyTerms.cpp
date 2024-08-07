@@ -18,7 +18,7 @@
 namespace OMEGA {
 
 Tendencies *Tendencies::DefaultTendencies = nullptr;
-std::map<std::string, Tendencies> Tendencies::AllTendencies;
+std::map<std::string, std::unique_ptr<Tendencies>> Tendencies::AllTendencies;
 
 //------------------------------------------------------------------------------
 // Initialize the tendencies. Assumes that HorzMesh as alread been initialized.
@@ -30,9 +30,8 @@ int Tendencies::init() {
 
    int NVertLevels = 60;
 
-   Tendencies DefTendencies("Default", DefHorzMesh, NVertLevels, TendConfig);
-
-   Tendencies::DefaultTendencies = get("Default");
+   Tendencies::DefaultTendencies =
+       create("Default", DefHorzMesh, NVertLevels, TendConfig);
 
    return Err;
 
@@ -74,7 +73,7 @@ Tendencies *Tendencies::get(const std::string Name ///< [in] Name of tendencies
    auto it = AllTendencies.find(Name);
 
    if (it != AllTendencies.end()) {
-      return &(it->second);
+      return it->second.get();
    } else {
       LOG_ERROR(
           "Tendencies::get: Attempt to retrieve non-existent tendencies:");
@@ -86,14 +85,20 @@ Tendencies *Tendencies::get(const std::string Name ///< [in] Name of tendencies
 
 //------------------------------------------------------------------------------
 // Construct a new group of tendencies
-Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
-                       const HorzMesh *Mesh,    ///< [in] Horizontal mesh
-                       int NVertLevels, ///< [in] Number of vertical levels
-                       Config *Options  ///< [in] Configuration options
-                       )
+Tendencies::Tendencies(
+    const std::string &Name, ///< [in] Name for tendencies
+    const HorzMesh *Mesh,    ///< [in] Horizontal mesh
+    int NVertLevels,         ///< [in] Number of vertical levels
+    Config *Options,         ///< [in] Configuration options
+    std::function<void(Array2DReal, OceanState *, AuxiliaryState *, int, Real)>
+        InCustomThicknessTend,
+    std::function<void(Array2DReal, OceanState *, AuxiliaryState *, int, Real)>
+        InCustomVelocityTend)
     : ThicknessFluxDiv(Mesh, Options), PotientialVortHAdv(Mesh, Options),
       KEGrad(Mesh, Options), SHHGrad(Mesh, Options),
-      VelocityDiffusion(Mesh, Options), VelocityHyperDiff(Mesh, Options) {
+      VelocityDiffusion(Mesh, Options), VelocityHyperDiff(Mesh, Options),
+      CustomThicknessTend(InCustomThicknessTend),
+      CustomVelocityTend(InCustomVelocityTend) {
 
    // Tendency arrays
    LayerThicknessTend =
@@ -106,10 +111,17 @@ Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
    NEdgesOwned = Mesh->NEdgesOwned;
    NChunks     = NVertLevels / VecLength;
 
-   // Associate this instance with a name
-   AllTendencies.emplace(Name, *this);
-
 } // end constructor
+
+Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
+                       const HorzMesh *Mesh,    ///< [in] Horizontal mesh
+                       int NVertLevels, ///< [in] Number of vertical levels
+                       Config *Options) ///< [in] Configuration options
+    : Tendencies(Name, Mesh, NVertLevels, Options,
+                 std::function<void(Array2DReal, OceanState *, AuxiliaryState *,
+                                    int, Real)>{},
+                 std::function<void(Array2DReal, OceanState *, AuxiliaryState *,
+                                    int, Real)>{}) {}
 
 //------------------------------------------------------------------------------
 // Compute tendencies for layer thickness equation
@@ -137,6 +149,11 @@ void Tendencies::computeThicknessTendencies(
              LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KChunk,
                                  ThickFluxEdge, NormalVelEdge);
           });
+   }
+
+   if (CustomThicknessTend) {
+      CustomThicknessTend(LocLayerThicknessTend, State, AuxState, TimeLevel,
+                          Time);
    }
 
 } // end thickness tendency compute
@@ -213,6 +230,11 @@ void Tendencies::computeVelocityTendencies(
              LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
                                   Del2DivCell, Del2RVortVertex);
           });
+   }
+
+   if (CustomVelocityTend) {
+      CustomVelocityTend(LocNormalVelocityTend, State, AuxState, TimeLevel,
+                         Time);
    }
 
 } // end velocity tendency compute
