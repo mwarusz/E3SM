@@ -49,15 +49,11 @@ class TimeStepper {
    TimeStepper(const TimeStepper &) = delete;
    TimeStepper(TimeStepper &&)      = delete;
 
- private:
-   static TimeStepper *DefaultTimeStepper;
-   static std::map<std::string, std::unique_ptr<TimeStepper>> AllTimeSteppers;
    Tendencies *Tend;
    AuxiliaryState *AuxState;
    HorzMesh *Mesh;
-
- protected:
    Halo *MeshHalo;
+
    void updateStateByTend(OceanState *State1, int TimeLevel1,
                           OceanState *State2, int TimeLevel2, Real Coeff) const;
    void updateThicknessByTend(OceanState *State1, int TimeLevel1,
@@ -73,9 +69,9 @@ class TimeStepper {
    void updateVelocityByTend(OceanState *State, int TimeLevel,
                              Real Coeff) const;
 
-   void computeThickTend(OceanState *State, int TimeLevel, Real Time) const;
-   void computeVelTend(OceanState *State, int TimeLevel, Real Time) const;
-   void computeTendencies(OceanState *State, int TimeLevel, Real Time) const;
+ private:
+   static TimeStepper *DefaultTimeStepper;
+   static std::map<std::string, std::unique_ptr<TimeStepper>> AllTimeSteppers;
 };
 
 } // namespace OMEGA

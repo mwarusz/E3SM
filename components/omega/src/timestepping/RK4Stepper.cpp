@@ -7,11 +7,9 @@ RK4Stepper::RK4Stepper(const std::string &Name, Tendencies *Tend,
     : TimeStepper(Name, TimeStepperType::RungeKutta4, Tend, AuxState, Mesh,
                   MeshHalo) {
 
-   auto *DefDecomp  = Decomp::getDefault();
    auto NVertLevels = OceanState::getDefault()->LayerThickness[0].extent_int(1);
 
-   ProvisState =
-       OceanState::create("Provis", Mesh, DefDecomp, MeshHalo, NVertLevels, 1);
+   ProvisState = OceanState::create("Provis", Mesh, MeshHalo, NVertLevels, 1);
 
    RKA[0] = 0;
    RKA[1] = 1. / 2;
@@ -34,7 +32,7 @@ void RK4Stepper::doStep(OceanState *State, Real Time, Real TimeStep) const {
    for (int Stage = 0; Stage < NStages; ++Stage) {
       const Real StageTime = Time + RKC[Stage] * TimeStep;
       if (Stage == 0) {
-         computeTendencies(State, 0, StageTime);
+         Tend->computeAllTendencies(State, AuxState, 0, StageTime);
          updateStateByTend(State, 1, State, 0, RKB[Stage] * TimeStep);
       } else {
          updateStateByTend(ProvisState, 0, State, 0, RKA[Stage] * TimeStep);
@@ -48,7 +46,7 @@ void RK4Stepper::doStep(OceanState *State, Real Time, Real TimeStep) const {
             ProvisState->copyToDevice(0);
          }
 
-         computeTendencies(ProvisState, 0, StageTime);
+         Tend->computeAllTendencies(ProvisState, AuxState, 0, StageTime);
          updateStateByTend(State, 1, RKB[Stage] * TimeStep);
       }
    }

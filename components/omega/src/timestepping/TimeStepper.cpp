@@ -143,34 +143,4 @@ void TimeStepper::updateStateByTend(OceanState *State, int TimeLevel,
    updateStateByTend(State, TimeLevel, State, TimeLevel, Coeff);
 }
 
-void TimeStepper::computeTendencies(OceanState *State, int TimeLevel,
-                                    Real Time) const {
-   AuxState->computeAll(State, TimeLevel);
-   Tend->computeAllTendencies(State, TimeLevel, AuxState, Time);
-}
-
-void TimeStepper::computeThickTend(OceanState *State, int TimeLevel,
-                                   Real Time) const {
-   // only need LayerThicknessAux
-   OMEGA_SCOPE(LayerThicknessAux, AuxState->LayerThicknessAux);
-   OMEGA_SCOPE(LayerThickCell, State->LayerThickness[TimeLevel]);
-   OMEGA_SCOPE(NormalVelEdge, State->NormalVelocity[TimeLevel]);
-
-   const int NChunks = LayerThickCell.extent_int(1) / VecLength;
-
-   parallelFor(
-       "computeLayerThickAux", {Mesh->NEdgesAll, NChunks},
-       KOKKOS_LAMBDA(int IEdge, int KChunk) {
-          LayerThicknessAux.computeVarsOnEdge(IEdge, KChunk, LayerThickCell,
-                                              NormalVelEdge);
-       });
-   Tend->computeThicknessTendencies(State, TimeLevel, AuxState, Time);
-}
-
-void TimeStepper::computeVelTend(OceanState *State, int TimeLevel,
-                                 Real Time) const {
-   AuxState->computeAll(State, TimeLevel);
-   Tend->computeVelocityTendencies(State, TimeLevel, AuxState, Time);
-}
-
 } // namespace OMEGA
