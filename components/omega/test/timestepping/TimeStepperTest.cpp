@@ -21,102 +21,34 @@
 using namespace OMEGA;
 
 constexpr Geometry Geom   = Geometry::Planar;
-constexpr int NVertLevels = 1;
-constexpr Real Pi         = M_PI;
+constexpr int NVertLevels = 60;
 
-struct ManufacturedSolution {
-   Real m_grav  = 9.80616;
-   Real m_f0    = 1e-4;
-   Real m_lx    = 10000e3;
-   Real m_ly    = std::sqrt(3) / 2 * m_lx;
-   Real m_eta0  = 1;
-   Real m_h0    = 1000;
-   int m_mx     = 2;
-   int m_my     = 2;
-   Real m_kx    = m_mx * (2 * Pi / m_lx);
-   Real m_ky    = m_my * (2 * Pi / m_ly);
-   Real m_omega = std::sqrt(m_grav * m_h0 * (m_kx * m_kx + m_ky * m_ky));
-
-   KOKKOS_FUNCTION Real layerThickness(Real x, Real y, Real t) const {
-      return m_h0 + m_eta0 * std::sin(m_kx * x + m_ky * y - m_omega * t);
-   }
-
-   KOKKOS_FUNCTION Real velocityX(Real x, Real y, Real t) const {
-      return m_eta0 * std::cos(m_kx * x + m_ky * y - m_omega * t);
-   }
-
-   KOKKOS_FUNCTION Real velocityY(Real x, Real y, Real t) const {
-      return m_eta0 * std::cos(m_kx * x + m_ky * y - m_omega * t);
-   }
-};
-
-struct ManufacturedThickTend : ManufacturedSolution {
-   KOKKOS_FUNCTION Real h_tend(Real x, Real y, Real t) const {
-      using std::cos;
-      using std::sin;
-
-      Real phi = m_kx * x + m_ky * y - m_omega * t;
-      return m_eta0 * (-m_h0 * (m_kx + m_ky) * sin(phi) - m_omega * cos(phi) +
-                       m_eta0 * (m_kx + m_ky) * cos(2 * phi));
-   }
-
+struct DecayThicknessTendency {
    void operator()(Array2DReal ThicknessTend, OceanState *State,
                    AuxiliaryState *AuxState, int TimeLevel, Real Time) const {
-
-      auto *Mesh       = HorzMesh::getDefault();
-      auto NVertLevels = ThicknessTend.extent_int(1);
-      const auto XCell = createDeviceMirrorCopy(Mesh->XCellH);
-      const auto YCell = createDeviceMirrorCopy(Mesh->YCellH);
-
-      parallelFor(
-          {Mesh->NCellsAll, NVertLevels}, KOKKOS_LAMBDA(int ICell, int K) {
-             Real X = XCell(ICell);
-             Real Y = YCell(ICell);
-             ThicknessTend(ICell, K) += h_tend(X, Y, Time);
-          });
+      // auto *Mesh       = HorzMesh::getDefault();
+      // parallelFor(
+      //     {Mesh->NCellsAll, NVertLevels}, KOKKOS_LAMBDA(int ICell, int K) {
+      //        ThicknessTend(ICell, K) += h_tend(X, Y, Time);
+      //     });
    }
 };
 
-struct ManufacturedVelTend : ManufacturedSolution {
-   KOKKOS_FUNCTION Real vx_tend(Real x, Real y, Real t) const {
-      using std::cos;
-      using std::sin;
+struct DecayVelocityTendency {
+   Real Coeff = 1;
 
-      Real phi = m_kx * x + m_ky * y - m_omega * t;
-      return m_eta0 * ((-m_f0 + m_grav * m_kx) * cos(phi) + m_omega * sin(phi) -
-                       m_eta0 * (m_kx + m_ky) * sin(2 * phi) / 2);
-   }
+   Real exactSolution(Real Time) { return std::exp(-Coeff * Time); }
 
-   KOKKOS_FUNCTION Real vy_tend(Real x, Real y, Real t) const {
-      using std::cos;
-      using std::sin;
-
-      Real phi = m_kx * x + m_ky * y - m_omega * t;
-      return m_eta0 * ((m_f0 + m_grav * m_ky) * cos(phi) + m_omega * sin(phi) -
-                       m_eta0 * (m_kx + m_ky) * sin(2 * phi) / 2);
-   }
-
-   void operator()(Array2DReal VelocityTend, OceanState *State,
+   void operator()(Array2DReal NormalVelTend, OceanState *State,
                    AuxiliaryState *AuxState, int TimeLevel, Real Time) const {
 
-      auto *Mesh           = HorzMesh::getDefault();
-      auto NVertLevels     = VelocityTend.extent_int(1);
-      const auto XEdge     = createDeviceMirrorCopy(Mesh->XEdgeH);
-      const auto YEdge     = createDeviceMirrorCopy(Mesh->YEdgeH);
-      const auto AngleEdge = createDeviceMirrorCopy(Mesh->AngleEdgeH);
+      auto *Mesh                = HorzMesh::getDefault();
+      auto NVertLevels          = NormalVelTend.extent_int(1);
+      const auto &NormalVelEdge = State->NormalVelocity[TimeLevel];
 
       parallelFor(
           {Mesh->NEdgesAll, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int K) {
-             Real X = XEdge(IEdge);
-             Real Y = YEdge(IEdge);
-
-             Real NX = std::cos(AngleEdge(IEdge));
-             Real NY = std::sin(AngleEdge(IEdge));
-
-             Real VXTend = vx_tend(X, Y, Time);
-             Real VYTend = vy_tend(X, Y, Time);
-
-             VelocityTend(IEdge, K) += NX * VXTend + NY * VYTend;
+             NormalVelTend(IEdge, K) -= Coeff * NormalVelEdge(IEdge, K);
           });
    }
 };
@@ -124,61 +56,14 @@ struct ManufacturedVelTend : ManufacturedSolution {
 int initState() {
    int Err = 0;
 
-   ManufacturedSolution Setup;
    auto *Mesh  = HorzMesh::getDefault();
    auto *State = OceanState::getDefault();
 
    const auto &LayerThickCell = State->LayerThickness[0];
    const auto &NormalVelEdge  = State->NormalVelocity[0];
 
-   Err += setScalar(
-       KOKKOS_LAMBDA(Real X, Real Y) { return Setup.layerThickness(X, Y, 0); },
-       LayerThickCell, Geom, Mesh, OnCell, NVertLevels);
-
-   Real ThickSum;
-   parallelReduce(
-       {Mesh->NCellsOwned, NVertLevels},
-       KOKKOS_LAMBDA(int ICell, int K, Real &Accum) {
-          Accum += LayerThickCell(ICell, K) * LayerThickCell(ICell, K);
-       },
-       ThickSum);
-   std::cout << "thick sum: " << ThickSum << std::endl;
-
-   Err += setVectorEdge(
-       KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
-          VecField[0] = Setup.velocityX(X, Y, 0);
-          VecField[1] = Setup.velocityY(X, Y, 0);
-       },
-       NormalVelEdge, EdgeComponent::Normal, Geom, Mesh, NVertLevels,
-       ExchangeHalos::Yes, CartProjection::No);
-
-   Real NormalVelSum;
-   parallelReduce(
-       {Mesh->NEdgesOwned, NVertLevels},
-       KOKKOS_LAMBDA(int IEdge, int K, Real &Accum) {
-          Accum += NormalVelEdge(IEdge, K) * NormalVelEdge(IEdge, K);
-       },
-       NormalVelSum);
-   std::cout << "vel sum: " << NormalVelSum << std::endl;
-   // need to override FVertex with prescribed values
-   // cannot use setScalar because it doesn't support setting 1D arrays
-   const auto &FVertex = Mesh->FVertex;
-
-   auto XVertex = createDeviceMirrorCopy(Mesh->XVertexH);
-   auto YVertex = createDeviceMirrorCopy(Mesh->YVertexH);
-
-   auto LonVertex = createDeviceMirrorCopy(Mesh->LonVertexH);
-   auto LatVertex = createDeviceMirrorCopy(Mesh->LatVertexH);
-
-   parallelFor(
-       {Mesh->NVerticesOwned},
-       KOKKOS_LAMBDA(int IVertex) { FVertex(IVertex) = Setup.m_f0; });
-
-   auto MyHalo    = Halo::getDefault();
-   auto &FVertexH = Mesh->FVertexH;
-   deepCopy(FVertexH, FVertex);
-   Err += MyHalo->exchangeFullArrayHalo(FVertexH, OnVertex);
-   deepCopy(FVertex, FVertexH);
+   deepCopy(LayerThickCell, 1);
+   deepCopy(NormalVelEdge, 1);
 
    return Err;
 }
@@ -192,29 +77,16 @@ int createExactSolution(Real TimeEnd) {
    auto *ExactState =
        OceanState::create("Exact", DefMesh, DefHalo, NVertLevels, 1);
 
-   ManufacturedSolution Setup;
-
    const auto &LayerThickCell = ExactState->LayerThickness[0];
    const auto &NormalVelEdge  = ExactState->NormalVelocity[0];
 
-   Err += setScalar(
-       KOKKOS_LAMBDA(Real X, Real Y) {
-          return Setup.layerThickness(X, Y, TimeEnd);
-       },
-       LayerThickCell, Geom, DefMesh, OnCell, NVertLevels);
-
-   Err += setVectorEdge(
-       KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
-          VecField[0] = Setup.velocityX(X, Y, TimeEnd);
-          VecField[1] = Setup.velocityY(X, Y, TimeEnd);
-       },
-       NormalVelEdge, EdgeComponent::Normal, Geom, DefMesh, NVertLevels,
-       ExchangeHalos::Yes, CartProjection::No);
+   deepCopy(LayerThickCell, 1);
+   deepCopy(NormalVelEdge, DecayVelocityTendency{}.exactSolution(TimeEnd));
 
    return Err;
 }
 
-void computeErrors() {
+ErrorMeasures computeErrors() {
    const auto *DefMesh = HorzMesh::getDefault();
 
    const auto *State      = OceanState::getDefault();
@@ -240,11 +112,15 @@ void computeErrors() {
                 << std::endl;
       std::cout << "MW: " << VelErrors.LInf << " " << VelErrors.L2 << std::endl;
    }
+
+   OceanState::erase("Exact");
+
+   return VelErrors;
 }
 
 //------------------------------------------------------------------------------
-// The initialization routine for aux vars testing
-int initTimeStepperTest(const std::string &mesh) {
+// The initialization routine for time stepper testing
+int initTimeStepperTest(TimeStepperType Type, const std::string &mesh) {
    int Err = 0;
 
    MachEnv::init(MPI_COMM_WORLD);
@@ -295,41 +171,40 @@ int initTimeStepperTest(const std::string &mesh) {
 
    Config Options;
    Tendencies::create("TestTendencies", HorzMesh::getDefault(), NVertLevels,
-                      &Options, ManufacturedThickTend{}, ManufacturedVelTend{});
+                      &Options, DecayThicknessTendency{},
+                      DecayVelocityTendency{});
+
+   TimeStepper::create("TestTimeStepper", Type,
+                       Tendencies::get("TestTendencies"),
+                       AuxiliaryState::getDefault(), HorzMesh::getDefault(),
+                       Halo::getDefault());
 
    return Err;
 }
 
-int testTimeStepping(int Scale) {
+ErrorMeasures runWithTimeStep(Real TimeStep) {
    int Err = 0;
 
-   const auto *Stepper = TimeStepper::create(
-       "TestTimeStepper", TimeStepperType::RungeKutta4,
-       Tendencies::get("TestTendencies"), AuxiliaryState::getDefault(),
-       HorzMesh::getDefault(), Halo::getDefault());
+   Err += initState();
 
-   auto *State = OceanState::getDefault();
+   const auto *Stepper = TimeStepper::get("TestTimeStepper");
+   auto *State         = OceanState::getDefault();
 
-   const Real TimeEnd = 10 * 60 * 60;
-   // const Real TimeEnd = 10 * 60;
-   Real TimeStep    = 3 * Scale / 1e3;
-   const int NSteps = std::ceil(TimeEnd / TimeStep);
-   TimeStep         = TimeEnd / NSteps;
+   const Real TimeEnd = 1;
+   const int NSteps   = std::ceil(TimeEnd / TimeStep);
+   TimeStep           = TimeEnd / NSteps;
 
-   std::cout << "TimeStep: " << TimeStep << std::endl;
-   std::cout << "NSteps: " << NSteps << std::endl;
+   // std::cout << "TimeStep: " << TimeStep << std::endl;
+   // std::cout << "NSteps: " << NSteps << std::endl;
 
    for (int Step = 0; Step < NSteps; ++Step) {
-      // std::cout << "Step: " << Step << std::endl;
       const Real Time = Step * TimeStep;
       Stepper->doStep(State, Time, TimeStep);
    }
 
    createExactSolution(TimeEnd);
-   computeErrors();
 
-   TimeStepper::clear();
-   return Err;
+   return computeErrors();
 }
 
 void finalizeTimeStepperTest() {
@@ -339,6 +214,7 @@ void finalizeTimeStepperTest() {
    MetaDim::destroy("NEdges");
    MetaDim::destroy("NVertLevels");
 
+   TimeStepper::clear();
    Tendencies::clear();
    AuxiliaryState::clear();
    OceanState::clear();
@@ -349,15 +225,25 @@ void finalizeTimeStepperTest() {
    MachEnv::removeAll();
 }
 
-int timeStepperTest(int Scale, const std::string &MeshFile = "OmegaMesh.nc") {
-   int Err = initTimeStepperTest(MeshFile);
+int timeStepperTest(TimeStepperType Type,
+                    const std::string &MeshFile = "OmegaMesh.nc") {
+   int Err = initTimeStepperTest(Type, MeshFile);
    if (Err != 0) {
       LOG_CRITICAL("TimeStepperTest: Error initializing");
    }
 
-   Err += initState();
+   int NRefinements = 2;
+   std::vector<Real> Errors(NRefinements);
 
-   Err += testTimeStepping(Scale);
+   const Real BaseTimeStep = 0.2;
+
+   Real TimeStep = BaseTimeStep;
+   for (int RefLevel = 0; RefLevel < NRefinements; ++RefLevel) {
+      Errors[RefLevel] = runWithTimeStep(TimeStep).L2;
+      TimeStep /= 2;
+   }
+
+   std::cout << "Rate: " << std::log2(Errors[0] / Errors[1]) << std::endl;
 
    if (Err == 0) {
       LOG_INFO("TimeStepperTest: Successful completion");
@@ -374,14 +260,7 @@ int main(int argc, char *argv[]) {
    MPI_Init(&argc, &argv);
    Kokkos::initialize(argc, argv);
 
-   RetVal += timeStepperTest(
-       200000, "/Users/mwarusz/mpas_meshes/planar_periodic_10000km/"
-               "planar_periodic_50x50.nc");
-   RetVal += timeStepperTest(
-       100000, "/Users/mwarusz/mpas_meshes/planar_periodic_10000km/"
-               "planar_periodic_100x100.nc");
-
-   // RetVal += timeStepperTest();
+   RetVal += timeStepperTest(TimeStepperType::RungeKutta4);
 
    Kokkos::finalize();
    MPI_Finalize();
