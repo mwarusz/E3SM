@@ -281,9 +281,12 @@ class Tendencies {
 
    // Methods to compute tendency groups
    // TODO Add AuxilaryState as calling argument
-   void computeThicknessTendencies(OceanState *State, AuxiliaryState *AuxState);
-   void computeVelocityTendencies(OceanState *State, AuxiliaryState *AuxState);
-   void computeAllTendencies(OceanState *State, AuxiliaryState *AuxState);
+   void computeThicknessTendencies(OceanState *State, AuxiliaryState *AuxState,
+                                   int TimeLevel, Real Time);
+   void computeVelocityTendencies(OceanState *State, AuxiliaryState *AuxState,
+                                  int TimeLevel, Real Time);
+   void computeAllTendencies(OceanState *State, AuxiliaryState *AuxState,
+                             int TimeLevel, Real Time);
 
    // Construct a new tendency object
    Tendencies(const std::string &Name, ///< [in] Name for tendencies
