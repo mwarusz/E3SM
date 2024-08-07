@@ -139,6 +139,8 @@ void Tendencies::computeThicknessTendenciesOnly(
    OMEGA_SCOPE(LocThicknessFluxDiv, ThicknessFluxDiv);
    const Array2DReal &NormalVelEdge = State->NormalVelocity[TimeLevel];
 
+   deepCopy(LocLayerThicknessTend, 0);
+
    // Compute thickness flux divergence
    const Array2DReal &ThickFluxEdge =
        AuxState->LayerThicknessAux.FluxLayerThickEdge;
@@ -175,6 +177,8 @@ void Tendencies::computeVelocityTendenciesOnly(
    OMEGA_SCOPE(LocSHHGrad, SHHGrad);
    OMEGA_SCOPE(LocVelocityDiffusion, VelocityDiffusion);
    OMEGA_SCOPE(LocVelocityHyperDiff, VelocityHyperDiff);
+
+   deepCopy(LocNormalVelocityTend, 0);
 
    // Compute potential vorticity horizontal advection
    const Array2DReal &FluxLayerThickEdge =
