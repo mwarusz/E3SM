@@ -72,7 +72,7 @@ OceanState::OceanState(
 
    NVertLevels = NVertLevels_;
    NTimeLevels = NTimeLevels_;
-   CurLevel    = NTimeLevels - 2;
+   CurLevel    = std::max(0, NTimeLevels - 2);
    NewLevel    = NTimeLevels - 1;
 
    MeshHalo = MeshHalo_;
