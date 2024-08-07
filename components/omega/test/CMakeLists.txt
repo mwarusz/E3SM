@@ -284,6 +284,17 @@ add_omega_test(
     "-n;2"
 )
 
+###################
+# Time Stepper test
+###################
+
+add_omega_test(
+  TIMESTEPPER_TEST
+  testTimeStepping.exe
+  timestepping/TimeStepperTest.cpp
+    "-n;1"
+)
+
 ##################
 # Kokkos test
 ##################
