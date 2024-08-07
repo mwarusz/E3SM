@@ -115,8 +115,10 @@ Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
 // Compute tendencies for layer thickness equation
 // TODO Add AuxilaryState as argument
 void Tendencies::computeThicknessTendencies(
-    OceanState *State,       ///< [in] State variables
-    AuxiliaryState *AuxState ///< [in] Auxilary state variables
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int TimeLevel,            ///< [in] Time level
+    Real Time                 ///< [in] Time
 ) {
 
    OMEGA_SCOPE(LocLayerThicknessTend, LayerThicknessTend);
@@ -138,8 +140,10 @@ void Tendencies::computeThicknessTendencies(
 //------------------------------------------------------------------------------
 // Compute tendencies for normal velocity equation
 void Tendencies::computeVelocityTendencies(
-    OceanState *State,       ///< [in] State variables
-    AuxiliaryState *AuxState ///< [in] Auxilary state variables
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int TimeLevel,            ///< [in] Time level
+    Real Time                 ///< [in] Time
 ) {
 
    OMEGA_SCOPE(LocNormalVelocityTend, NormalVelocityTend);
@@ -156,7 +160,7 @@ void Tendencies::computeVelocityTendencies(
        AuxState->LayerThicknessAux.FluxLayerThickEdge;
    const Array2DReal &NormRVortEdge = AuxState->VorticityAux.NormRelVortEdge;
    const Array2DReal &NormFEdge     = AuxState->VorticityAux.NormPlanetVortEdge;
-   const Array2DReal &NormVelEdge   = State->NormalVelocity[0];
+   const Array2DReal &NormVelEdge   = State->NormalVelocity[TimeLevel];
    parallelFor(
        {LocNEdgesOwned, LocNChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
           LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
@@ -202,13 +206,15 @@ void Tendencies::computeVelocityTendencies(
 //------------------------------------------------------------------------------
 // Compute both layer thickness and normal velocity tendencies
 void Tendencies::computeAllTendencies(
-    OceanState *State,       ///< [in] State variables
-    AuxiliaryState *AuxState ///< [in] Auxilary state variables
+    OceanState *State,        ///< [in] State variables
+    AuxiliaryState *AuxState, ///< [in] Auxilary state variables
+    int TimeLevel,            ///< [in] Time level
+    Real Time                 ///< [in] Time
 ) {
 
-   AuxState->computeAll(State, 0);
-   computeThicknessTendencies(State, AuxState);
-   computeVelocityTendencies(State, AuxState);
+   AuxState->computeAll(State, TimeLevel);
+   computeThicknessTendencies(State, AuxState, TimeLevel, Time);
+   computeVelocityTendencies(State, AuxState, TimeLevel, Time);
 
 } // end all tendency compute
 
