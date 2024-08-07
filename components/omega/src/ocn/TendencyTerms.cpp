@@ -125,6 +125,7 @@ void Tendencies::computeThicknessTendencies(
    OMEGA_SCOPE(LocNCellsOwned, NCellsOwned);
    OMEGA_SCOPE(LocNChunks, NChunks);
    OMEGA_SCOPE(LocThicknessFluxDiv, ThicknessFluxDiv);
+   const Array2DReal &NormalVelEdge = State->NormalVelocity[TimeLevel];
 
    // Compute thickness flux divergence
    const Array2DReal &ThickFluxEdge =
@@ -132,7 +133,7 @@ void Tendencies::computeThicknessTendencies(
    parallelFor(
        {LocNCellsOwned, LocNChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
           LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KChunk,
-                              ThickFluxEdge);
+                              ThickFluxEdge, NormalVelEdge);
        });
 
 } // end thickness tendency compute
