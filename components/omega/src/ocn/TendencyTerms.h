@@ -353,6 +353,13 @@ class Tendencies {
               Config *Options          ///< [in] Configuration options
    );
 
+   void computeThicknessTendenciesOnly(OceanState *State,
+                                       AuxiliaryState *AuxState, int TimeLevel,
+                                       Real Time);
+   void computeVelocityTendenciesOnly(OceanState *State,
+                                      AuxiliaryState *AuxState, int TimeLevel,
+                                      Real Time);
+
    // forbid copy and move construction
    Tendencies(const Tendencies &) = delete;
    Tendencies(Tendencies &&)      = delete;
