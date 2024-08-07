@@ -48,7 +48,9 @@ struct ManufacturedSolution {
    KOKKOS_FUNCTION Real velocityY(Real x, Real y, Real t) const {
       return m_eta0 * std::cos(m_kx * x + m_ky * y - m_omega * t);
    }
+};
 
+struct ManufacturedThickTend : ManufacturedSolution {
    KOKKOS_FUNCTION Real h_tend(Real x, Real y, Real t) const {
       using std::cos;
       using std::sin;
@@ -58,6 +60,24 @@ struct ManufacturedSolution {
                        m_eta0 * (m_kx + m_ky) * cos(2 * phi));
    }
 
+   void operator()(Array2DReal ThicknessTend, OceanState *State,
+                   AuxiliaryState *AuxState, int TimeLevel, Real Time) const {
+
+      auto *Mesh       = HorzMesh::getDefault();
+      auto NVertLevels = ThicknessTend.extent_int(1);
+      const auto XCell = createDeviceMirrorCopy(Mesh->XCellH);
+      const auto YCell = createDeviceMirrorCopy(Mesh->YCellH);
+
+      parallelFor(
+          {Mesh->NCellsAll, NVertLevels}, KOKKOS_LAMBDA(int ICell, int K) {
+             Real X = XCell(ICell);
+             Real Y = YCell(ICell);
+             ThicknessTend(ICell, K) += h_tend(X, Y, Time);
+          });
+   }
+};
+
+struct ManufacturedVelTend : ManufacturedSolution {
    KOKKOS_FUNCTION Real vx_tend(Real x, Real y, Real t) const {
       using std::cos;
       using std::sin;
@@ -74,6 +94,30 @@ struct ManufacturedSolution {
       Real phi = m_kx * x + m_ky * y - m_omega * t;
       return m_eta0 * ((m_f0 + m_grav * m_ky) * cos(phi) + m_omega * sin(phi) -
                        m_eta0 * (m_kx + m_ky) * sin(2 * phi) / 2);
+   }
+
+   void operator()(Array2DReal VelocityTend, OceanState *State,
+                   AuxiliaryState *AuxState, int TimeLevel, Real Time) const {
+
+      auto *Mesh           = HorzMesh::getDefault();
+      auto NVertLevels     = VelocityTend.extent_int(1);
+      const auto XEdge     = createDeviceMirrorCopy(Mesh->XEdgeH);
+      const auto YEdge     = createDeviceMirrorCopy(Mesh->YEdgeH);
+      const auto AngleEdge = createDeviceMirrorCopy(Mesh->AngleEdgeH);
+
+      parallelFor(
+          {Mesh->NEdgesAll, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int K) {
+             Real X = XEdge(IEdge);
+             Real Y = YEdge(IEdge);
+
+             Real NX = std::cos(AngleEdge(IEdge));
+             Real NY = std::sin(AngleEdge(IEdge));
+
+             Real VXTend = vx_tend(X, Y, Time);
+             Real VYTend = vy_tend(X, Y, Time);
+
+             VelocityTend(IEdge, K) += NX * VXTend + NY * VYTend;
+          });
    }
 };
 
@@ -142,12 +186,11 @@ int initState() {
 int createExactSolution(Real TimeEnd) {
    int Err = 0;
 
-   auto *DefDecomp = Decomp::getDefault();
-   auto *DefHalo   = Halo::getDefault();
-   auto *DefMesh   = HorzMesh::getDefault();
+   auto *DefHalo = Halo::getDefault();
+   auto *DefMesh = HorzMesh::getDefault();
 
    auto *ExactState =
-       OceanState::create("Exact", DefMesh, DefDecomp, DefHalo, NVertLevels, 1);
+       OceanState::create("Exact", DefMesh, DefHalo, NVertLevels, 1);
 
    ManufacturedSolution Setup;
 
@@ -250,11 +293,9 @@ int initTimeStepperTest(const std::string &mesh) {
       LOG_ERROR("TimeStepperTest: error initializing default aux state");
    }
 
-   int TendenciesErr = Tendencies::init();
-   if (TendenciesErr != 0) {
-      Err++;
-      LOG_ERROR("TimeStepperTest: error initializing default tendencies");
-   }
+   Config Options;
+   Tendencies::create("TestTendencies", HorzMesh::getDefault(), NVertLevels,
+                      &Options, ManufacturedThickTend{}, ManufacturedVelTend{});
 
    return Err;
 }
@@ -262,10 +303,12 @@ int initTimeStepperTest(const std::string &mesh) {
 int testTimeStepping(int Scale) {
    int Err = 0;
 
-   TimeStepper::init();
+   const auto *Stepper = TimeStepper::create(
+       "TestTimeStepper", TimeStepperType::RungeKutta4,
+       Tendencies::get("TestTendencies"), AuxiliaryState::getDefault(),
+       HorzMesh::getDefault(), Halo::getDefault());
 
-   const auto *Stepper = TimeStepper::getDefault();
-   auto *State         = OceanState::getDefault();
+   auto *State = OceanState::getDefault();
 
    const Real TimeEnd = 10 * 60 * 60;
    // const Real TimeEnd = 10 * 60;
