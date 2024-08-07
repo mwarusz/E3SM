@@ -16,6 +16,9 @@
 #include "MachEnv.h"
 #include "OceanState.h"
 
+#include <functional>
+#include <memory>
+
 namespace OMEGA {
 
 /// Divergence of thickness flux at cell centers, for updating layer thickness
@@ -289,12 +292,27 @@ class Tendencies {
    void computeAllTendencies(OceanState *State, AuxiliaryState *AuxState,
                              int TimeLevel, Real Time);
 
-   // Construct a new tendency object
-   Tendencies(const std::string &Name, ///< [in] Name for tendencies
-              const HorzMesh *Mesh,    ///< [in] Horizontal mesh
-              int NVertLevels,         ///< [in] Number of vertical levels
-              Config *Options          ///< [in] Configuration options
-   );
+   // Create tendencies
+   template <class... ArgTypes>
+   static Tendencies *create(const std::string &Name, ArgTypes &&...Args) {
+      // Check to see if tendencies of the same name already exist and
+      // if so, exit with an error
+      if (AllTendencies.find(Name) != AllTendencies.end()) {
+         LOG_ERROR(
+             "Attempted to create Tendencies with name {} but Tendencies of "
+             "that name already exists",
+             Name);
+         return nullptr;
+      }
+
+      // create new tendencies on the heap and put it in a map of
+      // unique_ptrs, which will manage its lifetime
+      auto *NewTendencies =
+          new Tendencies(Name, std::forward<ArgTypes>(Args)...);
+      AllTendencies.emplace(Name, NewTendencies);
+
+      return get(Name);
+   }
 
    // Destructor
    ~Tendencies();
@@ -317,6 +335,28 @@ class Tendencies {
    );
 
  private:
+   // Construct a new tendency object
+   Tendencies(const std::string &Name, ///< [in] Name for tendencies
+              const HorzMesh *Mesh,    ///< [in] Horizontal mesh
+              int NVertLevels,         ///< [in] Number of vertical levels
+              Config *Options,         ///< [in] Configuration options
+              std::function<void(Array2DReal, OceanState *, AuxiliaryState *,
+                                 int, Real)>
+                  InCustomThicknessTend,
+              std::function<void(Array2DReal, OceanState *, AuxiliaryState *,
+                                 int, Real)>
+                  InCustomVelocityTend);
+
+   Tendencies(const std::string &Name, ///< [in] Name for tendencies
+              const HorzMesh *Mesh,    ///< [in] Horizontal mesh
+              int NVertLevels,         ///< [in] Number of vertical levels
+              Config *Options          ///< [in] Configuration options
+   );
+
+   // forbid copy and move construction
+   Tendencies(const Tendencies &) = delete;
+   Tendencies(Tendencies &&)      = delete;
+
    // Mesh sizes
    I4 NCellsOwned; ///< Number of cells owned by this task
    I4 NEdgesOwned; ///< Number of edges owned by this task
@@ -326,7 +366,12 @@ class Tendencies {
    static Tendencies *DefaultTendencies;
 
    // Map of all tendency objects
-   static std::map<std::string, Tendencies> AllTendencies;
+   static std::map<std::string, std::unique_ptr<Tendencies>> AllTendencies;
+
+   std::function<void(Array2DReal, OceanState *, AuxiliaryState *, int, Real)>
+       CustomThicknessTend;
+   std::function<void(Array2DReal, OceanState *, AuxiliaryState *, int, Real)>
+       CustomVelocityTend;
 
 }; // end class Tendencies
 
