@@ -43,16 +43,16 @@ class TimeStepper {
    static void clear();
 
  protected:
+   Tendencies *Tend;
+   AuxiliaryState *AuxState;
+   HorzMesh *Mesh;
+   Halo *MeshHalo;
+
    TimeStepper(const std::string &Name, TimeStepperType Type, Tendencies *Tend,
                AuxiliaryState *AuxState, HorzMesh *Mesh, Halo *MeshHalo);
 
    TimeStepper(const TimeStepper &) = delete;
    TimeStepper(TimeStepper &&)      = delete;
-
-   Tendencies *Tend;
-   AuxiliaryState *AuxState;
-   HorzMesh *Mesh;
-   Halo *MeshHalo;
 
    void updateStateByTend(OceanState *State1, int TimeLevel1,
                           OceanState *State2, int TimeLevel2, Real Coeff) const;

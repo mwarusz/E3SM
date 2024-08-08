@@ -7,7 +7,7 @@ RK4Stepper::RK4Stepper(const std::string &Name, Tendencies *Tend,
     : TimeStepper(Name, TimeStepperType::RungeKutta4, Tend, AuxState, Mesh,
                   MeshHalo) {
 
-   auto NVertLevels = OceanState::getDefault()->LayerThickness[0].extent_int(1);
+   auto NVertLevels = Tend->LayerThicknessTend.extent_int(1);
 
    ProvisState = OceanState::create("Provis", Mesh, MeshHalo, NVertLevels, 1);
 
@@ -29,25 +29,26 @@ RK4Stepper::RK4Stepper(const std::string &Name, Tendencies *Tend,
 
 void RK4Stepper::doStep(OceanState *State, Real Time, Real TimeStep) const {
 
+   const int CurLevel  = 0;
+   const int NextLevel = 1;
+
    for (int Stage = 0; Stage < NStages; ++Stage) {
       const Real StageTime = Time + RKC[Stage] * TimeStep;
+
       if (Stage == 0) {
-         Tend->computeAllTendencies(State, AuxState, 0, StageTime);
-         updateStateByTend(State, 1, State, 0, RKB[Stage] * TimeStep);
+         Tend->computeAllTendencies(State, AuxState, CurLevel, StageTime);
+         updateStateByTend(State, NextLevel, State, CurLevel,
+                           RKB[Stage] * TimeStep);
       } else {
-         updateStateByTend(ProvisState, 0, State, 0, RKA[Stage] * TimeStep);
+         updateStateByTend(ProvisState, CurLevel, State, CurLevel,
+                           RKA[Stage] * TimeStep);
 
          if (Stage == 2) {
-            ProvisState->copyToHost(0);
-            MeshHalo->exchangeFullArrayHalo(ProvisState->NormalVelocityH[0],
-                                            OnEdge);
-            MeshHalo->exchangeFullArrayHalo(ProvisState->LayerThicknessH[0],
-                                            OnCell);
-            ProvisState->copyToDevice(0);
+            ProvisState->exchangeHalo(CurLevel);
          }
 
-         Tend->computeAllTendencies(ProvisState, AuxState, 0, StageTime);
-         updateStateByTend(State, 1, RKB[Stage] * TimeStep);
+         Tend->computeAllTendencies(ProvisState, AuxState, CurLevel, StageTime);
+         updateStateByTend(State, NextLevel, RKB[Stage] * TimeStep);
       }
    }
 
