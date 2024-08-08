@@ -17,25 +17,20 @@
 
 #include <cmath>
 #include <iomanip>
+#include <iostream>
 
 using namespace OMEGA;
 
 constexpr Geometry Geom   = Geometry::Planar;
-constexpr int NVertLevels = 60;
+constexpr int NVertLevels = 1;
 
 struct DecayThicknessTendency {
    void operator()(Array2DReal ThicknessTend, OceanState *State,
-                   AuxiliaryState *AuxState, int TimeLevel, Real Time) const {
-      // auto *Mesh       = HorzMesh::getDefault();
-      // parallelFor(
-      //     {Mesh->NCellsAll, NVertLevels}, KOKKOS_LAMBDA(int ICell, int K) {
-      //        ThicknessTend(ICell, K) += h_tend(X, Y, Time);
-      //     });
-   }
+                   AuxiliaryState *AuxState, int TimeLevel, Real Time) const {}
 };
 
 struct DecayVelocityTendency {
-   Real Coeff = 1;
+   Real Coeff = 0.5;
 
    Real exactSolution(Real Time) { return std::exp(-Coeff * Time); }
 
@@ -57,7 +52,7 @@ int initState() {
    int Err = 0;
 
    auto *Mesh  = HorzMesh::getDefault();
-   auto *State = OceanState::getDefault();
+   auto *State = OceanState::get("TestState");
 
    const auto &LayerThickCell = State->LayerThickness[0];
    const auto &NormalVelEdge  = State->NormalVelocity[0];
@@ -89,43 +84,29 @@ int createExactSolution(Real TimeEnd) {
 ErrorMeasures computeErrors() {
    const auto *DefMesh = HorzMesh::getDefault();
 
-   const auto *State      = OceanState::getDefault();
+   const auto *State      = OceanState::get("TestState");
    const auto *ExactState = OceanState::get("Exact");
 
-   const auto &ThickCell     = State->LayerThickness[0];
-   const auto &NormalVelEdge = State->NormalVelocity[0];
-
-   const auto &ExactThickCell     = ExactState->LayerThickness[0];
+   const auto &NormalVelEdge      = State->NormalVelocity[0];
    const auto &ExactNormalVelEdge = ExactState->NormalVelocity[0];
-
-   ErrorMeasures ThickErrors;
-   computeErrors(ThickErrors, ThickCell, ExactThickCell, DefMesh, OnCell,
-                 NVertLevels);
 
    ErrorMeasures VelErrors;
    computeErrors(VelErrors, NormalVelEdge, ExactNormalVelEdge, DefMesh, OnEdge,
                  NVertLevels);
-
-   if (MachEnv::getDefault()->isMasterTask()) {
-      std::cout.precision(18);
-      std::cout << "MW: " << ThickErrors.LInf << " " << ThickErrors.L2
-                << std::endl;
-      std::cout << "MW: " << VelErrors.LInf << " " << VelErrors.L2 << std::endl;
-   }
-
-   OceanState::erase("Exact");
 
    return VelErrors;
 }
 
 //------------------------------------------------------------------------------
 // The initialization routine for time stepper testing
-int initTimeStepperTest(TimeStepperType Type, const std::string &mesh) {
+int initTimeStepperTest(const std::string &mesh) {
    int Err = 0;
 
    MachEnv::init(MPI_COMM_WORLD);
    MachEnv *DefEnv  = MachEnv::getDefault();
    MPI_Comm DefComm = DefEnv->getComm();
+
+   // default init
 
    int IOErr = IO::init(DefComm);
    if (IOErr != 0) {
@@ -151,60 +132,54 @@ int initTimeStepperTest(TimeStepperType Type, const std::string &mesh) {
       LOG_ERROR("TimeStepperTest: error initializing default mesh");
    }
 
-   const auto &Mesh = HorzMesh::getDefault();
-   MetaDim::create("NCells", Mesh->NCellsSize);
-   MetaDim::create("NVertices", Mesh->NVerticesSize);
-   MetaDim::create("NEdges", Mesh->NEdgesSize);
+   // non-default init
+
+   auto *DefMesh = HorzMesh::getDefault();
+   auto *DefHalo = Halo::getDefault();
+
+   MetaDim::create("NCells", DefMesh->NCellsSize);
+   MetaDim::create("NVertices", DefMesh->NVerticesSize);
+   MetaDim::create("NEdges", DefMesh->NEdgesSize);
    MetaDim::create("NVertLevels", NVertLevels);
 
-   int StateErr = OceanState::init();
-   if (StateErr != 0) {
+   const int NTimeLevels = 2;
+   auto *TestOceanState  = OceanState::create("TestState", DefMesh, DefHalo,
+                                              NVertLevels, NTimeLevels);
+   if (!TestOceanState) {
       Err++;
-      LOG_ERROR("TimeStepperTest: error initializing default state");
+      LOG_ERROR("TimeStepperTest: error creating test state");
    }
 
-   int AuxStateErr = AuxiliaryState::init();
-   if (AuxStateErr != 0) {
+   auto *TestAuxState =
+       AuxiliaryState::create("TestAuxState", DefMesh, NVertLevels);
+   if (!TestAuxState) {
       Err++;
-      LOG_ERROR("TimeStepperTest: error initializing default aux state");
+      LOG_ERROR("TimeStepperTest: error creating test auxiliary state");
    }
 
    Config Options;
-   Tendencies::create("TestTendencies", HorzMesh::getDefault(), NVertLevels,
-                      &Options, DecayThicknessTendency{},
-                      DecayVelocityTendency{});
-
-   TimeStepper::create("TestTimeStepper", Type,
-                       Tendencies::get("TestTendencies"),
-                       AuxiliaryState::getDefault(), HorzMesh::getDefault(),
-                       Halo::getDefault());
+   auto *TestTendencies =
+       Tendencies::create("TestTendencies", DefMesh, NVertLevels, &Options,
+                          DecayThicknessTendency{}, DecayVelocityTendency{});
+   if (!TestTendencies) {
+      Err++;
+      LOG_ERROR("TimeStepperTest: error creating test tendencies");
+   }
 
    return Err;
 }
 
-ErrorMeasures runWithTimeStep(Real TimeStep) {
-   int Err = 0;
-
-   Err += initState();
-
+void timeLoop(Real TimeEnd, Real TimeStep) {
    const auto *Stepper = TimeStepper::get("TestTimeStepper");
-   auto *State         = OceanState::getDefault();
+   auto *State         = OceanState::get("TestState");
 
-   const Real TimeEnd = 1;
-   const int NSteps   = std::ceil(TimeEnd / TimeStep);
-   TimeStep           = TimeEnd / NSteps;
-
-   // std::cout << "TimeStep: " << TimeStep << std::endl;
-   // std::cout << "NSteps: " << NSteps << std::endl;
+   const int NSteps = std::ceil(TimeEnd / TimeStep);
+   TimeStep         = TimeEnd / NSteps;
 
    for (int Step = 0; Step < NSteps; ++Step) {
       const Real Time = Step * TimeStep;
       Stepper->doStep(State, Time, TimeStep);
    }
-
-   createExactSolution(TimeEnd);
-
-   return computeErrors();
 }
 
 void finalizeTimeStepperTest() {
@@ -225,29 +200,85 @@ void finalizeTimeStepperTest() {
    MachEnv::removeAll();
 }
 
-int timeStepperTest(TimeStepperType Type,
-                    const std::string &MeshFile = "OmegaMesh.nc") {
-   int Err = initTimeStepperTest(Type, MeshFile);
+int testTimeStepper(const std::string &Name, TimeStepperType Type,
+                    Real ExpectedOrder, Real ATol) {
+   int Err = 0;
+
+   auto *DefMesh        = HorzMesh::getDefault();
+   auto *DefHalo        = Halo::getDefault();
+   auto *TestAuxState   = AuxiliaryState::get("TestAuxState");
+   auto *TestTendencies = Tendencies::get("TestTendencies");
+
+   auto *TestTimeStepper = TimeStepper::create(
+       "TestTimeStepper", Type, TestTendencies, TestAuxState, DefMesh, DefHalo);
+
+   if (!TestTimeStepper) {
+      Err++;
+      LOG_ERROR("TimeStepperTest: error creating test time stepper {}", Name);
+   }
+
+   int NRefinements = 2;
+   std::vector<ErrorMeasures> Errors(NRefinements);
+
+   const Real TimeEnd      = 2;
+   const Real BaseTimeStep = 0.2;
+
+   const static bool CallOnlyOnce = [=]() {
+      createExactSolution(TimeEnd);
+      return true;
+   }();
+
+   Real TimeStep = BaseTimeStep;
+   for (int RefLevel = 0; RefLevel < NRefinements; ++RefLevel) {
+      Err += initState();
+
+      timeLoop(TimeEnd, TimeStep);
+
+      Errors[RefLevel] = computeErrors();
+
+      TimeStep /= 2;
+   }
+
+   std::vector<Real> ConvRates(NRefinements - 1);
+   for (int RefLevel = 0; RefLevel < NRefinements - 1; ++RefLevel) {
+      ConvRates[RefLevel] =
+          std::log2(Errors[RefLevel].LInf / Errors[RefLevel + 1].LInf);
+   }
+
+   if (std::abs(ConvRates.back() - ExpectedOrder) > ATol) {
+      Err++;
+      LOG_ERROR(
+          "Wrong convergence rate for time stepper {}, got {:.3f}, expected {}",
+          Name, ConvRates.back(), ExpectedOrder);
+   }
+
+   TimeStepper::erase("TestTimeStepper");
+
+   return Err;
+}
+
+int timeStepperTest(const std::string &MeshFile = "OmegaMesh.nc") {
+
+   int Err = initTimeStepperTest(MeshFile);
+
    if (Err != 0) {
       LOG_CRITICAL("TimeStepperTest: Error initializing");
    }
 
-   int NRefinements = 2;
-   std::vector<Real> Errors(NRefinements);
+   Real ExpectedOrder = 4;
+   Real ATol          = 0.1;
+   Err += testTimeStepper("RungeKutta4", TimeStepperType::RungeKutta4,
+                          ExpectedOrder, ATol);
 
-   const Real BaseTimeStep = 0.2;
-
-   Real TimeStep = BaseTimeStep;
-   for (int RefLevel = 0; RefLevel < NRefinements; ++RefLevel) {
-      Errors[RefLevel] = runWithTimeStep(TimeStep).L2;
-      TimeStep /= 2;
-   }
-
-   std::cout << "Rate: " << std::log2(Errors[0] / Errors[1]) << std::endl;
+   ExpectedOrder = 1;
+   ATol          = 0.1;
+   Err += testTimeStepper("ForwardBackward", TimeStepperType::ForwardBackward,
+                          ExpectedOrder, ATol);
 
    if (Err == 0) {
       LOG_INFO("TimeStepperTest: Successful completion");
    }
+
    finalizeTimeStepperTest();
 
    return Err;
@@ -260,7 +291,7 @@ int main(int argc, char *argv[]) {
    MPI_Init(&argc, &argv);
    Kokkos::initialize(argc, argv);
 
-   RetVal += timeStepperTest(TimeStepperType::RungeKutta4);
+   RetVal += timeStepperTest();
 
    Kokkos::finalize();
    MPI_Finalize();
