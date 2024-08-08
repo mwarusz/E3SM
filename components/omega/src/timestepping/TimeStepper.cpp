@@ -1,6 +1,6 @@
 #include "TimeStepper.h"
 #include "ForwardBackwardStepper.h"
-#include "RK4Stepper.h"
+#include "RungeKutta4Stepper.h"
 
 namespace OMEGA {
 
@@ -34,7 +34,8 @@ TimeStepper *TimeStepper::create(const std::string &Name, TimeStepperType Type,
           new ForwardBackwardStepper(Name, Tend, AuxState, Mesh, MeshHalo);
       break;
    case TimeStepperType::RungeKutta4:
-      NewTimeStepper = new RK4Stepper(Name, Tend, AuxState, Mesh, MeshHalo);
+      NewTimeStepper =
+          new RungeKutta4Stepper(Name, Tend, AuxState, Mesh, MeshHalo);
       break;
    }
 
@@ -51,7 +52,7 @@ int TimeStepper::init() {
    auto *DefTend     = Tendencies::getDefault();
 
    TimeStepper::DefaultTimeStepper =
-       create("Default", TimeStepperType::RungeKutta4, DefTend, DefAuxState,
+       create("Default", TimeStepperType::ForwardBackward, DefTend, DefAuxState,
               DefMesh, DefHalo);
    return Err;
 }

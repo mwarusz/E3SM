@@ -5,10 +5,10 @@
 
 namespace OMEGA {
 
-class RK4Stepper : public TimeStepper {
+class RungeKutta4Stepper : public TimeStepper {
  public:
-   RK4Stepper(const std::string &Name, Tendencies *Tend,
-              AuxiliaryState *AuxState, HorzMesh *Mesh, Halo *MeshHalo);
+   RungeKutta4Stepper(const std::string &Name, Tendencies *Tend,
+                      AuxiliaryState *AuxState, HorzMesh *Mesh, Halo *MeshHalo);
 
    void doStep(OceanState *State, Real Time, Real TimeStep) const override;
 

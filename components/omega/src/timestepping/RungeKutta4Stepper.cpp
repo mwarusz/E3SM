@@ -1,9 +1,11 @@
-#include "RK4Stepper.h"
+#include "RungeKutta4Stepper.h"
 
 namespace OMEGA {
 
-RK4Stepper::RK4Stepper(const std::string &Name, Tendencies *Tend,
-                       AuxiliaryState *AuxState, HorzMesh *Mesh, Halo *MeshHalo)
+RungeKutta4Stepper::RungeKutta4Stepper(const std::string &Name,
+                                       Tendencies *Tend,
+                                       AuxiliaryState *AuxState, HorzMesh *Mesh,
+                                       Halo *MeshHalo)
     : TimeStepper(Name, TimeStepperType::RungeKutta4, Tend, AuxState, Mesh,
                   MeshHalo) {
 
@@ -27,7 +29,8 @@ RK4Stepper::RK4Stepper(const std::string &Name, Tendencies *Tend,
    RKC[3] = 1;
 }
 
-void RK4Stepper::doStep(OceanState *State, Real Time, Real TimeStep) const {
+void RungeKutta4Stepper::doStep(OceanState *State, Real Time,
+                                Real TimeStep) const {
 
    const int CurLevel  = 0;
    const int NextLevel = 1;
