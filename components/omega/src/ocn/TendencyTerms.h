@@ -365,9 +365,9 @@ class Tendencies {
    Tendencies(Tendencies &&)      = delete;
 
    // Mesh sizes
-   I4 NCellsOwned; ///< Number of cells owned by this task
-   I4 NEdgesOwned; ///< Number of edges owned by this task
-   I4 NChunks;     ///< Number of vertical level chunks
+   I4 NCellsAll; ///< Number of cells including full halo
+   I4 NEdgesAll; ///< Number of edges including full halo
+   I4 NChunks;   ///< Number of vertical level chunks
 
    // Pointer to default tendencies
    static Tendencies *DefaultTendencies;
