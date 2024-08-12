@@ -42,7 +42,8 @@ class TimeStepper {
    /// Remove all time steppers
    static void clear();
 
-   // these should be protected, they are public only because of CUDA limitations
+   // these should be protected, they are public only because of CUDA
+   // limitations
    void updateStateByTend(OceanState *State1, int TimeLevel1,
                           OceanState *State2, int TimeLevel2, Real Coeff) const;
    void updateThicknessByTend(OceanState *State1, int TimeLevel1,

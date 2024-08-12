@@ -291,7 +291,7 @@ class Tendencies {
                                   int TimeLevel, Real Time);
    void computeAllTendencies(OceanState *State, AuxiliaryState *AuxState,
                              int TimeLevel, Real Time);
-   
+
    void computeThicknessTendenciesOnly(OceanState *State,
                                        AuxiliaryState *AuxState, int TimeLevel,
                                        Real Time);
