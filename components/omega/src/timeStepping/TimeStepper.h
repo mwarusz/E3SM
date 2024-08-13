@@ -18,9 +18,6 @@ enum class TimeStepperType { ForwardBackward, RungeKutta4 };
 
 class TimeStepper {
  public:
-   std::string Name;
-   TimeStepperType Type;
-
    virtual ~TimeStepper() = default;
    virtual void doStep(OceanState *State, Real Time, Real TimeStep) const = 0;
 
@@ -42,6 +39,9 @@ class TimeStepper {
    /// Remove all time steppers
    static void clear();
 
+   std::string getName() const;
+   TimeStepperType getType() const;
+
    // these should be protected, they are public only because of CUDA
    // limitations
    void updateStateByTend(OceanState *State1, int TimeLevel1,
@@ -60,6 +60,9 @@ class TimeStepper {
                              Real Coeff) const;
 
  protected:
+   std::string Name;
+   TimeStepperType Type;
+
    Tendencies *Tend;
    AuxiliaryState *AuxState;
    HorzMesh *Mesh;
