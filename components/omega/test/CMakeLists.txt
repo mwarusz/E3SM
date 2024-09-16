@@ -317,6 +317,13 @@ add_omega_test(
     "-n;2"
 )
 
+add_omega_test(
+  STEADYZONAL_TEST
+  testSteadyZonal.exe
+  timeStepping/SteadyZonalTest.cpp
+    "-n;2"
+)
+
 ##################
 # Kokkos test
 ##################

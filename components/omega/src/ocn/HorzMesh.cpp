@@ -528,8 +528,10 @@ void HorzMesh::readBottomDepth() {
 
    int BottomDepthID;
    BottomDepthH = HostArray1DR8("BottomDepth", NCellsSize);
-   Err          = IO::readArray(BottomDepthH.data(), NCellsAll, "bottomDepth",
-                                MeshFileID, CellDecompR8, BottomDepthID);
+   deepCopy(BottomDepthH, 0);
+   // Err          = IO::readArray(BottomDepthH.data(), NCellsAll,
+   // "bottomDepth",
+   //                              MeshFileID, CellDecompR8, BottomDepthID);
    if (Err != 0)
       LOG_CRITICAL("HorzMesh: error reading bottomDepth");
 
@@ -619,22 +621,22 @@ void HorzMesh::readCoriolis() {
 
    int FCellID;
    FCellH = HostArray1DR8("FCell", NCellsSize);
-   Err    = IO::readArray(FCellH.data(), NCellsAll, "fCell", MeshFileID,
-                          CellDecompR8, FCellID);
+   // Err    = IO::readArray(FCellH.data(), NCellsAll, "fCell", MeshFileID,
+   //                        CellDecompR8, FCellID);
    if (Err != 0)
       LOG_CRITICAL("HorzMesh: error reading fCell");
 
    int FVertexID;
    FVertexH = HostArray1DR8("FVertex", NVerticesSize);
-   Err = IO::readArray(FVertexH.data(), NVerticesAll, "fVertex", MeshFileID,
-                       VertexDecompR8, FVertexID);
+   // Err = IO::readArray(FVertexH.data(), NVerticesAll, "fVertex", MeshFileID,
+   //                     VertexDecompR8, FVertexID);
    if (Err != 0)
       LOG_CRITICAL("HorzMesh: error reading fVertex");
 
    int FEdgeID;
    FEdgeH = HostArray1DR8("FEdge", NEdgesSize);
-   Err    = IO::readArray(FEdgeH.data(), NEdgesAll, "fEdge", MeshFileID,
-                          EdgeDecompR8, FEdgeID);
+   // Err    = IO::readArray(FEdgeH.data(), NEdgesAll, "fEdge", MeshFileID,
+   //                        EdgeDecompR8, FEdgeID);
    if (Err != 0)
       LOG_CRITICAL("HorzMesh: error reading fEdge");
 
