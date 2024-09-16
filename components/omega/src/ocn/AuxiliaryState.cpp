@@ -123,6 +123,8 @@ AuxiliaryState *AuxiliaryState::create(const std::string &Name,
    auto *NewAuxState = new AuxiliaryState(Name, Mesh, NVertLevels);
    AllAuxStates.emplace(Name, NewAuxState);
 
+   NewAuxState->LayerThicknessAux.FluxThickEdgeChoice = Center;
+
    return NewAuxState;
 }
 

@@ -506,7 +506,8 @@ void HorzMesh::readCoordinates() {
 //------------------------------------------------------------------------------
 // Read the cell-centered bottom depth
 void HorzMesh::readBottomDepth() {
-   readCellArray(BottomDepthH, "bottomDepth");
+   BottomDepthH = HostArray1DReal("BottomDepth", NCellsSize);
+   // readCellArray(BottomDepthH, "bottomDepth");
 } // end readDepth
 
 //------------------------------------------------------------------------------
@@ -572,12 +573,14 @@ void HorzMesh::readCoriolis() {
 
    int Err;
 
-   readCellArray(FCellH, "fCell");
+   FCellH = HostArray1DReal("FCell", NCellsSize);
+   // readCellArray(FCellH, "fCell");
 
-   readVertexArray(FVertexH, "fVertex");
+   FVertexH = HostArray1DReal("FVertex", NVerticesSize);
+   // readVertexArray(FVertexH, "fVertex");
 
-   readEdgeArray(FEdgeH, "fEdge");
-
+   FEdgeH = HostArray1DReal("FEdge", NEdgesSize);
+   // readEdgeArray(FEdgeH, "fEdge");
 } // end readCoriolis
 
 //------------------------------------------------------------------------------
