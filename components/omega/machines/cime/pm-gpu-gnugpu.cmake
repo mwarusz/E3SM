@@ -1,0 +1,5 @@
+set(OMEGA_CIME_MACHINE pm-gpu CACHE STRING "")
+set(OMEGA_CIME_COMPILER gnugpu CACHE STRING "")
+set(OMEGA_BUILD_TYPE Release CACHE STRING "")
+set(OMEGA_BUILD_TEST ON CACHE BOOL "")
+set(OMEGA_PARMETIS_ROOT /global/cfs/cdirs/e3sm/software/polaris/pm-gpu/spack/dev_polaris_0_5_0_gnugpu_mpich/var/spack/environments/dev_polaris_0_5_0_gnugpu_mpich/.spack-env/view CACHE STRING "")
