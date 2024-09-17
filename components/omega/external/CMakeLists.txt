@@ -2,6 +2,12 @@
 
 include(ExternalProject)
 
+if(APPLE AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(GSW_LFLAGS "-dynamiclib -install_name ${OMEGA_BUILD_DIR}/external/GSW-C/libgswteos-10.so")
+else()
+  set(GSW_LFLAGS "-shared -fPIC")
+endif()
+
 # Add GSW-C project
 ExternalProject_Add(
     gswteos
@@ -10,7 +16,7 @@ ExternalProject_Add(
 		${OMEGA_SOURCE_DIR}/external/GSW-C
 		${OMEGA_BUILD_DIR}/external/GSW-C
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND make CC=${CMAKE_C_COMPILER} all
+    BUILD_COMMAND make LFLAGS=${GSW_LFLAGS} CC=${CMAKE_C_COMPILER} all
     INSTALL_COMMAND ""
     BUILD_BYPRODUCTS ${OMEGA_BUILD_DIR}/external/GSW-C/libgswteos-10.so
 		${OMEGA_BUILD_DIR}/external/GSW-C/gsw_check
