@@ -41,7 +41,7 @@ target_link_libraries(
 if(GKlib_FOUND)
     target_link_libraries(
         OmegaLibFlags
-        PUBLIC
+        INTERFACE
         gklib
     )
 endif()
