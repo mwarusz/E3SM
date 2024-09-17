@@ -281,7 +281,7 @@ add_omega_test(
     TEND_PLANE_TEST
     testTendencyTermsPlane.exe
     ocn/TendencyTermsTest.cpp
-    "-n 8;--cpu-bind=cores"
+    "-n;8"
 )
 target_compile_definitions(
   testTendencyTermsPlane.exe
@@ -301,7 +301,7 @@ add_omega_test(
   TEND_SPHERE_TEST
     testTendencyTermsSphere.exe
     ocn/TendencyTermsTest.cpp
-    "-n 8;--cpu-bind=cores"
+    "-n;8"
 )
 target_compile_definitions(
   testTendencyTermsSphere.exe
@@ -350,7 +350,7 @@ add_omega_test(
     REDUCTIONS_TEST
     testReductions.exe
     base/ReductionsTest.cpp
-    "-n;2;--cpu-bind=cores"
+    "-n;2"
 )
 
 ###################
