@@ -63,7 +63,7 @@ constexpr int NVertLevels = 64;
 int initState() {
    int Err = 0;
 
-   auto *Mesh  = HorzMesh::getDefault();
+   auto *Mesh  = HorzMesh::get("TestMesh");
    auto *State = OceanState::get("TestState");
 
    const auto &LayerThickCell = State->LayerThickness[0];
@@ -120,13 +120,13 @@ int initState() {
 int createExactSolution(Real TimeEnd) {
    int Err = 0;
 
-   auto *DefHalo = Halo::getDefault();
-   auto *DefMesh = HorzMesh::getDefault();
+   auto *DefHalo  = Halo::getDefault();
+   auto *TestMesh = HorzMesh::get("TestMesh");
 
    auto *TestState = OceanState::get("TestState");
 
    auto *ExactState =
-       OceanState::create("Exact", DefMesh, DefHalo, NVertLevels, 1);
+       OceanState::create("Exact", TestMesh, DefHalo, NVertLevels, 1);
 
    const auto &ExactLayerThickCell = ExactState->LayerThickness[0];
    const auto &ExactNormalVelEdge  = ExactState->NormalVelocity[0];
@@ -141,7 +141,7 @@ int createExactSolution(Real TimeEnd) {
 }
 
 ErrorMeasures computeErrors() {
-   const auto *DefMesh = HorzMesh::getDefault();
+   const auto *TestMesh = HorzMesh::get("TestMesh");
 
    const auto *State      = OceanState::get("TestState");
    const auto *ExactState = OceanState::get("Exact");
@@ -153,24 +153,24 @@ ErrorMeasures computeErrors() {
    const auto &ExactLayerThickCell = ExactState->LayerThickness[0];
 
    ErrorMeasures VelErrors;
-   computeErrors(VelErrors, NormalVelEdge, ExactNormalVelEdge, DefMesh, OnEdge,
+   computeErrors(VelErrors, NormalVelEdge, ExactNormalVelEdge, TestMesh, OnEdge,
                  NVertLevels);
 
    ErrorMeasures ThickErrors;
-   computeErrors(ThickErrors, LayerThickCell, ExactLayerThickCell, DefMesh,
+   computeErrors(ThickErrors, LayerThickCell, ExactLayerThickCell, TestMesh,
                  OnCell, NVertLevels);
 
    return ThickErrors;
 }
 
 Real minDcEdge() {
-   const auto *DefMesh = HorzMesh::getDefault();
+   const auto *TestMesh = HorzMesh::get("TestMesh");
 
-   const auto &DcEdge = DefMesh->DcEdge;
+   const auto &DcEdge = TestMesh->DcEdge;
 
    Real MinDcEdgeLoc;
    parallelReduce(
-       {DefMesh->NEdgesOwned},
+       {TestMesh->NEdgesOwned},
        KOKKOS_LAMBDA(int IEdge, Real &Accum) {
           Accum = Kokkos::min(DcEdge(IEdge), Accum);
        },
@@ -221,24 +221,20 @@ int initTimeStepperTest(const std::string &mesh) {
       LOG_ERROR("TimeStepperTest: error initializing default halo");
    }
 
-   int MeshErr = HorzMesh::init();
-   if (MeshErr != 0) {
-      Err++;
-      LOG_ERROR("TimeStepperTest: error initializing default mesh");
-   }
-
    // Non-default init
    // Creating non-default state and auxiliary state to use only one vertical
    // level
 
-   auto *DefMesh = HorzMesh::getDefault();
-   auto *DefHalo = Halo::getDefault();
+   auto *DefDecomp = Decomp::getDefault();
+   auto *DefHalo   = Halo::getDefault();
+
+   auto *TestMesh = HorzMesh::create("TestMesh", DefDecomp, NVertLevels);
 
    // Horz dimensions created in HorzMesh
    auto VertDim = Dimension::create("NVertLevels", NVertLevels);
 
    const int NTimeLevels = 2;
-   auto *TestOceanState  = OceanState::create("TestState", DefMesh, DefHalo,
+   auto *TestOceanState  = OceanState::create("TestState", TestMesh, DefHalo,
                                               NVertLevels, NTimeLevels);
    if (!TestOceanState) {
       Err++;
@@ -246,7 +242,7 @@ int initTimeStepperTest(const std::string &mesh) {
    }
 
    auto *TestAuxState =
-       AuxiliaryState::create("TestAuxState", DefMesh, NVertLevels);
+       AuxiliaryState::create("TestAuxState", TestMesh, NVertLevels);
    if (!TestAuxState) {
       Err++;
       LOG_ERROR("TimeStepperTest: error creating test auxiliary state");
@@ -256,7 +252,7 @@ int initTimeStepperTest(const std::string &mesh) {
 
    // Creating non-default tendencies with custom velocity tendencies
    auto *TestTendencies =
-       Tendencies::create("TestTendencies", DefMesh, NVertLevels, &Options);
+       Tendencies::create("TestTendencies", TestMesh, NVertLevels, &Options);
    if (!TestTendencies) {
       Err++;
       LOG_ERROR("TimeStepperTest: error creating test tendencies");
@@ -326,15 +322,16 @@ void finalizeTimeStepperTest() {
 int testSteadyZonal(const std::string &Name, TimeStepperType Type) {
    int Err = 0;
 
-   auto *DefMesh        = HorzMesh::getDefault();
+   auto *TestMesh       = HorzMesh::get("TestMesh");
    auto *DefHalo        = Halo::getDefault();
    auto *TestAuxState   = AuxiliaryState::get("TestAuxState");
    auto *TestTendencies = Tendencies::get("TestTendencies");
 
    Calendar TestCalendar("TestCalendar", CalendarNoCalendar);
 
-   auto *TestTimeStepper = TimeStepper::create(
-       "TestTimeStepper", Type, TestTendencies, TestAuxState, DefMesh, DefHalo);
+   auto *TestTimeStepper =
+       TimeStepper::create("TestTimeStepper", Type, TestTendencies,
+                           TestAuxState, TestMesh, DefHalo);
 
    if (!TestTimeStepper) {
       Err++;
