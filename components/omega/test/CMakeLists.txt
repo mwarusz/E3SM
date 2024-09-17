@@ -70,7 +70,7 @@ function(add_omega_test test_name exe_name source_files mpi_args)
   else()
     add_test(
       NAME ${test_name}
-      COMMAND ../omega_env.sh ./${exe_name}
+      COMMAND ./${exe_name}
     )
   endif()
 
@@ -96,7 +96,7 @@ add_omega_test(
     DATA_TYPES_TEST
     testDataTypes.exe
     base/DataTypesTest.cpp
-    "-n;1"
+    "-n;1;"
 )
 
 ##################
@@ -107,7 +107,7 @@ add_omega_test(
     MACHINE_ENV_TEST
     testMachEnv.exe
     base/MachEnvTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -118,7 +118,7 @@ add_omega_test(
     BROADCAST_TEST
     testBroadcast.exe
     base/BroadcastTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -129,7 +129,7 @@ add_omega_test(
     LOGGING_TEST
     testLogging.exe
     infra/LoggingTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -152,7 +152,7 @@ add_omega_test(
     DECOMP_NTASK1_TEST
     testDecompNTask1.exe
     base/DecompTest.cpp
-    "-n;1"
+    "-n;1;"
 )
 
 ###########################
@@ -163,7 +163,7 @@ add_omega_test(
     DECOMP_NTASK8_TEST
     testDecompNTask8.exe
     base/DecompTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -174,7 +174,7 @@ add_omega_test(
     HALO_TEST
     testHalo.exe
     base/HaloTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -185,7 +185,7 @@ add_omega_test(
     DIMENSION_TEST
     testDimension.exe
     infra/DimensionTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ################
@@ -196,7 +196,7 @@ add_omega_test(
     HORZMESH_TEST
     testHorzMesh.exe
     ocn/HorzMeshTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 #######################
@@ -207,7 +207,7 @@ add_omega_test(
     HORZOPERATORS_PLANE_TEST
     testHorzOperatorsPlane.exe
     ocn/HorzOperatorsTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 target_compile_definitions(
   testHorzOperatorsPlane.exe
@@ -219,7 +219,7 @@ add_omega_test(
   HORZOPERATORS_SPHERE_TEST
     testHorzOperatorsSphere.exe
     ocn/HorzOperatorsTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 target_compile_definitions(
   testHorzOperatorsSphere.exe
@@ -234,7 +234,7 @@ add_omega_test(
   AUXVARS_PLANE_TEST
     testAuxiliaryVarsPlane.exe
     ocn/AuxiliaryVarsTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 target_compile_definitions(
   testAuxiliaryVarsPlane.exe
@@ -246,7 +246,7 @@ add_omega_test(
   AUXVARS_SPHERE_TEST
   testAuxiliaryVarsSphere.exe
     ocn/AuxiliaryVarsTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 target_compile_definitions(
   testAuxiliaryVarsSphere.exe
@@ -262,7 +262,7 @@ add_omega_test(
   AUXSTATE_TEST
     testAuxiliaryState.exe
     ocn/AuxiliaryStateTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 #############
@@ -273,7 +273,7 @@ add_omega_test(
     IO_TEST
     testIO.exe
     base/IOTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -284,7 +284,7 @@ add_omega_test(
     CONFIG_TEST
     testConfig.exe
     infra/ConfigTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -295,7 +295,7 @@ add_omega_test(
     FIELD_TEST
     testField.exe
     infra/FieldTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -306,7 +306,7 @@ add_omega_test(
     IOSTREAM_TEST
     testIOStream.exe
     infra/IOStreamTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 #####################
@@ -386,7 +386,7 @@ add_omega_test(
     TENDENCIES_TEST
     testTendencies.exe
     ocn/TendenciesTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -408,7 +408,7 @@ add_omega_test(
     STATE_TEST
     testState.exe
     ocn/StateTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -419,7 +419,7 @@ add_omega_test(
     TIMEMGR_TEST
     testTimeMgr.exe
     infra/TimeMgrTest.cpp
-    "-n;1"
+    "-n;1;"
 )
 
 ############################
@@ -459,7 +459,7 @@ add_omega_test(
   TIMESTEPPER_TEST
   testTimeStepper.exe
   timeStepping/TimeStepperTest.cpp
-    "-n;2"
+    "-n;2;"
 )
 
 #######################
@@ -488,7 +488,7 @@ add_omega_test(
     DRIVER_TEST
     testDriver.exe
     drivers/StandaloneDriverTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##################
@@ -499,7 +499,7 @@ add_omega_test(
     TRACERS_TEST
     testTracers.exe
     ocn/TracersTest.cpp
-    "-n;8"
+    "-n;8;"
 )
 
 ##########################
