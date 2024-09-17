@@ -153,7 +153,10 @@ endmacro()
 macro(init_standalone_build)
 
   # get cime configuration
-  read_cime_config()
+  if (OMEGA_SKIP_CIME)
+  else()
+    read_cime_config()
+  endif()
 
   # find compilers
   if(OMEGA_C_COMPILER)
