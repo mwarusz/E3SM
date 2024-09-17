@@ -58,7 +58,7 @@ target_link_libraries(
     gptl
     gswteos-10
     pacer
-    stdc++fs
+    # stdc++fs
     cpptrace::cpptrace
 )
 
