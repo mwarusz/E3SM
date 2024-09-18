@@ -392,8 +392,7 @@ int main(int argc, char *argv[]) {
    MPI_Init(&argc, &argv);
    Kokkos::initialize(argc, argv);
 
-   RetVal += timeStepperTest(
-       "/Users/mwarusz/mpas_meshes/icos-nw/icos-cvt-hi/icos960.nc");
+   RetVal += timeStepperTest("PerfMesh.nc");
 
    Kokkos::finalize();
    MPI_Finalize();

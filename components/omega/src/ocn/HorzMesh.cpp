@@ -524,7 +524,7 @@ void HorzMesh::readCoordinates() {
 // Read the cell-centered bottom depth
 void HorzMesh::readBottomDepth() {
 
-   I4 Err;
+   I4 Err = 0;
 
    int BottomDepthID;
    BottomDepthH = HostArray1DR8("BottomDepth", NCellsSize);
@@ -542,7 +542,7 @@ void HorzMesh::readBottomDepth() {
 // lengths (between centers and vertices), and edge angles
 void HorzMesh::readMeasurements() {
 
-   I4 Err;
+   I4 Err = 0;
 
    int AreaCellID;
    AreaCellH = HostArray1DR8("AreaCell", NCellsSize);
@@ -617,7 +617,7 @@ void HorzMesh::readWeights() {
 // Read the Coriolis parameter at the cells, edges, and vertices
 void HorzMesh::readCoriolis() {
 
-   int Err;
+   int Err = 0;
 
    int FCellID;
    FCellH = HostArray1DR8("FCell", NCellsSize);
