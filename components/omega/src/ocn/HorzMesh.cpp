@@ -507,6 +507,7 @@ void HorzMesh::readCoordinates() {
 // Read the cell-centered bottom depth
 void HorzMesh::readBottomDepth() {
    BottomDepthH = HostArray1DReal("BottomDepth", NCellsSize);
+   deepCopy(BottomDepthH, 0);
    // readCellArray(BottomDepthH, "bottomDepth");
 } // end readDepth
 
@@ -528,7 +529,7 @@ void HorzMesh::readMeasurements() {
    readCellArray(MeshDensityH, "meshDensity");
 
    // not using helper function since it kiteAreas is a 2d array
-   I4 Err;
+   I4 Err = 0;
 
    // Read into a temporary double precision array
    int KiteAreasOnVertexID;
@@ -571,7 +572,7 @@ void HorzMesh::readWeights() {
 // Read the Coriolis parameter at the cells, edges, and vertices
 void HorzMesh::readCoriolis() {
 
-   int Err;
+   int Err = 0;
 
    FCellH = HostArray1DReal("FCell", NCellsSize);
    // readCellArray(FCellH, "fCell");
