@@ -12,6 +12,10 @@
 #include "DataTypes.h"
 #include <utility>
 
+#ifdef OMEGA_USE_CALIPER
+#include <caliper/cali.h>
+#endif
+
 namespace OMEGA {
 
 #define OMEGA_SCOPE(a, b) auto &a = b
@@ -113,7 +117,6 @@ constexpr bool exec_is_gpu =
     !Kokkos::SpaceAccessibility<ExecSpace, Kokkos::HostSpace>::accessible;
 
 #ifdef OMEGA_USE_CALIPER
-#include <caliper/cali.h>
 inline void timer_start(char const *label) {
    if constexpr (exec_is_gpu) {
       Kokkos::fence();
