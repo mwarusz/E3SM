@@ -39,17 +39,18 @@ target_link_libraries(
     metis
 )
 
-if (${OMEGA_USE_CALIPER})
-  target_link_libraries(OmegaLibFlags INTERFACE caliper)
-  target_compile_definitions(OmegaLibFlags INTERFACE OMEGA_USE_CALIPER=1)
-endif()
-
 if(GKlib_FOUND)
     target_link_libraries(
         OmegaLibFlags
         INTERFACE
         gklib
     )
+endif()
+
+if (${OMEGA_USE_CALIPER})
+  	find_package(caliper REQUIRED)
+	target_link_libraries(OmegaLibFlags INTERFACE caliper)
+	target_compile_definitions(OmegaLibFlags INTERFACE OMEGA_USE_CALIPER=1)
 endif()
 
 # Add source files for the library
