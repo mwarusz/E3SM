@@ -30,6 +30,7 @@ macro(common)
   option(OMEGA_LOG_FLUSH "Turn on unbuffered logging (default OFF)." OFF)
   option(OMEGA_SINGLE_PRECISION "Use single precision real type." OFF)
   set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "Omega vector length")
+  option(OMEGA_USE_CALIPER "Use caliper" OFF)
 
   if(NOT DEFINED OMEGA_CXX_FLAGS)
     set(OMEGA_CXX_FLAGS "")
