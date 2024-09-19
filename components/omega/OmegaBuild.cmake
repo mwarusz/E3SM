@@ -29,6 +29,7 @@ macro(common)
   option(OMEGA_DEBUG "Turn on error message throwing (default OFF)." OFF)
   option(OMEGA_LOG_FLUSH "Turn on unbuffered logging (default OFF)." OFF)
   option(OMEGA_SINGLE_PRECISION "Use single precision real type." OFF)
+  set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "Omega vector length")
 
   if(NOT DEFINED OMEGA_CXX_FLAGS)
     set(OMEGA_CXX_FLAGS "")
@@ -213,6 +214,7 @@ macro(init_standalone_build)
   message(STATUS "OMEGA_C_COMPILER = ${OMEGA_C_COMPILER}")
   message(STATUS "OMEGA_CXX_COMPILER = ${OMEGA_CXX_COMPILER}")
   message(STATUS "OMEGA_Fortran_COMPILER = ${OMEGA_Fortran_COMPILER}")
+  message(STATUS "OMEGA_VECTOR_LENGTH = ${OMEGA_VECTOR_LENGTH}")
 
   # detect OMEGA_ARCH if not provided
   if("${OMEGA_ARCH}" STREQUAL "")
