@@ -298,10 +298,13 @@ void timeLoop(TimeInstant TimeStart, Real TimeEnd) {
    //
    Kokkos::Timer Timer;
    Timer.reset();
+   timer_start("time_loop");
    for (int Step = 0; Step < NSteps; ++Step) {
       const TimeInstant Time = TimeStart + Step * TimeStep;
       Stepper->doStep(State, Time);
    }
+   Kokkos::fence();
+   timer_stop("time_loop");
    std::cout << "RunTime: " << Timer.seconds() << std::endl;
 }
 

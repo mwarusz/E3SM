@@ -24,6 +24,10 @@ if (NOT TARGET Kokkos::kokkos)
 	)
 endif()
 
+if (${OMEGA_USE_CALIPER})
+  find_package(caliper REQUIRED)
+endif()
+
 # Add the Scorpio library
 if (NOT TARGET pioc)
 
