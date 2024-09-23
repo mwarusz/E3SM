@@ -108,6 +108,34 @@ class PotentialVortHAdvOnEdge {
       }
    }
 
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
+                                   const Array2DR8 &NormRVortEdge,
+                                   const Array2DR8 &NormFEdge,
+                                   const Array2DR8 &FluxLayerThickEdge,
+                                   const Array2DR8 &NormVelEdge) const {
+
+      const I4 KStart         = KChunk * VecLength;
+      Real VortTmp[VecLength] = {0};
+
+      for (int J = 0; J < NEdgesOnEdge(IEdge); ++J) {
+         I4 JEdge = EdgesOnEdge(IEdge, J);
+         for (int KVec = 0; KVec < VecLength; ++KVec) {
+            const I4 K    = KStart + KVec;
+            Real NormVort = (NormRVortEdge(IEdge, K) + NormFEdge(IEdge, K) +
+                             NormRVortEdge(JEdge, K) + NormFEdge(JEdge, K)) *
+                            0.5_Real;
+
+            VortTmp[KVec] += WeightsOnEdge(IEdge, J) *
+                             FluxLayerThickEdge(JEdge, K) *
+                             NormVelEdge(JEdge, K) * NormVort;
+         }
+      }
+
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         Tend[KVec] += VortTmp[KVec];
+      }
+   }
+
  private:
    Array1DI4 NEdgesOnEdge;
    Array2DI4 EdgesOnEdge;
@@ -138,6 +166,20 @@ class KEGradOnEdge {
       }
    }
 
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
+                                   const Array2DR8 &KECell) const {
+
+      const I4 KStart      = KChunk * VecLength;
+      const I4 JCell0      = CellsOnEdge(IEdge, 0);
+      const I4 JCell1      = CellsOnEdge(IEdge, 1);
+      const Real InvDcEdge = 1._Real / DcEdge(IEdge);
+
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const I4 K = KStart + KVec;
+         Tend[KVec] -= (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
+      }
+   }
+
  private:
    Array2DI4 CellsOnEdge;
    Array1DReal DcEdge;
@@ -165,6 +207,21 @@ class SSHGradOnEdge {
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(IEdge, K) -=
+             Grav * (SshCell(ICell1, K) - SshCell(ICell0, K)) * InvDcEdge;
+      }
+   }
+
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
+                                   const Array2DReal &SshCell) const {
+
+      const I4 KStart      = KChunk * VecLength;
+      const I4 ICell0      = CellsOnEdge(IEdge, 0);
+      const I4 ICell1      = CellsOnEdge(IEdge, 1);
+      const Real InvDcEdge = 1._Real / DcEdge(IEdge);
+
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const I4 K = KStart + KVec;
+         Tend[KVec] -=
              Grav * (SshCell(ICell1, K) - SshCell(ICell0, K)) * InvDcEdge;
       }
    }
@@ -214,6 +271,32 @@ class VelocityDiffusionOnEdge {
       }
    }
 
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
+                                   const Array2DR8 &DivCell,
+                                   const Array2DR8 &RVortVertex) const {
+
+      const I4 KStart = KChunk * VecLength;
+      const I4 ICell0 = CellsOnEdge(IEdge, 0);
+      const I4 ICell1 = CellsOnEdge(IEdge, 1);
+
+      const I4 IVertex0 = VerticesOnEdge(IEdge, 0);
+      const I4 IVertex1 = VerticesOnEdge(IEdge, 1);
+
+      const Real DcEdgeInv = 1._Real / DcEdge(IEdge);
+      const Real DvEdgeInv = 1._Real / DvEdge(IEdge);
+
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const I4 K = KStart + KVec;
+         const Real Del2U =
+             ((DivCell(ICell1, K) - DivCell(ICell0, K)) * DcEdgeInv -
+              (RVortVertex(IVertex1, K) - RVortVertex(IVertex0, K)) *
+                  DvEdgeInv);
+
+         Tend[KVec] +=
+             EdgeMask(IEdge, K) * ViscDel2 * MeshScalingDel2(IEdge) * Del2U;
+      }
+   }
+
  private:
    Array2DI4 CellsOnEdge;
    Array2DI4 VerticesOnEdge;
@@ -258,6 +341,32 @@ class VelocityHyperDiffOnEdge {
                   DvEdgeInv);
 
          Tend(IEdge, K) -=
+             EdgeMask(IEdge, K) * ViscDel4 * MeshScalingDel4(IEdge) * Del2U;
+      }
+   }
+
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
+                                   const Array2DR8 &Del2DivCell,
+                                   const Array2DR8 &Del2RVortVertex) const {
+
+      const I4 KStart = KChunk * VecLength;
+      const I4 ICell0 = CellsOnEdge(IEdge, 0);
+      const I4 ICell1 = CellsOnEdge(IEdge, 1);
+
+      const I4 IVertex0 = VerticesOnEdge(IEdge, 0);
+      const I4 IVertex1 = VerticesOnEdge(IEdge, 1);
+
+      const Real DcEdgeInv = 1._Real / DcEdge(IEdge);
+      const Real DvEdgeInv = 1._Real / DvEdge(IEdge);
+
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const I4 K = KStart + KVec;
+         const Real Del2U =
+             ((Del2DivCell(ICell1, K) - Del2DivCell(ICell0, K)) * DcEdgeInv -
+              (Del2RVortVertex(IVertex1, K) - Del2RVortVertex(IVertex0, K)) *
+                  DvEdgeInv);
+
+         Tend[KVec] -=
              EdgeMask(IEdge, K) * ViscDel4 * MeshScalingDel4(IEdge) * Del2U;
       }
    }

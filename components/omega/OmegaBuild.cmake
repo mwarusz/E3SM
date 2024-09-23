@@ -32,6 +32,7 @@ macro(common)
   set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "Omega vector length")
   option(OMEGA_USE_CALIPER "Use caliper" OFF)
   option(OMEGA_FUSED_VELTEND "Fused velocity tendency" OFF)
+  option(OMEGA_FUSED_ACCUM "Fused accum" OFF)
 
   if(NOT DEFINED OMEGA_CXX_FLAGS)
     set(OMEGA_CXX_FLAGS "")
