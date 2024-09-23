@@ -212,8 +212,10 @@ void TimeStepper::updateVelocityByTend(OceanState *State1, int TimeLevel1,
 void TimeStepper::updateStateByTend(OceanState *State1, int TimeLevel1,
                                     OceanState *State2, int TimeLevel2,
                                     TimeInterval Coeff) const {
+   timer_start("update_state");
    updateThicknessByTend(State1, TimeLevel1, State2, TimeLevel2, Coeff);
    updateVelocityByTend(State1, TimeLevel1, State2, TimeLevel2, Coeff);
+   timer_stop("update_state");
 }
 
 } // namespace OMEGA
