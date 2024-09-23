@@ -263,8 +263,10 @@ int initTimeStepperTest(const std::string &mesh) {
    TestTendencies->PotientialVortHAdv.Enabled = true;
    TestTendencies->KEGrad.Enabled             = true;
    TestTendencies->SSHGrad.Enabled            = true;
-   TestTendencies->VelocityDiffusion.Enabled  = false;
-   TestTendencies->VelocityHyperDiff.Enabled  = false;
+   TestTendencies->VelocityDiffusion.Enabled  = true;
+   TestTendencies->VelocityDiffusion.ViscDel2 = 0;
+   TestTendencies->VelocityHyperDiff.Enabled  = true;
+   TestTendencies->VelocityHyperDiff.ViscDel4 = 0;
 
    return Err;
 }
