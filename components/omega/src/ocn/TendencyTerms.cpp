@@ -241,6 +241,61 @@ void Tendencies::computeVelocityTendenciesOnly(
    OMEGA_SCOPE(LocVelocityDiffusion, VelocityDiffusion);
    OMEGA_SCOPE(LocVelocityHyperDiff, VelocityHyperDiff);
 
+#ifdef OMEGA_FUSED_VELTEND
+
+   // Compute potential vorticity horizontal advection
+   const Array2DReal &FluxLayerThickEdge =
+       AuxState->LayerThicknessAux.FluxLayerThickEdge;
+   const Array2DReal &NormRVortEdge = AuxState->VorticityAux.NormRelVortEdge;
+   const Array2DReal &NormFEdge     = AuxState->VorticityAux.NormPlanetVortEdge;
+   const Array2DReal &NormVelEdge   = State->NormalVelocity[VelTimeLevel];
+
+   const Array2DReal &KECell      = AuxState->KineticAux.KineticEnergyCell;
+   const Array2DReal &SSHCell     = AuxState->LayerThicknessAux.SshCell;
+   const Array2DReal &DivCell     = AuxState->KineticAux.VelocityDivCell;
+   const Array2DReal &RVortVertex = AuxState->VorticityAux.RelVortVertex;
+   const Array2DReal &Del2DivCell = AuxState->VelocityDel2Aux.Del2DivCell;
+   const Array2DReal &Del2RVortVertex =
+       AuxState->VelocityDel2Aux.Del2RelVortVertex;
+
+   parallelFor(
+       {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          const int KStart = KChunk * VecLength;
+          for (int KVec = 0; KVec < VecLength; ++KVec) {
+             const int K                     = KStart + KVec;
+             LocNormalVelocityTend(IEdge, K) = 0;
+          }
+
+          if (LocPotientialVortHAdv.Enabled) {
+             LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
+                                   NormRVortEdge, NormFEdge, FluxLayerThickEdge,
+                                   NormVelEdge);
+          }
+
+          if (LocKEGrad.Enabled) {
+             LocKEGrad(LocNormalVelocityTend, IEdge, KChunk, KECell);
+          }
+
+          if (LocSSHGrad.Enabled) {
+             LocSSHGrad(LocNormalVelocityTend, IEdge, KChunk, SSHCell);
+          }
+
+          if (LocVelocityDiffusion.Enabled) {
+             LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk, DivCell,
+                                  RVortVertex);
+          }
+
+          if (LocVelocityHyperDiff.Enabled) {
+             LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
+                                  Del2DivCell, Del2RVortVertex);
+          }
+       });
+
+   if (CustomVelocityTend) {
+      CustomVelocityTend(LocNormalVelocityTend, State, AuxState, ThickTimeLevel,
+                         VelTimeLevel, Time);
+   }
+#else
    deepCopy(LocNormalVelocityTend, 0);
 
    // Compute potential vorticity horizontal advection
@@ -303,6 +358,7 @@ void Tendencies::computeVelocityTendenciesOnly(
       CustomVelocityTend(LocNormalVelocityTend, State, AuxState, ThickTimeLevel,
                          VelTimeLevel, Time);
    }
+#endif
 
 } // end velocity tendency compute
 
