@@ -261,6 +261,37 @@ void Tendencies::computeVelocityTendenciesOnly(
    parallelFor(
        {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
           const int KStart = KChunk * VecLength;
+#ifdef OMEGA_FUSED_ACCUM
+          Real NormalVelTendAccum[VecLength] = {0};
+          if (LocPotientialVortHAdv.Enabled) {
+             LocPotientialVortHAdv(NormalVelTendAccum, IEdge, KChunk,
+                                   NormRVortEdge, NormFEdge, FluxLayerThickEdge,
+                                   NormVelEdge);
+          }
+
+          if (LocKEGrad.Enabled) {
+             LocKEGrad(NormalVelTendAccum, IEdge, KChunk, KECell);
+          }
+
+          if (LocSSHGrad.Enabled) {
+             LocSSHGrad(NormalVelTendAccum, IEdge, KChunk, SSHCell);
+          }
+
+          if (LocVelocityDiffusion.Enabled) {
+             LocVelocityDiffusion(NormalVelTendAccum, IEdge, KChunk, DivCell,
+                                  RVortVertex);
+          }
+
+          if (LocVelocityHyperDiff.Enabled) {
+             LocVelocityHyperDiff(NormalVelTendAccum, IEdge, KChunk,
+                                  Del2DivCell, Del2RVortVertex);
+          }
+
+          for (int KVec = 0; KVec < VecLength; ++KVec) {
+             const int K                     = KStart + KVec;
+             LocNormalVelocityTend(IEdge, K) = NormalVelTendAccum[KVec];
+          }
+#else
           for (int KVec = 0; KVec < VecLength; ++KVec) {
              const int K                     = KStart + KVec;
              LocNormalVelocityTend(IEdge, K) = 0;
@@ -289,6 +320,7 @@ void Tendencies::computeVelocityTendenciesOnly(
              LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
                                   Del2DivCell, Del2RVortVertex);
           }
+#endif
        });
 
    if (CustomVelocityTend) {

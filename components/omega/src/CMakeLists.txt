@@ -28,6 +28,13 @@ if (OMEGA_FUSED_VELTEND)
       OMEGA_FUSED_VELTEND=1
   )
 endif()
+if (OMEGA_FUSED_ACCUM)
+  target_compile_definitions(
+      OmegaLibFlags
+      INTERFACE
+      OMEGA_FUSED_ACCUM=1
+  )
+endif()
 
 target_link_options(
     OmegaLibFlags
