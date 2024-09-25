@@ -18,7 +18,7 @@ function(add_omega_test test_name exe_name source_files mpi_args)
     OmegaLibFlags
   )
 
-  set_target_properties(${exe_name} PROPERTIES LINKER_LANGUAGE C)
+  #set_target_properties(${exe_name} PROPERTIES LINKER_LANGUAGE C)
 
   # Add the test command
   if (mpi_args)
