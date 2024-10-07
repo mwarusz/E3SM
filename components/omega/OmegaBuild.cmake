@@ -28,6 +28,7 @@ macro(common)
 
   option(OMEGA_DEBUG "Turn on error message throwing (default OFF)." OFF)
   option(OMEGA_LOG_FLUSH "Turn on unbuffered logging (default OFF)." OFF)
+  option(OMEGA_SINGLE_PRECISION "Use single precision real type." OFF)
 
   if(NOT DEFINED OMEGA_CXX_FLAGS)
     set(OMEGA_CXX_FLAGS "")
@@ -258,6 +259,13 @@ macro(init_standalone_build)
   endif()
 
   message(STATUS "OMEGA_ARCH = ${OMEGA_ARCH}")
+
+
+  if (${OMEGA_SINGLE_PRECISION} STREQUAL "ON")
+    message(STATUS "OMEGA_PRECISION = SINGLE")
+  else()
+    message(STATUS "OMEGA_PRECISION = DOUBLE")
+  endif()
 
   # create a env script
   set(_EnvScript ${OMEGA_BUILD_DIR}/omega_env.sh)
