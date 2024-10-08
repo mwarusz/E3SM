@@ -109,10 +109,10 @@ class PotentialVortHAdvOnEdge {
    }
 
    KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
-                                   const Array2DR8 &NormRVortEdge,
-                                   const Array2DR8 &NormFEdge,
-                                   const Array2DR8 &FluxLayerThickEdge,
-                                   const Array2DR8 &NormVelEdge) const {
+                                   const Array2DReal &NormRVortEdge,
+                                   const Array2DReal &NormFEdge,
+                                   const Array2DReal &FluxLayerThickEdge,
+                                   const Array2DReal &NormVelEdge) const {
 
       const I4 KStart         = KChunk * VecLength;
       Real VortTmp[VecLength] = {0};
@@ -167,7 +167,7 @@ class KEGradOnEdge {
    }
 
    KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
-                                   const Array2DR8 &KECell) const {
+                                   const Array2DReal &KECell) const {
 
       const I4 KStart      = KChunk * VecLength;
       const I4 JCell0      = CellsOnEdge(IEdge, 0);
@@ -272,8 +272,8 @@ class VelocityDiffusionOnEdge {
    }
 
    KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
-                                   const Array2DR8 &DivCell,
-                                   const Array2DR8 &RVortVertex) const {
+                                   const Array2DReal &DivCell,
+                                   const Array2DReal &RVortVertex) const {
 
       const I4 KStart = KChunk * VecLength;
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
@@ -346,8 +346,8 @@ class VelocityHyperDiffOnEdge {
    }
 
    KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
-                                   const Array2DR8 &Del2DivCell,
-                                   const Array2DR8 &Del2RVortVertex) const {
+                                   const Array2DReal &Del2DivCell,
+                                   const Array2DReal &Del2RVortVertex) const {
 
       const I4 KStart = KChunk * VecLength;
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
