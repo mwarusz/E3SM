@@ -33,6 +33,12 @@ using Real = float;
 using Real = double;
 #endif
 
+#ifdef GEOM_SINGLE_PRECISION
+using GeomReal = float;
+#else
+using GeomReal = double;
+#endif
+
 // user-defined literal for generic reals
 KOKKOS_INLINE_FUNCTION constexpr Real operator""_Real(long double x) {
    return x;

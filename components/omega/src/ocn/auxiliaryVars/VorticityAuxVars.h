@@ -83,12 +83,12 @@ class VorticityAuxVars {
    I4 VertexDegree;
    Array2DI4 CellsOnVertex;
    Array2DI4 EdgesOnVertex;
-   Array2DReal EdgeSignOnVertex;
-   Array1DReal DcEdge;
-   Array2DReal KiteAreasOnVertex;
-   Array1DReal AreaTriangle;
+   Array2DGeomReal EdgeSignOnVertex;
+   Array1DGeomReal DcEdge;
+   Array2DGeomReal KiteAreasOnVertex;
+   Array1DGeomReal AreaTriangle;
    Array2DI4 VerticesOnEdge;
-   Array1DReal FVertex;
+   Array1DGeomReal FVertex;
 };
 
 } // namespace OMEGA

@@ -95,15 +95,15 @@ class VelocityDel2AuxVars {
  private:
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
-   Array2DReal EdgeSignOnCell;
-   Array1DReal DcEdge;
-   Array1DReal DvEdge;
-   Array1DReal AreaCell;
+   Array2DGeomReal EdgeSignOnCell;
+   Array1DGeomReal DcEdge;
+   Array1DGeomReal DvEdge;
+   Array1DGeomReal AreaCell;
    Array2DI4 EdgesOnVertex;
    Array2DI4 CellsOnEdge;
    Array2DI4 VerticesOnEdge;
-   Array2DReal EdgeSignOnVertex;
-   Array1DReal AreaTriangle;
+   Array2DGeomReal EdgeSignOnVertex;
+   Array1DGeomReal AreaTriangle;
    I4 VertexDegree;
 };
 

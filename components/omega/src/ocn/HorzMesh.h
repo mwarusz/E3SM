@@ -35,10 +35,12 @@ class HorzMesh {
 
    void createDimensions(Decomp *MeshDecomp);
 
-   void readVertexArray(HostArray1DReal &VertexArrayH,
+   void readVertexArray(HostArray1DGeomReal &VertexArrayH,
                         const std::string &MPASName);
-   void readEdgeArray(HostArray1DReal &EdgeArrayH, const std::string &MPASName);
-   void readCellArray(HostArray1DReal &CellArrayH, const std::string &MPASName);
+   void readEdgeArray(HostArray1DGeomReal &EdgeArrayH,
+                      const std::string &MPASName);
+   void readCellArray(HostArray1DGeomReal &CellArrayH,
+                      const std::string &MPASName);
 
    void readCoordinates();
 
@@ -154,106 +156,118 @@ class HorzMesh {
 
    // Coordinates
 
-   HostArray1DReal XCellH;   ///< X Coordinates of cell centers (m)
-   HostArray1DReal YCellH;   ///< Y Coordinates of cell centers (m)
-   HostArray1DReal ZCellH;   ///< Z Coordinates of cell centers (m)
-   HostArray1DReal LonCellH; ///< Longitude location of cell centers (radians)
-   HostArray1DReal LatCellH; ///< Latitude location of cell centers (radians)
+   HostArray1DGeomReal XCellH; ///< X Coordinates of cell centers (m)
+   HostArray1DGeomReal YCellH; ///< Y Coordinates of cell centers (m)
+   HostArray1DGeomReal ZCellH; ///< Z Coordinates of cell centers (m)
+   HostArray1DGeomReal
+       LonCellH; ///< Longitude location of cell centers (radians)
+   HostArray1DGeomReal
+       LatCellH; ///< Latitude location of cell centers (radians)
 
-   HostArray1DReal XEdgeH;   ///< X Coordinate of edge midpoints (m)
-   HostArray1DReal YEdgeH;   ///< Y Coordinate of edge midpoints (m)
-   HostArray1DReal ZEdgeH;   ///< Z Coordinate of edge midpoints (m)
-   HostArray1DReal LonEdgeH; ///< Longitude location of edge midpoints (radians)
-   HostArray1DReal LatEdgeH; ///< Latitude location of edge midpoints (radians)
+   HostArray1DGeomReal XEdgeH; ///< X Coordinate of edge midpoints (m)
+   HostArray1DGeomReal YEdgeH; ///< Y Coordinate of edge midpoints (m)
+   HostArray1DGeomReal ZEdgeH; ///< Z Coordinate of edge midpoints (m)
+   HostArray1DGeomReal
+       LonEdgeH; ///< Longitude location of edge midpoints (radians)
+   HostArray1DGeomReal
+       LatEdgeH; ///< Latitude location of edge midpoints (radians)
 
-   HostArray1DReal XVertexH;   ///< X Coordinate of vertices (m)
-   HostArray1DReal YVertexH;   ///< Y Coordinate of vertices (m)
-   HostArray1DReal ZVertexH;   ///< Z Coordinate of vertices (m)
-   HostArray1DReal LonVertexH; ///< Longitude location of vertices (radians)
-   HostArray1DReal LatVertexH; ///< Latitude location of vertices (radians)
+   HostArray1DGeomReal XVertexH;   ///< X Coordinate of vertices (m)
+   HostArray1DGeomReal YVertexH;   ///< Y Coordinate of vertices (m)
+   HostArray1DGeomReal ZVertexH;   ///< Z Coordinate of vertices (m)
+   HostArray1DGeomReal LonVertexH; ///< Longitude location of vertices (radians)
+   HostArray1DGeomReal LatVertexH; ///< Latitude location of vertices (radians)
 
    // Mesh measurements
 
-   Array1DReal AreaCell;      ///< Area of each cell (m^2)
-   HostArray1DReal AreaCellH; ///< Area of each cell (m^2)
+   Array1DGeomReal AreaCell;      ///< Area of each cell (m^2)
+   HostArray1DGeomReal AreaCellH; ///< Area of each cell (m^2)
 
-   Array1DReal AreaTriangle; ///< Area of each triangle in the dual grid (m^2)
-   HostArray1DReal
+   Array1DGeomReal
+       AreaTriangle; ///< Area of each triangle in the dual grid (m^2)
+   HostArray1DGeomReal
        AreaTriangleH; ///< Area of each triangle in the dual grid (m^2)
 
-   Array2DReal
+   Array2DGeomReal
        KiteAreasOnVertex; ///< Area of the portions of each dual cell that
                           ///  are part of each cellsOnVertex (m^2)
-   HostArray2DReal
+   HostArray2DGeomReal
        KiteAreasOnVertexH; ///< Area of the portions of each dual cell that
                            ///  are part of each cellsOnVertex (m^2)
 
-   Array1DReal
+   Array1DGeomReal
        DvEdge; ///< Length of each edge, computed as the distance between
                ///  verticesOnEdge (m)
-   HostArray1DReal DvEdgeH; ///< Length of each edge, computed as the distance
-                            ///  between verticesOnEdge (m)
+   HostArray1DGeomReal
+       DvEdgeH; ///< Length of each edge, computed as the distance
+                ///  between verticesOnEdge (m)
 
-   Array1DReal
+   Array1DGeomReal
        DcEdge; ///< Length of each edge, computed as the distance between
                ///  CellsOnEdge (m)
-   HostArray1DReal DcEdgeH; ///< Length of each edge, computed as the distance
-                            ///  between CellsOnEdge (m)
+   HostArray1DGeomReal
+       DcEdgeH; ///< Length of each edge, computed as the distance
+                ///  between CellsOnEdge (m)
 
-   Array1DReal AngleEdge; ///< Angle the edge normal makes with local eastward
-                          ///  direction (radians)
-   HostArray1DReal AngleEdgeH; ///< Angle the edge normal makes with local
-                               ///  eastward direction (radians)
+   Array1DGeomReal
+       AngleEdge; ///< Angle the edge normal makes with local eastward
+                  ///  direction (radians)
+   HostArray1DGeomReal AngleEdgeH; ///< Angle the edge normal makes with local
+                                   ///  eastward direction (radians)
 
-   HostArray1DReal
+   HostArray1DGeomReal
        MeshDensityH; ///< Value of density function used to generate a
                      ///  particular mesh at cell centers
 
    // Weights
 
-   Array2DReal
+   Array2DGeomReal
        WeightsOnEdge; ///< Reconstruction weights associated with each of
                       ///  the edgesOnEdge
-   HostArray2DReal WeightsOnEdgeH; ///< Reconstruction weights associated with
-                                   ///  each of the edgesOnEdge
+   HostArray2DGeomReal
+       WeightsOnEdgeH; ///< Reconstruction weights associated with
+                       ///  each of the edgesOnEdge
 
    // Coriolis
 
-   Array1DReal FEdge;      ///< Coriolis parameter at edges (radians s^-1)
-   HostArray1DReal FEdgeH; ///< Coriolis parameter at edges (radians s^-1)
+   Array1DGeomReal FEdge;      ///< Coriolis parameter at edges (radians s^-1)
+   HostArray1DGeomReal FEdgeH; ///< Coriolis parameter at edges (radians s^-1)
 
-   Array1DReal FCell; ///< Coriolis parameter at cell centers (radians s^-1)
-   HostArray1DReal
+   Array1DGeomReal FCell; ///< Coriolis parameter at cell centers (radians s^-1)
+   HostArray1DGeomReal
        FCellH; ///< Coriolis parameter at cell centers (radians s^-1)
 
-   Array1DReal FVertex;      ///< Coriolis parameter at vertices (radians s^-1)
-   HostArray1DReal FVertexH; ///< Coriolis parameter at vertices (radians s^-1)
+   Array1DGeomReal FVertex; ///< Coriolis parameter at vertices (radians s^-1)
+   HostArray1DGeomReal
+       FVertexH; ///< Coriolis parameter at vertices (radians s^-1)
 
    // Depth
 
-   Array1DReal BottomDepth;      ///< Depth of the bottom of the ocean (m)
-   HostArray1DReal BottomDepthH; ///< Depth of the bottom of the ocean (m)
+   Array1DGeomReal BottomDepth;      ///< Depth of the bottom of the ocean (m)
+   HostArray1DGeomReal BottomDepthH; ///< Depth of the bottom of the ocean (m)
 
    // Edge sign
 
-   Array2DReal EdgeSignOnCell;      ///< Sign of vector connecting cells
-   HostArray2DReal EdgeSignOnCellH; ///< Sign of vector connecting cells
+   Array2DGeomReal EdgeSignOnCell;      ///< Sign of vector connecting cells
+   HostArray2DGeomReal EdgeSignOnCellH; ///< Sign of vector connecting cells
 
-   Array2DReal EdgeSignOnVertex;      ///< Sign of vector connecting vertices
-   HostArray2DReal EdgeSignOnVertexH; ///< Sign of vector connecting vertices
+   Array2DGeomReal EdgeSignOnVertex; ///< Sign of vector connecting vertices
+   HostArray2DGeomReal
+       EdgeSignOnVertexH; ///< Sign of vector connecting vertices
 
    // Masks
-   Array2DReal EdgeMask;      ///< Mask to determine if computations should be
-                              ///  done on edge
-   HostArray2DReal EdgeMaskH; ///< Mask to determine if computations should be
-                              ///  done on edge
+   Array2DGeomReal EdgeMask; ///< Mask to determine if computations should be
+                             ///  done on edge
+   HostArray2DGeomReal
+       EdgeMaskH; ///< Mask to determine if computations should be
+                  ///  done on edge
 
    // Mesh scaling
-   Array1DReal MeshScalingDel2;      /// Coef to Laplacian mixing terms
-   HostArray1DReal MeshScalingDel2H; /// Coef to Laplacian mixing terms
+   Array1DGeomReal MeshScalingDel2;      /// Coef to Laplacian mixing terms
+   HostArray1DGeomReal MeshScalingDel2H; /// Coef to Laplacian mixing terms
 
-   Array1DReal MeshScalingDel4;      /// Coef to biharmonic mixing terms
-   HostArray1DReal MeshScalingDel4H; /// Coef to biharmonic mixing terms
+   Array1DGeomReal MeshScalingDel4;      /// Coef to biharmonic mixing terms
+   HostArray1DGeomReal MeshScalingDel4H; /// Coef to biharmonic mixing terms
 
    // Methods
 

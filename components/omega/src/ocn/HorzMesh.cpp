@@ -405,7 +405,7 @@ void HorzMesh::finalizeParallelIO() {
 } // end finalizeParallelIO
 
 // Read 1D vertex array
-void HorzMesh::readVertexArray(HostArray1DReal &VertexArrayH,
+void HorzMesh::readVertexArray(HostArray1DGeomReal &VertexArrayH,
                                const std::string &MPASName) {
    int Err;
 
@@ -423,12 +423,12 @@ void HorzMesh::readVertexArray(HostArray1DReal &VertexArrayH,
       LOG_CRITICAL("HorzMesh: error reading {}", MPASName);
 
    // Create host array of desired precision and copy the read data into it
-   VertexArrayH = HostArray1DReal(OmegaName + "H", NVerticesSize);
+   VertexArrayH = HostArray1DGeomReal(OmegaName + "H", NVerticesSize);
    deepCopy(VertexArrayH, TmpArrayR8);
 }
 
 // Read 1D edge array
-void HorzMesh::readEdgeArray(HostArray1DReal &EdgeArrayH,
+void HorzMesh::readEdgeArray(HostArray1DGeomReal &EdgeArrayH,
                              const std::string &MPASName) {
    int Err;
 
@@ -446,12 +446,12 @@ void HorzMesh::readEdgeArray(HostArray1DReal &EdgeArrayH,
       LOG_CRITICAL("HorzMesh: error reading {}", MPASName);
 
    // Create host array of desired precision and copy the read data into it
-   EdgeArrayH = HostArray1DReal(OmegaName + "H", NEdgesSize);
+   EdgeArrayH = HostArray1DGeomReal(OmegaName + "H", NEdgesSize);
    deepCopy(EdgeArrayH, TmpArrayR8);
 }
 
 // Read 1D cell array
-void HorzMesh::readCellArray(HostArray1DReal &CellArrayH,
+void HorzMesh::readCellArray(HostArray1DGeomReal &CellArrayH,
                              const std::string &MPASName) {
    int Err;
 
@@ -469,7 +469,7 @@ void HorzMesh::readCellArray(HostArray1DReal &CellArrayH,
       LOG_CRITICAL("HorzMesh: error reading {}", MPASName);
 
    // Create host array of desired precision and copy the read data into it
-   CellArrayH = HostArray1DReal(OmegaName + "H", NCellsSize);
+   CellArrayH = HostArray1DGeomReal(OmegaName + "H", NCellsSize);
    deepCopy(CellArrayH, TmpArrayR8);
 }
 
@@ -506,7 +506,7 @@ void HorzMesh::readCoordinates() {
 //------------------------------------------------------------------------------
 // Read the cell-centered bottom depth
 void HorzMesh::readBottomDepth() {
-   BottomDepthH = HostArray1DReal("BottomDepth", NCellsSize);
+   BottomDepthH = HostArray1DGeomReal("BottomDepth", NCellsSize);
    deepCopy(BottomDepthH, 0);
    // readCellArray(BottomDepthH, "bottomDepth");
 } // end readDepth
@@ -544,7 +544,7 @@ void HorzMesh::readMeasurements() {
 
    // Create and fill array with Real precision
    KiteAreasOnVertexH =
-       HostArray2DReal("KiteAreasOnVertex", NVerticesSize, VertexDegree);
+       HostArray2DGeomReal("KiteAreasOnVertex", NVerticesSize, VertexDegree);
    deepCopy(KiteAreasOnVertexH, TmpKiteAreasOnVertexR8);
 
 } // end readMeasurements
@@ -563,7 +563,7 @@ void HorzMesh::readWeights() {
    if (Err != 0)
       LOG_CRITICAL("HorzMesh: error reading weightsOnEdge");
 
-   WeightsOnEdgeH = HostArray2DReal("WeightsOnEdge", NEdgesSize, MaxEdges2);
+   WeightsOnEdgeH = HostArray2DGeomReal("WeightsOnEdge", NEdgesSize, MaxEdges2);
    deepCopy(WeightsOnEdgeH, TmpWeightsOnEdgeR8);
 
 } // end readWeights
@@ -574,13 +574,13 @@ void HorzMesh::readCoriolis() {
 
    int Err = 0;
 
-   FCellH = HostArray1DReal("FCell", NCellsSize);
+   FCellH = HostArray1DGeomReal("FCell", NCellsSize);
    // readCellArray(FCellH, "fCell");
 
-   FVertexH = HostArray1DReal("FVertex", NVerticesSize);
+   FVertexH = HostArray1DGeomReal("FVertex", NVerticesSize);
    // readVertexArray(FVertexH, "fVertex");
 
-   FEdgeH = HostArray1DReal("FEdge", NEdgesSize);
+   FEdgeH = HostArray1DGeomReal("FEdge", NEdgesSize);
    // readEdgeArray(FEdgeH, "fEdge");
 } // end readCoriolis
 
@@ -588,7 +588,7 @@ void HorzMesh::readCoriolis() {
 // Compute the sign of edge contributions to a cell/vertex for each edge
 void HorzMesh::computeEdgeSign() {
 
-   EdgeSignOnCell = Array2DReal("EdgeSignOnCell", NCellsSize, MaxEdges);
+   EdgeSignOnCell = Array2DGeomReal("EdgeSignOnCell", NCellsSize, MaxEdges);
 
    OMEGA_SCOPE(o_NEdgesOnCell, NEdgesOnCell);
    OMEGA_SCOPE(o_EdgesOnCell, EdgesOnCell);
@@ -612,7 +612,7 @@ void HorzMesh::computeEdgeSign() {
    EdgeSignOnCellH = createHostMirrorCopy(EdgeSignOnCell);
 
    EdgeSignOnVertex =
-       Array2DReal("EdgeSignOnVertex", NVerticesSize, VertexDegree);
+       Array2DGeomReal("EdgeSignOnVertex", NVerticesSize, VertexDegree);
 
    OMEGA_SCOPE(o_VertexDegree, VertexDegree);
    OMEGA_SCOPE(o_EdgesOnVertex, EdgesOnVertex);
@@ -642,7 +642,7 @@ void HorzMesh::computeEdgeSign() {
 // and vertices
 void HorzMesh::setMasks(int NVertLevels) {
 
-   EdgeMask = Array2DReal("EdgeMask", NEdgesSize, NVertLevels);
+   EdgeMask = Array2DGeomReal("EdgeMask", NEdgesSize, NVertLevels);
 
    OMEGA_SCOPE(O_EdgeMask, EdgeMask);
 
@@ -662,8 +662,8 @@ void HorzMesh::setMasks(int NVertLevels) {
 // equations so viscosity and diffusion scale with mesh.
 void HorzMesh::setMeshScaling() {
 
-   MeshScalingDel2 = Array1DReal("MeshScalingDel2", NEdgesSize);
-   MeshScalingDel4 = Array1DReal("MeshScalingDel4", NEdgesSize);
+   MeshScalingDel2 = Array1DGeomReal("MeshScalingDel2", NEdgesSize);
+   MeshScalingDel4 = Array1DGeomReal("MeshScalingDel4", NEdgesSize);
 
    OMEGA_SCOPE(o_MeshScalingDel2, MeshScalingDel2);
    OMEGA_SCOPE(o_MeshScalingDel4, MeshScalingDel4);

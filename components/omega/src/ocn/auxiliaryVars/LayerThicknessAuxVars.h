@@ -87,7 +87,7 @@ class LayerThicknessAuxVars {
 
  private:
    Array2DI4 CellsOnEdge;
-   Array1DReal BottomDepth;
+   Array1DGeomReal BottomDepth;
 };
 
 } // namespace OMEGA

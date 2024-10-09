@@ -36,9 +36,9 @@ class DivergenceOnCell {
  private:
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
-   Array1DReal DvEdge;
-   Array1DReal AreaCell;
-   Array2DReal EdgeSignOnCell;
+   Array1DGeomReal DvEdge;
+   Array1DGeomReal AreaCell;
+   Array2DGeomReal EdgeSignOnCell;
 };
 
 class GradientOnEdge {
@@ -62,7 +62,7 @@ class GradientOnEdge {
 
  private:
    Array2DI4 CellsOnEdge;
-   Array1DReal DcEdge;
+   Array1DGeomReal DcEdge;
 };
 
 class CurlOnVertex {
@@ -96,9 +96,9 @@ class CurlOnVertex {
  private:
    I4 VertexDegree;
    Array2DI4 EdgesOnVertex;
-   Array1DReal DcEdge;
-   Array1DReal AreaTriangle;
-   Array2DReal EdgeSignOnVertex;
+   Array1DGeomReal DcEdge;
+   Array1DGeomReal AreaTriangle;
+   Array2DGeomReal EdgeSignOnVertex;
 };
 
 class TangentialReconOnEdge {
@@ -129,7 +129,7 @@ class TangentialReconOnEdge {
  private:
    Array1DI4 NEdgesOnEdge;
    Array2DI4 EdgesOnEdge;
-   Array2DReal WeightsOnEdge;
+   Array2DGeomReal WeightsOnEdge;
 };
 
 } // namespace OMEGA
