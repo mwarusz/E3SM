@@ -275,7 +275,7 @@ int initTimeStepperTest(const std::string &mesh) {
 // of steps
 int adjustTimeStep(TimeStepper *Stepper, Real TimeEnd) {
    TimeInterval TimeStep = Stepper->getTimeStep();
-   Real TimeStepSeconds;
+   R8 TimeStepSeconds;
    TimeStep.get(TimeStepSeconds, TimeUnits::Seconds);
 
    const int NSteps = std::ceil(TimeEnd / TimeStepSeconds);
@@ -354,7 +354,7 @@ int testSteadyZonal(const std::string &Name, TimeStepperType Type) {
    Real CFL = 0.6;
 
    SteadyZonal Setup;
-   Real TimeStepSeconds =
+   R8 TimeStepSeconds =
        CFL * minDcEdge() / (Setup.m_u0 + std::sqrt(grav * Setup.m_h0));
 
    TestTimeStepper->setTimeStep(
