@@ -20,6 +20,13 @@ target_compile_definitions(
     INTERFACE
     OMEGA_ARCH=${OMEGA_ARCH}
 )
+if (OMEGA_VECTOR_LENGTH)
+  target_compile_definitions(
+      OmegaLibFlags
+      INTERFACE
+      OMEGA_VECTOR_LENGTH=${OMEGA_VECTOR_LENGTH}
+  )
+endif()
 
 target_link_options(
     OmegaLibFlags
