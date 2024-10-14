@@ -20,6 +20,8 @@
 #include "mpi.h"
 
 #include "Logging.h"
+#include <DataTypes.h>
+#include <Kokkos_SIMD.hpp>
 #include <map>
 #include <memory>
 
@@ -32,7 +34,12 @@ namespace OMEGA {
 #ifdef OMEGA_VECTOR_LENGTH
 constexpr int VecLength = OMEGA_VECTOR_LENGTH;
 #else
+#ifdef OMEGA_TARGET_DEVICE
 constexpr int VecLength = 1;
+#else
+// Use Kokkos to try to automatically detect native vector length for CPUs
+constexpr int VecLength = Kokkos::Experimental::native_simd<Real>::size();
+#endif
 #endif
 
 /// The MachEnv class is a container that holds information on
