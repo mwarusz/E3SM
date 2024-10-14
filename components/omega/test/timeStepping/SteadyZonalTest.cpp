@@ -172,7 +172,7 @@ Real minDcEdge() {
    parallelReduce(
        {TestMesh->NEdgesOwned},
        KOKKOS_LAMBDA(int IEdge, Real &Accum) {
-          Accum = Kokkos::min(DcEdge(IEdge), Accum);
+          Accum = Kokkos::min<Real>(DcEdge(IEdge), Accum);
        },
        Kokkos::Min<Real>(MinDcEdgeLoc));
 

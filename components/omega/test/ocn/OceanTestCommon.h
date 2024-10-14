@@ -18,7 +18,7 @@ inline bool isApprox(Real X, Real Y, Real RTol) {
 // convert spherical components of a vector to Cartesian
 KOKKOS_INLINE_FUNCTION void sphereToCartVec(Real (&CartVec)[3],
                                             const Real (&SphereVec)[2],
-                                            Real Lon, Real Lat) {
+                                            GeomReal Lon, GeomReal Lat) {
    using std::cos;
    using std::sin;
    CartVec[0] = -sin(Lon) * SphereVec[0] - sin(Lat) * cos(Lon) * SphereVec[1];
@@ -28,9 +28,9 @@ KOKKOS_INLINE_FUNCTION void sphereToCartVec(Real (&CartVec)[3],
 
 // returns Cartesian components of unit vector tangent to the spherical arc
 // between Cartesian points X1 and X2 parametrized with t
-KOKKOS_INLINE_FUNCTION void tangentVector(Real (&TanVec)[3],
-                                          const Real (&X1)[3],
-                                          const Real (&X2)[3], Real t = 0) {
+KOKKOS_INLINE_FUNCTION void tangentVector(GeomReal (&TanVec)[3],
+                                          const GeomReal (&X1)[3],
+                                          const GeomReal (&X2)[3], Real t = 0) {
    const Real Radius =
        Kokkos::sqrt(X1[0] * X1[0] + X1[1] * X1[1] + X1[2] * X1[2]);
    Real XC[3];
@@ -105,12 +105,12 @@ int setScalar(const Functor &Fun, const Array2DReal &ScalarElement,
    parallelFor(
        {NElementsOwned, NVertLevels}, KOKKOS_LAMBDA(int IElement, int K) {
           if (Geom == Geometry::Planar) {
-             const Real X               = XElement(IElement);
-             const Real Y               = YElement(IElement);
+             const GeomReal X               = XElement(IElement);
+             const GeomReal Y               = YElement(IElement);
              ScalarElement(IElement, K) = Fun(X, Y);
           } else {
-             const Real Lon             = LonElement(IElement);
-             const Real Lat             = LatElement(IElement);
+             const GeomReal Lon             = LonElement(IElement);
+             const GeomReal Lat             = LatElement(IElement);
              ScalarElement(IElement, K) = Fun(Lon, Lat);
           }
        });
@@ -162,8 +162,8 @@ int setVectorEdge(const Functor &Fun, const Array2DReal &VectorFieldEdge,
        {Mesh->NEdgesOwned, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int K) {
           Real VecFieldEdge;
           if (Geom == Geometry::Planar) {
-             const Real XE = XEdge(IEdge);
-             const Real YE = YEdge(IEdge);
+             const GeomReal XE = XEdge(IEdge);
+             const GeomReal YE = YEdge(IEdge);
 
              Real VecField[2];
              Fun(VecField, XE, YE);
@@ -182,8 +182,8 @@ int setVectorEdge(const Functor &Fun, const Array2DReal &VectorFieldEdge,
                     EdgeTangentX * VecField[0] + EdgeTangentY * VecField[1];
              }
           } else {
-             const Real LonE = LonEdge(IEdge);
-             const Real LatE = LatEdge(IEdge);
+             const GeomReal LonE = LonEdge(IEdge);
+             const GeomReal LatE = LatEdge(IEdge);
 
              Real VecField[2];
              Fun(VecField, LonE, LatE);
@@ -192,15 +192,15 @@ int setVectorEdge(const Functor &Fun, const Array2DReal &VectorFieldEdge,
                 Real VecFieldCart[3];
                 sphereToCartVec(VecFieldCart, VecField, LonE, LatE);
 
-                const Real EdgeCoords[3] = {XEdge[IEdge], YEdge[IEdge],
+                const GeomReal EdgeCoords[3] = {XEdge[IEdge], YEdge[IEdge],
                                             ZEdge[IEdge]};
 
                 if (EdgeComp == EdgeComponent::Normal) {
                    const int JCell1         = CellsOnEdge(IEdge, 1);
-                   const Real CellCoords[3] = {XCell(JCell1), YCell(JCell1),
+                   const GeomReal CellCoords[3] = {XCell(JCell1), YCell(JCell1),
                                                ZCell(JCell1)};
 
-                   Real EdgeNormal[3];
+                   GeomReal EdgeNormal[3];
                    tangentVector(EdgeNormal, EdgeCoords, CellCoords);
                    VecFieldEdge = EdgeNormal[0] * VecFieldCart[0] +
                                   EdgeNormal[1] * VecFieldCart[1] +
@@ -209,10 +209,10 @@ int setVectorEdge(const Functor &Fun, const Array2DReal &VectorFieldEdge,
 
                 if (EdgeComp == EdgeComponent::Tangential) {
                    const int JVertex1         = VerticesOnEdge(IEdge, 1);
-                   const Real VertexCoords[3] = {
+                   const GeomReal VertexCoords[3] = {
                        XVertex(JVertex1), YVertex(JVertex1), ZVertex(JVertex1)};
 
-                   Real EdgeTangent[3];
+                   GeomReal EdgeTangent[3];
                    tangentVector(EdgeTangent, EdgeCoords, VertexCoords);
                    VecFieldEdge = EdgeTangent[0] * VecFieldCart[0] +
                                   EdgeTangent[1] * VecFieldCart[1] +
@@ -220,15 +220,15 @@ int setVectorEdge(const Functor &Fun, const Array2DReal &VectorFieldEdge,
                 }
              } else {
                 if (EdgeComp == EdgeComponent::Normal) {
-                   const Real EdgeNormalX = std::cos(AngleEdge(IEdge));
-                   const Real EdgeNormalY = std::sin(AngleEdge(IEdge));
+                   const GeomReal EdgeNormalX = std::cos(AngleEdge(IEdge));
+                   const GeomReal EdgeNormalY = std::sin(AngleEdge(IEdge));
                    VecFieldEdge =
                        EdgeNormalX * VecField[0] + EdgeNormalY * VecField[1];
                 }
 
                 if (EdgeComp == EdgeComponent::Tangential) {
-                   const Real EdgeTangentX = -std::sin(AngleEdge(IEdge));
-                   const Real EdgeTangentY = std::cos(AngleEdge(IEdge));
+                   const GeomReal EdgeTangentX = -std::sin(AngleEdge(IEdge));
+                   const GeomReal EdgeTangentY = std::cos(AngleEdge(IEdge));
                    VecFieldEdge =
                        EdgeTangentX * VecField[0] + EdgeTangentY * VecField[1];
                 }

@@ -140,7 +140,8 @@ using HostMemInvLayout = MemInvLayout;
    MAKE_OMEGA_VIEW_DIMS(N, V, I8, ML, MS)   \
    MAKE_OMEGA_VIEW_DIMS(N, V, R4, ML, MS)   \
    MAKE_OMEGA_VIEW_DIMS(N, V, R8, ML, MS)   \
-   MAKE_OMEGA_VIEW_DIMS(N, V, Real, ML, MS)
+   MAKE_OMEGA_VIEW_DIMS(N, V, Real, ML, MS) \
+   MAKE_OMEGA_VIEW_DIMS(N, V, GeomReal, ML, MS)
 
 // Aliases for Kokkos device arrays of various dimensions and types
 MAKE_OMEGA_VIEW_TYPES(Array, View, MemLayout, MemSpace)
