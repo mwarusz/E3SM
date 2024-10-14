@@ -85,7 +85,7 @@ check_setup()
 ###########################################################
 # STEP 3: Build                                           #
 #                                                         #
-# build Omega, and generate tests                          #
+# build Omega, and generate tests                         #
 ###########################################################
 
 add_subdirectory(external)
@@ -106,3 +106,11 @@ endif()
 ###########################################################
 
 wrap_outputs()
+
+###########################################################
+# STEP 5: Print summary                                   #
+#                                                         #
+# print summary of build configuration                    #
+###########################################################
+
+print_config_summary()
