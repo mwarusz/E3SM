@@ -279,8 +279,8 @@ class TracerHorzAdvOnCell {
    TracerHorzAdvOnCell(const HorzMesh *Mesh);
 
    KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
-                                   I4 KChunk, const Array2DR8 &NormVelEdge,
-                                   const Array3DR8 &HTracersOnEdge) const {
+                                   I4 KChunk, const Array2DReal &NormVelEdge,
+                                   const Array3DReal &HTracersOnEdge) const {
 
       const I4 KStart        = KChunk * VecLength;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
@@ -307,9 +307,9 @@ class TracerHorzAdvOnCell {
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DI4 CellsOnEdge;
-   Array2DR8 EdgeSignOnCell;
-   Array1DR8 DvEdge;
-   Array1DR8 AreaCell;
+   Array2DReal EdgeSignOnCell;
+   Array1DReal DvEdge;
+   Array1DReal AreaCell;
 };
 
 // Tracer horizontal diffusion term
@@ -321,9 +321,10 @@ class TracerDiffOnCell {
 
    TracerDiffOnCell(const HorzMesh *Mesh);
 
-   KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
-                                   I4 KChunk, const Array3DR8 &TracerCell,
-                                   const Array2DR8 &MeanLayerThickEdge) const {
+   KOKKOS_FUNCTION void
+   operator()(const Array3DReal &Tend, I4 L, I4 ICell, I4 KChunk,
+              const Array3DReal &TracerCell,
+              const Array2DReal &MeanLayerThickEdge) const {
 
       const I4 KStart        = KChunk * VecLength;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
@@ -358,11 +359,11 @@ class TracerDiffOnCell {
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DI4 CellsOnEdge;
-   Array2DR8 EdgeSignOnCell;
-   Array1DR8 DvEdge;
-   Array1DR8 DcEdge;
-   Array1DR8 AreaCell;
-   Array1DR8 MeshScalingDel2;
+   Array2DReal EdgeSignOnCell;
+   Array1DReal DvEdge;
+   Array1DReal DcEdge;
+   Array1DReal AreaCell;
+   Array1DReal MeshScalingDel2;
 };
 
 // Tracer biharmonic horizontal mixing term
@@ -376,7 +377,7 @@ class TracerHyperDiffOnCell {
 
    KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
                                    I4 KChunk,
-                                   const Array3DR8 &TrDel2Cell) const {
+                                   const Array3DReal &TrDel2Cell) const {
 
       const I4 KStart        = KChunk * VecLength;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
@@ -410,11 +411,11 @@ class TracerHyperDiffOnCell {
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DI4 CellsOnEdge;
-   Array2DR8 EdgeSignOnCell;
-   Array1DR8 DvEdge;
-   Array1DR8 DcEdge;
-   Array1DR8 AreaCell;
-   Array1DR8 MeshScalingDel4;
+   Array2DReal EdgeSignOnCell;
+   Array1DReal DvEdge;
+   Array1DReal DcEdge;
+   Array1DReal AreaCell;
+   Array1DReal MeshScalingDel4;
 };
 
 /// A class that can be used to calculate the thickness and
