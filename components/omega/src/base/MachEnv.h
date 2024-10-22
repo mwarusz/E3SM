@@ -31,8 +31,10 @@ namespace OMEGA {
 // GPU builds to maximize parallelism instead.
 #ifdef OMEGA_VECTOR_LENGTH
 constexpr int VecLength = OMEGA_VECTOR_LENGTH;
+#define OMEGA_SIMD_PRAGMA _Pragma("omp simd")
 #else
 constexpr int VecLength = 1;
+#define OMEGA_SIMD_PRAGMA
 #endif
 
 /// The MachEnv class is a container that holds information on

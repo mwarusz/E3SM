@@ -29,6 +29,7 @@ class LayerThicknessAuxVars {
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const int K = KStart + KVec;
          MeanLayerThickEdge(IEdge, K) =
@@ -37,6 +38,7 @@ class LayerThicknessAuxVars {
 
       switch (FluxThickEdgeChoice) {
       case Center:
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const int K = KStart + KVec;
             FluxLayerThickEdge(IEdge, K) =
@@ -45,6 +47,7 @@ class LayerThicknessAuxVars {
          }
          break;
       case Upwind:
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const int K = KStart + KVec;
             if (NormalVelEdge(IEdge, K) > 0) {
@@ -66,6 +69,7 @@ class LayerThicknessAuxVars {
 
       // Temporary for stacked shallow water
       const int KStart = KChunk * VecLength;
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const int K       = KStart + KVec;
          SshCell(ICell, K) = LayerThickCell(ICell, K) - BottomDepth(ICell);
