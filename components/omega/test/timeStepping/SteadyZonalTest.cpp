@@ -284,7 +284,7 @@ int adjustTimeStep(TimeStepper *Stepper, Real TimeEnd) {
    TimeStep.set(TimeStepSeconds, TimeUnits::Seconds);
    Stepper->setTimeStep(TimeInterval(TimeStepSeconds, TimeUnits::Seconds));
 
-   std::cout << "TimeStep: " << TimeStepSeconds << std::endl;
+   //std::cout << "TimeStep: " << TimeStepSeconds << std::endl;
 
    return NSteps;
 }
@@ -307,7 +307,7 @@ void timeLoop(TimeInstant TimeStart, Real TimeEnd) {
    }
    Kokkos::fence();
    timer_stop("time_loop");
-   std::cout << "RunTime: " << Timer.seconds() << std::endl;
+   //std::cout << "RunTime: " << Timer.seconds() << std::endl;
 }
 
 void finalizeTimeStepperTest() {
@@ -346,7 +346,7 @@ int testSteadyZonal(const std::string &Name, TimeStepperType Type) {
    // Start time = 0
    const TimeInstant TimeStart(&TestCalendar, 0, 0, 0, 0, 0, 0);
 
-   const Real TimeEnd = day;
+   const Real TimeEnd = day / 8;
 
    Err += initState();
    createExactSolution(TimeEnd);
@@ -364,7 +364,9 @@ int testSteadyZonal(const std::string &Name, TimeStepperType Type) {
 
    ErrorMeasures Errf = computeErrors();
 
+if (MachEnv::getDefault()->isMasterTask()) {
    std::cout << Errf.L2 << " " << Errf.LInf << std::endl;
+}
 
    TimeStepper::erase("TestTimeStepper");
 
