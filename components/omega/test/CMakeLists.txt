@@ -45,14 +45,22 @@ function(add_omega_test test_name exe_name source_files mpi_args)
     )
   endif()
 
-  set_target_properties(${exe_name} PROPERTIES LINKER_LANGUAGE C)
+  set_target_properties(${exe_name} PROPERTIES LINKER_LANGUAGE CXX)
 
   # Add the test command
   if (mpi_args)
-    add_test(
-      NAME ${test_name}
-      COMMAND ../omega_env.sh ${OMEGA_MPI_EXEC} ${OMEGA_MPI_ARGS} ${mpi_args} -- ./${exe_name}
-    )
+
+    if("${OMEGA_ARCH}" STREQUAL "SYCL")
+      add_test(
+        NAME ${test_name}
+        COMMAND ${OMEGA_MPI_EXEC} ${mpi_args} ${OMEGA_MPI_ARGS} ./${exe_name}
+      )
+    else()
+      add_test(
+        NAME ${test_name}
+        COMMAND ${OMEGA_MPI_EXEC} ${OMEGA_MPI_ARGS} ${mpi_args} -- ./${exe_name}
+      )
+    endif()
 
   else()
     add_test(
@@ -282,7 +290,7 @@ add_omega_test(
     TEND_PLANE_TEST
     testTendencyTermsPlane.exe
     ocn/TendencyTermsTest.cpp
-    "-n 8;--cpu-bind=cores"
+    "-n 8;"
 )
 target_compile_definitions(
   testTendencyTermsPlane.exe
@@ -302,7 +310,7 @@ add_omega_test(
   TEND_SPHERE_TEST
     testTendencyTermsSphere.exe
     ocn/TendencyTermsTest.cpp
-    "-n 8;--cpu-bind=cores"
+    "-n 8;"
 )
 target_compile_definitions(
   testTendencyTermsSphere.exe
@@ -351,7 +359,7 @@ add_omega_test(
     REDUCTIONS_TEST
     testReductions.exe
     base/ReductionsTest.cpp
-    "-n;2;--cpu-bind=cores"
+    "-n;2;"
 )
 
 ###################

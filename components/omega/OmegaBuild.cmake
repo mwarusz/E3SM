@@ -30,6 +30,10 @@ macro(common)
   option(OMEGA_LOG_FLUSH "Turn on unbuffered logging (default OFF)." OFF)
   option(OMEGA_TEST_CDASH "Turn on CDash support (default ON)." ON)
 
+  if("${OMEGA_BUILD_TYPE}" STREQUAL "Debug" OR "${OMEGA_BUILD_TYPE}" STREQUAL "DEBUG")
+    set(OMEGA_DEBUG ON)
+  endif()
+
   if(NOT DEFINED OMEGA_CXX_FLAGS)
     set(OMEGA_CXX_FLAGS "")
   endif()
@@ -121,7 +125,7 @@ macro(read_cime_config)
                 break()
 
             elseif("${arg}" STREQUAL "-n" OR "${arg}" STREQUAL "-N" OR
-                   "${arg}" STREQUAL "-c")
+                   "${arg}" STREQUAL "-c" OR "${arg}" STREQUAL "-np")
                 set(SKIP_ARG TRUE)
 
             else()
@@ -220,6 +224,9 @@ macro(init_standalone_build)
     elseif(USE_HIP)
       set(OMEGA_ARCH "HIP")
 
+    elseif(USE_SYCL)
+      set(OMEGA_ARCH "SYCL")
+
     else()
 
       execute_process(
@@ -298,7 +305,11 @@ macro(init_standalone_build)
   set(_CtestScript ${OMEGA_BUILD_DIR}/omega_ctest.sh)
   file(WRITE ${_CtestScript}  "#!/usr/bin/env bash\n\n")
   file(APPEND ${_CtestScript} "source ./omega_env.sh\n\n")
-  file(APPEND ${_CtestScript} "ctest --output-on-failure $* # --rerun-failed\n\n")
+  if(OMEGA_DEBUG)
+    file(APPEND ${_CtestScript} "ctest --output-on-failure --verbose $* # --rerun-failed\n\n")
+  else()
+    file(APPEND ${_CtestScript} "ctest --output-on-failure $* # --rerun-failed\n\n")
+  endif()
 
   # create a profile script
   set(_ProfileScript ${OMEGA_BUILD_DIR}/omega_profile.sh)
@@ -426,10 +437,10 @@ macro(init_standalone_build)
     file(APPEND ${_ProfileScript} "    -o \$OUTFILE ./src/omega.exe 1000")
 
   elseif("${OMEGA_ARCH}" STREQUAL "SYCL")
-    set(CMAKE_CXX_COMPILER ${OMEGA_SYCL_COMPILER})
+    set(CMAKE_CXX_COMPILER ${OMEGA_CXX_COMPILER})
 
-    if(OMEGA_SYCL_FLAGS)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OMEGA_SYCL_FLAGS}")
+    if(SYCL_FLAGS)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SYCL_FLAGS}")
     endif()
 
   else()
@@ -462,7 +473,7 @@ macro(init_standalone_build)
 
   message(STATUS "CMAKE_CXX_COMPILER     = ${CMAKE_CXX_COMPILER}")
   message(STATUS "CMAKE_CXX_FLAGS        = ${CMAKE_CXX_FLAGS}")
-#  message(STATUS "CMAKE_EXE_LINKER_FLAGS = ${CMAKE_EXE_LINKER_FLAGS}")
+  message(STATUS "CMAKE_EXE_LINKER_FLAGS = ${CMAKE_EXE_LINKER_FLAGS}")
 
 endmacro()
 
@@ -515,10 +526,6 @@ macro(update_variables)
   set(CMAKE_BUILD_TYPE ${OMEGA_BUILD_TYPE})
 
   add_definitions(-DOMEGA_BUILD_MODE=${OMEGA_BUILD_MODE})
-
-  if("${OMEGA_BUILD_TYPE}" STREQUAL "Debug" OR "${OMEGA_BUILD_TYPE}" STREQUAL "DEBUG")
-    set(OMEGA_DEBUG ON)
-  endif()
 
   if(NOT DEFINED OMEGA_LOG_LEVEL)
     set(OMEGA_LOG_LEVEL "INFO")
