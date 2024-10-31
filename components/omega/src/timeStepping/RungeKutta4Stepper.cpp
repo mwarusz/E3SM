@@ -57,11 +57,11 @@ void RungeKutta4Stepper::doStep(OceanState *State, TimeInstant Time) const {
                            RKA[Stage] * TimeStep);
 
          // TODO(mwarusz) this depends on halo width actually
-   
+
          if (Stage == 2) {
-	    //timer_start("exchange_halo");
+            // timer_start("exchange_halo");
             ProvisState->exchangeHalo(CurLevel);
-	    //timer_stop("exchange_halo");
+            // timer_stop("exchange_halo");
          }
 
          Tend->computeAllTendencies(ProvisState, AuxState, CurLevel, CurLevel,
@@ -73,10 +73,10 @@ void RungeKutta4Stepper::doStep(OceanState *State, TimeInstant Time) const {
 
    // Update time levels (New -> Old) of prognostic variables with halo
    // exchanges
-   //timer_start("update_time_lev");
+   // timer_start("update_time_lev");
    State->updateTimeLevels();
-   //timer_stop("update_time_lev");
-   
+   // timer_stop("update_time_lev");
+
    timer_stop("do_step");
 }
 

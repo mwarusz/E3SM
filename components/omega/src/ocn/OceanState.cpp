@@ -370,18 +370,18 @@ void OceanState::copyToHost(int TimeLevel) {
 //------------------------------------------------------------------------------
 // Perform state halo exchange
 void OceanState::exchangeHalo(int TimeLevel) {
-   //timer_start("exchange_copy_host");
+   // timer_start("exchange_copy_host");
    copyToHost(TimeLevel);
-   //timer_stop("exchange_copy_host");
-   //timer_start("exchange_thick");
+   // timer_stop("exchange_copy_host");
+   // timer_start("exchange_thick");
    MeshHalo->exchangeFullArrayHalo(LayerThicknessH[TimeLevel], OnCell);
-   //timer_stop("exchange_thick");
-   //timer_start("exchange_vel");
+   // timer_stop("exchange_thick");
+   // timer_start("exchange_vel");
    MeshHalo->exchangeFullArrayHalo(NormalVelocityH[TimeLevel], OnEdge);
-   //timer_stop("exchange_vel");
-   //timer_start("exchange_copy_dev");
+   // timer_stop("exchange_vel");
+   // timer_start("exchange_copy_dev");
    copyToDevice(TimeLevel);
-   //timer_stop("exchange_copy_dev");
+   // timer_stop("exchange_copy_dev");
 } // end exchangeHalo
 
 //------------------------------------------------------------------------------

@@ -505,6 +505,23 @@ Decomp::Decomp(
    // to map that to the local NXxAll+1 (NXxSize). We insert that value
    // first in the map so that later attempts to change will be ignored.
 
+   // if (MyTask == 0) {
+   //   std::cout << "MW: cells" << std::endl;
+   //   for (int Cell = 0; Cell < NCellsOwned; ++Cell) {
+   //     std::cout << Cell << " " << CellIDH(Cell) << std::endl;
+   //   }
+   //
+   //   std::cout << "MW: edges" << std::endl;
+   //   for (int Edge = 0; Edge < NEdgesOwned; ++Edge) {
+   //     std::cout << Edge << " " << EdgeIDH(Edge) << std::endl;
+   //   }
+   //
+   //   std::cout << "MW: vertices" << std::endl;
+   //   for (int Vertex = 0; Vertex < NVerticesOwned; ++Vertex) {
+   //     std::cout << Vertex << " " << VertexIDH(Vertex) << std::endl;
+   //   }
+   // }
+
    std::map<I4, I4> GlobToLocCell;
    GlobToLocCell[NCellsGlobal + 1] = NCellsAll;
    for (int Cell = 0; Cell < NCellsAll; ++Cell) {
@@ -1195,6 +1212,15 @@ int Decomp::partEdges(
    // The owned and first halo of edges comes from the edges around
    // the owned cells, so start with these.
    I4 EdgeCount = 0;
+
+#ifdef OMEGA_PRESERVE_ORDER
+   for (auto EdgeGlob : EdgesOwned) {
+      EdgeIDTmp(EdgeCount) = EdgeGlob;
+      EdgesAll.erase(EdgeGlob);
+      ++EdgeCount;
+   }
+#endif
+
    HaloCount--; // initialize for first halo entry in reverse order
    for (int Cell = 0; Cell < NCellsOwned; ++Cell) {
       for (int CellEdge = 0; CellEdge < MaxEdges; ++CellEdge) {
@@ -1432,6 +1458,15 @@ int Decomp::partVertices(
    // The owned and first halo of vertices comes from the vertices around
    // the owned cells, so start with these.
    I4 VrtxCount = 0;
+
+#ifdef OMEGA_PRESERVE_ORDER
+   for (auto VrtxGlob : VerticesOwned) {
+      VertexIDTmp(VrtxCount) = VrtxGlob;
+      VerticesAll.erase(VrtxGlob);
+      ++VrtxCount;
+   }
+#endif
+
    HaloCount--; // initialize for first halo entry in reverse order
    for (int Cell = 0; Cell < NCellsOwned; ++Cell) {
       for (int CellVrtx = 0; CellVrtx < MaxEdges; ++CellVrtx) {

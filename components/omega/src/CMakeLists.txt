@@ -35,6 +35,13 @@ if (OMEGA_FUSED_ACCUM)
       OMEGA_FUSED_ACCUM=1
   )
 endif()
+if (OMEGA_PRESERVE_ORDER)
+  target_compile_definitions(
+      OmegaLibFlags
+      INTERFACE
+      OMEGA_PRESERVE_ORDER=1
+  )
+endif()
 
 target_link_options(
     OmegaLibFlags
