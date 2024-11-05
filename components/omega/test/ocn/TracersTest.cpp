@@ -436,7 +436,7 @@ int main(int argc, char *argv[]) {
       count = 0;
 
       Array2DReal SaltTracerByName;
-      Err = Tracers::getByName(SaltTracerByName, 1, "Salt");
+      Err = Tracers::getByName(SaltTracerByName, 0, "Salinity");
 
       Array2DReal SaltTracerByIndexVar;
       Err = Tracers::getByIndex(SaltTracerByIndexVar, 1, Tracers::IndxSalt);

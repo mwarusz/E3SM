@@ -31,7 +31,7 @@ Omega:
     TracerHyperDiffTendencyEnable: true
     EddyDiff4: 0.0
   Tracers:
-    Base: [Temp, Salt]
+    Base: [Temperature, Salinity]
     Debug: [Debug1, Debug2, Debug3]
   IOStreams:
     # InitialState should only be used when starting from scratch
