@@ -38,7 +38,7 @@ std::map<std::string, std::shared_ptr<IOStream>> IOStream::AllStreams;
 // Initializes all streams defined in the input configuration file. This
 // does not validate the contents of the streams since the relevant Fields
 // may not have been defined yet. Returns an error code.
-int IOStream::init(Clock &ModelClock //< [inout] Omega model clock
+int IOStream::init(Clock *&ModelClock //< [inout] Omega model clock
 ) {
 
    int Err = 0; // default return code
@@ -81,7 +81,7 @@ int IOStream::init(Clock &ModelClock //< [inout] Omega model clock
 // Performs a final write of any streams that have the OnShutdown option and
 // then removes all streams to clean up. Returns an error code.
 int IOStream::finalize(
-    const Clock &ModelClock // [in] Model clock needed for time stamps
+    const Clock *ModelClock // [in] Model clock needed for time stamps
 ) {
 
    int Err        = 0;
@@ -187,7 +187,7 @@ bool IOStream::validate() {
    }
 
    // Loop through all the field names in Contents and check whether they
-   // have been defined as an Field
+   // have been defined as a Field
    for (auto IField = Contents.begin(); IField != Contents.end(); ++IField) {
       std::string FieldName = *IField;
 
@@ -236,7 +236,7 @@ bool IOStream::validateAll() {
 // Reads a single stream if it is time. Returns an error code.
 int IOStream::read(
     const std::string &StreamName, // [in] Name of stream
-    const Clock &ModelClock,       // [in] Model clock for time info
+    const Clock *ModelClock,       // [in] Model clock for time info
     Metadata &ReqMetadata, // [inout] global metadata requested from file
     bool ForceRead         // [in] optional: read even if not time
 ) {
@@ -261,7 +261,7 @@ int IOStream::read(
 // Writes a single stream if it is time. Returns an error code.
 int IOStream::write(
     const std::string &StreamName, // [in] Name of stream
-    const Clock &ModelClock,       // [in] Model clock needed for time stamps
+    const Clock *ModelClock,       // [in] Model clock needed for time stamps
     bool ForceWrite                // [in] optional: write even if not time
 ) {
    int Err = 0; // default return code
@@ -286,7 +286,7 @@ int IOStream::write(
 // Loops through all streams and writes them if it is time. This is
 // useful if most I/O is consolidated at one point (eg end of step).
 int IOStream::writeAll(
-    const Clock &ModelClock // [in] Model clock needed for time stamps
+    const Clock *ModelClock // [in] Model clock needed for time stamps
 ) {
 
    int Err = 0; // accumulated error for return value
@@ -339,7 +339,7 @@ IOStream::IOStream() {
 
 int IOStream::create(const std::string &StreamName, //< [in] name of stream
                      Config &StreamConfig, //< [in] input stream configuration
-                     Clock &ModelClock     //< [inout] Omega model clock
+                     Clock *&ModelClock    //< [inout] Omega model clock
 ) {
 
    int Err = 0;
@@ -430,7 +430,7 @@ int IOStream::create(const std::string &StreamName, //< [in] name of stream
    std::string AlarmName = StreamName;
 
    // For alarms, need to retrieve clock start time
-   TimeInstant ClockStart = ModelClock.getStartTime();
+   TimeInstant ClockStart = ModelClock->getStartTime();
 
    // Read frequency of input/output
    int IOFreq;
@@ -538,7 +538,7 @@ int IOStream::create(const std::string &StreamName, //< [in] name of stream
    }
    // If an alarm is set, attach it to the model clock
    if (HasAlarm) {
-      Err = ModelClock.attachAlarm(&(NewStream->MyAlarm));
+      Err = ModelClock->attachAlarm(&(NewStream->MyAlarm));
       if (Err != 0) {
          LOG_ERROR("Error attaching alarm to model clock for stream {}",
                    StreamName);
@@ -575,13 +575,13 @@ int IOStream::create(const std::string &StreamName, //< [in] name of stream
       std::string EndName   = StreamName + "End";
       NewStream->StartAlarm = Alarm(StartName, Start);
       NewStream->EndAlarm   = Alarm(EndName, End);
-      Err                   = ModelClock.attachAlarm(&(NewStream->StartAlarm));
+      Err                   = ModelClock->attachAlarm(&(NewStream->StartAlarm));
       if (Err != 0) {
          LOG_ERROR("Error attaching start alarm to model clock for stream {}",
                    StreamName);
          return Err;
       }
-      Err = ModelClock.attachAlarm(&(NewStream->EndAlarm));
+      Err = ModelClock->attachAlarm(&(NewStream->EndAlarm));
       if (Err != 0) {
          LOG_ERROR("Error attaching end alarm to model clock for stream {}",
                    StreamName);
@@ -2215,7 +2215,7 @@ int IOStream::readFieldData(
 // Reads a stream if it is time. Returns an error code. This is the internal
 // read function used by the public read interface.
 int IOStream::readStream(
-    const Clock &ModelClock, // [in] model clock for getting time
+    const Clock *ModelClock, // [in] model clock for getting time
     Metadata &ReqMetadata,   // [inout] global metadata to extract from file
     bool ForceRead           // [in] optional: read even if not time
 ) {
@@ -2241,7 +2241,7 @@ int IOStream::readStream(
    }
 
    // Get current simulation time and time string
-   TimeInstant SimTime    = ModelClock.getCurrentTime();
+   TimeInstant SimTime    = ModelClock->getCurrentTime();
    std::string SimTimeStr = SimTime.getString(5, 0, "_");
 
    // Reset alarms and flags
@@ -2363,7 +2363,7 @@ int IOStream::readStream(
 // Writes stream. This is the internal member write function used by the
 // public write interfaces.
 int IOStream::writeStream(
-    const Clock &ModelClock, // [in] Model clock needed for time stamps
+    const Clock *ModelClock, // [in] Model clock needed for time stamps
     bool ForceWrite,         // [in] Optional: write even if not time
     bool FinalCall           // [in] Optional flag if called from finalize
 ) {
@@ -2391,7 +2391,7 @@ int IOStream::writeStream(
    }
 
    // Get current simulation time and time string
-   TimeInstant SimTime    = ModelClock.getCurrentTime();
+   TimeInstant SimTime    = ModelClock->getCurrentTime();
    std::string SimTimeStr = SimTime.getString(4, 0, "_");
 
    // Reset alarms and flags
@@ -2615,7 +2615,7 @@ IO::IODataType IOStream::getFieldIOType(
 //    $s = seconds part of simulation time stamp
 std::string IOStream::buildFilename(
     const std::string &FilenameTemplate, // [in] template string for name
-    const Clock &ModelClock              // [in] model clock for sim time
+    const Clock *ModelClock              // [in] model clock for sim time
 ) {
 
    // Start with input template
@@ -2645,7 +2645,7 @@ std::string IOStream::buildFilename(
    }
 
    // For remaining options, we will need the simulation time
-   TimeInstant SimTime = ModelClock.getCurrentTime();
+   TimeInstant SimTime = ModelClock->getCurrentTime();
 
    // For many template options we also need the components of the current
    // sim time so we extract them here

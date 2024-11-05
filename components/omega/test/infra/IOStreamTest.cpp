@@ -52,7 +52,7 @@ void TestEval(const std::string &TestName, T TestVal, T ExpectVal, int &Error) {
 }
 //------------------------------------------------------------------------------
 // Initialization routine to create reference Fields
-int initIOStreamTest(std::shared_ptr<Clock> &ModelClock // Model clock
+int initIOStreamTest(Clock *&ModelClock // Model clock
 ) {
 
    int Err    = 0;
@@ -106,10 +106,10 @@ int initIOStreamTest(std::shared_ptr<Clock> &ModelClock // Model clock
    // Use internal start time and time step rather than Config
    TimeInstant SimStartTime(0001, 1, 1, 0, 0, 0.0);
    TimeInterval TimeStep(2, TimeUnits::Hours);
-   ModelClock = std::make_shared<Clock>(SimStartTime, TimeStep);
+   ModelClock = new Clock(SimStartTime, TimeStep);
 
    // Initialize IOStreams
-   Err1 = IOStream::init(*ModelClock);
+   Err1 = IOStream::init(ModelClock);
    TestEval("IOStream Initialization", Err1, ErrRef, Err);
 
    // Initialize HorzMesh - this should read Mesh stream
@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
    Kokkos::initialize();
    {
 
-      std::shared_ptr<Clock> ModelClock = nullptr;
+      Clock *ModelClock = nullptr;
 
       // Call initialization to create reference IO field
       Err1 = initIOStreamTest(ModelClock);
@@ -242,7 +242,7 @@ int main(int argc, char **argv) {
 
       // Read restart file for initial temperature and salinity data
       Metadata ReqMetadata; // leave empty for now - no required metadata
-      Err1 = IOStream::read("InitialState", *ModelClock, ReqMetadata);
+      Err1 = IOStream::read("InitialState", ModelClock, ReqMetadata);
       TestEval("Read restart file", Err1, ErrRef, Err);
 
       // Overwrite salinity array with values associated with global cell
@@ -266,7 +266,7 @@ int main(int argc, char **argv) {
          TimeInstant CurTime    = ModelClock->getCurrentTime();
          std::string CurTimeStr = CurTime.getString(4, 2, " ");
 
-         Err1 = IOStream::writeAll(*ModelClock);
+         Err1 = IOStream::writeAll(ModelClock);
          if (Err1 != 0) // to prevent too much output in log
             TestEval("Write all streams " + CurTimeStr, Err1, ErrRef, Err);
       }
@@ -276,7 +276,7 @@ int main(int argc, char **argv) {
       // written before we read.
       std::this_thread::sleep_for(std::chrono::seconds(5));
       bool ForceRead = true;
-      Err1 = IOStream::read("RestartRead", *ModelClock, ReqMetadata, ForceRead);
+      Err1 = IOStream::read("RestartRead", ModelClock, ReqMetadata, ForceRead);
       TestEval("Restart force read", Err1, ErrRef, Err);
 
       Err1             = 0;
@@ -292,7 +292,7 @@ int main(int argc, char **argv) {
       TestEval("Check Salt array ", Err1, ErrRef, Err);
 
       // Write final output and remove all streams
-      IOStream::finalize(*ModelClock);
+      IOStream::finalize(ModelClock);
    }
 
    // Clean up environments
