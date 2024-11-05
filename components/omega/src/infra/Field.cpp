@@ -399,6 +399,27 @@ int Field::addMetadata(
 }
 
 //------------------------------------------------------------------------------
+// Updates a metadata entry with a new value
+int Field::updateMetadata(const std::string &MetaName, // [in] Name of metadata
+                          const std::any Value         // [in] Value of metadata
+) {
+   int RetVal = 0;
+
+   if (hasMetadata(MetaName)) {
+      FieldMeta[MetaName] = Value;
+
+   } else {
+      LOG_ERROR("Failed to update metadata {} for field {} because the field "
+                "has no entry with that name.",
+                MetaName, FldName);
+
+      RetVal = -1;
+   }
+
+   return RetVal;
+}
+
+//------------------------------------------------------------------------------
 // Removes a metadata entry with the given name
 int Field::removeMetadata(
     const std::string &MetaName // [in] Name of metadata entry to remove
