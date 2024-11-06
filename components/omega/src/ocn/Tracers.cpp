@@ -139,6 +139,11 @@ I4 Tracers::init() {
    }
 
    // Add Fields to FieldGroup
+   // Create an overall Tracer and Restart group
+   auto AllTracerGrp = FieldGroup::create("Tracers");
+   if (!FieldGroup::exists("Restart"))
+      auto RestartGroup = FieldGroup::create("Restart");
+
    for (const auto &GroupPair : TracerGroups) {
       auto GroupName                   = GroupPair.first;
       std::string TracerFieldGroupName = GroupName;
@@ -156,6 +161,20 @@ I4 Tracers::init() {
             LOG_ERROR("Error adding {} to field group {}", TracerFieldName,
                       TracerFieldGroupName);
             return -7;
+         }
+
+         // Add tracer Field to all tracer group
+         Err = AllTracerGrp->addField(TracerFieldName);
+         if (Err != 0) {
+            LOG_ERROR("Error adding {} to All Tracer group", TracerFieldName);
+            return 8;
+         }
+
+         // Add tracer Field to restart group
+         Err = FieldGroup::addFieldToGroup(TracerFieldName, "Restart");
+         if (Err != 0) {
+            LOG_ERROR("Error adding {} to Restart group", TracerFieldName);
+            return 8;
          }
 
          // Associate Field with data

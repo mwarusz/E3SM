@@ -301,6 +301,10 @@ void OceanState::defineFields() {
    }
    auto StateGroup = FieldGroup::create(StateGroupName);
 
+   // Add restart group if needed
+   if (!FieldGroup::exists("Restart"))
+      auto RestartGroup = FieldGroup::create("Restart");
+
    Err = StateGroup->addField(NormalVelocityFldName);
    if (Err != 0)
       LOG_ERROR("Error adding {} to field group {}", NormalVelocityFldName,
@@ -309,6 +313,15 @@ void OceanState::defineFields() {
    if (Err != 0)
       LOG_ERROR("Error adding {} to field group {}", LayerThicknessFldName,
                 StateGroupName);
+
+   Err = FieldGroup::addFieldToGroup(NormalVelocityFldName, "Restart");
+   if (Err != 0)
+      LOG_ERROR("Error adding {} to Restart field group",
+                NormalVelocityFldName);
+   Err = FieldGroup::addFieldToGroup(LayerThicknessFldName, "Restart");
+   if (Err != 0)
+      LOG_ERROR("Error adding {} to Restart field group",
+                LayerThicknessFldName);
 
    // Associate Field with data
    I4 TimeIndex;

@@ -15,6 +15,7 @@
 #include "Halo.h"
 #include "HorzMesh.h"
 #include "IO.h"
+#include "IOStream.h"
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OceanDriver.h"
@@ -73,6 +74,17 @@ int initOmegaModules(MPI_Comm Comm) {
       return Err;
    }
 
+   TimeStepper *DefStepper = TimeStepper::getDefault();
+   Clock *ModelClock       = DefStepper->getClock();
+
+   // Initialize IOStreams - this does not yet validate the contents
+   // of each file, only creates streams from Config
+   Err = IOStream::init(ModelClock);
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: Error initializing IOStreams");
+      return Err;
+   }
+
    Err = IO::init(Comm);
    if (Err != 0) {
       LOG_CRITICAL("ocnInit: Error initializing parallel IO");
@@ -103,6 +115,23 @@ int initOmegaModules(MPI_Comm Comm) {
       return Err;
    }
 
+   // Create the vertical dimension - this will eventually move to
+   // a vertical mesh later
+   Config *OmegaConfig = Config::getOmegaConfig();
+   Config DimConfig("Dimension");
+   Err = OmegaConfig->get(DimConfig);
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: Dimension group not found in Config");
+      return Err;
+   }
+   I4 NVertLevels;
+   Err = DimConfig.get("NVertLevels", NVertLevels);
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: NVertLevels not found in Dimension Config");
+      return Err;
+   }
+   auto VertDim = OMEGA::Dimension::create("NVertLevels", NVertLevels);
+
    Err = Tracers::init();
    if (Err != 0) {
       LOG_CRITICAL("ocnInit: Error initializing tracers infrastructure");
@@ -132,6 +161,19 @@ int initOmegaModules(MPI_Comm Comm) {
       LOG_CRITICAL("ocnInit: Error initializing default state");
       return Err;
    }
+
+   // Now that all fields have been defined, validate all the streams
+   // contents
+   bool StreamsValid = IOStream::validateAll();
+   if (!StreamsValid) {
+      LOG_CRITICAL("ocnInit: Error validating IO Streams");
+      return Err;
+   }
+
+   // Initialize data from Restart or InitialState files
+   std::string SimTimeStr          = " "; // create SimulationTime metadata
+   std::shared_ptr<Field> SimField = Field::get(SimMeta);
+   SimField->addMetadata("SimulationTime", SimTimeStr);
 
    return Err;
 } // end initOmegaModules

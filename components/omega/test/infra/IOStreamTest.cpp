@@ -181,12 +181,13 @@ int initIOStreamTest(Clock *&ModelClock // Model clock
    TestEval("Add Salinity to tracer group", Err1, ErrRef, Err);
 
    // Also create a Restart group
-   auto RestartGroup = FieldGroup::create("Restart");
+   if (!FieldGroup::exists("Restart"))
+      auto RestartGroup = FieldGroup::create("Restart");
 
    // Add fields to restart group
-   Err1 = RestartGroup->addField("Temperature");
+   Err1 = FieldGroup::addFieldToGroup("Temperature", "Restart");
    TestEval("Add Temperature to restart group", Err1, ErrRef, Err);
-   Err1 = RestartGroup->addField("Salinity");
+   Err1 = FieldGroup::addFieldToGroup("Salinity", "Restart");
    TestEval("Add Salinity to restart group", Err1, ErrRef, Err);
 
    // End of init
