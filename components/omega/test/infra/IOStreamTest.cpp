@@ -171,14 +171,21 @@ int initIOStreamTest(Clock *&ModelClock // Model clock
        Field::create("Salinity", "Salinity at cell centers", "",
                      "sea_water_salinity", 0.0, 100.0, FillValue, 2, DimNames);
 
-   // Create Tracer group
+   // Create Tracer group and Base tracer group
    auto TracerGroup = FieldGroup::create("Tracers");
+   auto BaseGroup   = FieldGroup::create("Base");
 
    // Add fields to tracer group
    Err1 = TracerGroup->addField("Temperature");
    TestEval("Add Temperature to tracer group", Err1, ErrRef, Err);
    Err1 = TracerGroup->addField("Salinity");
    TestEval("Add Salinity to tracer group", Err1, ErrRef, Err);
+
+   // Add fields to base tracer group
+   Err1 = BaseGroup->addField("Temperature");
+   TestEval("Add Temperature to base tracer group", Err1, ErrRef, Err);
+   Err1 = BaseGroup->addField("Salinity");
+   TestEval("Add Salinity to base tracer group", Err1, ErrRef, Err);
 
    // Also create a Restart group
    if (!FieldGroup::exists("Restart"))

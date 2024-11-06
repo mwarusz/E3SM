@@ -175,7 +175,54 @@ int initOmegaModules(MPI_Comm Comm) {
    std::shared_ptr<Field> SimField = Field::get(SimMeta);
    SimField->addMetadata("SimulationTime", SimTimeStr);
 
+   // read from initial state if this is starting a new simulation
+   Metadata ReqMeta; // no requested metadata for initial state
+   Err = IOStream::read("InitialState", ModelClock, ReqMeta);
+   if (Err != 0) {
+      LOG_CRITICAL("Error reading the initial state file");
+      return Err;
+   }
+
+   // read restart if starting from restart
+   SimTimeStr                = " ";
+   ReqMeta["SimulationTime"] = SimTimeStr;
+   Err = IOStream::read("RestartRead", ModelClock, ReqMeta);
+   if (Err != 0) {
+      LOG_CRITICAL("Error reading the restart file");
+      return Err;
+   }
+
+   // If reading from restart, reset the current time to the input time
+   if (SimTimeStr != " ") {
+      TimeInstant NewCurrentTime(SimTimeStr);
+      Err = ModelClock->setCurrentTime(NewCurrentTime);
+      if (Err != 0) {
+         LOG_CRITICAL("Error resetting the simulation time from restart");
+         return Err;
+      }
+   }
+
+   // Update Halos and Device arrays with new state and tracer fields
+
+   OceanState *DefState = OceanState::getDefault();
+   I4 CurTimeLevel      = DefState->CurLevel;
+   DefState->exchangeHalo(CurTimeLevel);
+   DefState->copyToDevice(CurTimeLevel);
+
+   // Now update tracers - assume using same time level index
+   Err = Tracers::exchangeHalo(CurTimeLevel);
+   if (Err != 0) {
+      LOG_CRITICAL("Error updating tracer halo after restart");
+      return Err;
+   }
+   Err = Tracers::copyToDevice(CurTimeLevel);
+   if (Err != 0) {
+      LOG_CRITICAL("Error updating tracer device arrays after restart");
+      return Err;
+   }
+
    return Err;
+
 } // end initOmegaModules
 
 } // end namespace OMEGA
