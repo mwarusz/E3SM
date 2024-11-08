@@ -205,7 +205,7 @@ int initOmegaModules(MPI_Comm Comm) {
    // Update Halos and Device arrays with new state and tracer fields
 
    OceanState *DefState = OceanState::getDefault();
-   I4 CurTimeLevel      = DefState->CurLevel;
+   I4 CurTimeLevel      = 0;
    DefState->exchangeHalo(CurTimeLevel);
    DefState->copyToDevice(CurTimeLevel);
 
