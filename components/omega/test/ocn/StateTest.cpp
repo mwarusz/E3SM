@@ -415,11 +415,12 @@ int main(int argc, char *argv[]) {
             // -(NTimeLevels-2). After an update the time indices shift to
             // one older level, but wraps around if they extend below the
             // lower limit.
+            int NMin          = -(NTimeLevels - 2);
             int CurTimeUpdate = CurTime - N;
             int NewTimeUpdate = NewTime - N;
-            if (CurTimeUpdate < NTimeLevels - 2)
+            if (CurTimeUpdate < NMin)
                CurTimeUpdate += NTimeLevels;
-            if (NewTimeUpdate < NTimeLevels - 2)
+            if (NewTimeUpdate < NMin)
                NewTimeUpdate += NTimeLevels;
 
             // Check updated levels show up in the right place
