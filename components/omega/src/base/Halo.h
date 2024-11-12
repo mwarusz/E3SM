@@ -218,9 +218,9 @@ class Halo {
    /// the neighboring tasks
    int startSends();
 
-   /// Function template to find the memory space the input Array is defined in
-
-   template<typename T> ArrayMemLoc findMemLoc(const T &Array) {
+   /// Function template to find the memory space in which the input Array
+   /// is defined.
+   template <typename T> ArrayMemLoc findMemLoc(const T &Array) {
       if (std::is_same_v<MemSpace, HostMemSpace>) {
          return ArrayMemLoc::Both;
       } else if (T::is_hostspace) {
@@ -229,6 +229,15 @@ class Halo {
          return ArrayMemLoc::Device;
       }
    }
+
+   /// Struct template to specify the rank of a supported Array
+   template <class T> struct ArrayRank {
+      static constexpr bool Is1D = T::rank == 1;
+      static constexpr bool Is2D = T::rank == 2;
+      static constexpr bool Is3D = T::rank == 3;
+      static constexpr bool Is4D = T::rank == 4;
+      static constexpr bool Is5D = T::rank == 5;
+   };
 
    /// Buffer pack functions overloaded to each supported Kokkos array type.
    /// Select out the proper elements from the input Array to send to a
