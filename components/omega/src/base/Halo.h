@@ -22,8 +22,8 @@
 #include "Decomp.h"
 #include "Logging.h"
 #include "MachEnv.h"
-#include "mpi.h"
 #include "OmegaKokkos.h"
+#include "mpi.h"
 #include <memory>
 #include <numeric>
 
@@ -37,8 +37,11 @@ static const MPI_Datatype MPI_RealKind = MPI_FLOAT;
 static const MPI_Datatype MPI_RealKind = MPI_DOUBLE;
 #endif
 
-/// The meshElement enum identifies the index space to use for a halo exchange.
+/// The MeshElement enum identifies the index space to use for a halo exchange.
 enum MeshElement { OnCell, OnEdge, OnVertex };
+
+/// The ArrayMemLoc enum identifies the memory location of an array
+enum class ArrayMemLoc { Unknown, Device, Host, Both };
 
 /// The Halo class contains two nested classes, ExchList and Neighbor classes,
 /// defined below. The Halo class holds all the Neighbor objects needed by a
@@ -214,6 +217,18 @@ class Halo {
    /// Call MPI_Isend for each Neighbor to send the packed buffers to
    /// the neighboring tasks
    int startSends();
+
+   /// Function template to find the memory space the input Array is defined in
+
+   template<typename T> ArrayMemLoc findMemLoc(const T &Array) {
+      if (std::is_same_v<MemSpace, HostMemSpace>) {
+         return ArrayMemLoc::Both;
+      } else if (T::is_hostspace) {
+         return ArrayMemLoc::Host;
+      } else {
+         return ArrayMemLoc::Device;
+      }
+   }
 
    /// Buffer pack functions overloaded to each supported Kokkos array type.
    /// Select out the proper elements from the input Array to send to a
