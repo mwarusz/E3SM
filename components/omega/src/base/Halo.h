@@ -230,6 +230,16 @@ class Halo {
       }
    }
 
+   /// Function template that returns a bool that is true if the Array is
+   /// on the device, or if the device and host memory spaces are the same
+   /// space. Used to determine if buffer packs and unpacks are done within
+   /// Kokkos parallelFor kernels.
+   template <typename T> bool devBufferPUP(const T &Array) {
+      bool OnDev = findMemLoc(Array) == ArrayMemLoc::Both ||
+                   findMemLoc(Array) == ArrayMemLoc::Device;
+      return OnDev;
+   }
+
    /// Struct template to specify the rank of a supported Array
    template <class T> struct ArrayRank {
       static constexpr bool Is1D = T::rank == 1;
