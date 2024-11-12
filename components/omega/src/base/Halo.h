@@ -23,6 +23,7 @@
 #include "Logging.h"
 #include "MachEnv.h"
 #include "mpi.h"
+#include "OmegaKokkos.h"
 #include <memory>
 #include <numeric>
 
@@ -98,12 +99,15 @@ class Halo {
       std::vector<I4> NList;
       /// Total number of elements in ExchList, sum of NList
       I4 NTot;
-      /// Array containing starting indices in the buffer for each halo layer
-      std::vector<I4> Offsets;
-      /// 2D vector containing for each halo layer the list of local
-      /// indices of elements to be packed into the send buffer, or the local
-      /// indices of elements unpacked from the receive buffer
-      std::vector<std::vector<I4>> Ind;
+      /// Host and device arrays containing starting indices in the
+      /// buffer for each halo layer
+      HostArray1DI4 OffsetsH;
+      Array1DI4 Offsets;
+      /// Host and device arrays containing the list of local indices of array
+      /// elements to be packed into the send buffer, or the local indices of
+      /// elements unpacked from the receive buffer
+      HostArray1DI4 IndexH;
+      Array1DI4 Index;
 
       /// The constructor for the ExchList class takes as input an array of
       /// vectors, each containing a list of indices to be sent or received for
@@ -131,8 +135,9 @@ class Halo {
       /// Arrays of ExchList objects for sends and recieves for each
       /// index space. 0 = OnCell, 1 = OnEdge, 2 = OnVertex
       ExchList SendLists[3], RecvLists[3];
-      /// Buffers for MPI communication
-      std::vector<R8> SendBuffer, RecvBuffer;
+      /// Buffers for MPI communication on host and device
+      HostArray1DR8 SendBufferH, RecvBufferH;
+      Array1DR8 SendBuffer, RecvBuffer;
       /// MPI request handles for non-blocking MPI communication
       MPI_Request RReq, SReq;
 
