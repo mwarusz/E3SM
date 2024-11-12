@@ -53,26 +53,39 @@ Halo::ExchList::ExchList(
    // First dimension of List is the number of halo layers
    I4 HaloLayers = List.size();
 
-   // Set member vector sizes to number of halo layers
-   NList.resize(HaloLayers);
-   Offsets.resize(HaloLayers);
+   // Allocate member vectors and arrays based on number of halo layers
+   NHalo.resize(HaloLayers);
+   OffsetsH = HostArray1DI4("OffsetsH", HaloLayers);
+   Offsets  = Array1DI4("Offsets", HaloLayers);
 
-   // Copy List into member 2D vector Ind which holds the indices
-   Ind = List;
-
-   // Count the total number of elements in the list and set the
-   // number of elements in each halo layer
+   // Count the total number of elements in the list, set the number of
+   // elements in each halo layer, and set the offsets for each layer
    NTot = 0;
-   for (int I = 0; I < HaloLayers; ++I) {
-      NList[I] = List[I].size();
-      NTot += NList[I];
+   OffsetsH(0) = 0;
+   for (int IHalo = 0; IHalo < HaloLayers-1; ++IHalo) {
+      NHalo[IHalo] = List[IHalo].size();
+      NTot += NHalo[IHalo];
+      OffsetsH(IHalo + 1) = OffsetsH(IHalo) + NHalo[IHalo];
+   }
+   NHalo[HaloLayers-1] = List[HaloLayers-1].size();
+   NTot += NHalo[HaloLayers-1];
+
+   // Copy OffsetsH to device
+   deepCopy(Offsets, OffsetsH);
+
+   // Allocate host and device arrays for storing lists of indices
+   IndexH = HostArray1DI4("IndexH", NTot);
+   Index = Array1DI4("Index", NTot);
+
+   // Copy List into member IndexH array on host
+   for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
+      for (int IList = 0; IList < NHalo[IHalo]; ++IList) {
+         IndexH(OffsetsH(IHalo) + IList) = List[IHalo][IList];
+      }
    }
 
-   // Set the index offsets for each halo layer
-   Offsets[0] = 0;
-   for (int I = 0; I < HaloLayers - 1; ++I) {
-      Offsets[I + 1] = Offsets[I] + NList[I];
-   }
+   // Copy IndexH to device
+   deepCopy(Index, IndexH);
 
 } // end ExchList constructor
 
@@ -104,6 +117,12 @@ Halo::Neighbor::Neighbor(
    RecvLists[0] = ExchList(RecvCell);
    RecvLists[1] = ExchList(RecvEdge);
    RecvLists[2] = ExchList(RecvVrtx);
+
+   SendBuffer = Array1DR8("SendBuffer", 0);
+   RecvBuffer = Array1DR8("RecvBuffer", 0);
+
+   SendBufferH = HostArray1DR8("SendBufferH", 0);
+   RecvBufferH = HostArray1DR8("RecvBufferH", 0);
 
 } // end Neighbor constructor
 

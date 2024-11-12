@@ -96,7 +96,7 @@ class Halo {
    class ExchList {
     private:
       /// Array containing number of mesh elements in each halo layer
-      std::vector<I4> NList;
+      std::vector<I4> NHalo;
       /// Total number of elements in ExchList, sum of NList
       I4 NTot;
       /// Host and device arrays containing starting indices in the
@@ -114,10 +114,12 @@ class Halo {
       /// each halo layer for a particular neighbor
       ExchList(const std::vector<std::vector<I4>> List);
 
-      /// Empty constructor for ExchList class, needed by the definition
-      /// of the Neighbor class below which contains arrays of
-      /// uninitialized ExchList objects
+      /// Empty constructor for ExchList class
       ExchList();
+
+    public:
+      /// Destructor
+      ~ExchListD() {}
 
       /// Halo and Neighbor are friend class to allow access to private
       /// members of the class
@@ -157,6 +159,10 @@ class Halo {
                const std::vector<std::vector<I4>> &RecvCell,
                const std::vector<std::vector<I4>> &RecvEdge,
                const std::vector<std::vector<I4>> &RecvVert, const I4 NghbrID);
+
+    public:
+      /// Destructor
+      ~NeighborD() {}
 
       /// Halo is a friend class to allow access to private members
       /// of the class
