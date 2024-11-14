@@ -653,7 +653,7 @@ int Halo::exchangeVectorInt(
 // Allocate RecvBuffer and prepare for MPI communication by calling MPI_Irecv
 // for each Neighbor
 
-int Halo::startReceives() {
+int Halo::startReceives(const bool UseDevBuffer) {
 
    // Initialize vector to track MPI errors for each MPI_Irecv
    std::vector<I4> IErr(NNghbr, 0);
@@ -661,16 +661,27 @@ int Halo::startReceives() {
    I4 Err{0}; // Error code to return
 
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      if (RecvFlags[MyElem][INghbr]) {
-         MyNeighbor    = &Neighbors[INghbr];
-         I4 BufferSize = TotSize * MyNeighbor->RecvLists[MyElem].NTot;
-         MyNeighbor->RecvBuffer.resize(BufferSize);
-         IErr[INghbr] = MPI_Irecv(&MyNeighbor->RecvBuffer[0], BufferSize,
-                                  MPI_DOUBLE, MyNeighbor->TaskID, MPI_ANY_TAG,
-                                  MyComm, &MyNeighbor->RReq);
+      if (RecvFlags[CurElem][INghbr]) {
+         auto &LocNeighbor = Neighbors[INghbr];
+
+         I4 BufferSize = TotSize * LocNeighbor.RecvLists[CurElem].NTot;
+
+         void *DataPtr{nullptr};
+
+         if (UseDevBuffer && ExchOnDev) {
+            Kokkos::resize(LocNeighbor.RecvBuffer, BufferSize);
+            DataPtr = LocNeighbor.RecvBuffer.data();
+         } else {
+            Kokkos::resize(LocNeighbor.RecvBufferH, BufferSize);
+            DataPtr = LocNeighbor.RecvBufferH.data();
+         }
+
+         IErr[INghbr] =
+             MPI_Irecv(DataPtr, BufferSize, MPI_DOUBLE, LocNeighbor.TaskID,
+                       MPI_ANY_TAG, MyComm, &LocNeighbor.RReq);
          if (IErr[INghbr] != 0) {
             LOG_ERROR("MPI error {} on task {} receive from task {}",
-                      IErr[INghbr], MyTask, MyNeighbor->TaskID);
+                      IErr[INghbr], MyTask, LocNeighbor.TaskID);
             Err = -1;
          }
       }
@@ -683,23 +694,42 @@ int Halo::startReceives() {
 // Initiate MPI communication by calling MPI_Isend for each Neighbor to send
 // the packed buffers to each task
 
-int Halo::startSends() {
+int Halo::startSends(const bool UseDevBuffer) {
 
    // Initialize vector to track MPI errors for each MPI_Isend
    std::vector<I4> IErr(NNghbr, 0);
 
    I4 Err{0}; // Error code to return
 
+   if (UseDevBuffer)
+      Kokkos::fence();
+
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      if (SendFlags[MyElem][INghbr]) {
-         MyNeighbor    = &Neighbors[INghbr];
-         I4 BufferSize = TotSize * MyNeighbor->SendLists[MyElem].NTot;
+      if (SendFlags[CurElem][INghbr]) {
+         auto &LocNeighbor = Neighbors[INghbr];
+
+         void *DataPtr{nullptr};
+
+         I4 BufferSize = TotSize * LocNeighbor.SendLists[CurElem].NTot;
+
+         if (DeviceArray) {
+            if (ExchOnDev) {
+               DataPtr = LocNeighbor.SendBuffer.data();
+            } else {
+               Kokkos::resize(LocNeighbor.SendBufferH, BufferSize);
+               deepCopy(LocNeighbor.SendBufferH, LocNeighbor.SendBuffer);
+               DataPtr = LocNeighbor.SendBufferH.data();
+            }
+         } else {
+            DataPtr = LocNeighbor.SendBufferH.data();
+         }
+
          IErr[INghbr] =
-             MPI_Isend(&MyNeighbor->SendBuffer[0], BufferSize, MPI_DOUBLE,
-                       MyNeighbor->TaskID, 0, MyComm, &MyNeighbor->SReq);
+             MPI_Isend(DataPtr, BufferSize, MPI_DOUBLE, LocNeighbor.TaskID, 0,
+                       MyComm, &LocNeighbor.SReq);
          if (IErr[INghbr] != 0) {
             LOG_ERROR("MPI error {} on task {} send to task {}", IErr[INghbr],
-                      MyTask, MyNeighbor->TaskID);
+                      MyTask, LocNeighbor.TaskID);
             Err = -1;
          }
       }
