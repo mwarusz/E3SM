@@ -54,6 +54,12 @@ enum class ArrayMemLoc { Unknown, Device, Host, Both };
 /// here for easy accesibility by the Halo methods.
 class Halo {
  private:
+#ifdef OMEGA_MPI_ON_DEVICE
+   const ExchOnDev = true;
+#else
+   const ExchOnDev = false;
+#endif
+
    /// The default Halo handles halo exchanges for arrays defined on the mesh
    /// with the default decomposition. A pointer is stored here for easy
    /// retrieval.
@@ -90,10 +96,6 @@ class Halo {
    /// Flags to control which tasks in NeighborList that the local task needs to
    /// send elements to and receive elements from for each index space.
    std::vector<I4> SendFlags[3], RecvFlags[3];
-
-   /// Pointer to current neighbor, utilized in the various member functions
-   /// to make code more concise.
-   Neighbor *MyNeighbor{nullptr};
 
    /// The ExchList class contains the information needed to pack values from
    /// an array into a buffer or unpack values from a buffer into an array
@@ -214,11 +216,11 @@ class Halo {
                          const MeshElement IndexSpace);
 
    /// Allocate the recieve buffers and call MPI_Irecv for each Neighbor
-   int startReceives();
+   int startReceives(bool UseDevBuffer);
 
    /// Call MPI_Isend for each Neighbor to send the packed buffers to
    /// the neighboring tasks
-   int startSends();
+   int startSends(bool UseDevBuffer);
 
    /// Function template to find the memory space in which the input Array
    /// is defined.
