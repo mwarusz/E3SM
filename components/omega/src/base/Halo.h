@@ -49,15 +49,15 @@ enum class ArrayMemLoc { Unknown, Device, Host, Both };
 /// defined below. The Halo class holds all the Neighbor objects needed by a
 /// task to perform a full halo exchange with each of its neighboring tasks for
 /// any array defined on the mesh. The local task ID and the MPI communicator
-/// handle are also stored here. NumLayers, CurElem, TotSize, and MyNeighbor are
-/// temporary variables utilized by the current halo exchange which are stored
-/// here for easy accesibility by the Halo methods.
+/// handle are also stored here. NumLayers, CurElem, and TotSize are temporary
+/// variables utilized by the current halo exchange which are stored here
+/// for easy accesibility by the Halo methods.
 class Halo {
  private:
 #ifdef OMEGA_MPI_ON_DEVICE
-   const ExchOnDev = true;
+   const bool ExchOnDev = true;
 #else
-   const ExchOnDev = false;
+   const bool ExchOnDev = false;
 #endif
 
    /// The default Halo handles halo exchanges for arrays defined on the mesh
@@ -126,7 +126,7 @@ class Halo {
 
     public:
       /// Destructor
-      ~ExchListD() {}
+      ~ExchList() {}
 
       /// Halo and Neighbor are friend class to allow access to private
       /// members of the class
@@ -169,7 +169,7 @@ class Halo {
 
     public:
       /// Destructor
-      ~NeighborD() {}
+      ~Neighbor() {}
 
       /// Halo is a friend class to allow access to private members
       /// of the class
@@ -756,11 +756,11 @@ class Halo {
       bool AllReceived{false};
 
       // Save the index space the input array is defined on
-      MyElem = ThisElem;
+      CurElem = ThisElem;
 
       // For cell-based quantities, the number of halo layers equals HaloWidth,
       // edge- and vertex-based quantities have an extra layer.
-      if (MyElem == OnCell) {
+      if (CurElem == OnCell) {
          NumLayers = HaloWidth;
       } else {
          NumLayers = HaloWidth + 1;
@@ -781,30 +781,32 @@ class Halo {
          TotSize *= Array.extent(NDims - 1);
       }
 
+      // If the Array is on device, the buffer pack and unpack functions
+      // will use device buffers
+      bool UseDevBuffer = devBufferPUP(Array);
+
       // Allocate the receive buffers and Call MPI_Irecv for each Neighbor
       // so the local task is ready to accept messages from each
       // neighboring task
-      startReceives();
+      startReceives(UseDevBuffer);
 
       // Loop through each Neighbor, resetting communication flags and packing
       // buffers if there are elements to be sent to the neighboring task
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-         MyNeighbor           = &Neighbors[INghbr];
-         MyNeighbor->Received = false;
-         MyNeighbor->Unpacked = false;
-         if (SendFlags[MyElem][INghbr]) {
-            packBuffer(Array);
+         Neighbors[INghbr].Received = false;
+         Neighbors[INghbr].Unpacked = false;
+         if (SendFlags[CurElem][INghbr]) {
+            packBuffer(Array, INghbr);
          }
       }
 
       // Call MPI_Isend for each Neighbor to send the packed buffers
-      startSends();
+      startSends(UseDevBuffer);
 
       // Wait for all sends to complete before proceeding
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-         if (SendFlags[MyElem][INghbr]) {
-            MyNeighbor = &Neighbors[INghbr];
-            MPI_Wait(&MyNeighbor->SReq, MPI_STATUS_IGNORE);
+         if (SendFlags[CurElem][INghbr]) {
+            MPI_Wait(&Neighbors[INghbr].SReq, MPI_STATUS_IGNORE);
          }
       }
 
@@ -813,26 +815,31 @@ class Halo {
       I4 NRcvd   = 0;          // Integer to track number of messages received
 
       // Total number of messages the local task will receive
-      I4 NMessages = std::accumulate(RecvFlags[MyElem].begin(),
-                                     RecvFlags[MyElem].end(), 0);
+      I4 NMessages = std::accumulate(RecvFlags[CurElem].begin(),
+                                     RecvFlags[CurElem].end(), 0);
 
       // Until all messages from neighboring tasks are received, loop
       // through Neighbor objects and use MPI_Test to check if the message
       // has been received. Unpack buffers upon receipt of each message
-      while (not AllReceived) {
+      while (!AllReceived) {
          for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-            if (RecvFlags[MyElem][INghbr]) {
-               MyNeighbor = &Neighbors[INghbr];
-               if (not MyNeighbor->Received) {
-                  MPI_Test(&MyNeighbor->RReq, &MyNeighbor->Received,
+            if (RecvFlags[CurElem][INghbr]) {
+               if (!Neighbors[INghbr].Received) {
+                  MPI_Test(&Neighbors[INghbr].RReq, &Neighbors[INghbr].Received,
                            MPI_STATUS_IGNORE);
-                  if (MyNeighbor->Received) {
+                  if (Neighbors[INghbr].Received) {
                      ++NRcvd;
                   }
                }
-               if (MyNeighbor->Received and not MyNeighbor->Unpacked) {
-                  unpackBuffer(Array);
-                  MyNeighbor->Unpacked = true;
+               if (Neighbors[INghbr].Received && !Neighbors[INghbr].Unpacked) {
+                  if (UseDevBuffer && !ExchOnDev) {
+                     Kokkos::resize(Neighbors[INghbr].RecvBuffer,
+                                    Neighbors[INghbr].RecvBufferH.size());
+                     deepCopy(Neighbors[INghbr].RecvBuffer,
+                              Neighbors[INghbr].RecvBufferH);
+                  }
+                  unpackBuffer(Array, INghbr);
+                  Neighbors[INghbr].Unpacked = true;
                }
             }
          }

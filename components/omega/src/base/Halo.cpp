@@ -712,7 +712,7 @@ int Halo::startSends(const bool UseDevBuffer) {
 
          I4 BufferSize = TotSize * LocNeighbor.SendLists[CurElem].NTot;
 
-         if (DeviceArray) {
+         if (UseDevBuffer) {
             if (ExchOnDev) {
                DataPtr = LocNeighbor.SendBuffer.data();
             } else {
