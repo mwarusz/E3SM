@@ -328,11 +328,8 @@ int initState(const Array2DReal &LayerThickCell,
           }
        });
 
-   auto MyHalo    = Halo::getDefault();
-   auto &FVertexH = Mesh->FVertexH;
-   deepCopy(FVertexH, FVertex);
-   Err += MyHalo->exchangeFullArrayHalo(FVertexH, OnVertex);
-   deepCopy(FVertex, FVertexH);
+   auto MyHalo = Halo::getDefault();
+   Err += MyHalo->exchangeFullArrayHalo(FVertex, OnVertex);
 
    return Err;
 }

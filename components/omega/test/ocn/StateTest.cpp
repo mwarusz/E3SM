@@ -334,6 +334,7 @@ int main(int argc, char *argv[]) {
       // Finalize Omega objects
       OMEGA::TimeStepper::clear();
       OMEGA::HorzMesh::clear();
+      OMEGA::Halo::clear();
       OMEGA::Decomp::clear();
       OMEGA::MachEnv::removeAll();
       OMEGA::FieldGroup::clear();

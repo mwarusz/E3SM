@@ -116,12 +116,10 @@ int setScalar(const Functor &Fun, const Array2DReal &ScalarElement,
        });
 
    if (ExchangeHalosOpt == ExchangeHalos::Yes) {
-      auto MyHalo         = Halo::getDefault();
-      auto ScalarElementH = createHostMirrorCopy(ScalarElement);
-      Err = MyHalo->exchangeFullArrayHalo(ScalarElementH, Element);
+      auto MyHalo = Halo::getDefault();
+      Err         = MyHalo->exchangeFullArrayHalo(ScalarElement, Element);
       if (Err != 0)
          LOG_ERROR("setScalarElement: error in halo exchange");
-      deepCopy(ScalarElement, ScalarElementH);
    }
    return Err;
 }
@@ -183,12 +181,10 @@ int setScalar(const Functor &Fun, const Array3DReal &ScalarElement,
        });
 
    if (ExchangeHalosOpt == ExchangeHalos::Yes) {
-      auto MyHalo         = Halo::getDefault();
-      auto ScalarElementH = createHostMirrorCopy(ScalarElement);
-      Err = MyHalo->exchangeFullArrayHalo(ScalarElementH, Element);
+      auto MyHalo = Halo::getDefault();
+      Err         = MyHalo->exchangeFullArrayHalo(ScalarElement, Element);
       if (Err != 0)
          LOG_ERROR("setScalarElement: error in halo exchange");
-      deepCopy(ScalarElement, ScalarElementH);
    }
    return Err;
 }
@@ -305,12 +301,10 @@ int setVectorEdge(const Functor &Fun, const Array2DReal &VectorFieldEdge,
        });
 
    if (ExchangeHalosOpt == ExchangeHalos::Yes) {
-      auto MyHalo           = Halo::getDefault();
-      auto VectorFieldEdgeH = createHostMirrorCopy(VectorFieldEdge);
-      Err = MyHalo->exchangeFullArrayHalo(VectorFieldEdgeH, OnEdge);
+      auto MyHalo = Halo::getDefault();
+      Err         = MyHalo->exchangeFullArrayHalo(VectorFieldEdge, OnEdge);
       if (Err != 0)
          LOG_ERROR("setVectorEdge: error in halo exchange");
-      deepCopy(VectorFieldEdge, VectorFieldEdgeH);
    }
    return Err;
 }
