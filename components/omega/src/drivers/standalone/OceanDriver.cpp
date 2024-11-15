@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
    MPI_Init(&argc, &argv); // initialize MPI
    Kokkos::initialize();   // initialize Kokkos
    Pacer::initialize(MPI_COMM_WORLD);
-   Pacer::setPrefix("Omega");
+   Pacer::setPrefix("Omega:");
 
    Pacer::start("Init");
    ErrCurr = OMEGA::ocnInit(MPI_COMM_WORLD);
