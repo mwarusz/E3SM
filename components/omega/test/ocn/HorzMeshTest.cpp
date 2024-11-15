@@ -775,6 +775,7 @@ int main(int argc, char *argv[]) {
       // Finalize Omega objects
       OMEGA::HorzMesh::clear();
       OMEGA::Dimension::clear();
+      OMEGA::Halo::clear();
       OMEGA::Decomp::clear();
       OMEGA::MachEnv::removeAll();
 

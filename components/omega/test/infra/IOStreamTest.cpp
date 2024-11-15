@@ -301,6 +301,7 @@ int main(int argc, char **argv) {
    HorzMesh::clear();
    Field::clear();
    Dimension::clear();
+   Halo::clear();
    Decomp::clear();
    Kokkos::finalize();
    MPI_Finalize();
