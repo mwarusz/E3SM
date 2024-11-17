@@ -606,14 +606,24 @@ macro(update_variables)
     set(CMAKE_INSTALL_PREFIX ${OMEGA_INSTALL_PREFIX})
   endif()
 
+  if(NOT DEFINED OMEGA_MPI_ON_DEVICE)
+    option(OMEGA_MPI_ON_DEVICE "Allow device buffers in MPI communication (default ON)." ON)
+  endif()
+
   if("${OMEGA_ARCH}" STREQUAL "CUDA")
     option(Kokkos_ENABLE_CUDA "" ON)
     option(Kokkos_ENABLE_CUDA_LAMBDA "" ON)
     add_definitions(-DOMEGA_TARGET_DEVICE)
+    if(OMEGA_MPI_ON_DEVICE AND OMEGA_CIME_MACHINE STREQUAL "pm-gpu")
+      option(Kokkos_ENABLE_IMPL_CUDA_MALLOC_ASYNC "" OFF)
+    endif()
 
   elseif("${OMEGA_ARCH}" STREQUAL "HIP")
     option(Kokkos_ENABLE_HIP "" ON)
     add_definitions(-DOMEGA_TARGET_DEVICE)
+    if(OMEGA_MPI_ON_DEVICE AND OMEGA_CIME_MACHINE STREQUAL "frontier")
+      file(APPEND ${_EnvScript} "export MPICH_GPU_SUPPORT_ENABLED=1\n\n")
+    endif()
 
   elseif("${OMEGA_ARCH}" STREQUAL "SYCL")
     option(Kokkos_ENABLE_SYCL "" ON)
@@ -632,6 +642,10 @@ macro(update_variables)
   endif()
 
   add_definitions(-DOMEGA_ENABLE_${OMEGA_ARCH})
+
+  if(OMEGA_MPI_ON_DEVICE)
+    add_definitions(-DOMEGA_MPI_ON_DEVICE)
+  endif()
 
   # Include the findParmetis script
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
