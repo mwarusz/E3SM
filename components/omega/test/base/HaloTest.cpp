@@ -32,10 +32,10 @@ using namespace OMEGA;
 // InitArray contains the global IDs of the mesh elements for all the owned and
 // halo elements of the array, while TestArray contains the global IDs only in
 // the owned elements. The Halo class object, a label describing the test for
-// output, an integer to accumulate errors, and optionally the index space of
-// the input arrays (default is OnCell) are also input. A halo exchange is
-// performed on TestArray, and then TestArray is compared to InitArray. If any
-// elements differ the test is a failure and an error is returned.
+// output, and optionally the index space of the input arrays (default is
+// OnCell) are also input. An error code is returned as output. A halo exchange
+// is performed on TestArray, and then TestArray is compared to InitArray. If
+// any elements differ the test is a failure and an error is returned.
 
 template <typename T>
 int haloExchangeTest(

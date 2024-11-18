@@ -51,9 +51,11 @@ enum class ArrayMemLoc { Unknown, Device, Host, Both };
 /// any array defined on the mesh. The local task ID and the MPI communicator
 /// handle are also stored here. NumLayers, CurElem, and TotSize are temporary
 /// variables utilized by the current halo exchange which are stored here
-/// for easy accesibility by the Halo methods.
+/// for easy accessibility by the Halo methods.
 class Halo {
  private:
+   /// Flag to allow passing device arrays to MPI_Irecv and MPI_Isend in
+   /// startReceives and startSends, determined by pre-processing parameter
 #ifdef OMEGA_MPI_ON_DEVICE
    const bool ExchOnDev = true;
 #else
@@ -93,7 +95,7 @@ class Halo {
    /// an owned element is in the halo of that task in at least one index space.
    std::vector<I4> NeighborList;
 
-   /// Flags to control which tasks in NeighborList that the local task needs to
+   /// Flags to control which tasks in NeighborList the local task needs to
    /// send elements to and receive elements from for each index space.
    std::vector<I4> SendFlags[3], RecvFlags[3];
 
@@ -215,11 +217,14 @@ class Halo {
                          std::vector<std::vector<std::vector<I4>>> &RecvLists,
                          const MeshElement IndexSpace);
 
-   /// Allocate the recieve buffers and call MPI_Irecv for each Neighbor
+   /// Allocate the recieve buffers and call MPI_Irecv for each Neighbor.
+   /// The input bool UseDevBuffer specifies whether or not the device buffer
+   /// will be used in the unpackBuffer functionfor unpacking into the array.
    int startReceives(bool UseDevBuffer);
 
-   /// Call MPI_Isend for each Neighbor to send the packed buffers to
-   /// the neighboring tasks
+   /// Call MPI_Isend for each Neighbor to send the packed buffers to the
+   /// neighboring tasks. The input bool UseDevBuffer specifies whether or not
+   /// the device buffer was packed in the packBuffer function.
    int startSends(bool UseDevBuffer);
 
    /// Function template to find the memory space in which the input Array
@@ -293,7 +298,7 @@ class Halo {
    /// that Neighbor.
    template <typename T>
    typename std::enable_if_t<ArrayRank<T>::Is1D, int>
-   packBuffer(const T &Array,      // Kokkos array of any type
+   packBuffer(const T &Array,      // 1D Kokkos array of any type
               const I4 CurNeighbor // current neighbor
    ) {
       I4 Err = 0;
@@ -326,7 +331,7 @@ class Halo {
 
    template <typename T>
    typename std::enable_if_t<ArrayRank<T>::Is2D, int>
-   packBuffer(const T &Array,      // Kokkos array of any type
+   packBuffer(const T &Array,      // 2D Kokkos array of any type
               const I4 CurNeighbor // current neighbor
    ) {
       I4 Err = 0;
@@ -366,7 +371,7 @@ class Halo {
 
    template <typename T>
    typename std::enable_if_t<ArrayRank<T>::Is3D, int>
-   packBuffer(const T &Array,      // Kokkos array of any type
+   packBuffer(const T &Array,      // 3D Kokkos array of any type
               const I4 CurNeighbor // current neighbor
    ) {
       I4 Err = 0;
@@ -411,7 +416,7 @@ class Halo {
 
    template <typename T>
    typename std::enable_if_t<ArrayRank<T>::Is4D, int>
-   packBuffer(const T &Array,      // Kokkos array of any type
+   packBuffer(const T &Array,      // 4D Kokkos array of any type
               const I4 CurNeighbor // current neighbor
    ) {
       I4 Err = 0;
@@ -461,7 +466,7 @@ class Halo {
 
    template <typename T>
    typename std::enable_if_t<ArrayRank<T>::Is5D, int>
-   packBuffer(const T &Array,      // Kokkos array of any type
+   packBuffer(const T &Array,      // 5D Kokkos array of any type
               const I4 CurNeighbor // current neighbor
    ) {
       I4 Err = 0;
@@ -520,7 +525,7 @@ class Halo {
    /// corresponding halo elements of the input Array
    template <typename T>
    typename std::enable_if_t<ArrayRank<T>::Is1D, int>
-   unpackBuffer(const T &Array,      // Kokkos array of any type
+   unpackBuffer(const T &Array,      // 1D Kokkos array of any type
                 const I4 CurNeighbor // current neighbor
    ) {
       I4 Err = 0;
@@ -552,7 +557,7 @@ class Halo {
 
    template <typename T>
    typename std::enable_if_t<ArrayRank<T>::Is2D, int>
-   unpackBuffer(const T &Array,      // Kokkos array of any type
+   unpackBuffer(const T &Array,      // 2D Kokkos array of any type
                 const I4 CurNeighbor // current neighbor
    ) {
       I4 Err = 0;
@@ -591,7 +596,7 @@ class Halo {
 
    template <typename T>
    typename std::enable_if_t<ArrayRank<T>::Is3D, int>
-   unpackBuffer(const T &Array,      // Kokkos array of any type
+   unpackBuffer(const T &Array,      // 3D Kokkos array of any type
                 const I4 CurNeighbor // current neighbor
    ) {
       I4 Err = 0;
@@ -636,7 +641,7 @@ class Halo {
 
    template <typename T>
    typename std::enable_if_t<ArrayRank<T>::Is4D, int>
-   unpackBuffer(const T &Array,      // Kokkos array of any type
+   unpackBuffer(const T &Array,      // 4D Kokkos array of any type
                 const I4 CurNeighbor // current neighbor
    ) {
       I4 Err = 0;
@@ -687,7 +692,7 @@ class Halo {
 
    template <typename T>
    typename std::enable_if_t<ArrayRank<T>::Is5D, int>
-   unpackBuffer(const T &Array,      // Kokkos array of any type
+   unpackBuffer(const T &Array,      // 5D Kokkos array of any type
                 const I4 CurNeighbor // current neighbor
    ) {
       I4 Err = 0;
@@ -781,8 +786,8 @@ class Halo {
          TotSize *= Array.extent(NDims - 1);
       }
 
-      // If the Array is on device, the buffer pack and unpack functions
-      // will use device buffers
+      // If the Array is in device memory space, the buffer pack and unpack
+      // functions will use device buffers
       bool UseDevBuffer = devBufferPUP(Array);
 
       // Allocate the receive buffers and Call MPI_Irecv for each Neighbor
@@ -832,6 +837,9 @@ class Halo {
                   }
                }
                if (Neighbors[INghbr].Received && !Neighbors[INghbr].Unpacked) {
+                  // If the device buffer will be used in unpackBuffer, but the
+                  // exchange was done with the host buffer, a deep copy from
+                  // host to device is needed.
                   if (UseDevBuffer && !ExchOnDev) {
                      Kokkos::resize(Neighbors[INghbr].RecvBuffer,
                                     Neighbors[INghbr].RecvBufferH.size());
