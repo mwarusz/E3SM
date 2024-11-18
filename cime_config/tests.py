@@ -678,6 +678,7 @@ _TESTS = {
             "ERS_Ln22.ne4pg2_ne4pg2.F2010-SCREAMv1.scream-small_kernels--scream-output-preset-5",
             "ERS_Ln22.ne4pg2_ne4pg2.F2010-SCREAMv1.scream-small_kernels_p3--scream-output-preset-5",
             "ERS_Ln22.ne4pg2_ne4pg2.F2010-SCREAMv1.scream-small_kernels_shoc--scream-output-preset-5",
+            "SMS_D_Ln5.ne4pg2_oQU480.F2010-SCREAMv1-MPASSI.scream-mam4xx-all_mam4xx_procs",
             )
     },
 
@@ -708,6 +709,8 @@ _TESTS = {
             "PEM_Ln90.ne30pg2_ne30pg2.F2010-SCREAMv1.scream-spa_remap--scream-output-preset-4",
             "ERS_Ln90.ne30pg2_ne30pg2.F2010-SCREAMv1.scream-small_kernels--scream-output-preset-5",
             "ERP_Ln22.conusx4v1pg2_r05_oECv3.F2010-SCREAMv1-noAero.scream-bfbhash--scream-output-preset-6",
+            "ERS_Ln22.ne30pg2_ne30pg2.F2010-SCREAMv1.scream-L128--scream-output-preset-4",
+            "REP_Ld5.ne30pg2_ne30pg2.F2010-SCREAMv1.scream-L128--scream-output-preset-6"
             )
     },
 
@@ -820,12 +823,13 @@ _TESTS = {
     },
 
     "e3sm_wav_developer" : {
-        "time"    : "0:45:00",
+        "time"    : "1:00:00",
         "tests"   : (
-            "ERS.TL319_EC30to60E2r2_wQU225EC30to60E2r2.GMPAS-JRA1p5-WW3.ww3-jra_1958",
-            "PEM.TL319_EC30to60E2r2_wQU225EC30to60E2r2.GMPAS-JRA1p5-WW3.ww3-jra_1958",
-            "PET.TL319_EC30to60E2r2_wQU225EC30to60E2r2.GMPAS-JRA1p5-WW3.ww3-jra_1958",
             "SMS_D_Ln3.TL319_EC30to60E2r2_wQU225EC30to60E2r2.GMPAS-JRA1p5-WW3.ww3-jra_1958",
+            "ERS.ne30pg2_IcoswISC30E3r5_wQU225Icos30E3r5.WCYCL1850-WW3",
+            "PEM_P480.ne30pg2_IcoswISC30E3r5_wQU225Icos30E3r5.WCYCL1850-WW3",
+            "PET.ne30pg2_IcoswISC30E3r5_wQU225Icos30E3r5.WCYCL1850-WW3",
+            "SMS_D_Ln3.ne30pg2_IcoswISC30E3r5_wQU225Icos30E3r5.WCYCL1850-WW3",
             )
     },
 
