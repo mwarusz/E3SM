@@ -5,9 +5,9 @@
 // supported Kokkos array types for a given machine environment (MachEnv)
 // and parallel decomposition (Decomp). These exchanges are carried out
 // via non-blocking MPI library routines. Constructor and private member
-// functions are defined here. The Halo class public member function
-// exchangeFullArrayHalo which is called by the user to perform halo
-// exchanges on a given array is a template function and thus is defined
+// functions are defined here. Multiple Halo member functions are defined
+// as function templates, including the main interface to perform a halo
+// exchange on a given array, exchangeFullArrayHalo, and thus are defined
 // in the associated header file, Halo.h.
 //
 //===----------------------------------------------------------------------===//
@@ -403,7 +403,7 @@ int Halo::setNeighborFlags(std::vector<I4> ListOfTasks,
       }
    }
 
-   // initialize vectors to track MPI errors for each MPI_Isend and MPI_IRecv
+   // initialize vectors to track MPI errors for each MPI_Isend and MPI_Irecv
    std::vector<I4> SendErr(NNghbr, 0);
    std::vector<I4> RecvErr(NNghbr, 0);
 
@@ -650,8 +650,8 @@ int Halo::exchangeVectorInt(
 } // end exchangeVectorInt
 
 //------------------------------------------------------------------------------
-// Allocate RecvBuffer and prepare for MPI communication by calling MPI_Irecv
-// for each Neighbor
+// Allocate the required receive buffer and prepare for MPI communication by
+// calling MPI_Irecv for each Neighbor
 
 int Halo::startReceives(const bool UseDevBuffer) {
 
@@ -668,6 +668,8 @@ int Halo::startReceives(const bool UseDevBuffer) {
 
          void *DataPtr{nullptr};
 
+         // If both flags  are true, the device buffer will receive the message,
+         // otherwise the host buffer will.
          if (UseDevBuffer && ExchOnDev) {
             Kokkos::resize(LocNeighbor.RecvBuffer, BufferSize);
             DataPtr = LocNeighbor.RecvBuffer.data();
@@ -712,7 +714,12 @@ int Halo::startSends(const bool UseDevBuffer) {
 
          I4 BufferSize = TotSize * LocNeighbor.SendLists[CurElem].NTot;
 
+         // If UseDevBuffer is true the device buffer was packed by packBuffer,
+         // otherwise the host buffer was
          if (UseDevBuffer) {
+            // If ExchOnDev is true, the device buffer can be passed to
+            // MPI_Isend, otherwise the device buffer needs to be copied
+            // to the host buffer, which will be passed to MPI_Isend
             if (ExchOnDev) {
                DataPtr = LocNeighbor.SendBuffer.data();
             } else {
