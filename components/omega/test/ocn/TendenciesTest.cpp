@@ -1,3 +1,4 @@
+#include "Tendencies.h"
 #include "AuxiliaryState.h"
 #include "Config.h"
 #include "DataTypes.h"
@@ -11,7 +12,6 @@
 #include "MachEnv.h"
 #include "OceanTestCommon.h"
 #include "OmegaKokkos.h"
-#include "TendencyTerms.h"
 #include "TimeStepper.h"
 #include "mpi.h"
 
