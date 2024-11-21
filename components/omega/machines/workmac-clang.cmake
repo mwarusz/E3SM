@@ -12,5 +12,8 @@ set(OMEGA_PARMETIS_ROOT "/Users/mwarusz/installs/parmetis" CACHE STRING "")
 
 set(OMEGA_CXX_FLAGS -g CACHE STRING "")
 
+set(OMEGA_USE_CALIPER ON CACHE BOOL "")
+set(caliper_DIR $ENV{HOME}/installs/caliper/share/cmake/caliper CACHE STRING "")
+
 set(OMEGA_MPI_EXEC mpirun CACHE STRING "")
 set(OMEGA_BUILD_TEST ON CACHE BOOL "")
