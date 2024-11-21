@@ -87,6 +87,8 @@ Omega:
       UseStartEnd: false
       Contents:
         - Tracers
+        - State
+        - SshCellDefault
     Highfreq:
       UsePointerFile: false
       Filename: ocn.hifreq.$Y-$M-$D_$h.$m.$s

@@ -115,6 +115,11 @@ I4 Tracers::init() {
    // total number of tracers
    NumTracers = TracerIndex;
 
+   // A tracer dimension is sometimes needed for aux variables so we
+   // define it here
+   std::shared_ptr<Dimension> TracerDim =
+      Dimension::create("NTracers", NumTracers);
+
    // Initialize tracers arrays for device and host
    TracerArrays.resize(NTimeLevels);
    TracerArraysH.resize(NTimeLevels);
