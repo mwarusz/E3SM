@@ -396,3 +396,14 @@ add_omega_test(
     ocn/TracersTest.cpp
     "-n;8"
 )
+
+##################
+# Perf test
+##################
+
+add_omega_test(
+    PERF_TEST
+    testPerf.exe
+    perf/PerfTest.cpp
+    "-n;8"
+)
