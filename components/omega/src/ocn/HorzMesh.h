@@ -154,14 +154,22 @@ class HorzMesh {
 
    // Coordinates
 
-   HostArray1DReal XCellH;   ///< X Coordinates of cell centers (m)
-   HostArray1DReal YCellH;   ///< Y Coordinates of cell centers (m)
+   Array1DReal XCell;      ///< X Coordinates of cell centers (m)
+   HostArray1DReal XCellH; ///< X Coordinates of cell centers (m)
+
+   Array1DReal YCell;      ///< Y Coordinates of cell centers (m)
+   HostArray1DReal YCellH; ///< Y Coordinates of cell centers (m)
+
    HostArray1DReal ZCellH;   ///< Z Coordinates of cell centers (m)
    HostArray1DReal LonCellH; ///< Longitude location of cell centers (radians)
    HostArray1DReal LatCellH; ///< Latitude location of cell centers (radians)
 
-   HostArray1DReal XEdgeH;   ///< X Coordinate of edge midpoints (m)
-   HostArray1DReal YEdgeH;   ///< Y Coordinate of edge midpoints (m)
+   Array1DReal XEdge;      ///< X Coordinate of edge midpoints (m)
+   HostArray1DReal XEdgeH; ///< X Coordinate of edge midpoints (m)
+
+   Array1DReal YEdge;      ///< Y Coordinate of edge midpoints (m)
+   HostArray1DReal YEdgeH; ///< Y Coordinate of edge midpoints (m)
+
    HostArray1DReal ZEdgeH;   ///< Z Coordinate of edge midpoints (m)
    HostArray1DReal LonEdgeH; ///< Longitude location of edge midpoints (radians)
    HostArray1DReal LatEdgeH; ///< Latitude location of edge midpoints (radians)
