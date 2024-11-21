@@ -21,7 +21,7 @@ inline static I4 IndxDebug3 = Tracers::IndxInvalid;
 // Tracer definitions packaged in a defineAllTracers function
 static void defineAllTracers() {
 
-   define("Temp",                               ///< [in] Name of tracer
+   define("Temperature",                        ///< [in] Name of tracer
           "Conservative Temperature",           ///< [in] Long name, description
           "degree_C",                           ///< [in] Units
           "sea_water_conservative_temperature", ///< [in] CF standard Name
@@ -30,8 +30,8 @@ static void defineAllTracers() {
           1.e33,                                ///< [in] value of undef entries
           IndxTemp);                            ///< [out] (optional) static index
 
-   define("Salt", "Absolute Salinity", "g kg-1", "sea_water_absolute_salinity",
-          0.0, 50.0, 1.e33, IndxSalt);
+   define("Salinity", "Absolute Salinity", "g kg-1",
+          "sea_water_absolute_salinity", 0.0, 50.0, 1.e33, IndxSalt);
 
    define("Debug1", "Debug Tracer 1", "none", "none", 0.0, 100.0, 1.e33,
           IndxDebug1);

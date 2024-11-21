@@ -564,6 +564,11 @@ int main(int argc, char **argv) {
       TstEval<std::string>("Get All Metadata string",
                            std::any_cast<std::string>(MetaVal), RefStr, Err);
 
+      // Test updating a metadata value
+      Err1 = CodeField->updateMetadata("CodeI8", MetaI8 + 2);
+      Err1 = CodeField->getMetadata("CodeI8", MetaI8);
+      TstEval<I8>("Update I8 Metadata", MetaI8, RefI8 + 2, Err);
+
       // Test removal of a metadata entry with the given name
       Err1 = CodeField->removeMetadata("CodeBool");
       TstEval<int>("Remove metadata call", Err1, ErrRef, Err);

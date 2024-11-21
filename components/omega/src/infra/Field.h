@@ -248,6 +248,11 @@ class Field {
    int addMetadata(const std::initializer_list<std::pair<std::string, std::any>>
                        &MetaPairs);
 
+   /// Updates a metadata entry with a new value
+   int updateMetadata(const std::string &MetaName, ///< [in] Name of metadata
+                      const std::any Value         ///< [in] Value of metadata
+   );
+
    /// Removes a metadata entry with the given name
    int
    removeMetadata(const std::string &MetaName ///< [in] Name of entry to remove

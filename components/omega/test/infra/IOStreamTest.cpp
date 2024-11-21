@@ -10,6 +10,7 @@
 //===-----------------------------------------------------------------------===/
 
 #include "IOStream.h"
+#include "AuxiliaryState.h"
 #include "Config.h"
 #include "DataTypes.h"
 #include "Decomp.h"
@@ -23,6 +24,7 @@
 #include "OmegaKokkos.h"
 #include "TimeMgr.h"
 #include "TimeStepper.h"
+#include "Tracers.h"
 #include "mpi.h"
 #include <chrono>
 #include <thread>
@@ -52,7 +54,7 @@ void TestEval(const std::string &TestName, T TestVal, T ExpectVal, int &Error) {
 }
 //------------------------------------------------------------------------------
 // Initialization routine to create reference Fields
-int initIOStreamTest(std::shared_ptr<Clock> &ModelClock // Model clock
+int initIOStreamTest(Clock *&ModelClock // Model clock
 ) {
 
    int Err    = 0;
@@ -71,6 +73,20 @@ int initIOStreamTest(std::shared_ptr<Clock> &ModelClock // Model clock
    TestEval("Config read all", Err1, ErrRef, Err);
    Config *OmegaConfig = Config::getOmegaConfig();
 
+   // Initialize the default time stepper (phase 1) that includes the
+   // num time levels, calendar, model clock and start/stop times and alarms
+   Err = TimeStepper::init1();
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: Error phase 1 initializing default time stepper");
+      return Err;
+   }
+
+   // Use alternative model clock rather than the input config
+   // for testing
+   TimeInstant SimStartTime(0001, 1, 1, 0, 0, 0.0);
+   TimeInterval TimeStep(2, TimeUnits::Hours);
+   ModelClock = new Clock(SimStartTime, TimeStep);
+
    // Initialize base-level IO
    Err1 = IO::init(DefComm);
    TestEval("IO Initialization", Err1, ErrRef, Err);
@@ -87,29 +103,8 @@ int initIOStreamTest(std::shared_ptr<Clock> &ModelClock // Model clock
    Err1 = Field::init();
    TestEval("IO Field initialization", Err1, ErrRef, Err);
 
-   // Create the model clock and time step
-   // Get Calendar from time management config group
-   Config TimeMgmtConfig("TimeIntegration");
-   Err = OmegaConfig->get(TimeMgmtConfig);
-   if (Err != 0) {
-      LOG_CRITICAL("ocnInit: TimeManagement group not found in Config");
-      return Err;
-   }
-   std::string ConfigCalStr;
-   Err = TimeMgmtConfig.get("CalendarType", ConfigCalStr);
-   if (Err != 0) {
-      LOG_CRITICAL("ocnInit: CalendarType not found in TimeMgmtConfig");
-      return Err;
-   }
-   Calendar::init(ConfigCalStr);
-
-   // Use internal start time and time step rather than Config
-   TimeInstant SimStartTime(0001, 1, 1, 0, 0, 0.0);
-   TimeInterval TimeStep(2, TimeUnits::Hours);
-   ModelClock = std::make_shared<Clock>(SimStartTime, TimeStep);
-
    // Initialize IOStreams
-   Err1 = IOStream::init(*ModelClock);
+   Err1 = IOStream::init(ModelClock);
    TestEval("IOStream Initialization", Err1, ErrRef, Err);
 
    // Initialize HorzMesh - this should read Mesh stream
@@ -123,13 +118,17 @@ int initIOStreamTest(std::shared_ptr<Clock> &ModelClock // Model clock
    std::shared_ptr<Dimension> VertDim =
        Dimension::create("NVertLevels", NVertLevels);
 
-   // Initialize time stepper needed before ocean state (for time levels)
-   Err1 = TimeStepper::init1();
-   TestEval("Ocean time step initialization", Err1, ErrRef, Err);
-
    // Initialize State
    Err1 = OceanState::init();
    TestEval("Ocean state initialization", Err1, ErrRef, Err);
+
+   // Initialize Aux State
+   Err1 = AuxiliaryState::init();
+   TestEval("Ocean aux state initialization", Err1, ErrRef, Err);
+
+   // Initialize Tracers
+   Err1 = Tracers::init();
+   TestEval("Ocean tracer initialization", Err1, ErrRef, Err);
 
    // Add some global (Model and Simulation) metadata
    std::shared_ptr<Field> CodeField = Field::get(CodeMeta);
@@ -152,42 +151,9 @@ int initIOStreamTest(std::shared_ptr<Clock> &ModelClock // Model clock
    Err1 = SimField->addMetadata("SimStartTime", StartTimeStr);
    TestEval("Add SimStartTime metadata", Err1, ErrRef, Err);
 
-   // Define temperature and salinity tracer fields and create a tracer
-   // group
-
-   std::vector<std::string> DimNames(2);
-   DimNames[0] = "NCells";
-   DimNames[1] = "NVertLevels";
-
-   // 2D Fields on device
-
-   DimNames[0]    = "NCells";
-   DimNames[1]    = "NVertLevels";
-   Real FillValue = -1.2345e-30;
-   auto TempField = Field::create(
-       "Temperature", "Potential temperature at cell centers", "deg C",
-       "sea_water_pot_tem", -3.0, 100.0, FillValue, 2, DimNames);
-   auto SaltField =
-       Field::create("Salinity", "Salinity at cell centers", "",
-                     "sea_water_salinity", 0.0, 100.0, FillValue, 2, DimNames);
-
-   // Create Tracer group
-   auto TracerGroup = FieldGroup::create("Tracers");
-
-   // Add fields to tracer group
-   Err1 = TracerGroup->addField("Temperature");
-   TestEval("Add Temperature to tracer group", Err1, ErrRef, Err);
-   Err1 = TracerGroup->addField("Salinity");
-   TestEval("Add Salinity to tracer group", Err1, ErrRef, Err);
-
-   // Also create a Restart group
-   auto RestartGroup = FieldGroup::create("Restart");
-
-   // Add fields to restart group
-   Err1 = RestartGroup->addField("Temperature");
-   TestEval("Add Temperature to restart group", Err1, ErrRef, Err);
-   Err1 = RestartGroup->addField("Salinity");
-   TestEval("Add Salinity to restart group", Err1, ErrRef, Err);
+   // Validate all streams (Mesh stream already validated in HorzMesh?)
+   bool AllValidated = IOStream::validateAll();
+   TestEval("IOStream Validation", AllValidated, true, Err);
 
    // End of init
    return Err;
@@ -210,7 +176,7 @@ int main(int argc, char **argv) {
    Kokkos::initialize();
    {
 
-      std::shared_ptr<Clock> ModelClock = nullptr;
+      Clock *ModelClock = nullptr;
 
       // Call initialization to create reference IO field
       Err1 = initIOStreamTest(ModelClock);
@@ -223,30 +189,18 @@ int main(int argc, char **argv) {
       I4 NCellsOwned    = DefDecomp->NCellsOwned;
       Array1DI4 CellID  = DefDecomp->CellID;
 
-      // Create data arrays
-
-      Array2DR8 Temp("Temp", NCellsSize, NVertLevels);
-      Array2DR8 Salt("Salt", NCellsSize, NVertLevels);
-      Array2DR8 Test("Test", NCellsSize, NVertLevels);
-
-      // Attach data arrays to fields
-
-      Err1 = Field::attachFieldData<Array2DR8>("Temperature", Temp);
-      TestEval("Attach temperature data to field", Err1, ErrRef, Err);
-      Err1 = Field::attachFieldData<Array2DR8>("Salinity", Salt);
-      TestEval("Attach salinity data to field", Err1, ErrRef, Err);
-
-      // Validate all streams (Mesh stream already validated in HorzMesh?)
-      bool AllValidated = IOStream::validateAll();
-      TestEval("IOStream Validation", AllValidated, true, Err);
-
       // Read restart file for initial temperature and salinity data
       Metadata ReqMetadata; // leave empty for now - no required metadata
-      Err1 = IOStream::read("InitialState", *ModelClock, ReqMetadata);
+      Err1 = IOStream::read("InitialState", ModelClock, ReqMetadata);
       TestEval("Read restart file", Err1, ErrRef, Err);
 
       // Overwrite salinity array with values associated with global cell
       // ID to test proper indexing of IO
+      Array2DReal Test("Test", NCellsSize, NVertLevels);
+      Array2DReal Salt;
+      Err1 = Tracers::getByIndex(Salt, 0, Tracers::IndxSalt);
+      TestEval("Retrieve Salinity", Err1, ErrRef, Err);
+
       parallelFor(
           {NCellsSize, NVertLevels}, KOKKOS_LAMBDA(int Cell, int K) {
              Salt(Cell, K) = 0.0001_Real * (CellID(Cell) + K);
@@ -266,7 +220,7 @@ int main(int argc, char **argv) {
          TimeInstant CurTime    = ModelClock->getCurrentTime();
          std::string CurTimeStr = CurTime.getString(4, 2, " ");
 
-         Err1 = IOStream::writeAll(*ModelClock);
+         Err1 = IOStream::writeAll(ModelClock);
          if (Err1 != 0) // to prevent too much output in log
             TestEval("Write all streams " + CurTimeStr, Err1, ErrRef, Err);
       }
@@ -276,7 +230,7 @@ int main(int argc, char **argv) {
       // written before we read.
       std::this_thread::sleep_for(std::chrono::seconds(5));
       bool ForceRead = true;
-      Err1 = IOStream::read("RestartRead", *ModelClock, ReqMetadata, ForceRead);
+      Err1 = IOStream::read("RestartRead", ModelClock, ReqMetadata, ForceRead);
       TestEval("Restart force read", Err1, ErrRef, Err);
 
       Err1             = 0;
@@ -292,12 +246,14 @@ int main(int argc, char **argv) {
       TestEval("Check Salt array ", Err1, ErrRef, Err);
 
       // Write final output and remove all streams
-      IOStream::finalize(*ModelClock);
+      IOStream::finalize(ModelClock);
    }
 
    // Clean up environments
    TimeStepper::clear();
+   Tracers::clear();
    OceanState::clear();
+   AuxiliaryState::clear();
    HorzMesh::clear();
    Field::clear();
    Dimension::clear();
