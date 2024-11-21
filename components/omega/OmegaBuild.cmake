@@ -37,6 +37,7 @@ macro(common)
     set(OMEGA_LINK_OPTIONS "")
   endif()
 
+  option(OMEGA_USE_CALIPER "Use caliper" OFF)
   set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "Omega vector length")
 
 endmacro()

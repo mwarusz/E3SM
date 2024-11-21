@@ -12,6 +12,10 @@
 #include "DataTypes.h"
 #include <utility>
 
+#ifdef OMEGA_USE_CALIPER
+#include <caliper/cali.h>
+#endif
+
 namespace OMEGA {
 
 #define OMEGA_SCOPE(a, b) auto &a = b
@@ -108,6 +112,28 @@ inline void parallelReduce(const int (&upper_bounds)[N], const F &f,
                            const int (&tile)[N] = DefaultTile<N>::value) {
    parallelReduce("", upper_bounds, f, std::forward<R>(reducer), tile);
 }
+
+constexpr bool exec_is_gpu =
+    !Kokkos::SpaceAccessibility<ExecSpace, Kokkos::HostSpace>::accessible;
+
+#ifdef OMEGA_USE_CALIPER
+inline void timer_start(char const *label) {
+   if constexpr (exec_is_gpu) {
+      Kokkos::fence();
+   }
+   cali_begin_region(label);
+}
+
+inline void timer_stop(char const *label) {
+   if constexpr (exec_is_gpu) {
+      Kokkos::fence();
+   }
+   cali_end_region(label);
+}
+#else
+inline void timer_start(char const *label) {}
+inline void timer_stop(char const *label) {}
+#endif
 
 } // end namespace OMEGA
 

@@ -55,6 +55,12 @@ if(GKlib_FOUND)
     )
 endif()
 
+if (${OMEGA_USE_CALIPER})
+  	find_package(caliper REQUIRED)
+	target_link_libraries(OmegaLibFlags INTERFACE caliper)
+	target_compile_definitions(OmegaLibFlags INTERFACE OMEGA_USE_CALIPER=1)
+endif()
+
 # Add source files for the library
 file(GLOB_RECURSE _LIBSRC_FILES infra/*.cpp base/*.cpp ocn/*.cpp timeStepping/*.cpp)
 
