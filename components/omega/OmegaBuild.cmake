@@ -38,6 +38,8 @@ macro(common)
     set(OMEGA_LINK_OPTIONS "")
   endif()
 
+  set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "Omega vector length")
+
 endmacro()
 
 macro(run_bash_command command outvar)
