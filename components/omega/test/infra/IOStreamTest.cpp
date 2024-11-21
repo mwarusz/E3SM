@@ -9,8 +9,8 @@
 //
 //===-----------------------------------------------------------------------===/
 
-#include "AuxiliaryState.h"
 #include "IOStream.h"
+#include "AuxiliaryState.h"
 #include "Config.h"
 #include "DataTypes.h"
 #include "Decomp.h"
