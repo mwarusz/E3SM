@@ -476,8 +476,8 @@ I4 OceanState::exchangeHalo(const I4 TimeLevel) {
    I4 TimeIndex;
    Err = getTimeIndex(TimeIndex, TimeLevel);
 
-   MeshHalo->exchangeFullArrayHalo(LayerThicknessH[TimeIndex], OnCell);
-   MeshHalo->exchangeFullArrayHalo(NormalVelocityH[TimeIndex], OnEdge);
+   MeshHalo->exchangeFullArrayHalo(LayerThickness[TimeIndex], OnCell);
+   MeshHalo->exchangeFullArrayHalo(NormalVelocity[TimeIndex], OnEdge);
 
    return 0;
 
