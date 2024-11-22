@@ -77,7 +77,7 @@ int initStateTest() {
    }
 
    // Initialize Field infrastructure
-   Err = Field::init();
+   Err = Field::init(ModelClock);
    if (Err != 0) {
       LOG_CRITICAL("State: Error initializing Fields");
       return Err;

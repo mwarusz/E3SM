@@ -82,6 +82,11 @@ const std::string CalendarKindName[NUM_SUPPORTED_CALENDARS] = {
     "Gregorian", "No Leap", "Julian",      "Julian Day", "Modified Julian Day",
     "360 Day",   "Custom",  "No Calendar", "Invalid"};
 
+/// Standard CF-compliant name associated with each supported calendar type
+const std::string CalendarCFName[NUM_SUPPORTED_CALENDARS] = {
+    "gregorian", "noleap", "julian", "julian_day", "modified_julian_day",
+    "360_day",   "custom", "none",   "invalid"};
+
 /// The TimeFrac class includes the core representation, functions and
 /// operators for time within OMEGA.
 ///

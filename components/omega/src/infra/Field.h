@@ -19,6 +19,7 @@
 #include "DataTypes.h"
 #include "Dimension.h"
 #include "Logging.h"
+#include "TimeMgr.h"
 #include <any>
 #include <map>
 #include <memory>
@@ -107,6 +108,14 @@ class Field {
    /// Location of data
    FieldMemLoc MemLoc;
 
+   /// Flag for whether this is a time-dependent field that needs the
+   /// Unlimited time dimension added during IO
+   bool TimeDependent;
+
+   /// Flag for whether this is a field that is distributed across tasks
+   /// or whether it is entirely local
+   bool Distributed;
+
    /// Data attached to this field. This will be a pointer to the Kokkos
    /// array holding the data. We use a void pointer to manage all the
    /// various types and cast to the appropriate type when needed.
@@ -117,7 +126,9 @@ class Field {
    // Initialization
    //---------------------------------------------------------------------------
    /// Initializes the fields for global code and simulation metadata
-   static int init();
+   /// It also initializes the unlimited time dimension needed by most fields
+   static int init(const Clock *ModelClock ///< [in] the default model clock
+   );
 
    //---------------------------------------------------------------------------
    // Create/destroy/query fields
@@ -142,7 +153,8 @@ class Field {
           const std::any ValidMax,        ///< [in] max valid field value
           const std::any FillValue,       ///< [in] scalar for undefined entries
           const int NumDims,              ///< [in] number of dimensions
-          const std::vector<std::string> &Dimensions ///< dim names for each dim
+          const std::vector<std::string> &Dimensions, ///< [in] dim names
+          const bool InTimeDependent = true ///< [in] opt flag for unlim time
    );
 
    //---------------------------------------------------------------------------
@@ -221,6 +233,17 @@ class Field {
    int getDimNames(
        std::vector<std::string> &Dimensions ///< [out] list of dimensions
    ) const;
+
+   //---------------------------------------------------------------------------
+   // Query for other properties
+   /// Determine whether this is a time-dependent field that requires the
+   /// unlimited time dimension for IO
+   bool isTimeDependent() const;
+
+   /// Determine whether this is a distributed field or whether it is entirely
+   /// local. This is needed to determine whether IO uses parallel read/write
+   /// or an undistributed read/write.
+   bool isDistributed() const;
 
    //---------------------------------------------------------------------------
    // Metadata functions

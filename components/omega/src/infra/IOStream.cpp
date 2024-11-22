@@ -598,6 +598,11 @@ int IOStream::create(const std::string &StreamName, //< [in] name of stream
       return Err;
    }
 
+   // If this is a write stream, add the time field for CF compliant
+   // time information
+   if (NewStream->Mode == IO::ModeWrite)
+      NewStream->addField("time");
+
    // The contents are stored as an ordered set so we use the addField
    // interface to add each name. Note that in this context, the field
    // name can also be a group name. Group names are expanded during the
@@ -643,6 +648,10 @@ int IOStream::defineAllDims(
 
       // For input files, we read the DimID from the file
       if (Mode == IO::ModeRead) {
+         // skip reading the unlimited time dimension
+         if (DimName == "time")
+            continue;
+
          // If dimension not found, only generate a warning since there
          // may be some dimensions that are not required
          I4 InLength;
@@ -690,14 +699,49 @@ int IOStream::defineAllDims(
 } // End defineAllDims
 
 //------------------------------------------------------------------------------
+// Retrieves field size and dim lengths for non-distributed fields
+// (distributed fields get this information from computeDecomp)
+void IOStream::getFieldSize(
+    std::shared_ptr<Field> FieldPtr, // [in] pointer to Field
+    int &LocalSize,                  // [out] size of local array
+    std::vector<int> &DimLengths     // [out] vector of local dim lengths
+) {
+
+   // Retrieve some basic field information
+   std::string FieldName = FieldPtr->getName();
+   int NDims             = FieldPtr->getNumDims();
+   if (NDims == 0) { // scalar field
+      LocalSize     = 1;
+      DimLengths[0] = 1;
+      return;
+   } else if (NDims < 1) {
+      LOG_ERROR("Invalid number of dimensions for Field {}", FieldName);
+      return;
+   }
+
+   std::vector<std::string> DimNames(NDims);
+   int Err = FieldPtr->getDimNames(DimNames);
+   if (Err != 0) {
+      LOG_ERROR("Error retrieving dimension names for Field {}", FieldName);
+      return;
+   }
+
+   LocalSize = 1;
+   for (int IDim = 0; IDim < NDims; ++IDim) {
+      std::string DimName                = DimNames[IDim];
+      std::shared_ptr<Dimension> ThisDim = Dimension::get(DimName);
+      DimLengths[IDim]                   = ThisDim->getLengthLocal();
+      LocalSize *= DimLengths[IDim];
+   }
+}
+//------------------------------------------------------------------------------
 // Computes the parallel decomposition (offsets) for a field needed for parallel
 // I/O. Return error code and also Decomp ID and array size for field.
 int IOStream::computeDecomp(
-    std::shared_ptr<Field> FieldPtr,       // [in] pointer to Field
-    std::map<std::string, int> &AllDimIDs, // [in] dimension IDs
-    int &DecompID,               // [out] ID assigned to the decomposition
-    int &LocalSize,              // [out] size of local array
-    std::vector<int> &DimLengths // [out] vector of local dim lengths
+    std::shared_ptr<Field> FieldPtr, // [in] pointer to Field
+    int &DecompID,                   // [out] ID assigned to the decomposition
+    int &LocalSize,                  // [out] size of local array
+    std::vector<int> &DimLengths     // [out] vector of local dim lengths
 ) {
 
    int Err = 0;
@@ -706,7 +750,7 @@ int IOStream::computeDecomp(
    std::string FieldName   = FieldPtr->getName();
    IO::IODataType MyIOType = getFieldIOType(FieldPtr);
    int NDims               = FieldPtr->getNumDims();
-   if (NDims < 1) {
+   if (NDims < 0) {
       LOG_ERROR("Invalid number of dimensions for Field {}", FieldName);
       Err = 1;
       return Err;
@@ -906,22 +950,34 @@ int IOStream::writeFieldData(
    // Retrieve some basic field information
    std::string FieldName = FieldPtr->getName();
    bool OnHost           = FieldPtr->isOnHost();
+   bool IsDistributed    = FieldPtr->isDistributed();
+   bool IsTimeDependent  = FieldPtr->isTimeDependent();
    FieldType MyType      = FieldPtr->getType();
    int NDims             = FieldPtr->getNumDims();
-   if (NDims < 1) {
+   if (NDims < 0) {
       LOG_ERROR("Invalid number of dimensions for Field {}", FieldName);
       Err = 2;
       return Err;
    }
 
-   // Create the decomposition needed for parallel I/O
+   // Create the decomposition needed for parallel I/O or if not decomposed
+   // get the relevant size information
    int MyDecompID;
    int LocSize;
-   std::vector<int> DimLengths(NDims);
-   Err = computeDecomp(FieldPtr, AllDimIDs, MyDecompID, LocSize, DimLengths);
-   if (Err != 0) {
-      LOG_ERROR("Error computing decomposition for Field {}", FieldName);
-      return Err;
+   int NDimsTmp = std::max(NDims, 1);
+   std::vector<int> DimLengths(NDimsTmp);
+   if (IsDistributed) {
+      Err = computeDecomp(FieldPtr, MyDecompID, LocSize, DimLengths);
+      if (Err != 0) {
+         LOG_ERROR("Error computing decomposition for Field {}", FieldName);
+         return Err;
+      }
+   } else { // Get dimension lengths
+      IOStream::getFieldSize(FieldPtr, LocSize, DimLengths);
+      // Scalar data stored as an array with size 1 so reset the local NDims
+      // to pick this up
+      if (NDims == 0)
+         ++NDims;
    }
 
    // Extract and write the array of data based on the type, dimension and
@@ -1541,21 +1597,45 @@ int IOStream::writeFieldData(
 
    } // end switch data type
 
-   // Write the data
-   Err = OMEGA::IO::writeArray(DataPtr, LocSize, FillValPtr, FileID, MyDecompID,
-                               FieldID);
-   if (Err != 0) {
-      LOG_ERROR("Error writing data array for field {} in stream {}", FieldName,
-                Name);
-      return Err;
+   // If this variable has an unlimited time dimension, set the frame/record
+   // number
+   if (IsTimeDependent) {
+      // currently always 0 but will be updated once support for multiple
+      // records is added
+      int Frame = 0;
+      Err       = PIOc_setframe(FileID, FieldID, Frame);
+      if (Err != 0) {
+         LOG_ERROR("Error setting frame for unlimited time");
+         return Err;
+      }
    }
 
-   // Clean up the decomp
-   Err = OMEGA::IO::destroyDecomp(MyDecompID);
-   if (Err != 0) {
-      LOG_ERROR("Error destroying decomp for field {} in stream {}", FieldName,
-                Name);
-      return Err;
+   // Write the data
+   if (IsDistributed) {
+      Err = OMEGA::IO::writeArray(DataPtr, LocSize, FillValPtr, FileID,
+                                  MyDecompID, FieldID);
+      if (Err != 0) {
+         LOG_ERROR("Error writing data array for field {} in stream {}",
+                   FieldName, Name);
+         return Err;
+      }
+
+      // Clean up the decomp
+      Err = OMEGA::IO::destroyDecomp(MyDecompID);
+      if (Err != 0) {
+         LOG_ERROR("Error destroying decomp for field {} in stream {}",
+                   FieldName, Name);
+         return Err;
+      }
+
+   } else {
+      Err = OMEGA::IO::writeNDVar(DataPtr, FileID, FieldID);
+      if (Err != 0) {
+         LOG_ERROR(
+             "Error writing non-distributed data for field {} in stream {}",
+             FieldName, Name);
+         return Err;
+      }
    }
 
    return Err;
@@ -1581,22 +1661,34 @@ int IOStream::readFieldData(
    std::string OldFieldName = FieldName;
    OldFieldName[0]          = std::tolower(OldFieldName[0]);
    bool OnHost              = FieldPtr->isOnHost();
+   bool IsDistributed       = FieldPtr->isDistributed();
+   bool IsTimeDependent     = FieldPtr->isTimeDependent();
    FieldType MyType         = FieldPtr->getType();
    int NDims                = FieldPtr->getNumDims();
-   if (NDims < 1) {
+   if (NDims < 0) {
       LOG_ERROR("Invalid number of dimensions for Field {}", FieldName);
       Err = 1;
       return Err;
    }
 
-   // Compute the parallel decomposition
+   // Create the decomposition needed for parallel I/O or if not decomposed
+   // get the relevant size information
    int DecompID;
    int LocSize;
-   std::vector<int> DimLengths(NDims);
-   Err = computeDecomp(FieldPtr, AllDimIDs, DecompID, LocSize, DimLengths);
-   if (Err != 0) {
-      LOG_ERROR("Error computing decomposition for Field {}", FieldName);
-      return Err;
+   int NDimsTmp = std::min(NDims, 1);
+   std::vector<int> DimLengths(NDimsTmp);
+   if (IsDistributed) {
+      Err = computeDecomp(FieldPtr, DecompID, LocSize, DimLengths);
+      if (Err != 0) {
+         LOG_ERROR("Error computing decomposition for Field {}", FieldName);
+         return Err;
+      }
+   } else { // Get dimension lengths
+      IOStream::getFieldSize(FieldPtr, LocSize, DimLengths);
+      // Scalar data stored as an array with size 1 so reset the local NDims
+      // to pick this up
+      if (NDims == 0)
+         ++NDims;
    }
 
    // The IO routines require a pointer to a contiguous memory on the host
@@ -1624,11 +1716,20 @@ int IOStream::readFieldData(
    }
 
    // read data into vector
-   Err = IO::readArray(DataPtr, LocSize, FieldName, FileID, DecompID, FieldID);
+   if (IsDistributed) {
+      Err =
+          IO::readArray(DataPtr, LocSize, FieldName, FileID, DecompID, FieldID);
+   } else {
+      Err = IO::readNDVar(DataPtr, FieldName, FileID, FieldID);
+   }
    if (Err != 0) {
       // For back compatibility, try to read again with old field name
-      Err = IO::readArray(DataPtr, LocSize, OldFieldName, FileID, DecompID,
-                          FieldID);
+      if (IsDistributed) {
+         Err = IO::readArray(DataPtr, LocSize, OldFieldName, FileID, DecompID,
+                             FieldID);
+      } else {
+         Err = IO::readNDVar(DataPtr, OldFieldName, FileID, FieldID);
+      }
       if (Err == 0) {
          LOG_INFO("Ignore PIO error for field {} ", FieldName);
          LOG_INFO("Found field under old name {} ", OldFieldName);
@@ -2394,6 +2495,15 @@ int IOStream::writeStream(
    TimeInstant SimTime    = ModelClock->getCurrentTime();
    std::string SimTimeStr = SimTime.getString(4, 0, "_");
 
+   // Update the time field with elapsed time since simulation start
+   TimeInstant StartTime    = ModelClock->getStartTime();
+   TimeInterval ElapsedTime = SimTime - StartTime;
+   R8 ElapsedTimeR8;
+   Err = ElapsedTime.get(ElapsedTimeR8, TimeUnits::Seconds);
+   HostArray1DR8 OutTime("OutTime", 1);
+   OutTime(0) = ElapsedTimeR8;
+   Err        = Field::attachFieldData("time", OutTime);
+
    // Reset alarms and flags
    if (OnStartup)
       OnStartup = false;
@@ -2463,18 +2573,23 @@ int IOStream::writeStream(
 
       // Retrieve the dimensions for this field and determine dim IDs
       NDims = ThisField->getNumDims();
-      if (NDims < 1) {
-         LOG_ERROR("Invalid number of dimensions for Field {}", FieldName);
-         Err = 2;
-         return Err;
+      if (NDims > 0) {
+         DimNames.resize(NDims);
+         FieldDims.resize(NDims);
+         Err = ThisField->getDimNames(DimNames);
+         if (Err != 0) {
+            LOG_ERROR("Error retrieving dimension names for Field {}",
+                      FieldName);
+            return Err;
+         }
       }
-      DimNames.resize(NDims);
-      FieldDims.resize(NDims);
-      Err = ThisField->getDimNames(DimNames);
-      if (Err != 0) {
-         LOG_ERROR("Error retrieving dimension names for Field {}", FieldName);
-         return Err;
+      // If this is a time-dependent field, we insert the unlimited time
+      // dimension as the first dimension (for field definition only)
+      if (ThisField->isTimeDependent()) {
+         ++NDims;
+         DimNames.insert(DimNames.begin(), "time");
       }
+      // Get the dim IDs
       for (int IDim = 0; IDim < NDims; ++IDim) {
          std::string DimName = DimNames[IDim];
          FieldDims[IDim]     = AllDimIDs[DimName];

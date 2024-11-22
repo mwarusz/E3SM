@@ -95,12 +95,22 @@ int initIOStreamTest(Clock *&ModelClock // Model clock
    Decomp::init();
    Decomp *DefDecomp = Decomp::getDefault();
 
+   // Initialize time stepper for time levels and clock
+   Err1 = TimeStepper::init1();
+   TestEval("Ocean time step initialization", Err1, ErrRef, Err);
+
    // Initialize Halo updates
    Halo::init();
    OMEGA::Halo *DefHalo = OMEGA::Halo::getDefault();
 
+   // Override the input time stepper clock with a clock more suitable
+   // for testing streams
+   TimeInstant SimStartTime(0001, 1, 1, 0, 0, 0.0);
+   TimeInterval TimeStep(2, TimeUnits::Hours);
+   ModelClock = new Clock(SimStartTime, TimeStep);
+
    // Initialize Field
-   Err1 = Field::init();
+   Err1 = Field::init(ModelClock);
    TestEval("IO Field initialization", Err1, ErrRef, Err);
 
    // Initialize IOStreams
@@ -211,7 +221,6 @@ int main(int argc, char **argv) {
       TimeInstant StopTime(0002, 1, 1, 0, 0, 0.0);
       Alarm StopAlarm("Stop Time", StopTime);
       Err1 = ModelClock->attachAlarm(&StopAlarm);
-      TestEval("Attach stop alarm", Err1, ErrRef, Err);
 
       // Overwrite
       // Step forward in time and write files if it is time
