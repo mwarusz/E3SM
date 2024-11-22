@@ -9,9 +9,13 @@ set(Kokkos_ARCH_NATIVE ON CACHE BOOL "")
 set(Kokkos_ARCH_AMPERE80 ON CACHE BOOL "")
 set(Kokkos_ENABLE_CUDA_CONSTEXPR ON CACHE BOOL "")
 
+
 set(OMEGA_PARMETIS_ROOT /global/cfs/cdirs/e3sm/software/polaris/pm-cpu/spack/dev_polaris_0_4_0_gnu_mpich/var/spack/environments/dev_polaris_0_4_0_gnu_mpich/.spack-env/view CACHE STRING "")
 
 set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "")
+
+#set(Kokkos_ENABLE_IMPL_CUDA_MALLOC_ASYNC OFF CACHE BOOL "")
+set(OMEGA_MPI_ON_DEVICE OFF CACHE BOOL "")
 
 set(OMEGA_MPI_EXEC srun CACHE STRING "")
 set(OMEGA_BUILD_TEST ON CACHE BOOL "")

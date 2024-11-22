@@ -13,6 +13,8 @@ set(OMEGA_PARMETIS_ROOT /ccs/proj/cli115/software/polaris/frontier/spack/dev_pol
 
 set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "")
 
+set(OMEGA_MPI_ON_DEVICE OFF CACHE BOOL "")
+
 set(OMEGA_MPI_EXEC srun CACHE STRING "")
 set(OMEGA_BUILD_TEST ON CACHE BOOL "")
 
