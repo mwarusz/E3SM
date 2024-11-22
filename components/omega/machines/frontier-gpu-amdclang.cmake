@@ -20,4 +20,4 @@ set(NetCDF_PATH $ENV{NETCDF_DIR} CACHE STRING "")
 set(PnetCDF_PATH $ENV{NETCDF_DIR} CACHE STRING "")
 
 set(OMEGA_USE_CALIPER ON CACHE BOOL "")
-set(caliper_DIR $ENV{HOME}/installs/caliper/share/cmake/caliper CACHE STRING "")
+set(caliper_DIR $ENV{HOME}/installs/caliper-amdclang/share/cmake/caliper CACHE STRING "")
