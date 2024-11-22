@@ -350,6 +350,7 @@ int testSteadyZonal() {
    Real TimeStepSeconds =
        CFL * minDcEdge() / (Setup.m_u0 + std::sqrt(grav * Setup.m_h0));
    TimeInterval TimeStep(TimeStepSeconds, TimeUnits::Seconds);
+   TimeStep.set(TimeStepSeconds, TimeUnits::Seconds);
 
    Err += initState();
    createExactSolution(TimeEndSeconds);
