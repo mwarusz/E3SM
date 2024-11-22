@@ -302,15 +302,15 @@ void timeLoop(TimeInstant TimeStart, Real TimeEnd) {
    auto *Stepper = TimeStepper::getDefault();
    auto *State   = OceanState::getDefault();
 
-   const int NSteps            = adjustTimeStep(Stepper, TimeEnd);
+   int NSteps                  = adjustTimeStep(Stepper, TimeEnd);
    const TimeInterval TimeStep = Stepper->getTimeStep();
 
    // Time loop
    Stepper->doStep(State, TimeStart);
 
+   NSteps = 100;
    timer_start("time_loop");
-   // for (int Step = 0; Step < NSteps - 1; ++Step) {
-   for (int Step = 0; Step < 1; ++Step) {
+   for (int Step = 0; Step < NSteps; ++Step) {
       TimeInstant Time = TimeStart + (Step + 1) * TimeStep;
       Stepper->doStep(State, Time);
    }
