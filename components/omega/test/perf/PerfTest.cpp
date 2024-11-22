@@ -292,6 +292,7 @@ int adjustTimeStep(TimeStepper *Stepper, Real TimeEnd) {
 
    TimeStepSeconds = TimeEnd / NSteps;
    TimeStep.set(TimeStepSeconds, TimeUnits::Seconds);
+
    Stepper->changeTimeStep(TimeInterval(TimeStepSeconds, TimeUnits::Seconds));
 
    return NSteps;
@@ -308,7 +309,8 @@ void timeLoop(TimeInstant TimeStart, Real TimeEnd) {
    Stepper->doStep(State, TimeStart);
 
    timer_start("time_loop");
-   for (int Step = 0; Step < NSteps - 1; ++Step) {
+   // for (int Step = 0; Step < NSteps - 1; ++Step) {
+   for (int Step = 0; Step < 1; ++Step) {
       TimeInstant Time = TimeStart + (Step + 1) * TimeStep;
       Stepper->doStep(State, Time);
    }
@@ -338,6 +340,7 @@ int testSteadyZonal() {
    auto *DefHalo        = Halo::getDefault();
    auto *TestAuxState   = AuxiliaryState::getDefault();
    auto *TestTendencies = Tendencies::getDefault();
+   auto *Stepper        = TimeStepper::getDefault();
 
    SteadyZonal Setup;
 
@@ -350,7 +353,7 @@ int testSteadyZonal() {
    Real TimeStepSeconds =
        CFL * minDcEdge() / (Setup.m_u0 + std::sqrt(grav * Setup.m_h0));
    TimeInterval TimeStep(TimeStepSeconds, TimeUnits::Seconds);
-   TimeStep.set(TimeStepSeconds, TimeUnits::Seconds);
+   Stepper->changeTimeStep(TimeStep);
 
    Err += initState();
    createExactSolution(TimeEndSeconds);
