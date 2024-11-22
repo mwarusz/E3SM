@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
    if (ErrCurr != 0)
       LOG_ERROR("Error initializing OMEGA");
    Pacer::stop("Init");
-   //
+
    // Get time information
    OMEGA::TimeStepper *DefStepper = OMEGA::TimeStepper::getDefault();
    OMEGA::Alarm *EndAlarm         = DefStepper->getEndAlarm();
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
    } else {
       LOG_ERROR("OMEGA terminating due to error");
    }
-   
+
    Pacer::print("omega");
    Pacer::finalize();
 
