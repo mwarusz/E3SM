@@ -493,13 +493,17 @@ void Tendencies::computeAllTendencies(
     TimeInstant Time                ///< [in] Time
 ) {
 
+   timer_start("compute_aux");
    AuxState->computeAll(State, TracerArray, ThickTimeLevel, VelTimeLevel);
+   timer_stop("compute_aux");
+   timer_start("compute_tendencies");
    computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
                                   Time);
    computeVelocityTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
                                  Time);
    computeTracerTendenciesOnly(State, AuxState, TracerArray, ThickTimeLevel,
                                VelTimeLevel, Time);
+   timer_stop("compute_tendencies");
 
 } // end all tendency compute
 
