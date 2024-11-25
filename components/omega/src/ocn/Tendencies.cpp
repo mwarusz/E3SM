@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Tendencies.h"
+#include "CustomTendencyTerms.h"
 #include "Tracers.h"
 
 namespace OMEGA {
@@ -37,6 +38,49 @@ int Tendencies::init() {
 
    Tendencies::DefaultTendencies =
        create("Default", DefHorzMesh, NVertLevels, NTracers, &TendConfig);
+
+   // Check if use the customized tendencies
+   bool UseCustomTendency = false;
+   Err = TendConfig.get("UseCustomTendency", UseCustomTendency);
+   if (Err != 0) {
+      LOG_ERROR("Tendencies:: UseCustomTendency not found in Config");
+      return Err;
+   }
+
+   if (UseCustomTendency) {
+      // Clear tendencies previously created
+      Tendencies::clear();
+
+      // Check if use manufactured tendency terms
+      bool ManufacturedTend = false;
+      I4 ManufacturedTendErr =
+          TendConfig.get("ManufacturedSolutionTendency", ManufacturedTend);
+
+      if (ManufacturedTendErr != 0 && ManufacturedTend) {
+         LOG_CRITICAL("Tendencies: ManufacturedSolutionTendency "
+                      "not found in TendConfig");
+         return ManufacturedTendErr;
+      }
+
+      if (ManufacturedTend) {
+         ManufacturedSolution ManufacturedSol;
+         I4 ManufacturedInitErr = ManufacturedSol.init();
+
+         if (ManufacturedInitErr != 0) {
+            LOG_CRITICAL("Error in initializing the manufactured solution "
+                         "tendency terms");
+            return ManufacturedInitErr;
+         }
+
+         // Re-create tendencies with the manufactured tendencies
+         Tendencies::DefaultTendencies =
+             create("Default", DefHorzMesh, NVertLevels, NTracers, &TendConfig,
+                    ManufacturedSol.ManufacturedThickTend,
+                    ManufacturedSol.ManufacturedVelTend);
+
+      } // if ManufacturedTend
+
+   } // end if UseCustomTendency
 
    Err = DefaultTendencies->readTendConfig(&TendConfig);
 
