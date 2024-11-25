@@ -469,7 +469,7 @@ I4 Tracers::exchangeHalo(const I4 TimeLevel) {
    I4 TimeIndex;
 
    Err = getTimeIndex(TimeIndex, TimeLevel);
-   Err = MeshHalo->exchangeFullArrayHalo(TracerArraysH[TimeIndex], OnCell);
+   Err = MeshHalo->exchangeFullArrayHalo(TracerArrays[TimeIndex], OnCell);
    if (Err != 0)
       return -1;
 
