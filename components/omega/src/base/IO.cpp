@@ -717,6 +717,34 @@ int readArray(void *Array,                // [out] array to be read
 } // End IOReadArray
 
 //------------------------------------------------------------------------------
+// Reads a non-distributed variable. Uses a void pointer for generic interface.
+// All arrays are assumed to be in contiguous storage.
+int readNDVar(void *Variable,             // [out] array to be read
+              const std::string &VarName, // [in] name of variable to read
+              int FileID,                 // [in] ID of open file to read from
+              int &VarID // [out] Id assigned to variable for later use
+) {
+
+   int Err = 0; // default return code
+
+   // Find variable ID from file
+   Err = PIOc_inq_varid(FileID, VarName.c_str(), &VarID);
+   if (Err != PIO_NOERR) {
+      LOG_ERROR("IO::readArray: Error finding varid for variable {}", VarName);
+      return Err;
+   }
+
+   // PIO Read array call to read the distributed array
+   Err = PIOc_get_var(FileID, VarID, Variable);
+   if (Err != PIO_NOERR)
+      LOG_ERROR("IO::readNDVar: Error in SCORPIO get_var for variable {}",
+                VarName);
+
+   return Err;
+
+} // End IOReadNDVar
+
+//------------------------------------------------------------------------------
 // Writes a distributed array. This generic interface uses void pointers.
 // All arrays are assumed to be in contiguous storage and the variable
 // must have a valid ID assigned by the defineVar function.
@@ -750,6 +778,27 @@ int writeArray(void *Array,     // [in] array to be written
    return Err;
 
 } // end writeArray
+
+//------------------------------------------------------------------------------
+// Writes a non-distributed variable. This generic interface uses void pointers.
+// All arrays are assumed to be in contiguous storage and the variable
+// must have a valid ID assigned by the defineVar function.
+
+int writeNDVar(void *Variable, // [in] variable to be written
+               int FileID,     // [in] ID of open file to write to
+               int VarID       // [in] variable ID assigned by defineVar
+) {
+   int Err = 0;
+
+   Err = PIOc_put_var(FileID, VarID, Variable);
+   if (Err != PIO_NOERR) {
+      LOG_ERROR("Error in PIO writing non-distributed variable");
+      return Err;
+   }
+
+   return Err;
+
+} // end writeNDVar
 
 //------------------------------------------------------------------------------
 
