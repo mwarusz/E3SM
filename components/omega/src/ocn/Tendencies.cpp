@@ -36,9 +36,6 @@ int Tendencies::init() {
       return Err;
    }
 
-   Tendencies::DefaultTendencies =
-       create("Default", DefHorzMesh, NVertLevels, NTracers, &TendConfig);
-
    // Check if use the customized tendencies
    bool UseCustomTendency = false;
    Err = TendConfig.get("UseCustomTendency", UseCustomTendency);
@@ -47,10 +44,11 @@ int Tendencies::init() {
       return Err;
    }
 
-   if (UseCustomTendency) {
-      // Clear tendencies previously created
-      Tendencies::clear();
+   /// Instances of custom tendencies - empty by default
+   CustomTendencyType CustomThickTend;
+   CustomTendencyType CustomVelTend;
 
+   if (UseCustomTendency) {
       // Check if use manufactured tendency terms
       bool ManufacturedTend = false;
       I4 ManufacturedTendErr =
@@ -72,15 +70,17 @@ int Tendencies::init() {
             return ManufacturedInitErr;
          }
 
-         // Re-create tendencies with the manufactured tendencies
-         Tendencies::DefaultTendencies =
-             create("Default", DefHorzMesh, NVertLevels, NTracers, &TendConfig,
-                    ManufacturedSol.ManufacturedThickTend,
-                    ManufacturedSol.ManufacturedVelTend);
+         CustomThickTend = ManufacturedSol.ManufacturedThickTend;
+         CustomVelTend   = ManufacturedSol.ManufacturedVelTend;
 
       } // if ManufacturedTend
 
    } // end if UseCustomTendency
+
+   // Ceate default tendencies
+   Tendencies::DefaultTendencies =
+       create("Default", DefHorzMesh, NVertLevels, NTracers, &TendConfig,
+              CustomThickTend, CustomVelTend);
 
    Err = DefaultTendencies->readTendConfig(&TendConfig);
 
