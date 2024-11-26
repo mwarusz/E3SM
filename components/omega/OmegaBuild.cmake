@@ -610,13 +610,14 @@ macro(update_variables)
     option(OMEGA_MPI_ON_DEVICE "Allow device buffers in MPI communication (default ON)." ON)
   endif()
 
+  option(OMEGA_CUDA_MALLOC_ASYNC "Enable CUDA async support (default OFF)." OFF) 
+
   if("${OMEGA_ARCH}" STREQUAL "CUDA")
     option(Kokkos_ENABLE_CUDA "" ON)
     option(Kokkos_ENABLE_CUDA_LAMBDA "" ON)
     add_definitions(-DOMEGA_TARGET_DEVICE)
-    if(OMEGA_MPI_ON_DEVICE AND OMEGA_CIME_MACHINE STREQUAL "pm-gpu")
-      option(Kokkos_ENABLE_IMPL_CUDA_MALLOC_ASYNC "" OFF)
-    endif()
+    option(Kokkos_ENABLE_IMPL_CUDA_MALLOC_ASYNC "" OFF)
+    set(Kokkos_ENABLE_IMPL_CUDA_MALLOC_ASYNC ${OMEGA_CUDA_MALLOC_ASYNC} CACHE BOOL "" FORCE)
 
   elseif("${OMEGA_ARCH}" STREQUAL "HIP")
     option(Kokkos_ENABLE_HIP "" ON)
