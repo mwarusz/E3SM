@@ -906,7 +906,7 @@ int IOStream::writeFieldData(
    // Retrieve some basic field information
    std::string FieldName = FieldPtr->getName();
    bool OnHost           = FieldPtr->isOnHost();
-   FieldType MyType      = FieldPtr->getType();
+   ArrayDataType MyType  = FieldPtr->getType();
    int NDims             = FieldPtr->getNumDims();
    if (NDims < 1) {
       LOG_ERROR("Invalid number of dimensions for Field {}", FieldName);
@@ -946,7 +946,7 @@ int IOStream::writeFieldData(
    switch (MyType) {
 
    // I4 Fields
-   case FieldType::I4:
+   case ArrayDataType::I4:
 
       DataI4.resize(LocSize);
       DataPtr = DataI4.data();
@@ -1091,7 +1091,7 @@ int IOStream::writeFieldData(
       break; // end I4 type
 
    // I8 Fields
-   case FieldType::I8:
+   case ArrayDataType::I8:
 
       DataI8.resize(LocSize);
       DataPtr = DataI8.data();
@@ -1235,7 +1235,7 @@ int IOStream::writeFieldData(
       break; // end I8 type
 
    // R4 Fields
-   case FieldType::R4:
+   case ArrayDataType::R4:
 
       DataR4.resize(LocSize);
       DataPtr = DataR4.data();
@@ -1379,7 +1379,7 @@ int IOStream::writeFieldData(
       break; // end R4 type
 
    // R8 Fields
-   case FieldType::R8:
+   case ArrayDataType::R8:
 
       // Get fill value
       Err = FieldPtr->getMetadata("FillValue", FillValR8);
@@ -1581,7 +1581,7 @@ int IOStream::readFieldData(
    std::string OldFieldName = FieldName;
    OldFieldName[0]          = std::tolower(OldFieldName[0]);
    bool OnHost              = FieldPtr->isOnHost();
-   FieldType MyType         = FieldPtr->getType();
+   ArrayDataType MyType     = FieldPtr->getType();
    int NDims                = FieldPtr->getNumDims();
    if (NDims < 1) {
       LOG_ERROR("Invalid number of dimensions for Field {}", FieldName);
@@ -1609,16 +1609,16 @@ int IOStream::readFieldData(
    std::vector<R8> DataR8(1);
 
    switch (MyType) {
-   case FieldType::I4:
+   case ArrayDataType::I4:
       DataI4.resize(LocSize);
       DataPtr = DataI4.data();
-   case FieldType::I8:
+   case ArrayDataType::I8:
       DataI8.resize(LocSize);
       DataPtr = DataI8.data();
-   case FieldType::R4:
+   case ArrayDataType::R4:
       DataR4.resize(LocSize);
       DataPtr = DataR4.data();
-   case FieldType::R8:
+   case ArrayDataType::R8:
       DataR8.resize(LocSize);
       DataPtr = DataR8.data();
    }
@@ -1643,7 +1643,7 @@ int IOStream::readFieldData(
    switch (MyType) {
 
    // I4 Fields
-   case FieldType::I4:
+   case ArrayDataType::I4:
       switch (NDims) {
       case 1:
          if (OnHost) {
@@ -1780,7 +1780,7 @@ int IOStream::readFieldData(
       break; // end I4 fields
 
    // I8 Fields
-   case FieldType::I8:
+   case ArrayDataType::I8:
       switch (NDims) {
       case 1:
          if (OnHost) {
@@ -1917,7 +1917,7 @@ int IOStream::readFieldData(
       break; // end I8 fields
 
    // R4 Fields
-   case FieldType::R4:
+   case ArrayDataType::R4:
       switch (NDims) {
       case 1:
          if (OnHost) {
@@ -2054,7 +2054,7 @@ int IOStream::readFieldData(
       break; // end R4 fields
 
    // R8 Fields
-   case FieldType::R8:
+   case ArrayDataType::R8:
       switch (NDims) {
       case 1:
          if (OnHost) {
@@ -2569,21 +2569,21 @@ IO::IODataType IOStream::getFieldIOType(
    IO::IODataType ReturnType;
 
    // Get the field data type
-   FieldType MyType = FieldPtr->getType();
+   ArrayDataType MyType = FieldPtr->getType();
 
    // Determine IO data type based on field type and any reduced precision
    // conversion
    switch (MyType) {
-   case FieldType::I4:
+   case ArrayDataType::I4:
       ReturnType = IO::IOTypeI4;
       break;
-   case FieldType::I8:
+   case ArrayDataType::I8:
       ReturnType = IO::IOTypeI8;
       break;
-   case FieldType::R4:
+   case ArrayDataType::R4:
       ReturnType = IO::IOTypeR4;
       break;
-   case FieldType::R8:
+   case ArrayDataType::R8:
       if (ReducePrecision) {
          ReturnType = IO::IOTypeR4;
       } else {

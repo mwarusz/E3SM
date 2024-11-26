@@ -588,19 +588,19 @@ int main(int argc, char **argv) {
       TstEval<std::string>("Retrieve field name", MyName, "Test1DI4H", Err);
 
       // Retrieve data type of field
-      FieldType Type1DI4 = Test1DI4H->getType();
-      TstEval<FieldType>("Retrieve field type - member", Type1DI4,
-                         FieldType::I4, Err);
+      ArrayDataType Type1DI4 = Test1DI4H->getType();
+      TstEval<ArrayDataType>("Retrieve field type - member", Type1DI4,
+                             ArrayDataType::I4, Err);
 
       // Retrieve type of a given field by name
-      FieldType Type1DR8 = Field::getFieldType("Test1DR8H");
-      TstEval<FieldType>("Retrieve type by field name", Type1DR8, FieldType::R8,
-                         Err);
+      ArrayDataType Type1DR8 = Field::getFieldType("Test1DR8H");
+      TstEval<ArrayDataType>("Retrieve type by field name", Type1DR8,
+                             ArrayDataType::R8, Err);
 
       // Retrieve location of field data
-      FieldMemLoc MemLoc1DI4H = Test1DI4H->getMemoryLocation();
-      if (MemLoc1DI4H == FieldMemLoc::Both or
-          MemLoc1DI4H == FieldMemLoc::Host) {
+      ArrayMemLoc MemLoc1DI4H = Test1DI4H->getMemoryLocation();
+      if (MemLoc1DI4H == ArrayMemLoc::Both or
+          MemLoc1DI4H == ArrayMemLoc::Host) {
          LOG_INFO("Retrieve mem location - member: PASS");
       } else {
          LOG_ERROR("Retrieve mem location - member: FAIL");
@@ -609,16 +609,16 @@ int main(int argc, char **argv) {
       bool OnHost = Test1DI4H->isOnHost();
       TstEval<bool>("Retrieve onHost flag", OnHost, true, Err);
 
-      FieldMemLoc MemLoc1DI4 = Field::getFieldMemoryLocation("Test1DI4");
-      if (MemLoc1DI4 == FieldMemLoc::Both or
-          MemLoc1DI4 == FieldMemLoc::Device) {
+      ArrayMemLoc MemLoc1DI4 = Field::getFieldMemoryLocation("Test1DI4");
+      if (MemLoc1DI4 == ArrayMemLoc::Both or
+          MemLoc1DI4 == ArrayMemLoc::Device) {
          LOG_INFO("Retrieve mem location by name: PASS");
       } else {
          LOG_ERROR("Retrieve mem location by name: FAIL");
          ++Err;
       }
       OnHost = Field::isFieldOnHost("Test1DI4");
-      if (MemLoc1DI4 == FieldMemLoc::Both) {
+      if (MemLoc1DI4 == ArrayMemLoc::Both) {
          TstEval<bool>("Retrieve onHost flag for device", OnHost, true, Err);
       } else {
          TstEval<bool>("Retrieve onHost flag for device", OnHost, false, Err);

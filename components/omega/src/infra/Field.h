@@ -19,11 +19,11 @@
 #include "DataTypes.h"
 #include "Dimension.h"
 #include "Logging.h"
+#include "OmegaKokkos.h"
 #include <any>
 #include <map>
 #include <memory>
 #include <set>
-#include <type_traits>
 
 namespace OMEGA {
 
@@ -34,50 +34,6 @@ using Metadata = std::map<std::string, std::any>;
 static const std::string CodeMeta{"code"}; ///< name for code metadata
 /// Field name to use for global simulation metadata
 static const std::string SimMeta{"simulation"}; ///< name for sim metatdata
-
-/// An enum is used to provide a shorthand for determining the type of
-/// field. These correspond to the supported Omega data types (Real will be
-/// identical to R4 or R8 depending on settings)
-enum class FieldType { Unknown, I4, I8, R4, R8 };
-
-/// An enum is used to identify the location of the data - currently
-/// either the device (the default) or explicitly on the host. Both refers
-/// to the CPU-only case where the host and device are identical.
-enum class FieldMemLoc { Unknown, Device, Host, Both };
-
-namespace Impl {
-// determine FieldType from Kokkos array type
-template <class T> constexpr FieldType determineFieldType() {
-   if (std::is_same_v<typename T::non_const_value_type, I4>) {
-      return FieldType::I4;
-   }
-
-   if (std::is_same_v<typename T::non_const_value_type, I8>) {
-      return FieldType::I8;
-   }
-
-   if (std::is_same_v<typename T::non_const_value_type, R4>) {
-      return FieldType::R4;
-   }
-
-   if (std::is_same_v<typename T::non_const_value_type, R8>) {
-      return FieldType::R8;
-   }
-
-   return FieldType::Unknown;
-}
-
-// determine FieldMemLoc from Kokkos array type
-template <class T> constexpr FieldMemLoc determineFieldMemLoc() {
-   if (std::is_same_v<MemSpace, HostMemSpace>) {
-      return FieldMemLoc::Both;
-   } else if (T::is_hostspace) {
-      return FieldMemLoc::Host;
-   } else {
-      return FieldMemLoc::Device;
-   }
-}
-} // namespace Impl
 
 //------------------------------------------------------------------------------
 /// The Field class manages all metadata and attached data for OMEGA fields
@@ -102,10 +58,10 @@ class Field {
    std::vector<std::string> DimNames;
 
    /// Data type for field data
-   FieldType DataType;
+   ArrayDataType DataType;
 
    /// Location of data
-   FieldMemLoc MemLoc;
+   ArrayMemLoc MemLoc;
 
    /// Data attached to this field. This will be a pointer to the Kokkos
    /// array holding the data. We use a void pointer to manage all the
@@ -185,20 +141,20 @@ class Field {
    //---------------------------------------------------------------------------
    // Retrieve data type of field
    /// Determine type of a given field from instance
-   FieldType getType() const;
+   ArrayDataType getType() const;
 
    /// Determine type of a given field by name
-   static FieldType
+   static ArrayDataType
    getFieldType(const std::string &FieldName ///< [in] name of field
    );
 
    //---------------------------------------------------------------------------
    // Query location of field data
    /// Determine location of data from instance
-   FieldMemLoc getMemoryLocation() const;
+   ArrayMemLoc getMemoryLocation() const;
 
    /// Determine location of data by field name
-   static FieldMemLoc
+   static ArrayMemLoc
    getFieldMemoryLocation(const std::string &FieldName ///< [in] name of field
    );
 
@@ -318,8 +274,8 @@ class Field {
       DataArray = std::make_shared<T>(InDataArray);
 
       // Determine type and location
-      DataType = Impl::determineFieldType<T>();
-      MemLoc   = Impl::determineFieldMemLoc<T>();
+      DataType = Impl::checkArrayType<T>();
+      MemLoc   = Impl::findArrayMemLoc<T>();
 
       return Err;
    };

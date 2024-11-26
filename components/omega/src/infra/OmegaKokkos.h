@@ -10,11 +10,65 @@
 //===----------------------------------------------------------------------===//
 
 #include "DataTypes.h"
+#include <type_traits>
 #include <utility>
 
 namespace OMEGA {
 
 #define OMEGA_SCOPE(a, b) auto &a = b
+
+/// An enum is used to provide a shorthand for determining the type of
+/// field. These correspond to the supported Omega data types (Real will be
+/// identical to R4 or R8 depending on settings)
+enum class ArrayDataType { Unknown, I4, I8, R4, R8 };
+
+/// An enum is used to identify the location of the data - currently
+/// either the device (the default) or explicitly on the host. Both refers
+/// to the CPU-only case where the host and device are identical.
+enum class ArrayMemLoc { Unknown, Device, Host, Both };
+
+namespace Impl {
+// determine ArrayDataType from Kokkos array type
+template <class T> constexpr ArrayDataType checkArrayType() {
+   if (std::is_same_v<typename T::non_const_value_type, I4>) {
+      return ArrayDataType::I4;
+   }
+
+   if (std::is_same_v<typename T::non_const_value_type, I8>) {
+      return ArrayDataType::I8;
+   }
+
+   if (std::is_same_v<typename T::non_const_value_type, R4>) {
+      return ArrayDataType::R4;
+   }
+
+   if (std::is_same_v<typename T::non_const_value_type, R8>) {
+      return ArrayDataType::R8;
+   }
+
+   return ArrayDataType::Unknown;
+}
+
+// determine ArrayMemLoc from Kokkos array type
+template <class T> constexpr ArrayMemLoc findArrayMemLoc() {
+   if (std::is_same_v<MemSpace, HostMemSpace>) {
+      return ArrayMemLoc::Both;
+   } else if (T::is_hostspace) {
+      return ArrayMemLoc::Host;
+   } else {
+      return ArrayMemLoc::Device;
+   }
+}
+} // namespace Impl
+
+/// Struct template to specify the rank of a supported Array
+template <class T> struct ArrayRank {
+   static constexpr bool Is1D = T::rank == 1;
+   static constexpr bool Is2D = T::rank == 2;
+   static constexpr bool Is3D = T::rank == 3;
+   static constexpr bool Is4D = T::rank == 4;
+   static constexpr bool Is5D = T::rank == 5;
+};
 
 using ExecSpace     = MemSpace::execution_space;
 using HostExecSpace = HostMemSpace::execution_space;

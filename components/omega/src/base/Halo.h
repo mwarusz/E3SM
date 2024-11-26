@@ -42,9 +42,6 @@ static const MPI_Datatype MPI_RealKind = MPI_DOUBLE;
 /// The MeshElement enum identifies the index space to use for a halo exchange.
 enum MeshElement { OnCell, OnEdge, OnVertex };
 
-/// The ArrayMemLoc enum identifies the memory location of an array
-enum class ArrayMemLoc { Unknown, Device, Host, Both };
-
 /// The Halo class contains two nested classes, ExchList and Neighbor classes,
 /// defined below. The Halo class holds all the Neighbor objects needed by a
 /// task to perform a full halo exchange with each of its neighboring tasks for
@@ -227,36 +224,15 @@ class Halo {
    /// the device buffer was packed in the packBuffer function.
    int startSends(bool UseDevBuffer);
 
-   /// Function template to find the memory space in which the input Array
-   /// is defined.
-   template <typename T> ArrayMemLoc findMemLoc(const T &Array) {
-      if (std::is_same_v<MemSpace, HostMemSpace>) {
-         return ArrayMemLoc::Both;
-      } else if (T::is_hostspace) {
-         return ArrayMemLoc::Host;
-      } else {
-         return ArrayMemLoc::Device;
-      }
-   }
-
    /// Function template that returns a bool that is true if the Array is
    /// on the device, or if the device and host memory spaces are the same
    /// space. Used to determine if buffer packs and unpacks are done within
    /// Kokkos parallelFor kernels.
    template <typename T> bool devBufferPUP(const T &Array) {
-      bool OnDev = findMemLoc(Array) == ArrayMemLoc::Both ||
-                   findMemLoc(Array) == ArrayMemLoc::Device;
+      bool OnDev = Impl::findArrayMemLoc<T>() == ArrayMemLoc::Both ||
+                   Impl::findArrayMemLoc<T>() == ArrayMemLoc::Device;
       return OnDev;
    }
-
-   /// Struct template to specify the rank of a supported Array
-   template <class T> struct ArrayRank {
-      static constexpr bool Is1D = T::rank == 1;
-      static constexpr bool Is2D = T::rank == 2;
-      static constexpr bool Is3D = T::rank == 3;
-      static constexpr bool Is4D = T::rank == 4;
-      static constexpr bool Is5D = T::rank == 5;
-   };
 
    /// Construct a new halo labeled Name for the input MachEnv and Decomp
    Halo(const std::string &Name, const MachEnv *InEnv, const Decomp *InDecomp);
