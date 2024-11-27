@@ -57,7 +57,8 @@ dimension list since it will be added during I/O. Fields that do not change
 with time should include this argument with the value false so that the time
 dimension is not added. Actual field data stored in an array is attached in a
 separate call as described below. Scalar fields can be added by setting the
-NumDims to zero (the DimNames is then ignored). Scalar data is attached using
+NumDims to zero (the Dimensions vector is ignored but an empty vector
+must still be supplied in the argument list). Scalar data is attached using
 a 1D array with size 1. Fields without a data array can be created with:
 ```c++
    std::shared_ptr<Field> MyField =
