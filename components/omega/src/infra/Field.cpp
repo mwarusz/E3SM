@@ -91,7 +91,7 @@ Field::create(const std::string &FieldName,   // [in] Name of variable/field
               const std::any FillValue, // [in] scalar for undefined entries
               const int NumDims,        // [in] number of dimensions
               const std::vector<std::string> &Dimensions, // [in] dim names
-              bool InTimeDependent // [in] flag for time dependent field
+              bool TimeDependent // [in] flag for time dependent field
 ) {
 
    // Check to make sure a field of that name has not already been defined
@@ -129,7 +129,7 @@ Field::create(const std::string &FieldName,   // [in] Name of variable/field
    ThisField->FieldMeta["_FillValue"]    = FillValue;
 
    // Set the time-dependent flag
-   ThisField->TimeDependent = InTimeDependent;
+   ThisField->TimeDependent = TimeDependent;
 
    // Number of dimensions for the field
    ThisField->NDims = NumDims;

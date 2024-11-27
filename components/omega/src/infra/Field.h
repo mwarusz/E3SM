@@ -154,7 +154,7 @@ class Field {
           const std::any FillValue,       ///< [in] scalar for undefined entries
           const int NumDims,              ///< [in] number of dimensions
           const std::vector<std::string> &Dimensions, ///< [in] dim names
-          const bool InTimeDependent = true ///< [in] opt flag for unlim time
+          const bool TimeDependent = true ///< [in] opt flag for unlim time
    );
 
    //---------------------------------------------------------------------------
