@@ -16,8 +16,8 @@
 #include "TimeMgr.h"
 #include "TimeStepper.h"
 
-#include "mpi.h"
 #include "Pacer.h"
+#include <mpi.h>
 
 //------------------------------------------------------------------------------
 // The test driver for the standalone driver
