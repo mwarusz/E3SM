@@ -66,13 +66,13 @@ if (NOT TARGET pacer)
     add_library(pacer ${E3SM_ROOT}/share/pacer/Pacer.cpp)
 
     target_include_directories(
-        pacer	
+        pacer
         PRIVATE
         ${E3SM_ROOT}/share/timing
     )
 
     target_link_libraries(
-        pacer	
+        pacer
         PUBLIC
         gptl
     )
