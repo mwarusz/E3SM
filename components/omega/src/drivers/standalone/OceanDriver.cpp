@@ -10,7 +10,7 @@
 #include "TimeMgr.h"
 #include "TimeStepper.h"
 
-#include "mpi.h"
+#include <mpi.h>
 #include "Pacer.h"
 
 #include <iostream>
