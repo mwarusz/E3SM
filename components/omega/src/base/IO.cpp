@@ -331,7 +331,8 @@ int getDimFromFile(int FileID, // [in] ID of the file containing dim
    // First get the dimension ID
    Err = PIOc_inq_dimid(FileID, DimName.c_str(), &DimID);
    if (Err != PIO_NOERR) {
-      LOG_ERROR("PIO error while reading dimension {} ", DimName);
+      // Dimension missing in file - return error but let calling routine
+      // decide how to respond
       return Err;
    }
 
@@ -701,7 +702,8 @@ int readArray(void *Array,                // [out] array to be read
    // Find variable ID from file
    Err = PIOc_inq_varid(FileID, VarName.c_str(), &VarID);
    if (Err != PIO_NOERR) {
-      LOG_ERROR("IO::readArray: Error finding varid for variable {}", VarName);
+      // Variable not in file. Return error but let calling routine decide
+      // how to respond
       return Err;
    }
 
