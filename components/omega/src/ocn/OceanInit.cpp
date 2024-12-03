@@ -91,7 +91,7 @@ int initOmegaModules(MPI_Comm Comm) {
       return Err;
    }
 
-   Err = Field::init();
+   Err = Field::init(ModelClock);
    if (Err != 0) {
       LOG_CRITICAL("ocnInit: Error initializing Fields");
       return Err;

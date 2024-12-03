@@ -84,11 +84,17 @@ class IOStream {
    /// Computes the parallel decomposition (offsets) for a field.
    /// Needed for parallel I/O
    int computeDecomp(
-       std::shared_ptr<Field> FieldPtr,       ///< [in] field
-       std::map<std::string, int> &AllDimIDs, ///< [in] dimension IDs
+       std::shared_ptr<Field> FieldPtr, ///< [in] field
        int &DecompID, ///< [out] ID assigned to the defined decomposition
        I4 &LocalSize, ///< [out] size of the local array for this field
        std::vector<int> &DimLengths // [out] local dim lengths
+   );
+
+   /// Retrieves field size information for non-distributed fields
+   /// (distributed fields get this info from computeDecomp)
+   void getFieldSize(std::shared_ptr<Field> FieldPtr, ///< [in] field
+                     I4 &LocalSize, ///< [out] size of the local array
+                     std::vector<int> &DimLengths ///< [out] local dim lengths
    );
 
    /// Private function that performs most of the stream read - called by the

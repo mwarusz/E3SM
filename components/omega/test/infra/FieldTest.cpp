@@ -18,6 +18,7 @@
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OmegaKokkos.h"
+#include "TimeMgr.h"
 #include "mpi.h"
 #include <vector>
 
@@ -128,8 +129,13 @@ int initFieldTest() {
    std::shared_ptr<Dimension> StuffDim =
        Dimension::create("NStuff", NVertLevels);
 
+   // Create a model clock for time info
+   TimeInstant SimStartTime(0001, 1, 1, 0, 0, 0.0);
+   TimeInterval TimeStep(2, TimeUnits::Hours);
+   Clock *ModelClock = new Clock(SimStartTime, TimeStep);
+
    // Initialize Field class - creates Model and Sim metadata fields
-   int Err1 = Field::init();
+   int Err1 = Field::init(ModelClock);
    TstEval<int>("Field initialization", Err1, ErrRef, Err);
 
    // Add some global (Model and Simulation) metadata

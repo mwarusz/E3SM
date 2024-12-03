@@ -50,6 +50,9 @@ namespace IO {
 /// ID for global metadata (ie metadata not associated with a variable)
 constexpr int GlobalID = PIO_GLOBAL;
 
+/// Length for unlimited dimensions
+constexpr int Unlimited = PIO_UNLIMITED;
+
 /// Choice of parallel IO rearranger algorithm
 enum Rearranger {
    RearrBox     = PIO_REARR_BOX,    ///< box rearranger (default)
