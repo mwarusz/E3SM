@@ -269,6 +269,7 @@ _TESTS = {
             "SMS_D_Ld1.T62_oQU240.GMPAS-IAF.mpaso-harmonic_mean_drag",
             "SMS_D_Ld1.T62_oQU240.GMPAS-IAF.mpaso-upwind_advection",
             "ERS_Ld5_D.T62_oQU240.GMPAS-IAF.mpaso-conservation_check",
+            "ERS_Ld5_PS.ne30pg2_r05_IcoswISC30E3r5.CRYO1850-DISMF.mpaso-scaled_dib_dismf",
             )
         },
 
@@ -761,8 +762,22 @@ _TESTS = {
             "SMS_D_Ln5.ne4pg2_oQU480.F2010-SCREAMv1-MPASSI.scream-mam4xx-aci",
             "SMS_D_Ln5.ne4pg2_oQU480.F2010-SCREAMv1-MPASSI.scream-mam4xx-wetscav",
             "SMS_D_Ln5.ne4pg2_oQU480.F2010-SCREAMv1-MPASSI.scream-mam4xx-drydep",
+            "SMS_D_Ln5.ne30pg2_oECv3.F2010-SCREAMv1-MPASSI.scream-mam4xx-remap_emiss_ne4_ne30"
         )
     },
+
+    "e3sm_moab_dev" : {
+        "time"  : "01:00:00",
+        "tests" : (
+            "ERS_Vmoab_Ld3.ne4pg2_oQU480.WCYCL1850NS",
+            "ERS_Vmoab_Ld3.ne4pg2_oQU480.F1850",
+            "ERS_Vmoab_Ld3.ne4pg2_ne4pg2.I1850CNPRDCTCBCTOP",
+            "ERS_Vmoab_Ld3.T62_oQU240wLI.GMPAS-IAF",
+            "ERS_Vmoab_Ld3.T62_oQU120.CMPASO-NYF",
+            "ERS_Vmoab_Ld3.r05_r05.RMOSGPCC",
+        )
+    },
+
 
 
     "e3sm_gpuacc" : {

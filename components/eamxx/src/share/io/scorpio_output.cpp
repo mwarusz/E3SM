@@ -227,9 +227,13 @@ AtmosphereOutput (const ekat::Comm& comm, const ekat::ParameterList& params,
   if (use_vertical_remap_from_file) {
     // We build a remapper, to remap fields from the fm grid to the io grid
     auto vert_remap_file   = params.get<std::string>("vertical_remap_file");
-    auto f_lev = get_field("p_mid","sim");
-    auto f_ilev = get_field("p_int","sim");
-    m_vert_remapper = std::make_shared<VerticalRemapper>(io_grid,vert_remap_file,f_lev,f_ilev,m_fill_value);
+    auto p_mid = get_field("p_mid","sim");
+    auto p_int = get_field("p_int","sim");
+    auto vert_remapper = std::make_shared<VerticalRemapper>(io_grid,vert_remap_file);
+    vert_remapper->set_source_pressure (p_mid,p_int);
+    vert_remapper->set_mask_value(m_fill_value);
+    vert_remapper->set_extrapolation_type(VerticalRemapper::Mask); // both Top AND Bot
+    m_vert_remapper = vert_remapper;
     io_grid = m_vert_remapper->get_tgt_grid();
     set_grid(io_grid);
 
@@ -1044,8 +1048,14 @@ register_variables(const std::string& filename,
 
       // Gather longname (if not already in the io: string attributes)
       if (str_atts.count("long_name")==0) {
-        auto longname = m_longnames.get_longname(name);
+        auto longname = m_default_metadata.get_longname(name);
         scorpio::set_attribute(filename, name, "long_name", longname);
+      }
+
+      // Gather standard name, CF-Compliant (if not already in the io: string attributes)
+      if (str_atts.count("standard_name")==0) {
+        auto standardname = m_default_metadata.get_standardname(name);
+        scorpio::set_attribute(filename, name, "standard_name", standardname);
       }
     }
   }
