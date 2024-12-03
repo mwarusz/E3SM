@@ -405,3 +405,14 @@ add_omega_test(
     ocn/TracersTest.cpp
     "-n;8"
 )
+
+##########################
+# Tridiagonal solvers test
+##########################
+
+add_omega_test(
+    TRIDIAGSOLVERS_TEST
+    testTriDiagSolvers.exe
+    base/TriDiagSolversTest.cpp
+    "-n;1"
+)
