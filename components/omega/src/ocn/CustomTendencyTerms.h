@@ -148,14 +148,14 @@ class ManufacturedSolution {
 
                 // Del2 and del4 source terms
                 if (LocVelDiffTendencyEnable) {
-                   U += LocViscDel2 * LocEta0 * LocKx2 * cos(Phase);
-                   V += LocViscDel2 * LocEta0 * LocKy2 * cos(Phase);
+                   U += LocViscDel2 * LocEta0 * (LocKx2 + LocKy2) * cos(Phase);
+                   V += LocViscDel2 * LocEta0 * (LocKx2 + LocKy2) * cos(Phase);
                 }
                 if (LocVelHyperDiffTendencyEnable) {
                    U -= LocViscDel4 * LocEta0 *
-                        (LocKx4 * cos(Phase) + LocKx2 * LocKy2 * cos(Phase));
+                        ((LocKx4 + LocKy4 + LocKx2 * LocKy2) * cos(Phase));
                    V -= LocViscDel4 * LocEta0 *
-                        (LocKy4 * cos(Phase) + LocKx2 * LocKy2 * cos(Phase));
+                        ((LocKx4 + LocKy4 + LocKx2 * LocKy2) * cos(Phase));
                 }
 
                 R8 NormalCompSourceTerm =
