@@ -5,8 +5,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "IOStream.h"
 #include "OceanDriver.h"
 #include "OceanState.h"
+#include "TimeMgr.h"
 #include "TimeStepper.h"
 
 namespace OMEGA {
@@ -27,9 +29,11 @@ int ocnRun(TimeInstant &CurrTime ///< [inout] current sim time
    TimeInterval TimeStep = DefTimeStepper->getTimeStep();
    TimeInstant SimTime   = OmegaClock->getCurrentTime();
 
-   I8 IStep = 0;
+   // Get Simulation metadata field for later updates
+   std::shared_ptr<Field> SimInfo = Field::get(SimMeta);
 
    // time loop, integrate until EndAlarm or error encountered
+   I8 IStep = 0;
    while (Err == 0 && !(EndAlarm->isRinging())) {
 
       // track step count
@@ -41,6 +45,12 @@ int ocnRun(TimeInstant &CurrTime ///< [inout] current sim time
       DefTimeStepper->doStep(DefOceanState, SimTime);
 
       // write restart file/output, anything needed post-timestep
+
+      Err = IOStream::writeAll(OmegaClock);
+      if (Err != 0) {
+         LOG_CRITICAL("Error writing streams at end of step");
+         break;
+      }
 
       LOG_INFO("ocnRun: Time step {} complete, clock time: {}", IStep,
                SimTime.getString(4, 4, "-"));

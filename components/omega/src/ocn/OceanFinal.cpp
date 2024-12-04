@@ -14,7 +14,7 @@
 #include "MachEnv.h"
 #include "OceanDriver.h"
 #include "OceanState.h"
-#include "TendencyTerms.h"
+#include "Tendencies.h"
 #include "TimeMgr.h"
 #include "TimeStepper.h"
 #include "Tracers.h"

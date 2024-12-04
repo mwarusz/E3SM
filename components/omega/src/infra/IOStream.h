@@ -71,7 +71,7 @@ class IOStream {
    /// clock so that stream alarm can be attached to this clock during creation.
    static int create(const std::string &StreamName, ///< [in] name of stream
                      Config &StreamConfig, ///< [in] input stream configuration
-                     Clock &ModelClock     ///< [inout] Omega model clock
+                     Clock *&ModelClock    ///< [inout] Omega model clock
    );
 
    /// Define all dimensions used. Returns an error code as well as a map
@@ -84,17 +84,23 @@ class IOStream {
    /// Computes the parallel decomposition (offsets) for a field.
    /// Needed for parallel I/O
    int computeDecomp(
-       std::shared_ptr<Field> FieldPtr,       ///< [in] field
-       std::map<std::string, int> &AllDimIDs, ///< [in] dimension IDs
+       std::shared_ptr<Field> FieldPtr, ///< [in] field
        int &DecompID, ///< [out] ID assigned to the defined decomposition
        I4 &LocalSize, ///< [out] size of the local array for this field
        std::vector<int> &DimLengths // [out] local dim lengths
    );
 
+   /// Retrieves field size information for non-distributed fields
+   /// (distributed fields get this info from computeDecomp)
+   void getFieldSize(std::shared_ptr<Field> FieldPtr, ///< [in] field
+                     I4 &LocalSize, ///< [out] size of the local array
+                     std::vector<int> &DimLengths ///< [out] local dim lengths
+   );
+
    /// Private function that performs most of the stream read - called by the
    /// public read method
    int readStream(
-       const Clock &ModelClock, ///< [in] Model clock for alarms, time stamp
+       const Clock *ModelClock, ///< [in] Model clock for alarms, time stamp
        Metadata &ReqMetadata, ///< [inout] global metadata to extract from file
        bool ForceRead = false ///< [in] Optional: read even if not time
    );
@@ -102,7 +108,7 @@ class IOStream {
    /// Private function that performs most of the stream write - called by the
    /// public write method
    int writeStream(
-       const Clock &ModelClock, ///< [in] Model clock for alarms, time stamp
+       const Clock *ModelClock, ///< [in] Model clock for alarms, time stamp
        bool ForceWrite = false, ///< [in] Optional: write even if not time
        bool FinalCall  = false  ///< [in] Optional flag for shutdown
    );
@@ -151,7 +157,7 @@ class IOStream {
    ///    $s = seconds part of simulation time stamp
    static std::string buildFilename(
        const std::string &FilenameTemplate, ///< [in] template string for name
-       const Clock &ModelClock              ///< [in] model clock for sim time
+       const Clock *ModelClock              ///< [in] model clock for sim time
    );
 
    /// Sets ReducePrecision flag based on an input string, performing string
@@ -169,14 +175,14 @@ class IOStream {
    /// Creates all streams defined in the input configuration file. This does
    /// not validate the contents of the streams since the relevant Fields
    /// may not have been defined yet. Returns an error code.
-   static int init(Clock &ModelClock ///< [inout] Omega model clock
+   static int init(Clock *&ModelClock ///< [inout] Omega model clock
    );
 
    //---------------------------------------------------------------------------
    /// Performs a final write of any streams that have the OnShutdown option and
    /// then removes all streams to clean up. Returns an error code.
    static int
-   finalize(const Clock &ModelClock ///< [in] Model clock needed for time stamps
+   finalize(const Clock *ModelClock ///< [in] Model clock needed for time stamps
    );
 
    //---------------------------------------------------------------------------
@@ -222,7 +228,7 @@ class IOStream {
    //---------------------------------------------------------------------------
    /// Reads a stream if it is time. Returns an error code.
    static int read(const std::string &StreamName, ///< [in] Name of stream
-                   const Clock &ModelClock, ///< [in] Model clock for time info
+                   const Clock *ModelClock, ///< [in] Model clock for time info
                    Metadata &ReqMetadata, ///< [inout] Metadata desired in file
                    bool ForceRead = false ///< [in] opt: read even if not time
    );
@@ -231,7 +237,7 @@ class IOStream {
    /// Writes a stream if it is time. Returns an error code.
    static int
    write(const std::string &StreamName, ///< [in] Name of stream
-         const Clock &ModelClock,       ///< [in] Model clock for time stamps
+         const Clock *ModelClock,       ///< [in] Model clock for time stamps
          bool ForceWrite = false        ///< [in] opt: write even if not time
    );
 
@@ -239,7 +245,7 @@ class IOStream {
    /// Loops through all streams and writes them if it is time. This is
    /// useful if most I/O is consolidated at one point (eg end of step).
    static int
-   writeAll(const Clock &ModelClock ///< [in] Model clock for time stamps
+   writeAll(const Clock *ModelClock ///< [in] Model clock for time stamps
    );
 
    //---------------------------------------------------------------------------

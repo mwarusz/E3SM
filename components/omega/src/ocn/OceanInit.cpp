@@ -15,11 +15,12 @@
 #include "Halo.h"
 #include "HorzMesh.h"
 #include "IO.h"
+#include "IOStream.h"
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OceanDriver.h"
 #include "OceanState.h"
-#include "TendencyTerms.h"
+#include "Tendencies.h"
 #include "TimeMgr.h"
 #include "TimeStepper.h"
 #include "Tracers.h"
@@ -73,13 +74,24 @@ int initOmegaModules(MPI_Comm Comm) {
       return Err;
    }
 
+   TimeStepper *DefStepper = TimeStepper::getDefault();
+   Clock *ModelClock       = DefStepper->getClock();
+
+   // Initialize IOStreams - this does not yet validate the contents
+   // of each file, only creates streams from Config
+   Err = IOStream::init(ModelClock);
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: Error initializing IOStreams");
+      return Err;
+   }
+
    Err = IO::init(Comm);
    if (Err != 0) {
       LOG_CRITICAL("ocnInit: Error initializing parallel IO");
       return Err;
    }
 
-   Err = Field::init();
+   Err = Field::init(ModelClock);
    if (Err != 0) {
       LOG_CRITICAL("ocnInit: Error initializing Fields");
       return Err;
@@ -102,6 +114,23 @@ int initOmegaModules(MPI_Comm Comm) {
       LOG_CRITICAL("ocnInit: Error initializing default mesh");
       return Err;
    }
+
+   // Create the vertical dimension - this will eventually move to
+   // a vertical mesh later
+   Config *OmegaConfig = Config::getOmegaConfig();
+   Config DimConfig("Dimension");
+   Err = OmegaConfig->get(DimConfig);
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: Dimension group not found in Config");
+      return Err;
+   }
+   I4 NVertLevels;
+   Err = DimConfig.get("NVertLevels", NVertLevels);
+   if (Err != 0) {
+      LOG_CRITICAL("ocnInit: NVertLevels not found in Dimension Config");
+      return Err;
+   }
+   auto VertDim = OMEGA::Dimension::create("NVertLevels", NVertLevels);
 
    Err = Tracers::init();
    if (Err != 0) {
@@ -133,7 +162,67 @@ int initOmegaModules(MPI_Comm Comm) {
       return Err;
    }
 
+   // Now that all fields have been defined, validate all the streams
+   // contents
+   bool StreamsValid = IOStream::validateAll();
+   if (!StreamsValid) {
+      LOG_CRITICAL("ocnInit: Error validating IO Streams");
+      return Err;
+   }
+
+   // Initialize data from Restart or InitialState files
+   std::string SimTimeStr          = " "; // create SimulationTime metadata
+   std::shared_ptr<Field> SimField = Field::get(SimMeta);
+   SimField->addMetadata("SimulationTime", SimTimeStr);
+
+   // read from initial state if this is starting a new simulation
+   Metadata ReqMeta; // no requested metadata for initial state
+   Err = IOStream::read("InitialState", ModelClock, ReqMeta);
+   if (Err != 0) {
+      LOG_CRITICAL("Error reading the initial state file");
+      return Err;
+   }
+
+   // read restart if starting from restart
+   SimTimeStr                = " ";
+   ReqMeta["SimulationTime"] = SimTimeStr;
+   Err = IOStream::read("RestartRead", ModelClock, ReqMeta);
+   if (Err != 0) {
+      LOG_CRITICAL("Error reading the restart file");
+      return Err;
+   }
+
+   // If reading from restart, reset the current time to the input time
+   if (SimTimeStr != " ") {
+      TimeInstant NewCurrentTime(SimTimeStr);
+      Err = ModelClock->setCurrentTime(NewCurrentTime);
+      if (Err != 0) {
+         LOG_CRITICAL("Error resetting the simulation time from restart");
+         return Err;
+      }
+   }
+
+   // Update Halos and Device arrays with new state and tracer fields
+
+   OceanState *DefState = OceanState::getDefault();
+   I4 CurTimeLevel      = 0;
+   DefState->exchangeHalo(CurTimeLevel);
+   DefState->copyToDevice(CurTimeLevel);
+
+   // Now update tracers - assume using same time level index
+   Err = Tracers::exchangeHalo(CurTimeLevel);
+   if (Err != 0) {
+      LOG_CRITICAL("Error updating tracer halo after restart");
+      return Err;
+   }
+   Err = Tracers::copyToDevice(CurTimeLevel);
+   if (Err != 0) {
+      LOG_CRITICAL("Error updating tracer device arrays after restart");
+      return Err;
+   }
+
    return Err;
+
 } // end initOmegaModules
 
 } // end namespace OMEGA

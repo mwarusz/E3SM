@@ -28,12 +28,6 @@ namespace OMEGA {
 class OceanState {
 
  private:
-   void initParallelIO(I4 &CellDecompR8, I4 &EdgeDecompR8, Decomp *MeshDecomp);
-
-   void finalizeParallelIO(I4 CellDecompR8, I4 EdgeDecompR8);
-
-   void read(int StateFileID, I4 CellDecompR8, I4 EdgeDecompR8);
-
    void defineFields();
 
    Halo *MeshHalo;
@@ -114,9 +108,6 @@ class OceanState {
           const int NVertLevels,   ///< [in] Number of vertical levels
           const int NTimeLevels    ///< [in] Number of time levels
    );
-
-   /// load state from file
-   void loadStateFromFile(const std::string &StateFileName, Decomp *MeshDecomp);
 
    /// Get layer thickness device array at given time level
    I4 getLayerThickness(Array2DReal &LayerThick, const I4 TimeLevel) const;

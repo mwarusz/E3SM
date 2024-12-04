@@ -1,10 +1,7 @@
-#include "physics/p3/eamxx_p3_process_interface.hpp"
 #include "share/property_checks/field_within_interval_check.hpp"
 #include "share/property_checks/field_lower_bound_check.hpp"
-// Needed for p3_init, the only F90 code still used.
-#include "physics/p3/p3_functions.hpp"
-#include "physics/share/physics_constants.hpp"
-#include "physics/p3/p3_f90.hpp"
+#include "p3_functions.hpp"
+#include "eamxx_p3_process_interface.hpp"
 
 #include "ekat/ekat_assert.hpp"
 #include "ekat/util/ekat_units.hpp"
@@ -72,15 +69,15 @@ void P3Microphysics::set_grids(const std::shared_ptr<const GridsManager> grids_m
   add_field<Updated> ("T_mid",       scalar3d_layout_mid, K,      grid_name, ps);  // T_mid is the only one of these variables that is also updated.
 
   // Prognostic State:  (all fields are both input and output)
-  add_field<Updated>("qv",     scalar3d_layout_mid, kg/kg, grid_name, "tracers", ps);
-  add_field<Updated>("qc",     scalar3d_layout_mid, kg/kg, grid_name, "tracers", ps);
-  add_field<Updated>("qr",     scalar3d_layout_mid, kg/kg, grid_name, "tracers", ps);
-  add_field<Updated>("qi",     scalar3d_layout_mid, kg/kg, grid_name, "tracers", ps);
-  add_field<Updated>("qm",     scalar3d_layout_mid, kg/kg, grid_name, "tracers", ps);
-  add_field<Updated>("nc",     scalar3d_layout_mid, 1/kg,  grid_name, "tracers", ps);
-  add_field<Updated>("nr",     scalar3d_layout_mid, 1/kg,  grid_name, "tracers", ps);
-  add_field<Updated>("ni",     scalar3d_layout_mid, 1/kg,  grid_name, "tracers", ps);
-  add_field<Updated>("bm",     scalar3d_layout_mid, 1/kg,  grid_name, "tracers", ps);
+  add_tracer<Updated>("qv", m_grid, kg/kg, ps);
+  add_tracer<Updated>("qc", m_grid, kg/kg, ps);
+  add_tracer<Updated>("qr", m_grid, kg/kg, ps);
+  add_tracer<Updated>("qi", m_grid, kg/kg, ps);
+  add_tracer<Updated>("qm", m_grid, kg/kg, ps);
+  add_tracer<Updated>("nc", m_grid, 1/kg,  ps);
+  add_tracer<Updated>("nr", m_grid, 1/kg,  ps);
+  add_tracer<Updated>("ni", m_grid, 1/kg,  ps);
+  add_tracer<Updated>("bm", m_grid, 1/kg,  ps);
 
   // Diagnostic Inputs: (only the X_prev fields are both input and output, all others are just inputs)
   add_field<Required>("nc_nuceat_tend",     scalar3d_layout_mid, 1/(kg*s), grid_name, ps);
@@ -220,13 +217,8 @@ void P3Microphysics::init_buffers(const ATMBufferManager &buffer_manager)
 // =========================================================================================
 void P3Microphysics::initialize_impl (const RunType /* run_type */)
 {
-  // Gather runtime options
-  runtime_options.max_total_ni = m_params.get<double>("max_total_ni");
-
-  // setting P3 constants in a struct
-  m_p3constants.set_p3_from_namelist(m_params);
-  m_p3constants.print_p3constants(m_atm_logger);
-  // done setting P3 constants
+  // Gather runtime options from file
+  runtime_options.load_runtime_options_from_file(m_params);
 
   // Set property checks for fields in this process
   add_invariant_check<FieldWithinIntervalCheck>(get_field_out("T_mid"),m_grid,100.0,500.0,false);
@@ -249,8 +241,8 @@ void P3Microphysics::initialize_impl (const RunType /* run_type */)
   add_postcondition_check<FieldWithinIntervalCheck>(get_field_out("eff_radius_qr"),m_grid,0.0,5.0e3,false);
 
   // Initialize p3
-  p3::p3_init(/* write_tables = */ false,
-              this->get_comm().am_i_root());
+  P3F::p3_init(/* write_tables = */ false,
+               this->get_comm().am_i_root());
 
   // Initialize all of the structures that are passed to p3_main in run_impl.
   // Note: Some variables in the structures are not stored in the field manager.  For these

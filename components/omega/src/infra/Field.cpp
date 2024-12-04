@@ -16,6 +16,7 @@
 #include "Field.h"
 #include "DataTypes.h"
 #include "Dimension.h"
+#include "IO.h"
 #include "Logging.h"
 #include <iostream>
 #include <map>
@@ -30,7 +31,8 @@ std::map<std::string, std::shared_ptr<FieldGroup>> FieldGroup::AllGroups;
 
 //------------------------------------------------------------------------------
 // Initializes the fields for global code and simulation metadata
-int Field::init() {
+int Field::init(const Clock *ModelClock // [in] default model clock
+) {
 
    int Err = 0;
 
@@ -38,6 +40,24 @@ int Field::init() {
    // code or the simulation/experiment
    std::shared_ptr<Field> CodeField = create(CodeMeta);
    std::shared_ptr<Field> SimField  = create(SimMeta);
+
+   // Define an unlimited time dimension for many time-dependent fields
+   // for CF-compliant output
+   std::shared_ptr<Dimension> TimeDim =
+       Dimension::create("time", IO::Unlimited);
+
+   // Define a time field with required metadata for CF-compliant output
+   // It is defined here as a scalar field but the time axis will be added
+   // during IO
+   TimeInstant StartTime    = ModelClock->getStartTime();
+   std::string StartTimeStr = StartTime.getString(4, 0, " ");
+   std::string UnitString   = "seconds since " + StartTimeStr;
+   CalendarKind CalKind     = Calendar::getKind();
+   std::string CalName      = CalendarCFName[CalKind];
+   std::vector<std::string> DimNames; // empty dim names vector
+   std::shared_ptr<Field> TimeField = create("time", "time", UnitString, "time",
+                                             0.0, 1.e20, -9.99e30, 0, DimNames);
+   TimeField->addMetadata("calendar", CalName);
 
    return Err;
 }
@@ -70,7 +90,8 @@ Field::create(const std::string &FieldName,   // [in] Name of variable/field
               const std::any ValidMax,        // [in] max valid field value
               const std::any FillValue, // [in] scalar for undefined entries
               const int NumDims,        // [in] number of dimensions
-              const std::vector<std::string> &Dimensions // [in] dim names
+              const std::vector<std::string> &Dimensions, // [in] dim names
+              bool TimeDependent // [in] flag for time dependent field
 ) {
 
    // Check to make sure a field of that name has not already been defined
@@ -107,16 +128,24 @@ Field::create(const std::string &FieldName,   // [in] Name of variable/field
    ThisField->FieldMeta["FillValue"]     = FillValue;
    ThisField->FieldMeta["_FillValue"]    = FillValue;
 
+   // Set the time-dependent flag
+   ThisField->TimeDependent = TimeDependent;
+
    // Number of dimensions for the field
    ThisField->NDims = NumDims;
 
    // Dimension names for retrieval of dimension info
    // These must be in the same index order as the stored data
+   // Also determine whether this is a distributed field - true if any of
+   // the dimensions are distributed.
+   ThisField->Distributed = false;
    ThisField->DimNames;
    if (NumDims > 0) {
       ThisField->DimNames.resize(NumDims);
       for (int I = 0; I < NumDims; ++I) {
          ThisField->DimNames[I] = Dimensions[I];
+         if (Dimension::isDistributedDim(Dimensions[I]))
+            ThisField->Distributed = true;
       }
    }
 
@@ -302,6 +331,17 @@ bool Field::isFieldOnHost(const std::string &FieldName // [in] name of field
 int Field::getNumDims() const { return NDims; }
 
 //------------------------------------------------------------------------------
+// Determines whether the field is time dependent and requires the unlimited
+// time dimension during IO
+bool Field::isTimeDependent() const { return TimeDependent; }
+
+//------------------------------------------------------------------------------
+// Determinse whether a field is distributed across tasks or whether a copy
+// is entirely local. This is needed to determine whether a parallel IO or
+// a non-distributed IO will be used.
+bool Field::isDistributed() const { return Distributed; }
+
+//------------------------------------------------------------------------------
 // Returns a vector of dimension names associated with each dimension
 // of an array field. Returns an error code.
 int Field::getDimNames(
@@ -394,6 +434,27 @@ int Field::addMetadata(
    // Loop through pairs and add each individually
    for (const auto &MetaPair : MetaPairs) {
       RetVal += addMetadata(MetaPair.first, MetaPair.second);
+   }
+
+   return RetVal;
+}
+
+//------------------------------------------------------------------------------
+// Updates a metadata entry with a new value
+int Field::updateMetadata(const std::string &MetaName, // [in] Name of metadata
+                          const std::any Value         // [in] Value of metadata
+) {
+   int RetVal = 0;
+
+   if (hasMetadata(MetaName)) {
+      FieldMeta[MetaName] = Value;
+
+   } else {
+      LOG_ERROR("Failed to update metadata {} for field {} because the field "
+                "has no entry with that name.",
+                MetaName, FldName);
+
+      RetVal = -1;
    }
 
    return RetVal;

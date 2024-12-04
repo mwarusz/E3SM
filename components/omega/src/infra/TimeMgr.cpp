@@ -4137,6 +4137,16 @@ I4 Clock::setCurrentTime(
       NextTime = CurrTime + TimeStep;
    }
 
+   // Update status of all attached alarms based on new time
+   I4 Err1{0};
+   for (I4 N = 0; N < NumAlarms; ++N) {
+      Err1 = Alarms[N]->updateStatus(CurrTime);
+      if (Err1 != 0) {
+         ++Err;
+         LOG_ERROR("Clock::setCurrentTime error updating alarm # {}", N);
+         break;
+      }
+   }
    return Err;
 
 } // end Clock::setCurrentTime

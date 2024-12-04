@@ -12,7 +12,6 @@
 #include "Decomp.h"
 #include "Field.h"
 #include "Halo.h"
-#include "IO.h"
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OmegaKokkos.h"
@@ -53,7 +52,8 @@ int OceanState::init() {
    OceanState::DefaultOceanState =
        create("Default", DefHorzMesh, DefHalo, NVertLevels, NTimeLevels);
 
-   DefaultOceanState->loadStateFromFile(DefHorzMesh->MeshFileName, DefDecomp);
+   // State values are filled by a later read of the initial state or
+   // restart file
 
    return Err;
 }
@@ -182,76 +182,6 @@ void OceanState::clear() {
 } // end clear
 
 //------------------------------------------------------------------------------
-// Load state from file
-void OceanState::loadStateFromFile(const std::string &StateFileName,
-                                   Decomp *MeshDecomp) {
-
-   int StateFileID;
-   I4 CellDecompR8;
-   I4 EdgeDecompR8;
-
-   // Open the state file for reading (assume IO has already been initialized)
-   I4 Err;
-   Err = IO::openFile(StateFileID, StateFileName, IO::ModeRead);
-   if (Err != 0)
-      LOG_CRITICAL("OceanState: error opening state file");
-
-   // Create the parallel IO decompositions required to read in state variables
-   initParallelIO(CellDecompR8, EdgeDecompR8, MeshDecomp);
-
-   // Read layerThickness and normalVelocity
-   read(StateFileID, CellDecompR8, EdgeDecompR8);
-
-   // Destroy the parallel IO decompositions
-   finalizeParallelIO(CellDecompR8, EdgeDecompR8);
-
-   // Sync with device
-   copyToDevice(0);
-
-} // end loadStateFromFile
-
-//------------------------------------------------------------------------------
-// Initialize the parallel IO decompositions for the mesh variables
-void OceanState::initParallelIO(I4 &CellDecompR8, I4 &EdgeDecompR8,
-                                Decomp *MeshDecomp) {
-
-   I4 Err;
-   I4 NDims             = 3;
-   IO::Rearranger Rearr = IO::RearrBox;
-
-   // Create the IO decomp for arrays with (NCells) dimensions
-   std::vector<I4> CellDims{1, MeshDecomp->NCellsGlobal, NVertLevels};
-   std::vector<I4> CellID(NCellsAll * NVertLevels, -1);
-   for (int Cell = 0; Cell < NCellsAll; ++Cell) {
-      for (int Level = 0; Level < NVertLevels; ++Level) {
-         I4 GlobalID = (MeshDecomp->CellIDH(Cell) - 1) * NVertLevels + Level;
-         CellID[Cell * NVertLevels + Level] = GlobalID;
-      }
-   }
-
-   Err = IO::createDecomp(CellDecompR8, IO::IOTypeR8, NDims, CellDims,
-                          NCellsAll * NVertLevels, CellID, Rearr);
-   if (Err != 0)
-      LOG_CRITICAL("OceanState: error creating cell IO decomposition");
-
-   // Create the IO decomp for arrays with (NEdges) dimensions
-   std::vector<I4> EdgeDims{1, MeshDecomp->NEdgesGlobal, NVertLevels};
-   std::vector<I4> EdgeID(NEdgesAll * NVertLevels, -1);
-   for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
-      for (int Level = 0; Level < NVertLevels; ++Level) {
-         I4 GlobalID = (MeshDecomp->EdgeIDH(Edge) - 1) * NVertLevels + Level;
-         EdgeID[Edge * NVertLevels + Level] = GlobalID;
-      }
-   }
-
-   Err = IO::createDecomp(EdgeDecompR8, IO::IOTypeR8, NDims, EdgeDims,
-                          NEdgesAll * NVertLevels, EdgeID, Rearr);
-   if (Err != 0)
-      LOG_CRITICAL("OceanState: error creating edge IO decomposition");
-
-} // end initParallelIO
-
-//------------------------------------------------------------------------------
 // Define IO fields and metadata
 void OceanState::defineFields() {
 
@@ -301,6 +231,10 @@ void OceanState::defineFields() {
    }
    auto StateGroup = FieldGroup::create(StateGroupName);
 
+   // Add restart group if needed
+   if (!FieldGroup::exists("Restart"))
+      auto RestartGroup = FieldGroup::create("Restart");
+
    Err = StateGroup->addField(NormalVelocityFldName);
    if (Err != 0)
       LOG_ERROR("Error adding {} to field group {}", NormalVelocityFldName,
@@ -309,6 +243,15 @@ void OceanState::defineFields() {
    if (Err != 0)
       LOG_ERROR("Error adding {} to field group {}", LayerThicknessFldName,
                 StateGroupName);
+
+   Err = FieldGroup::addFieldToGroup(NormalVelocityFldName, "Restart");
+   if (Err != 0)
+      LOG_ERROR("Error adding {} to Restart field group",
+                NormalVelocityFldName);
+   Err = FieldGroup::addFieldToGroup(LayerThicknessFldName, "Restart");
+   if (Err != 0)
+      LOG_ERROR("Error adding {} to Restart field group",
+                LayerThicknessFldName);
 
    // Associate Field with data
    I4 TimeIndex;
@@ -326,61 +269,6 @@ void OceanState::defineFields() {
                 LayerThicknessFldName);
 
 } // end defineIOFields
-
-//------------------------------------------------------------------------------
-// Destroy parallel decompositions
-void OceanState::finalizeParallelIO(I4 CellDecompR8, I4 EdgeDecompR8) {
-
-   int Err = 0; // default return code
-
-   // Destroy the IO decomp for arrays with (NCells) dimensions
-   Err = IO::destroyDecomp(CellDecompR8);
-   if (Err != 0)
-      LOG_CRITICAL("OceanState: error destroying cell IO decomposition");
-
-   // Destroy the IO decomp for arrays with (NEdges) dimensions
-   Err = IO::destroyDecomp(EdgeDecompR8);
-   if (Err != 0)
-      LOG_CRITICAL("OceanState: error destroying edge IO decomposition");
-
-} // end finalizeParallelIO
-
-//------------------------------------------------------------------------------
-// Read Ocean State
-void OceanState::read(int StateFileID, I4 CellDecompR8, I4 EdgeDecompR8) {
-
-   I4 Err;
-   I4 TimeIndex;
-
-   Err = getTimeIndex(TimeIndex, 0);
-
-   // Read LayerThickness into a temporary double-precision array
-   int LayerThicknessID;
-   HostArray2DR8 TmpLayerThicknessR8("TmpLayerThicknessR8", NCellsSize,
-                                     NVertLevels);
-   Err = IO::readArray(TmpLayerThicknessR8.data(), NCellsAll, "layerThickness",
-                       StateFileID, CellDecompR8, LayerThicknessID);
-   if (Err != 0)
-      LOG_CRITICAL("OceanState: error reading layerThickness");
-
-   // Copy the thickness data into the final state array of user-specified
-   // precision
-   deepCopy(LayerThicknessH[TimeIndex], TmpLayerThicknessR8);
-
-   // Read NormalVelocity  into a temporary double-precision array
-   int NormalVelocityID;
-   HostArray2DR8 TmpNormalVelocityR8("TmpNormalVelocityR8", NEdgesSize,
-                                     NVertLevels);
-   Err = IO::readArray(TmpNormalVelocityR8.data(), NEdgesAll, "normalVelocity",
-                       StateFileID, EdgeDecompR8, NormalVelocityID);
-   if (Err != 0)
-      LOG_CRITICAL("OceanState: error reading normalVelocity");
-
-   // Copy the velocity data into the final state array of user-specified
-   // precision
-   deepCopy(NormalVelocityH[TimeIndex], TmpNormalVelocityR8);
-
-} // end read
 
 //------------------------------------------------------------------------------
 // Get layer thickness device array

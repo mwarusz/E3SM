@@ -50,6 +50,9 @@ namespace IO {
 /// ID for global metadata (ie metadata not associated with a variable)
 constexpr int GlobalID = PIO_GLOBAL;
 
+/// Length for unlimited dimensions
+constexpr int Unlimited = PIO_UNLIMITED;
+
 /// Choice of parallel IO rearranger algorithm
 enum Rearranger {
    RearrBox     = PIO_REARR_BOX,    ///< box rearranger (default)
@@ -275,6 +278,17 @@ int readArray(void *Array,                ///< [out] array to be read
               int &VarID    ///< [out] variable ID in case metadata needed
 );
 
+/// Reads a non-distributed variable. We use a void pointer here to create
+/// a generic interface for all types. Arrays are assumed to be in contiguous
+/// storage so the arrays of any dimension are treated as a 1-d array with
+/// the full local size. The routine returns the variable as well as the id
+/// assigned to the variable should that be needed later.
+int readNDVar(void *Variable,             ///< [out] variable to be read
+              const std::string &VarName, ///< [in] name of variable to read
+              int FileID,                 ///< [in] ID of open file to read from
+              int &VarID ///< [out] variable ID in case metadata needed
+);
+
 /// Writes a distributed array. A void pointer is used to create a generic
 /// interface. Arrays are assumed to be in contiguous storage and the variable
 /// must have a valid ID assigned by the defineVar function. A void pointer
@@ -285,6 +299,15 @@ int writeArray(void *Array,     ///< [in] array to be written
                int FileID,      ///< [in] ID of open file to write to
                int DecompID,    ///< [in] decomposition ID for this var
                int VarID        ///< [in] variable ID assigned by defineVar
+);
+
+/// Writes a non-distributed variable. A void pointer is used for a generic
+/// interface. Arrays are assumed to be in contiguous storage and the variable
+/// must have a valid ID assigned by the defineVar function. A void pointer
+/// to a scalar FillValue is also required to fill missing values.
+int writeNDVar(void *Variable, ///< [in] variable to be written
+               int FileID,     ///< [in] ID of open file to write to
+               int VarID       ///< [in] variable ID assigned by defineVar
 );
 
 } // end namespace IO
