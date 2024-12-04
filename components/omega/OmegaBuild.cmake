@@ -610,7 +610,7 @@ macro(update_variables)
     option(OMEGA_MPI_ON_DEVICE "Allow device buffers in MPI communication (default ON)." ON)
   endif()
 
-  option(OMEGA_CUDA_MALLOC_ASYNC "Enable CUDA async support (default OFF)." OFF) 
+  option(OMEGA_CUDA_MALLOC_ASYNC "Enable CUDA async support (default OFF)." OFF)
 
   set(OMEGA_TARGET_DEVICE FALSE)
 
