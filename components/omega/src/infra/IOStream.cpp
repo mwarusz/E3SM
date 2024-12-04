@@ -659,15 +659,12 @@ int IOStream::defineAllDims(
          if (Err != 0) { // can't find dim in file
             // Try again using old name for back compatibility to MPAS
             Err = IO::getDimFromFile(FileID, OldDimName, DimID, InLength);
-            if (Err == 0) {
-               LOG_INFO("Ignore PIO Error for Dimension {}: ", DimName);
-               LOG_INFO("Found under old dimension name {}: ", OldDimName);
-            } else {
-               if (Err != 0)
-                  LOG_WARN("Dimension {} not found in input stream {}", DimName,
-                           Name);
-            }
-            continue;
+            // If still not found, we skip this dimension, assuming it
+            // is not used for any variables to be read from the file. A later
+            // error check will catch any case where the dimension is actually
+            // needed but missing.
+            if (Err != 0)
+               continue;
          }
          // Check dimension length in input file matches what is expected
          if (InLength != Length) {
@@ -1730,10 +1727,7 @@ int IOStream::readFieldData(
       } else {
          Err = IO::readNDVar(DataPtr, OldFieldName, FileID, FieldID);
       }
-      if (Err == 0) {
-         LOG_INFO("Ignore PIO error for field {} ", FieldName);
-         LOG_INFO("Found field under old name {} ", OldFieldName);
-      } else {
+      if (Err != 0) { // still not found - return error
          LOG_ERROR("Error reading data array for {} in stream {}", FieldName,
                    Name);
          return Err;
