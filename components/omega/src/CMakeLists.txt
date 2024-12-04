@@ -10,6 +10,8 @@ target_include_directories(
     ${OMEGA_SOURCE_DIR}/src/infra
     ${OMEGA_SOURCE_DIR}/src/ocn
     ${OMEGA_SOURCE_DIR}/src/timeStepping
+    ${E3SM_ROOT}/share/timing
+    ${E3SM_ROOT}/share/pacer
     ${PIOC_SOURCE_DIR}
     ${PIOC_BINARY_DIR}
     ${Parmetis_INCLUDE_DIRS}
@@ -44,6 +46,8 @@ target_link_libraries(
     yaml-cpp
     parmetis
     metis
+    gptl
+    pacer
 )
 
 if(GKlib_FOUND)
