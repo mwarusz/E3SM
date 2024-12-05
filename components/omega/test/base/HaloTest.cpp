@@ -7,8 +7,8 @@
 /// everything needed to perform halo exchanges on any supported Kokkos array
 /// defined on a mesh in OMEGA with a given parallel decomposition. This
 /// unit test driver tests functionality by creating Kokkos arrays of every
-/// type and dimensionality supported in OMEGA, initializing each array based
-/// on global IDs of the mesh elememts, performing halo exchanges, and
+/// type, rank, and memory space supported in OMEGA, initializing each array
+/// based on global IDs of the mesh elememts, performing halo exchanges, and
 /// confirming the exchanged arrays are identical to the initial arrays.
 ///
 //
@@ -24,36 +24,38 @@
 #include "OmegaKokkos.h"
 #include "mpi.h"
 
+using namespace OMEGA;
+
 //------------------------------------------------------------------------------
 // This function template performs a single test on a Kokkos array type in a
 // given index space. Two Kokkos arrays of the same type and size are input,
 // InitArray contains the global IDs of the mesh elements for all the owned and
 // halo elements of the array, while TestArray contains the global IDs only in
 // the owned elements. The Halo class object, a label describing the test for
-// output, an integer to accumulate errors, and optionally the index space of
-// the input arrays (default is OnCell) are also input. A halo exchange is
-// performed on TestArray, and then TestArray is compared to InitArray. If any
-// elements differ the test is a failure and an error is returned.
+// output, and optionally the index space of the input arrays (default is
+// OnCell) are also input. An error code is returned as output. A halo exchange
+// is performed on TestArray, and then TestArray is compared to InitArray. If
+// any elements differ the test is a failure and an error is returned.
 
 template <typename T>
-void haloExchangeTest(
-    OMEGA::Halo *MyHalo,
+int haloExchangeTest(
+    Halo *MyHalo,
     T InitArray,  /// Array initialized based on global IDs of mesh elements
     T &TestArray, /// Array only initialized in owned elements
-    const char *Label,                          /// Unique label for test
-    OMEGA::I4 &TotErr,                          /// Integer to track errors
-    OMEGA::MeshElement ThisElem = OMEGA::OnCell /// index space, cell by default
+    const char *Label,            /// Unique label for test
+    MeshElement ThisElem = OnCell /// index space, cell by default
 ) {
 
-   OMEGA::I4 IErr{0}; // error code
+   I4 IErr   = 0; // error code
+   I4 RetErr = 0; // return error code
 
    // Set total array size and ensure arrays are of same size
-   OMEGA::I4 NTot = InitArray.size();
+   I4 NTot = InitArray.size();
    if (NTot != TestArray.size()) {
       LOG_ERROR("HaloTest: {} arrays must be of same size", Label);
       LOG_INFO("HaloTest: {} exchange test FAIL", Label);
-      TotErr += -1;
-      return;
+      RetErr += 1;
+      return RetErr;
    }
 
    // Perform halo exchange
@@ -61,17 +63,20 @@ void haloExchangeTest(
    if (IErr != 0) {
       LOG_ERROR("HaloTest: Error during {} halo exchange", Label);
       LOG_INFO("HaloTest: {} exchange test FAIL", Label);
-      TotErr += -1;
-      return;
+      RetErr += 1;
+      return RetErr;
    }
+
+   auto TestArrayH = createHostMirrorCopy(TestArray);
+   auto InitArrayH = createHostMirrorCopy(InitArray);
 
    // Collapse arrays to 1D for easy iteration
    Kokkos::View<typename T::value_type *, typename T::array_layout,
-                typename T::memory_space>
-       CollapsedInit(InitArray.data(), InitArray.size());
+                HostMemSpace>
+       CollapsedInit(InitArrayH.data(), InitArrayH.size());
    Kokkos::View<typename T::value_type *, typename T::array_layout,
-                typename T::memory_space>
-       CollapsedTest(TestArray.data(), TestArray.size());
+                HostMemSpace>
+       CollapsedTest(TestArrayH.data(), TestArrayH.size());
 
    // Confirm all elements are identical, if not set error code
    // and break out of loop
@@ -86,10 +91,10 @@ void haloExchangeTest(
       LOG_INFO("HaloTest: {} exchange test PASS", Label);
    } else {
       LOG_INFO("HaloTest: {} exchange test FAIL", Label);
-      TotErr += -1;
+      RetErr += 1;
    }
 
-   return;
+   return RetErr;
 
 } // end haloExchangeTest
 
@@ -99,37 +104,37 @@ void haloExchangeTest(
 
 int initHaloTest() {
 
-   OMEGA::I4 IErr{0};
+   I4 IErr{0};
 
    // Initialize the machine environment and fetch the default environment
    // pointer and the MPI communicator
-   OMEGA::MachEnv::init(MPI_COMM_WORLD);
-   OMEGA::MachEnv *DefEnv = OMEGA::MachEnv::getDefault();
-   MPI_Comm DefComm       = DefEnv->getComm();
+   MachEnv::init(MPI_COMM_WORLD);
+   MachEnv *DefEnv  = MachEnv::getDefault();
+   MPI_Comm DefComm = DefEnv->getComm();
 
    // Initialize the logging system
-   OMEGA::initLogging(DefEnv);
+   initLogging(DefEnv);
 
    // Open config file
-   OMEGA::Config("Omega");
-   IErr = OMEGA::Config::readAll("omega.yml");
+   Config("Omega");
+   IErr = Config::readAll("omega.yml");
    if (IErr != 0) {
       LOG_CRITICAL("HaloTest: Error reading config file");
       return IErr;
    }
 
    // Initialize the IO system
-   IErr = OMEGA::IO::init(DefComm);
+   IErr = IO::init(DefComm);
    if (IErr != 0)
       LOG_ERROR("HaloTest: error initializing parallel IO");
 
    // Create the default decomposition (initializes the decomposition)
-   IErr = OMEGA::Decomp::init();
+   IErr = Decomp::init();
    if (IErr != 0)
       LOG_ERROR("HaloTest: error initializing default decomposition");
 
    // Initialize the default halo
-   IErr = OMEGA::Halo::init();
+   IErr = Halo::init();
    if (IErr != 0)
       LOG_ERROR("HaloTest: error initializing default halo");
 
@@ -149,8 +154,8 @@ int initHaloTest() {
 int main(int argc, char *argv[]) {
 
    // Error tracking variables
-   OMEGA::I4 TotErr{0};
-   OMEGA::I4 IErr{0};
+   I4 TotErr = 0;
+   I4 IErr   = 0;
 
    // Initialize global MPI environment and Kokkos
    MPI_Init(&argc, &argv);
@@ -163,237 +168,352 @@ int main(int argc, char *argv[]) {
          LOG_ERROR("HaloTest: initHaloTest error");
 
       // Retrieve pointer to default halo
-      OMEGA::Halo *DefHalo = OMEGA::Halo::getDefault();
+      Halo *DefHalo = Halo::getDefault();
 
       // Retrieve pointer to default decomposition
-      OMEGA::Decomp *DefDecomp = OMEGA::Decomp::getDefault();
+      Decomp *DefDecomp = Decomp::getDefault();
 
-      OMEGA::I4 NumOwned;
-      OMEGA::I4 NumAll;
+      I4 NumOwned;
+      I4 NumAll;
 
       // Perform 1DI4 array tests for each index space (cell, edge, and vertex)
 
-      OMEGA::HostArray1DI4 Init1DI4Cell("Init1DI4Cell", DefDecomp->NCellsSize);
-      OMEGA::HostArray1DI4 Test1DI4Cell("Test1DI4Cell", DefDecomp->NCellsSize);
+      HostArray1DI4 Init1DI4CellH("Init1DI4CellH", DefDecomp->NCellsSize);
+      HostArray1DI4 Test1DI4CellH("Test1DI4CellH", DefDecomp->NCellsSize);
+      Array1DI4 Init1DI4Cell("Init1DI4Cell", DefDecomp->NCellsSize);
+      Array1DI4 Test1DI4Cell("Test1DI4Cell", DefDecomp->NCellsSize);
 
-      NumOwned     = DefDecomp->NCellsOwned;
-      NumAll       = DefDecomp->NCellsAll;
-      Init1DI4Cell = DefDecomp->CellIDH;
-      OMEGA::deepCopy(Test1DI4Cell, Init1DI4Cell);
+      NumOwned      = DefDecomp->NCellsOwned;
+      NumAll        = DefDecomp->NCellsAll;
+      Init1DI4CellH = DefDecomp->CellIDH;
+      deepCopy(Test1DI4CellH, Init1DI4CellH);
 
       for (int ICell = NumOwned; ICell < NumAll; ++ICell) {
-         Test1DI4Cell(ICell) = -1;
+         Test1DI4CellH(ICell) = -1;
       }
 
-      haloExchangeTest(DefHalo, Init1DI4Cell, Test1DI4Cell, "1DI4 Cell",
-                       TotErr);
+      deepCopy(Init1DI4Cell, Init1DI4CellH);
+      deepCopy(Test1DI4Cell, Test1DI4CellH);
 
-      OMEGA::HostArray1DI4 Init1DI4Edge("Init1DI4Edge", DefDecomp->NEdgesSize);
-      OMEGA::HostArray1DI4 Test1DI4Edge("Test1DI4Edge", DefDecomp->NEdgesSize);
+      TotErr +=
+          haloExchangeTest(DefHalo, Init1DI4CellH, Test1DI4CellH, "1DI4CellH");
+      TotErr +=
+          haloExchangeTest(DefHalo, Init1DI4Cell, Test1DI4Cell, "1DI4Cell");
 
-      NumOwned     = DefDecomp->NEdgesOwned;
-      NumAll       = DefDecomp->NEdgesAll;
-      Init1DI4Edge = DefDecomp->EdgeIDH;
-      OMEGA::deepCopy(Test1DI4Edge, Init1DI4Edge);
+      HostArray1DI4 Init1DI4EdgeH("Init1DI4EdgeH", DefDecomp->NEdgesSize);
+      HostArray1DI4 Test1DI4EdgeH("Test1DI4EdgeH", DefDecomp->NEdgesSize);
+      Array1DI4 Init1DI4Edge("Init1DI4Edge", DefDecomp->NEdgesSize);
+      Array1DI4 Test1DI4Edge("Test1DI4Edge", DefDecomp->NEdgesSize);
+
+      NumOwned      = DefDecomp->NEdgesOwned;
+      NumAll        = DefDecomp->NEdgesAll;
+      Init1DI4EdgeH = DefDecomp->EdgeIDH;
+      deepCopy(Test1DI4EdgeH, Init1DI4EdgeH);
 
       for (int IEdge = NumOwned; IEdge < NumAll; ++IEdge) {
-         Test1DI4Edge(IEdge) = -1;
+         Test1DI4EdgeH(IEdge) = -1;
       }
 
-      haloExchangeTest(DefHalo, Init1DI4Edge, Test1DI4Edge, "1DI4 Edge", TotErr,
-                       OMEGA::OnEdge);
+      deepCopy(Init1DI4Edge, Init1DI4EdgeH);
+      deepCopy(Test1DI4Edge, Test1DI4EdgeH);
+      TotErr += haloExchangeTest(DefHalo, Init1DI4EdgeH, Test1DI4EdgeH,
+                                 "1DI4EdgeH", OnEdge);
+      TotErr += haloExchangeTest(DefHalo, Init1DI4Edge, Test1DI4Edge,
+                                 "1DI4Edge", OnEdge);
 
-      OMEGA::HostArray1DI4 Init1DI4Vertex("Init1DI4Vertex",
-                                          DefDecomp->NVerticesSize);
-      OMEGA::HostArray1DI4 Test1DI4Vertex("Test1DI4Vertex",
-                                          DefDecomp->NVerticesSize);
+      HostArray1DI4 Init1DI4VertexH("Init1DI4VertexH",
+                                    DefDecomp->NVerticesSize);
+      HostArray1DI4 Test1DI4VertexH("Test1DI4VertexH",
+                                    DefDecomp->NVerticesSize);
+      Array1DI4 Init1DI4Vertex("Init1DI4Vertex", DefDecomp->NVerticesSize);
+      Array1DI4 Test1DI4Vertex("Test1DI4Vertex", DefDecomp->NVerticesSize);
 
-      NumOwned       = DefDecomp->NVerticesOwned;
-      NumAll         = DefDecomp->NVerticesAll;
-      Init1DI4Vertex = DefDecomp->VertexIDH;
-      OMEGA::deepCopy(Test1DI4Vertex, Init1DI4Vertex);
+      NumOwned        = DefDecomp->NVerticesOwned;
+      NumAll          = DefDecomp->NVerticesAll;
+      Init1DI4VertexH = DefDecomp->VertexIDH;
+      deepCopy(Test1DI4VertexH, Init1DI4VertexH);
 
       for (int IVertex = NumOwned; IVertex < NumAll; ++IVertex) {
-         Test1DI4Vertex(IVertex) = -1;
+         Test1DI4VertexH(IVertex) = -1;
       }
-      haloExchangeTest(DefHalo, Init1DI4Vertex, Test1DI4Vertex, "1DI4 Vertex",
-                       TotErr, OMEGA::OnVertex);
+
+      deepCopy(Init1DI4Vertex, Init1DI4VertexH);
+      deepCopy(Test1DI4Vertex, Test1DI4VertexH);
+      TotErr += haloExchangeTest(DefHalo, Init1DI4VertexH, Test1DI4VertexH,
+                                 "1DI4VertexH", OnVertex);
+      TotErr += haloExchangeTest(DefHalo, Init1DI4Vertex, Test1DI4Vertex,
+                                 "1DI4Vertex", OnVertex);
 
       // Declaration of variables for remaining tests
 
       // Random dimension sizes
-      OMEGA::I4 N2{20};
-      OMEGA::I4 N3{10};
-      OMEGA::I4 N4{3};
-      OMEGA::I4 N5{2};
+      I4 N2{20};
+      I4 N3{10};
+      I4 N4{3};
+      I4 N5{2};
 
-      NumOwned = DefDecomp->NCellsOwned;
-      NumAll   = DefDecomp->NCellsAll;
+      I4 NumGlobe = DefDecomp->NCellsGlobal;
+      NumOwned    = DefDecomp->NCellsOwned;
+      NumAll      = DefDecomp->NCellsAll;
 
       // Declare init and test arrays for all the remaining array types
-      OMEGA::HostArray1DI8 Init1DI8("Init1DI8", NumAll);
-      OMEGA::HostArray1DR4 Init1DR4("Init1DR4", NumAll);
-      OMEGA::HostArray1DR8 Init1DR8("Init1DR8", NumAll);
-      OMEGA::HostArray2DI4 Init2DI4("Init2DI4", NumAll, N2);
-      OMEGA::HostArray2DI8 Init2DI8("Init2DI8", NumAll, N2);
-      OMEGA::HostArray2DR4 Init2DR4("Init2DR4", NumAll, N2);
-      OMEGA::HostArray2DR8 Init2DR8("Init2DR8", NumAll, N2);
-      OMEGA::HostArray3DI4 Init3DI4("Init3DI4", N3, NumAll, N2);
-      OMEGA::HostArray3DI8 Init3DI8("Init3DI8", N3, NumAll, N2);
-      OMEGA::HostArray3DR4 Init3DR4("Init3DR4", N3, NumAll, N2);
-      OMEGA::HostArray3DR8 Init3DR8("Init3DR8", N3, NumAll, N2);
-      OMEGA::HostArray4DI4 Init4DI4("Init4DI4", N4, N3, NumAll, N2);
-      OMEGA::HostArray4DI8 Init4DI8("Init4DI8", N4, N3, NumAll, N2);
-      OMEGA::HostArray4DR4 Init4DR4("Init4DR4", N4, N3, NumAll, N2);
-      OMEGA::HostArray4DR8 Init4DR8("Init4DR8", N4, N3, NumAll, N2);
-      OMEGA::HostArray5DI4 Init5DI4("Init5DI4", N5, N4, N3, NumAll, N2);
-      OMEGA::HostArray5DI8 Init5DI8("Init5DI8", N5, N4, N3, NumAll, N2);
-      OMEGA::HostArray5DR4 Init5DR4("Init5DR4", N5, N4, N3, NumAll, N2);
-      OMEGA::HostArray5DR8 Init5DR8("Init5DR8", N5, N4, N3, NumAll, N2);
-      OMEGA::HostArray1DI8 Test1DI8("Test1DI8", NumAll);
-      OMEGA::HostArray1DR4 Test1DR4("Test1DR4", NumAll);
-      OMEGA::HostArray1DR8 Test1DR8("Test1DR8", NumAll);
-      OMEGA::HostArray2DI4 Test2DI4("Test2DI4", NumAll, N2);
-      OMEGA::HostArray2DI8 Test2DI8("Test2DI8", NumAll, N2);
-      OMEGA::HostArray2DR4 Test2DR4("Test2DR4", NumAll, N2);
-      OMEGA::HostArray2DR8 Test2DR8("Test2DR8", NumAll, N2);
-      OMEGA::HostArray3DI4 Test3DI4("Test3DI4", N3, NumAll, N2);
-      OMEGA::HostArray3DI8 Test3DI8("Test3DI8", N3, NumAll, N2);
-      OMEGA::HostArray3DR4 Test3DR4("Test3DR4", N3, NumAll, N2);
-      OMEGA::HostArray3DR8 Test3DR8("Test3DR8", N3, NumAll, N2);
-      OMEGA::HostArray4DI4 Test4DI4("Test4DI4", N4, N3, NumAll, N2);
-      OMEGA::HostArray4DI8 Test4DI8("Test4DI8", N4, N3, NumAll, N2);
-      OMEGA::HostArray4DR4 Test4DR4("Test4DR4", N4, N3, NumAll, N2);
-      OMEGA::HostArray4DR8 Test4DR8("Test4DR8", N4, N3, NumAll, N2);
-      OMEGA::HostArray5DI4 Test5DI4("Test5DI4", N5, N4, N3, NumAll, N2);
-      OMEGA::HostArray5DI8 Test5DI8("Test5DI8", N5, N4, N3, NumAll, N2);
-      OMEGA::HostArray5DR4 Test5DR4("Test5DR4", N5, N4, N3, NumAll, N2);
-      OMEGA::HostArray5DR8 Test5DR8("Test5DR8", N5, N4, N3, NumAll, N2);
+      HostArray1DI8 Init1DI8H("Init1DI8H", NumAll);
+      HostArray1DR4 Init1DR4H("Init1DR4H", NumAll);
+      HostArray1DR8 Init1DR8H("Init1DR8H", NumAll);
+      HostArray2DI4 Init2DI4H("Init2DI4H", NumAll, N2);
+      HostArray2DI8 Init2DI8H("Init2DI8H", NumAll, N2);
+      HostArray2DR4 Init2DR4H("Init2DR4H", NumAll, N2);
+      HostArray2DR8 Init2DR8H("Init2DR8H", NumAll, N2);
+      HostArray3DI4 Init3DI4H("Init3DI4H", N3, NumAll, N2);
+      HostArray3DI8 Init3DI8H("Init3DI8H", N3, NumAll, N2);
+      HostArray3DR4 Init3DR4H("Init3DR4H", N3, NumAll, N2);
+      HostArray3DR8 Init3DR8H("Init3DR8H", N3, NumAll, N2);
+      HostArray4DI4 Init4DI4H("Init4DI4H", N4, N3, NumAll, N2);
+      HostArray4DI8 Init4DI8H("Init4DI8H", N4, N3, NumAll, N2);
+      HostArray4DR4 Init4DR4H("Init4DR4H", N4, N3, NumAll, N2);
+      HostArray4DR8 Init4DR8H("Init4DR8H", N4, N3, NumAll, N2);
+      HostArray5DI4 Init5DI4H("Init5DI4H", N5, N4, N3, NumAll, N2);
+      HostArray5DI8 Init5DI8H("Init5DI8H", N5, N4, N3, NumAll, N2);
+      HostArray5DR4 Init5DR4H("Init5DR4H", N5, N4, N3, NumAll, N2);
+      HostArray5DR8 Init5DR8H("Init5DR8H", N5, N4, N3, NumAll, N2);
+      HostArray1DI8 Test1DI8H("Test1DI8H", NumAll);
+      HostArray1DR4 Test1DR4H("Test1DR4H", NumAll);
+      HostArray1DR8 Test1DR8H("Test1DR8H", NumAll);
+      HostArray2DI4 Test2DI4H("Test2DI4H", NumAll, N2);
+      HostArray2DI8 Test2DI8H("Test2DI8H", NumAll, N2);
+      HostArray2DR4 Test2DR4H("Test2DR4H", NumAll, N2);
+      HostArray2DR8 Test2DR8H("Test2DR8H", NumAll, N2);
+      HostArray3DI4 Test3DI4H("Test3DI4H", N3, NumAll, N2);
+      HostArray3DI8 Test3DI8H("Test3DI8H", N3, NumAll, N2);
+      HostArray3DR4 Test3DR4H("Test3DR4H", N3, NumAll, N2);
+      HostArray3DR8 Test3DR8H("Test3DR8H", N3, NumAll, N2);
+      HostArray4DI4 Test4DI4H("Test4DI4H", N4, N3, NumAll, N2);
+      HostArray4DI8 Test4DI8H("Test4DI8H", N4, N3, NumAll, N2);
+      HostArray4DR4 Test4DR4H("Test4DR4H", N4, N3, NumAll, N2);
+      HostArray4DR8 Test4DR8H("Test4DR8H", N4, N3, NumAll, N2);
+      HostArray5DI4 Test5DI4H("Test5DI4H", N5, N4, N3, NumAll, N2);
+      HostArray5DI8 Test5DI8H("Test5DI8H", N5, N4, N3, NumAll, N2);
+      HostArray5DR4 Test5DR4H("Test5DR4H", N5, N4, N3, NumAll, N2);
+      HostArray5DR8 Test5DR8H("Test5DR8H", N5, N4, N3, NumAll, N2);
+
+      Array1DI8 Init1DI8("Init1DI8", NumAll);
+      Array1DR4 Init1DR4("Init1DR4", NumAll);
+      Array1DR8 Init1DR8("Init1DR8", NumAll);
+      Array2DI4 Init2DI4("Init2DI4", NumAll, N2);
+      Array2DI8 Init2DI8("Init2DI8", NumAll, N2);
+      Array2DR4 Init2DR4("Init2DR4", NumAll, N2);
+      Array2DR8 Init2DR8("Init2DR8", NumAll, N2);
+      Array3DI4 Init3DI4("Init3DI4", N3, NumAll, N2);
+      Array3DI8 Init3DI8("Init3DI8", N3, NumAll, N2);
+      Array3DR4 Init3DR4("Init3DR4", N3, NumAll, N2);
+      Array3DR8 Init3DR8("Init3DR8", N3, NumAll, N2);
+      Array4DI4 Init4DI4("Init4DI4", N4, N3, NumAll, N2);
+      Array4DI8 Init4DI8("Init4DI8", N4, N3, NumAll, N2);
+      Array4DR4 Init4DR4("Init4DR4", N4, N3, NumAll, N2);
+      Array4DR8 Init4DR8("Init4DR8", N4, N3, NumAll, N2);
+      Array5DI4 Init5DI4("Init5DI4", N5, N4, N3, NumAll, N2);
+      Array5DI8 Init5DI8("Init5DI8", N5, N4, N3, NumAll, N2);
+      Array5DR4 Init5DR4("Init5DR4", N5, N4, N3, NumAll, N2);
+      Array5DR8 Init5DR8("Init5DR8", N5, N4, N3, NumAll, N2);
+      Array1DI8 Test1DI8("Test1DI8", NumAll);
+      Array1DR4 Test1DR4("Test1DR4", NumAll);
+      Array1DR8 Test1DR8("Test1DR8", NumAll);
+      Array2DI4 Test2DI4("Test2DI4", NumAll, N2);
+      Array2DI8 Test2DI8("Test2DI8", NumAll, N2);
+      Array2DR4 Test2DR4("Test2DR4", NumAll, N2);
+      Array2DR8 Test2DR8("Test2DR8", NumAll, N2);
+      Array3DI4 Test3DI4("Test3DI4", N3, NumAll, N2);
+      Array3DI8 Test3DI8("Test3DI8", N3, NumAll, N2);
+      Array3DR4 Test3DR4("Test3DR4", N3, NumAll, N2);
+      Array3DR8 Test3DR8("Test3DR8", N3, NumAll, N2);
+      Array4DI4 Test4DI4("Test4DI4", N4, N3, NumAll, N2);
+      Array4DI8 Test4DI8("Test4DI8", N4, N3, NumAll, N2);
+      Array4DR4 Test4DR4("Test4DR4", N4, N3, NumAll, N2);
+      Array4DR8 Test4DR8("Test4DR8", N4, N3, NumAll, N2);
+      Array5DI4 Test5DI4("Test5DI4", N5, N4, N3, NumAll, N2);
+      Array5DI8 Test5DI8("Test5DI8", N5, N4, N3, NumAll, N2);
+      Array5DR4 Test5DR4("Test5DR4", N5, N4, N3, NumAll, N2);
+      Array5DR8 Test5DR8("Test5DR8", N5, N4, N3, NumAll, N2);
+
+      I8 I8Val = 1000000000;
+      R4 R4Val = 0.1234;
+      R8 R8Val = 0.123456789;
 
       // Initialize and run remaining 1D tests
       for (int ICell = 0; ICell < NumAll; ++ICell) {
-         OMEGA::I4 NewVal = DefDecomp->CellIDH(ICell);
-         Init1DI8(ICell)  = static_cast<OMEGA::I8>(NewVal);
-         Init1DR4(ICell)  = static_cast<OMEGA::R4>(NewVal);
-         Init1DR8(ICell)  = static_cast<OMEGA::R8>(NewVal);
+         I4 NewVal        = DefDecomp->CellIDH(ICell);
+         Init1DI8H(ICell) = static_cast<I8>(NewVal) * I8Val;
+         Init1DR4H(ICell) = static_cast<R4>(NewVal) + R4Val;
+         Init1DR8H(ICell) = static_cast<R8>(NewVal) + R8Val;
       }
 
-      OMEGA::deepCopy(Test1DI8, Init1DI8);
-      OMEGA::deepCopy(Test1DR4, Init1DR4);
-      OMEGA::deepCopy(Test1DR8, Init1DR8);
+      deepCopy(Test1DI8H, Init1DI8H);
+      deepCopy(Test1DR4H, Init1DR4H);
+      deepCopy(Test1DR8H, Init1DR8H);
 
       for (int ICell = NumOwned; ICell < NumAll; ++ICell) {
-         Test1DI8(ICell) = -1;
-         Test1DR4(ICell) = -1;
-         Test1DR8(ICell) = -1;
+         Test1DI8H(ICell) = -1;
+         Test1DR4H(ICell) = -1;
+         Test1DR8H(ICell) = -1;
       }
 
-      haloExchangeTest(DefHalo, Init1DI8, Test1DI8, "1DI8", TotErr);
-      haloExchangeTest(DefHalo, Init1DR4, Test1DR4, "1DR4", TotErr);
-      haloExchangeTest(DefHalo, Init1DR8, Test1DR8, "1DR8", TotErr);
+      deepCopy(Init1DI8, Init1DI8H);
+      deepCopy(Init1DR4, Init1DR4H);
+      deepCopy(Init1DR8, Init1DR8H);
+      deepCopy(Test1DI8, Test1DI8H);
+      deepCopy(Test1DR4, Test1DR4H);
+      deepCopy(Test1DR8, Test1DR8H);
+
+      TotErr += haloExchangeTest(DefHalo, Init1DI8H, Test1DI8H, "1DI8H");
+      TotErr += haloExchangeTest(DefHalo, Init1DR4H, Test1DR4H, "1DR4H");
+      TotErr += haloExchangeTest(DefHalo, Init1DR8H, Test1DR8H, "1DR8H");
+      TotErr += haloExchangeTest(DefHalo, Init1DI8, Test1DI8, "1DI8");
+      TotErr += haloExchangeTest(DefHalo, Init1DR4, Test1DR4, "1DR4");
+      TotErr += haloExchangeTest(DefHalo, Init1DR8, Test1DR8, "1DR8");
 
       // Initialize and run 2D tests
       for (int ICell = 0; ICell < NumAll; ++ICell) {
          for (int J = 0; J < N2; ++J) {
-            OMEGA::I4 NewVal   = (J + 1) * DefDecomp->CellIDH(ICell);
-            Init2DI4(ICell, J) = NewVal;
-            Init2DI8(ICell, J) = static_cast<OMEGA::I8>(NewVal);
-            Init2DR4(ICell, J) = static_cast<OMEGA::R4>(NewVal);
-            Init2DR8(ICell, J) = static_cast<OMEGA::R8>(NewVal);
+            I4 NewVal           = DefDecomp->CellIDH(ICell) * N2 + J;
+            Init2DI4H(ICell, J) = NewVal;
+            Init2DI8H(ICell, J) = static_cast<I8>(NewVal) * I8Val;
+            Init2DR4H(ICell, J) = static_cast<R4>(NewVal) + R4Val;
+            Init2DR8H(ICell, J) = static_cast<R8>(NewVal) + R8Val;
          }
       }
 
-      OMEGA::deepCopy(Test2DI4, Init2DI4);
-      OMEGA::deepCopy(Test2DI8, Init2DI8);
-      OMEGA::deepCopy(Test2DR4, Init2DR4);
-      OMEGA::deepCopy(Test2DR8, Init2DR8);
+      deepCopy(Test2DI4H, Init2DI4H);
+      deepCopy(Test2DI8H, Init2DI8H);
+      deepCopy(Test2DR4H, Init2DR4H);
+      deepCopy(Test2DR8H, Init2DR8H);
 
       for (int ICell = NumOwned; ICell < NumAll; ++ICell) {
          for (int J = 0; J < N2; ++J) {
-            Test2DI4(ICell, J) = -1;
-            Test2DI8(ICell, J) = -1;
-            Test2DR4(ICell, J) = -1;
-            Test2DR8(ICell, J) = -1;
+            Test2DI4H(ICell, J) = -1;
+            Test2DI8H(ICell, J) = -1;
+            Test2DR4H(ICell, J) = -1;
+            Test2DR8H(ICell, J) = -1;
          }
       }
 
-      haloExchangeTest(DefHalo, Init2DI4, Test2DI4, "2DI4", TotErr);
-      haloExchangeTest(DefHalo, Init2DI8, Test2DI8, "2DI8", TotErr);
-      haloExchangeTest(DefHalo, Init2DR4, Test2DR4, "2DR4", TotErr);
-      haloExchangeTest(DefHalo, Init2DR8, Test2DR8, "2DR8", TotErr);
+      deepCopy(Init2DI4, Init2DI4H);
+      deepCopy(Init2DI8, Init2DI8H);
+      deepCopy(Init2DR4, Init2DR4H);
+      deepCopy(Init2DR8, Init2DR8H);
+      deepCopy(Test2DI4, Test2DI4H);
+      deepCopy(Test2DI8, Test2DI8H);
+      deepCopy(Test2DR4, Test2DR4H);
+      deepCopy(Test2DR8, Test2DR8H);
+
+      TotErr += haloExchangeTest(DefHalo, Init2DI4H, Test2DI4H, "2DI4H");
+      TotErr += haloExchangeTest(DefHalo, Init2DI8H, Test2DI8H, "2DI8H");
+      TotErr += haloExchangeTest(DefHalo, Init2DR4H, Test2DR4H, "2DR4H");
+      TotErr += haloExchangeTest(DefHalo, Init2DR8H, Test2DR8H, "2DR8H");
+      TotErr += haloExchangeTest(DefHalo, Init2DI4, Test2DI4, "2DI4");
+      TotErr += haloExchangeTest(DefHalo, Init2DI8, Test2DI8, "2DI8");
+      TotErr += haloExchangeTest(DefHalo, Init2DR4, Test2DR4, "2DR4");
+      TotErr += haloExchangeTest(DefHalo, Init2DR8, Test2DR8, "2DR8");
 
       // Initialize and run 3D tests
       for (int K = 0; K < N3; ++K) {
          for (int ICell = 0; ICell < NumAll; ++ICell) {
             for (int J = 0; J < N2; ++J) {
-               OMEGA::I4 NewVal = (K + 1) * (J + 1) * DefDecomp->CellIDH(ICell);
-               Init3DI4(K, ICell, J) = NewVal;
-               Init3DI8(K, ICell, J) = static_cast<OMEGA::I8>(NewVal);
-               Init3DR4(K, ICell, J) = static_cast<OMEGA::R4>(NewVal);
-               Init3DR8(K, ICell, J) = static_cast<OMEGA::R8>(NewVal);
+               I4 NewVal = (K * NumGlobe + DefDecomp->CellIDH(ICell)) * N2 + J;
+               Init3DI4H(K, ICell, J) = NewVal;
+               Init3DI8H(K, ICell, J) = static_cast<I8>(NewVal) * I8Val;
+               Init3DR4H(K, ICell, J) = static_cast<R4>(NewVal) + R4Val;
+               Init3DR8H(K, ICell, J) = static_cast<R8>(NewVal) + R8Val;
             }
          }
       }
 
-      OMEGA::deepCopy(Test3DI4, Init3DI4);
-      OMEGA::deepCopy(Test3DI8, Init3DI8);
-      OMEGA::deepCopy(Test3DR4, Init3DR4);
-      OMEGA::deepCopy(Test3DR8, Init3DR8);
+      deepCopy(Test3DI4H, Init3DI4H);
+      deepCopy(Test3DI8H, Init3DI8H);
+      deepCopy(Test3DR4H, Init3DR4H);
+      deepCopy(Test3DR8H, Init3DR8H);
 
       for (int K = 0; K < N3; ++K) {
          for (int ICell = NumOwned; ICell < NumAll; ++ICell) {
             for (int J = 0; J < N2; ++J) {
-               Test3DI4(K, ICell, J) = -1;
-               Test3DI8(K, ICell, J) = -1;
-               Test3DR4(K, ICell, J) = -1;
-               Test3DR8(K, ICell, J) = -1;
+               Test3DI4H(K, ICell, J) = -1;
+               Test3DI8H(K, ICell, J) = -1;
+               Test3DR4H(K, ICell, J) = -1;
+               Test3DR8H(K, ICell, J) = -1;
             }
          }
       }
 
-      haloExchangeTest(DefHalo, Init3DI4, Test3DI4, "3DI4", TotErr);
-      haloExchangeTest(DefHalo, Init3DI8, Test3DI8, "3DI8", TotErr);
-      haloExchangeTest(DefHalo, Init3DR4, Test3DR4, "3DR4", TotErr);
-      haloExchangeTest(DefHalo, Init3DR8, Test3DR8, "3DR8", TotErr);
+      deepCopy(Init3DI4, Init3DI4H);
+      deepCopy(Init3DI8, Init3DI8H);
+      deepCopy(Init3DR4, Init3DR4H);
+      deepCopy(Init3DR8, Init3DR8H);
+      deepCopy(Test3DI4, Test3DI4H);
+      deepCopy(Test3DI8, Test3DI8H);
+      deepCopy(Test3DR4, Test3DR4H);
+      deepCopy(Test3DR8, Test3DR8H);
+
+      TotErr += haloExchangeTest(DefHalo, Init3DI4H, Test3DI4H, "3DI4H");
+      TotErr += haloExchangeTest(DefHalo, Init3DI8H, Test3DI8H, "3DI8H");
+      TotErr += haloExchangeTest(DefHalo, Init3DR4H, Test3DR4H, "3DR4H");
+      TotErr += haloExchangeTest(DefHalo, Init3DR8H, Test3DR8H, "3DR8H");
+      TotErr += haloExchangeTest(DefHalo, Init3DI4, Test3DI4, "3DI4");
+      TotErr += haloExchangeTest(DefHalo, Init3DI8, Test3DI8, "3DI8");
+      TotErr += haloExchangeTest(DefHalo, Init3DR4, Test3DR4, "3DR4");
+      TotErr += haloExchangeTest(DefHalo, Init3DR8, Test3DR8, "3DR8");
 
       // Initialize and run 4D tests
       for (int L = 0; L < N4; ++L) {
          for (int K = 0; K < N3; ++K) {
             for (int ICell = 0; ICell < NumAll; ++ICell) {
                for (int J = 0; J < N2; ++J) {
-                  OMEGA::I4 NewVal =
-                      (L + 1) * (K + 1) * (J + 1) * DefDecomp->CellIDH(ICell);
-                  Init4DI4(L, K, ICell, J) = NewVal;
-                  Init4DI8(L, K, ICell, J) = static_cast<OMEGA::I8>(NewVal);
-                  Init4DR4(L, K, ICell, J) = static_cast<OMEGA::R4>(NewVal);
-                  Init4DR8(L, K, ICell, J) = static_cast<OMEGA::R8>(NewVal);
+                  I4 NewVal =
+                      ((L * N3 + K) * NumGlobe + DefDecomp->CellIDH(ICell)) *
+                          N2 +
+                      J;
+                  Init4DI4H(L, K, ICell, J) = NewVal;
+                  Init4DI8H(L, K, ICell, J) = static_cast<I8>(NewVal) * I8Val;
+                  Init4DR4H(L, K, ICell, J) = static_cast<R4>(NewVal) + R4Val;
+                  Init4DR8H(L, K, ICell, J) = static_cast<R8>(NewVal) + R8Val;
                }
             }
          }
       }
 
-      OMEGA::deepCopy(Test4DI4, Init4DI4);
-      OMEGA::deepCopy(Test4DI8, Init4DI8);
-      OMEGA::deepCopy(Test4DR4, Init4DR4);
-      OMEGA::deepCopy(Test4DR8, Init4DR8);
+      deepCopy(Test4DI4H, Init4DI4H);
+      deepCopy(Test4DI8H, Init4DI8H);
+      deepCopy(Test4DR4H, Init4DR4H);
+      deepCopy(Test4DR8H, Init4DR8H);
 
       for (int L = 0; L < N4; ++L) {
          for (int K = 0; K < N3; ++K) {
             for (int ICell = NumOwned; ICell < NumAll; ++ICell) {
                for (int J = 0; J < N2; ++J) {
-                  Test4DI4(L, K, ICell, J) = -1;
-                  Test4DI8(L, K, ICell, J) = -1;
-                  Test4DR4(L, K, ICell, J) = -1;
-                  Test4DR8(L, K, ICell, J) = -1;
+                  Test4DI4H(L, K, ICell, J) = -1;
+                  Test4DI8H(L, K, ICell, J) = -1;
+                  Test4DR4H(L, K, ICell, J) = -1;
+                  Test4DR8H(L, K, ICell, J) = -1;
                }
             }
          }
       }
 
-      haloExchangeTest(DefHalo, Init4DI4, Test4DI4, "4DI4", TotErr);
-      haloExchangeTest(DefHalo, Init4DI8, Test4DI8, "4DI8", TotErr);
-      haloExchangeTest(DefHalo, Init4DR4, Test4DR4, "4DR4", TotErr);
-      haloExchangeTest(DefHalo, Init4DR8, Test4DR8, "4DR8", TotErr);
+      deepCopy(Init4DI4, Init4DI4H);
+      deepCopy(Init4DI8, Init4DI8H);
+      deepCopy(Init4DR4, Init4DR4H);
+      deepCopy(Init4DR8, Init4DR8H);
+      deepCopy(Test4DI4, Test4DI4H);
+      deepCopy(Test4DI8, Test4DI8H);
+      deepCopy(Test4DR4, Test4DR4H);
+      deepCopy(Test4DR8, Test4DR8H);
+
+      TotErr += haloExchangeTest(DefHalo, Init4DI4H, Test4DI4H, "4DI4H");
+      TotErr += haloExchangeTest(DefHalo, Init4DI8H, Test4DI8H, "4DI8H");
+      TotErr += haloExchangeTest(DefHalo, Init4DR4H, Test4DR4H, "4DR4H");
+      TotErr += haloExchangeTest(DefHalo, Init4DR8H, Test4DR8H, "4DR8H");
+      TotErr += haloExchangeTest(DefHalo, Init4DI4, Test4DI4, "4DI4");
+      TotErr += haloExchangeTest(DefHalo, Init4DI8, Test4DI8, "4DI8");
+      TotErr += haloExchangeTest(DefHalo, Init4DR4, Test4DR4, "4DR4");
+      TotErr += haloExchangeTest(DefHalo, Init4DR8, Test4DR8, "4DR8");
 
       // Initialize and run 5D tests
       for (int M = 0; M < N5; ++M) {
@@ -401,49 +521,65 @@ int main(int argc, char *argv[]) {
             for (int K = 0; K < N3; ++K) {
                for (int ICell = 0; ICell < NumAll; ++ICell) {
                   for (int J = 0; J < N2; ++J) {
-                     OMEGA::I4 NewVal = (M + 1) * (L + 1) * (K + 1) * (J + 1) *
-                                        DefDecomp->CellIDH(ICell);
-                     Init5DI4(M, L, K, ICell, J) = NewVal;
-                     Init5DI8(M, L, K, ICell, J) =
-                         static_cast<OMEGA::I8>(NewVal);
-                     Init5DR4(M, L, K, ICell, J) =
-                         static_cast<OMEGA::R4>(NewVal);
-                     Init5DR8(M, L, K, ICell, J) =
-                         static_cast<OMEGA::R8>(NewVal);
+                     I4 NewVal = (((M * N4 + L) * N3 + K) * NumGlobe +
+                                  DefDecomp->CellIDH(ICell)) *
+                                     N2 +
+                                 J;
+                     Init5DI4H(M, L, K, ICell, J) = NewVal;
+                     Init5DI8H(M, L, K, ICell, J) =
+                         static_cast<I8>(NewVal) * I8Val;
+                     Init5DR4H(M, L, K, ICell, J) =
+                         static_cast<R4>(NewVal) + R4Val;
+                     Init5DR8H(M, L, K, ICell, J) =
+                         static_cast<R8>(NewVal) + R8Val;
                   }
                }
             }
          }
       }
 
-      OMEGA::deepCopy(Test5DI4, Init5DI4);
-      OMEGA::deepCopy(Test5DI8, Init5DI8);
-      OMEGA::deepCopy(Test5DR4, Init5DR4);
-      OMEGA::deepCopy(Test5DR8, Init5DR8);
+      deepCopy(Test5DI4H, Init5DI4H);
+      deepCopy(Test5DI8H, Init5DI8H);
+      deepCopy(Test5DR4H, Init5DR4H);
+      deepCopy(Test5DR8H, Init5DR8H);
 
       for (int M = 0; M < N5; ++M) {
          for (int L = 0; L < N4; ++L) {
             for (int K = 0; K < N3; ++K) {
                for (int ICell = NumOwned; ICell < NumAll; ++ICell) {
                   for (int J = 0; J < N2; ++J) {
-                     Test5DI4(M, L, K, ICell, J) = -1;
-                     Test5DI8(M, L, K, ICell, J) = -1;
-                     Test5DR4(M, L, K, ICell, J) = -1;
-                     Test5DR8(M, L, K, ICell, J) = -1;
+                     Test5DI4H(M, L, K, ICell, J) = -1;
+                     Test5DI8H(M, L, K, ICell, J) = -1;
+                     Test5DR4H(M, L, K, ICell, J) = -1;
+                     Test5DR8H(M, L, K, ICell, J) = -1;
                   }
                }
             }
          }
       }
 
-      haloExchangeTest(DefHalo, Init5DI4, Test5DI4, "5DI4", TotErr);
-      haloExchangeTest(DefHalo, Init5DI8, Test5DI8, "5DI8", TotErr);
-      haloExchangeTest(DefHalo, Init5DR4, Test5DR4, "5DR4", TotErr);
-      haloExchangeTest(DefHalo, Init5DR8, Test5DR8, "5DR8", TotErr);
+      deepCopy(Init5DI4, Init5DI4H);
+      deepCopy(Init5DI8, Init5DI8H);
+      deepCopy(Init5DR4, Init5DR4H);
+      deepCopy(Init5DR8, Init5DR8H);
+      deepCopy(Test5DI4, Test5DI4H);
+      deepCopy(Test5DI8, Test5DI8H);
+      deepCopy(Test5DR4, Test5DR4H);
+      deepCopy(Test5DR8, Test5DR8H);
+
+      TotErr += haloExchangeTest(DefHalo, Init5DI4H, Test5DI4H, "5DI4H");
+      TotErr += haloExchangeTest(DefHalo, Init5DI8H, Test5DI8H, "5DI8H");
+      TotErr += haloExchangeTest(DefHalo, Init5DR4H, Test5DR4H, "5DR4H");
+      TotErr += haloExchangeTest(DefHalo, Init5DR8H, Test5DR8H, "5DR8H");
+      TotErr += haloExchangeTest(DefHalo, Init5DI4, Test5DI4, "5DI4");
+      TotErr += haloExchangeTest(DefHalo, Init5DI8, Test5DI8, "5DI8");
+      TotErr += haloExchangeTest(DefHalo, Init5DR4, Test5DR4, "5DR4");
+      TotErr += haloExchangeTest(DefHalo, Init5DR8, Test5DR8, "5DR8");
 
       // Memory clean up
-      OMEGA::Decomp::clear();
-      OMEGA::MachEnv::removeAll();
+      Halo::clear();
+      Decomp::clear();
+      MachEnv::removeAll();
 
       if (TotErr == 0) {
          LOG_INFO("HaloTest: Successful completion");

@@ -360,16 +360,12 @@ I4 OceanState::copyToHost(const I4 TimeLevel) {
 // TimeLevel == [1:new, 0:current, -1:previous, -2:two times ago, ...]
 I4 OceanState::exchangeHalo(const I4 TimeLevel) {
 
-   copyToHost(TimeLevel);
-
    I4 Err = 0;
    I4 TimeIndex;
    Err = getTimeIndex(TimeIndex, TimeLevel);
 
-   MeshHalo->exchangeFullArrayHalo(LayerThicknessH[TimeIndex], OnCell);
-   MeshHalo->exchangeFullArrayHalo(NormalVelocityH[TimeIndex], OnEdge);
-
-   copyToDevice(TimeLevel);
+   MeshHalo->exchangeFullArrayHalo(LayerThickness[TimeIndex], OnCell);
+   MeshHalo->exchangeFullArrayHalo(NormalVelocity[TimeIndex], OnEdge);
 
    return 0;
 

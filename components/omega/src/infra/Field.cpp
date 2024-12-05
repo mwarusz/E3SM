@@ -151,8 +151,8 @@ Field::create(const std::string &FieldName,   // [in] Name of variable/field
 
    // Initialize data info to Unknown - these will be determined when the
    // field data is attached.
-   ThisField->DataType = FieldType::Unknown;
-   ThisField->MemLoc   = FieldMemLoc::Unknown;
+   ThisField->DataType = ArrayDataType::Unknown;
+   ThisField->MemLoc   = ArrayMemLoc::Unknown;
 
    // Initialize Data pointer as null until data is actually attached.
    ThisField->DataArray = nullptr;
@@ -195,8 +195,8 @@ Field::create(const std::string &FieldName // [in] Name of field
    ThisField->DimNames;
 
    // Initialize to Unknown or null - no data is attached
-   ThisField->DataType  = FieldType::Unknown;
-   ThisField->MemLoc    = FieldMemLoc::Unknown;
+   ThisField->DataType  = ArrayDataType::Unknown;
+   ThisField->MemLoc    = ArrayMemLoc::Unknown;
    ThisField->DataArray = nullptr;
 
    // Add to list of fields and return
@@ -255,11 +255,12 @@ std::string Field::getName() const { return FldName; }
 
 //------------------------------------------------------------------------------
 // Determine type of a given field from instance
-FieldType Field::getType() const { return DataType; }
+ArrayDataType Field::getType() const { return DataType; }
 
 //------------------------------------------------------------------------------
 // Determine type of a given field by name
-FieldType Field::getFieldType(const std::string &FieldName // [in] name of field
+ArrayDataType
+Field::getFieldType(const std::string &FieldName // [in] name of field
 ) {
    // Retrieve field with given name
    auto It = AllFields.find(FieldName);
@@ -270,17 +271,17 @@ FieldType Field::getFieldType(const std::string &FieldName // [in] name of field
    } else { // Could not find field with that name
       LOG_ERROR("Unable to retrieve field type. Field {} has not been created.",
                 FieldName);
-      return FieldType::Unknown;
+      return ArrayDataType::Unknown;
    }
 }
 
 //------------------------------------------------------------------------------
 // Determine memory location of data from instance
-FieldMemLoc Field::getMemoryLocation() const { return MemLoc; }
+ArrayMemLoc Field::getMemoryLocation() const { return MemLoc; }
 
 //------------------------------------------------------------------------------
 // Determine memory location of data by field name
-FieldMemLoc
+ArrayMemLoc
 Field::getFieldMemoryLocation(const std::string &FieldName // [in] name of field
 ) {
    // Retrieve field with given name
@@ -293,14 +294,14 @@ Field::getFieldMemoryLocation(const std::string &FieldName // [in] name of field
       LOG_ERROR("Unable to retrieve memory location."
                 " Field {} has not been created.",
                 FieldName);
-      return FieldMemLoc::Unknown;
+      return ArrayMemLoc::Unknown;
    }
 }
 
 //------------------------------------------------------------------------------
 // Query whether field is located on host from instance
 bool Field::isOnHost() const {
-   if (MemLoc == FieldMemLoc::Host or MemLoc == FieldMemLoc::Both) {
+   if (MemLoc == ArrayMemLoc::Host or MemLoc == ArrayMemLoc::Both) {
       return true;
    } else {
       return false;

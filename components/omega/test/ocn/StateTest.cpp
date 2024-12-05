@@ -465,6 +465,7 @@ int main(int argc, char *argv[]) {
       Tendencies::clear();
       TimeStepper::clear();
       HorzMesh::clear();
+      Halo::clear();
       Decomp::clear();
       MachEnv::removeAll();
       FieldGroup::clear();

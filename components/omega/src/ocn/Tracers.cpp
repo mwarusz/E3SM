@@ -488,19 +488,14 @@ I4 Tracers::copyToHost(const I4 TimeLevel) {
 // TimeLevel == [1:new, 0:current, -1:previous, -2:two times ago, ...]
 //---------------------------------------------------------------------------
 I4 Tracers::exchangeHalo(const I4 TimeLevel) {
-   // TODO: copy only halo cells
-   copyToHost(TimeLevel);
 
    I4 Err = 0;
    I4 TimeIndex;
 
    Err = getTimeIndex(TimeIndex, TimeLevel);
-   Err = MeshHalo->exchangeFullArrayHalo(TracerArraysH[TimeIndex], OnCell);
+   Err = MeshHalo->exchangeFullArrayHalo(TracerArrays[TimeIndex], OnCell);
    if (Err != 0)
       return -1;
-
-   // TODO: copy only halo cells
-   copyToDevice(TimeLevel);
 
    return 0;
 }
