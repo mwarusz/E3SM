@@ -6,6 +6,9 @@ set(OMEGA_Fortran_COMPILER "mpifort" CACHE STRING "")
 set(OMEGA_ARCH SERIAL CACHE STRING "")
 set(Kokkos_ARCH_NATIVE ON CACHE BOOL "")
 
+set(Kokkos_ENABLE_DEBUG ON CACHE BOOL "")
+set(Kokkos_ENABLE_DEBUG_BOUNDS_CHECK ON CACHE BOOL "")
+
 set(OMEGA_GKLIB_ROOT "/Users/mwarusz/installs/gklib" CACHE STRING "")
 set(OMEGA_METIS_ROOT "/Users/mwarusz/installs/metis" CACHE STRING "")
 set(OMEGA_PARMETIS_ROOT "/Users/mwarusz/installs/parmetis" CACHE STRING "")
