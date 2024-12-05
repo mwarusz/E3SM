@@ -172,6 +172,9 @@ int initTimeStepperTest(const std::string &mesh) {
       return Err;
    }
 
+   // Horz dimensions will be created in HorzMesh
+   auto VertDim = Dimension::create("NVertLevels", NVertLevels);
+
    // Note that the default time stepper is not used in subsequent tests
    // but is initialized here because the number of time levels is needed
    // to initialize the Tracers. If a later timestepper test uses more time
@@ -242,9 +245,6 @@ int initTimeStepperTest(const std::string &mesh) {
 
    auto *DefMesh = HorzMesh::getDefault();
    auto *DefHalo = Halo::getDefault();
-
-   // Horz dimensions created in HorzMesh
-   auto VertDim = Dimension::create("NVertLevels", NVertLevels);
 
    int NTracers          = Tracers::getNumTracers();
    const int NTimeLevels = 2;
