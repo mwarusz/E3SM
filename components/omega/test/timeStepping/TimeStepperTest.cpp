@@ -212,6 +212,12 @@ int initTimeStepperTest(const std::string &mesh) {
       LOG_ERROR("TimeStepperTest: error initializing tracers infrastructure");
    }
 
+   int AuxStateErr = AuxiliaryState::init();
+   if (AuxStateErr != 0) {
+      Err++;
+      LOG_ERROR("TimeStepperTest: error initializing default aux state");
+   }
+
    Err = Tendencies::init();
    if (Err != 0) {
       LOG_CRITICAL("Error initializing default tendencies");
