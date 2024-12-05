@@ -34,9 +34,9 @@ Omega:
     Base: [Temperature, Salinity]
     Debug: [Debug1, Debug2, Debug3]
   IOStreams:
-    # InitialState should only be used when starting from scratch
-    # After the simulations initial start, the frequency should be
-    # changed to never so that the initial state file is not read.
+    # InitialState should only be used when starting from scratch.
+    # For restart runs, the frequency units should be changed from
+    # "OnStartup" to "never" so that the initial state file is not read.
     InitialState:
       UsePointerFile: false
       Filename: OmegaMesh.nc
