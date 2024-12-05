@@ -151,10 +151,24 @@ int initTimeStepperTest(const std::string &mesh) {
    initLogging(DefEnv);
 
    // Open config file
-   OMEGA::Config("Omega");
-   Err = OMEGA::Config::readAll("omega.yml");
+   Config("Omega");
+   Err = Config::readAll("omega.yml");
    if (Err != 0) {
       LOG_CRITICAL("TimeStepperTest: Error reading config file");
+      return Err;
+   }
+
+   // Reset NVertLevels to 1 regardless of config value
+   Config *OmegaConfig = Config::getOmegaConfig();
+   Config DimConfig("Dimension");
+   Err = OmegaConfig->get(DimConfig);
+   if (Err != 0) {
+      LOG_CRITICAL("TimeStepperTest: Dimension group not found in Config");
+      return Err;
+   }
+   Err = DimConfig.set("NVertLevels", NVertLevels);
+   if (Err != 0) {
+      LOG_CRITICAL("TimeStepperTest: Unable to reset NVertLevels in Config");
       return Err;
    }
 
