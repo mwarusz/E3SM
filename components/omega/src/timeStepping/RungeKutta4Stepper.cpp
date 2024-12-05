@@ -53,8 +53,8 @@ void RungeKutta4Stepper::finalizeInit() {
    int NCellsSize  = Mesh->NCellsSize;
    int NTimeLevels = 1; // for provisional tracer
 
-   ProvisState =
-       OceanState::create("Provis", Mesh, MeshHalo, NVertLevels, NTimeLevels);
+   ProvisState = OceanState::create("Provis" + Name, Mesh, MeshHalo,
+                                    NVertLevels, NTimeLevels);
    if (!ProvisState)
       LOG_CRITICAL("Error creating Provis state");
 
