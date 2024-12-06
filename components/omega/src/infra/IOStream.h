@@ -168,6 +168,13 @@ class IOStream {
 
  public:
    //---------------------------------------------------------------------------
+   /// Return codes - these will be removed once Error Handler is completed
+
+   static constexpr int Success{0}; ///< Successful read/write completion
+   static constexpr int Skipped{1}; ///< Normal early return (eg if not time)
+   static constexpr int Fail{2};    ///< Fail
+
+   //---------------------------------------------------------------------------
    /// Default empty constructor
    IOStream();
 

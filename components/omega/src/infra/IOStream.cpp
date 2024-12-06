@@ -240,7 +240,7 @@ int IOStream::read(
     Metadata &ReqMetadata, // [inout] global metadata requested from file
     bool ForceRead         // [in] optional: read even if not time
 ) {
-   int Err = 0; // default return code
+   int Err = Success; // default return code
 
    // Retrieve stream by name and make sure it exists
    auto StreamItr = AllStreams.find(StreamName);
@@ -248,9 +248,10 @@ int IOStream::read(
       // Stream found, call the read function
       std::shared_ptr<IOStream> ThisStream = StreamItr->second;
       Err = ThisStream->readStream(ModelClock, ReqMetadata, ForceRead);
-   } else { // Stream not found, return error
-      LOG_ERROR("Unable to read stream {}. Stream not defined", StreamName);
-      Err = 1;
+   } else { // Stream not found
+      // The response to this case must be determined by the calling routine
+      // since a missing stream might be expected in some cases
+      Err = Fail;
    }
 
    return Err;
@@ -264,7 +265,7 @@ int IOStream::write(
     const Clock *ModelClock,       // [in] Model clock needed for time stamps
     bool ForceWrite                // [in] optional: write even if not time
 ) {
-   int Err = 0; // default return code
+   int Err = Success; // default return code
 
    // Retrieve stream by name and make sure it exists
    auto StreamItr = AllStreams.find(StreamName);
@@ -275,7 +276,7 @@ int IOStream::write(
    } else {
       // Stream not found, return error
       LOG_ERROR("Unable to write stream {}. Stream not defined", StreamName);
-      Err = 1;
+      Err = Fail;
    }
 
    return Err;
@@ -303,7 +304,7 @@ int IOStream::writeAll(
       }
 
       // check for errors
-      if (Err1 != 0) {
+      if (Err1 == Fail) {
          ++Err;
          LOG_ERROR("writeAll error in stream {}", StreamName);
       }
@@ -2314,24 +2315,24 @@ int IOStream::readStream(
     Metadata &ReqMetadata,   // [inout] global metadata to extract from file
     bool ForceRead           // [in] optional: read even if not time
 ) {
-   int Err = 0; // default return code
+
+   int Err; // return code
 
    // First check that this is an input stream
    if (Mode != IO::ModeRead) {
       LOG_ERROR("IOStream read: cannot read stream defined as output stream");
-      Err = 1;
-      return Err;
+      return Fail;
    }
 
    // If it is not time to read, return
    if (!ForceRead) {
       if (!MyAlarm.isRinging() and !OnStartup)
-         return Err;
+         return Skipped;
       if (UseStartEnd) { // If time outside interval, return
          if (!StartAlarm.isRinging())
-            return Err;
+            return Skipped;
          if (EndAlarm.isRinging())
-            return Err;
+            return Skipped;
       }
    }
 
@@ -2365,7 +2366,7 @@ int IOStream::readStream(
                              ExistAction);
    if (Err != 0) {
       LOG_ERROR("Error opening file {} for input", InFileName);
-      return Err;
+      return Fail;
    }
 
    // Read any requested global metadata
@@ -2405,12 +2406,12 @@ int IOStream::readStream(
       } else {
          LOG_ERROR("Metadata read failed: unknown data type for {} in file {}",
                    MetaName, InFileName);
-         ErrRead = 2;
+         ErrRead = Fail;
       }
 
       if (ErrRead != 0) {
          LOG_ERROR("Error reading metadata {} from file {}", InFileName);
-         return ErrRead;
+         return Fail;
       }
    } // end loop over requested metadata
 
@@ -2419,7 +2420,7 @@ int IOStream::readStream(
    Err = defineAllDims(InFileID, AllDimIDs);
    if (Err != 0) {
       LOG_ERROR("Error defining dimensions for file {} ", InFileName);
-      return Err;
+      return Fail;
    }
 
    // For each field in the contents, define field and read field data
@@ -2435,7 +2436,7 @@ int IOStream::readStream(
       if (Err != 0) {
          LOG_ERROR("Error reading field data for Field {} in Stream {}",
                    FieldName, Name);
-         return Err;
+         return Fail;
       }
 
    } // End loop over field list
@@ -2444,13 +2445,13 @@ int IOStream::readStream(
    Err = IO::closeFile(InFileID);
    if (Err != 0) {
       LOG_ERROR("Error closing input file {}", InFileName);
-      return Err;
+      return Fail;
    }
 
    LOG_INFO("Successfully read stream {} from file {}", Name, InFileName);
 
    // End of routine - return
-   return Err;
+   return Success;
 
 } // End read
 
@@ -2463,25 +2464,25 @@ int IOStream::writeStream(
     bool FinalCall           // [in] Optional flag if called from finalize
 ) {
 
-   int Err = 0; // default return code
+   int Err = Success; // default return code
 
    // First check that this is an output stream
    if (Mode != IO::ModeWrite) {
       LOG_ERROR("IOStream write: cannot write stream defined as input stream");
       Err = 1;
-      return Err;
+      return Fail;
    }
 
    // If it is not time to write, return
    if (!ForceWrite) {
       bool StartupShutdown = OnStartup or (OnShutdown and FinalCall);
       if (!MyAlarm.isRinging() and !StartupShutdown)
-         return Err;
+         return Skipped;
       if (UseStartEnd) { // If time outside interval, return
          if (!StartAlarm.isRinging())
-            return Err;
+            return Skipped;
          if (EndAlarm.isRinging())
-            return Err;
+            return Skipped;
       }
    }
 
@@ -2520,7 +2521,7 @@ int IOStream::writeStream(
    if (Err != 0) {
       LOG_ERROR("IOStream::write: error opening file {} for output",
                 OutFileName);
-      return Err;
+      return Fail;
    }
 
    // Write Metadata for global metadata (Code and Simulation)
@@ -2528,7 +2529,7 @@ int IOStream::writeStream(
    Err = writeFieldMeta(CodeMeta, OutFileID, IO::GlobalID);
    if (Err != 0) {
       LOG_ERROR("Error writing Code Metadata to file {}", OutFileName);
-      return Err;
+      return Fail;
    }
    std::shared_ptr<Field> SimField = Field::get(SimMeta);
    // Add the simulation time - if it was added previously, remove and
@@ -2538,12 +2539,12 @@ int IOStream::writeStream(
    Err = SimField->addMetadata("SimulationTime", SimTimeStr);
    if (Err != 0) {
       LOG_ERROR("Error adding current sim time to output {}", OutFileName);
-      return Err;
+      return Fail;
    }
    Err = writeFieldMeta(SimMeta, OutFileID, IO::GlobalID);
    if (Err != 0) {
       LOG_ERROR("Error writing Simulation Metadata to file {}", OutFileName);
-      return Err;
+      return Fail;
    }
 
    // Assign dimension IDs for all defined dimensions
@@ -2551,7 +2552,7 @@ int IOStream::writeStream(
    Err = defineAllDims(OutFileID, AllDimIDs);
    if (Err != 0) {
       LOG_ERROR("Error defined dimensions for file {}", OutFileName);
-      return Err;
+      return Fail;
    }
 
    // Define each field and write field metadata
@@ -2574,7 +2575,7 @@ int IOStream::writeStream(
          if (Err != 0) {
             LOG_ERROR("Error retrieving dimension names for Field {}",
                       FieldName);
-            return Err;
+            return Fail;
          }
       }
       // If this is a time-dependent field, we insert the unlimited time
@@ -2599,7 +2600,7 @@ int IOStream::writeStream(
                       FieldID);
       if (Err != 0) {
          LOG_ERROR("Error defining field {} in stream {}", FieldName, Name);
-         return Err;
+         return Fail;
       }
       FieldIDs[FieldName] = FieldID;
 
@@ -2608,7 +2609,7 @@ int IOStream::writeStream(
       if (Err != 0) {
          LOG_ERROR("Error writing field metadata for field {} in stream {}",
                    FieldName, Name);
-         return Err;
+         return Fail;
       }
    }
 
@@ -2616,7 +2617,7 @@ int IOStream::writeStream(
    Err = IO::endDefinePhase(OutFileID);
    if (Err != 0) {
       LOG_ERROR("Error ending define phase for stream {}", Name);
-      return Err;
+      return Fail;
    }
 
    // Now write data arrays for all fields in contents
@@ -2632,7 +2633,7 @@ int IOStream::writeStream(
       if (Err != 0) {
          LOG_ERROR("Error writing field data for Field {} in Stream {}",
                    FieldName, Name);
-         return Err;
+         return Fail;
       }
    }
 
@@ -2640,7 +2641,7 @@ int IOStream::writeStream(
    Err = IO::closeFile(OutFileID);
    if (Err != 0) {
       LOG_ERROR("Error closing output file {}", OutFileName);
-      return Err;
+      return Fail;
    }
 
    // If using pointer files for this stream, write the filename to the pointer
@@ -2654,7 +2655,7 @@ int IOStream::writeStream(
    LOG_INFO("Successfully wrote stream {} to file {}", Name, OutFileName);
 
    // End of routine - return
-   return Err;
+   return Success;
 
 } // end writeStream
 
