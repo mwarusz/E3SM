@@ -25,8 +25,13 @@ int testCorrectness() {
 
    parallelFor(
        {NBatch, NRow}, KOKKOS_LAMBDA(int I, int K) {
-          AX(I, K) = D(I, K) * X(I, K) + DL(I, K) * X(I, K - 1) +
-                     DU(I, K) * X(I, K + 1);
+          AX(I, K) = D(I, K) * X(I, K);
+          if (K > 0) {
+             AX(I, K) += DL(I, K) * X(I, K - 1);
+          }
+          if (K < NRow - 1) {
+             AX(I, K) += DU(I, K) * X(I, K + 1);
+          }
        });
 
    TeamPolicy Policy((NBatch + VecLength - 1) / VecLength, 1, 1);
@@ -73,7 +78,14 @@ int testDiffusionCorrectness() {
           const Real DL = K == 0 ? 0 : -G(I, K - 1);
           const Real DU = -G(I, K);
           const Real D  = H(I, K) - DL - DU;
-          AX(I, K)      = D * X(I, K) + DL * X(I, K - 1) + DU * X(I, K + 1);
+
+          AX(I, K) = D * X(I, K);
+          if (K > 0) {
+             AX(I, K) += DL * X(I, K - 1);
+          }
+          if (K < NRow - 1) {
+             AX(I, K) += DU * X(I, K + 1);
+          }
        });
 
    TeamPolicy Policy((NBatch + VecLength - 1) / VecLength, 1, 1);
@@ -97,48 +109,78 @@ int testDiffusionCorrectness() {
    return 0;
 }
 
-// int testDiffusionStability() {
-//   const int NCells = 100;
-//   const int NVertices = NCells + 1;
-//
-//   const Real DX = 1._Real / NCells;
-//   const Real DT = 1;
-//
-//   const Real LargeVal = 1e10;
-//
-//   Array1DReal DiffCoeff("DiffCoeff", NVertices);
-//
-//   parallelFor({NVertices}, KOKKOS_LAMBDA(int IVertex) {
-//       const Real XVertex = IVertex * dx;
-//       DiffCoeff(IVertex) = Kokkos::abs(XVertex - 0.5) < 0.2 ? LargeVal : 0;
-//   });
-//
-//   TeamPolicy Policy((NVertices + VecLength - 1) / VecLength, 1, 1);
-//   ThomasSolver::setScratchSize(Policy, NVertices);
-//
-//   Kokkos::parallel_for(Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
-//       auto& ScratchG = ThomasSolver::scratchG(Member);
-//       auto& ScratchH = ThomasSolver::scratchH(Member);
-//       auto& ScratchX = ThomasSolver::scratchX(Member);
-//
-//       Kokkos::parallel_for(TeamThreadRange(Member, NCells), KOKKOS_LAMBDA
-//       (int ICell) {
-//           ScratchH(ICell, IVec) = DX;
-//           ScratchG(ICell, IVec) = DiffCoeff(ICell + 1) * DT / DX;
-//           ScratchX(ICell, IVec) = Tracer(ICell) * H(ICell);
-//       });
-//
-//       ThomasSolver::solveDiffusionSystem(Member);
-//   });
-//
-//   return 0;
-// }
+int testDiffusionStability() {
+   const int NCells    = 100;
+   const int NVertices = NCells + 1;
+
+   const Real DX = 1._Real / NCells;
+   const Real DT = 1;
+
+   const Real LargeVal = 1e50;
+
+   Array1DReal DiffCoeff("DiffCoeff", NVertices);
+   parallelFor(
+       {NVertices}, KOKKOS_LAMBDA(int IVertex) {
+          const Real XVertex = IVertex * DX;
+          DiffCoeff(IVertex) = Kokkos::abs(XVertex - 0.5) < 0.2 ? LargeVal : 0;
+       });
+
+   Array1DReal Tracer("Tracer", NCells);
+   parallelFor(
+       {NCells}, KOKKOS_LAMBDA(int ICell) {
+          const Real XCell = (ICell + 0.5_Real) * DX;
+          const Real XTmp  = XCell - 0.5_Real;
+          Tracer(ICell)    = exp(-XTmp * XTmp);
+       });
+
+   TeamPolicy Policy((NVertices + VecLength - 1) / VecLength, 1, 1);
+   ThomasSolver::setScratchSize(Policy, NVertices);
+
+   for (int Iter = 0; Iter < 100; ++Iter) {
+      Kokkos::parallel_for(
+          Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+             DiffusionScratch Scratch(Member, NCells);
+
+             Kokkos::parallel_for(
+                 TeamThreadRange(Member, NCells), KOKKOS_LAMBDA(int ICell) {
+                    for (int IVec = 0; IVec < VecLength; ++IVec) {
+                       Scratch.H(ICell, IVec) = DX;
+                       Scratch.G(ICell, IVec) = DiffCoeff(ICell + 1) * DT / DX;
+                       Scratch.X(ICell, IVec) =
+                           Tracer(ICell) * Scratch.H(ICell, IVec);
+                    }
+                 });
+
+             Member.team_barrier();
+             ThomasSolver::solveDiffusionSystem(Member, Scratch);
+             Member.team_barrier();
+
+             Kokkos::parallel_for(
+                 TeamThreadRange(Member, NCells), KOKKOS_LAMBDA(int ICell) {
+                    Tracer(ICell) = Scratch.X(ICell, 0);
+                 });
+          });
+   }
+
+   Real Error;
+   parallelReduce(
+       {NCells},
+       KOKKOS_LAMBDA(int ICell, Real &Accum) {
+          Accum += Kokkos::abs(Tracer(ICell));
+       },
+       Error);
+
+   std::cout << Error << std::endl;
+
+   return 0;
+}
 
 int tridiagonalTest() {
    int Err = 0;
 
    Err += testCorrectness();
    Err += testDiffusionCorrectness();
+   Err += testDiffusionStability();
 
    return Err;
 }
