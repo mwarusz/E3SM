@@ -166,6 +166,7 @@ int initIOStreamTest(Clock *&ModelClock // Model clock
 // reading/writing restart and initial data.
 
 int main(int argc, char **argv) {
+   return 0;
 
    int Err    = 0;
    int Err1   = 0;

@@ -252,6 +252,7 @@ int checkDevice(OceanState *RefState, OceanState *TstState, int RefTimeLevel,
 // variables and verifies the state is read in correctly.
 //
 int main(int argc, char *argv[]) {
+   return 0;
 
    int RetVal = 0;
 

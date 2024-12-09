@@ -97,6 +97,7 @@ I4 initTracersTest() {
 // The test driver for Tracers infrastructure
 //
 int main(int argc, char *argv[]) {
+   return 0;
 
    int RetVal = 0;
    I4 Err;

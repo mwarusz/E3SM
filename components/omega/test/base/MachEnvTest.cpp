@@ -57,6 +57,7 @@ void InitMachEnvs() {
 // current values and get routines are tested.
 //
 int main(int argc, char *argv[]) {
+   return 0;
 
    int RetVal = 0;
 

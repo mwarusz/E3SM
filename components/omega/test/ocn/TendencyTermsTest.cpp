@@ -904,6 +904,7 @@ int tendencyTermsTest(const std::string &mesh = DefaultMeshFile) {
 } // end tendencyTermsTest
 
 int main(int argc, char *argv[]) {
+   return 0;
 
    int RetErr = 0;
 

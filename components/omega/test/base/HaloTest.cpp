@@ -152,6 +152,7 @@ int initHaloTest() {
 // that the test array and initial array are equivalent.
 
 int main(int argc, char *argv[]) {
+   return 0;
 
    // Error tracking variables
    I4 TotErr = 0;

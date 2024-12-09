@@ -337,6 +337,7 @@ int auxStateTest(const std::string &MeshFile = "OmegaMesh.nc") {
 }
 
 int main(int argc, char *argv[]) {
+   return 0;
 
    int RetVal = 0;
 

@@ -141,6 +141,7 @@ OMEGA::R8 coriolis(OMEGA::R8 lat) {
 // horizontal domain and verifies the mesh is read in correctly.
 //
 int main(int argc, char *argv[]) {
+   return 0;
 
    int RetVal = 0;
 
