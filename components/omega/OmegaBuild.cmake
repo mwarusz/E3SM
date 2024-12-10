@@ -28,6 +28,7 @@ macro(common)
 
   option(OMEGA_DEBUG "Turn on error message throwing (default OFF)." OFF)
   option(OMEGA_LOG_FLUSH "Turn on unbuffered logging (default OFF)." OFF)
+  option(OMEGA_TEST_CDASH "Turn on CDash support (default ON)." ON)
 
   if(NOT DEFINED OMEGA_CXX_FLAGS)
     set(OMEGA_CXX_FLAGS "")
