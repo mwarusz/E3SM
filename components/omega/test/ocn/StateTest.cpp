@@ -167,10 +167,10 @@ int initStateTest() {
    }
 
    // Finish initialization of initial state by filling halos and copying
-   // to device. Current time level is zero.
+   // to host. Current time level is zero.
    OceanState *DefState = OceanState::getDefault();
    DefState->exchangeHalo(0);
-   DefState->copyToDevice(0);
+   DefState->copyToHost(0);
 
    return Err;
 }
