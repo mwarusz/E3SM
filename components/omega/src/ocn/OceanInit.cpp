@@ -202,12 +202,12 @@ int initOmegaModules(MPI_Comm Comm) {
       }
    }
 
-   // Update Halos and Device arrays with new state and tracer fields
+   // Update Halos and Host arrays with new state and tracer fields
 
    OceanState *DefState = OceanState::getDefault();
    I4 CurTimeLevel      = 0;
    DefState->exchangeHalo(CurTimeLevel);
-   DefState->copyToDevice(CurTimeLevel);
+   DefState->copyToHost(CurTimeLevel);
 
    // Now update tracers - assume using same time level index
    Err = Tracers::exchangeHalo(CurTimeLevel);
@@ -215,7 +215,7 @@ int initOmegaModules(MPI_Comm Comm) {
       LOG_CRITICAL("Error updating tracer halo after restart");
       return Err;
    }
-   Err = Tracers::copyToDevice(CurTimeLevel);
+   Err = Tracers::copyToHost(CurTimeLevel);
    if (Err != 0) {
       LOG_CRITICAL("Error updating tracer device arrays after restart");
       return Err;
