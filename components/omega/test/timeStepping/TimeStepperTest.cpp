@@ -151,12 +151,29 @@ int initTimeStepperTest(const std::string &mesh) {
    initLogging(DefEnv);
 
    // Open config file
-   OMEGA::Config("Omega");
-   Err = OMEGA::Config::readAll("omega.yml");
+   Config("Omega");
+   Err = Config::readAll("omega.yml");
    if (Err != 0) {
       LOG_CRITICAL("TimeStepperTest: Error reading config file");
       return Err;
    }
+
+   // Reset NVertLevels to 1 regardless of config value
+   Config *OmegaConfig = Config::getOmegaConfig();
+   Config DimConfig("Dimension");
+   Err = OmegaConfig->get(DimConfig);
+   if (Err != 0) {
+      LOG_CRITICAL("TimeStepperTest: Dimension group not found in Config");
+      return Err;
+   }
+   Err = DimConfig.set("NVertLevels", NVertLevels);
+   if (Err != 0) {
+      LOG_CRITICAL("TimeStepperTest: Unable to reset NVertLevels in Config");
+      return Err;
+   }
+
+   // Horz dimensions will be created in HorzMesh
+   auto VertDim = Dimension::create("NVertLevels", NVertLevels);
 
    // Note that the default time stepper is not used in subsequent tests
    // but is initialized here because the number of time levels is needed
@@ -198,6 +215,12 @@ int initTimeStepperTest(const std::string &mesh) {
       LOG_ERROR("TimeStepperTest: error initializing tracers infrastructure");
    }
 
+   int AuxStateErr = AuxiliaryState::init();
+   if (AuxStateErr != 0) {
+      Err++;
+      LOG_ERROR("TimeStepperTest: error initializing default aux state");
+   }
+
    Err = Tendencies::init();
    if (Err != 0) {
       LOG_CRITICAL("Error initializing default tendencies");
@@ -222,9 +245,6 @@ int initTimeStepperTest(const std::string &mesh) {
 
    auto *DefMesh = HorzMesh::getDefault();
    auto *DefHalo = Halo::getDefault();
-
-   // Horz dimensions created in HorzMesh
-   auto VertDim = Dimension::create("NVertLevels", NVertLevels);
 
    int NTracers          = Tracers::getNumTracers();
    const int NTimeLevels = 2;

@@ -273,11 +273,10 @@ class Halo {
    /// neighboring task and pack them into the proper send buffer for
    /// that Neighbor.
    template <typename T>
-   typename std::enable_if_t<ArrayRank<T>::Is1D, int>
+   std::enable_if_t<ArrayRank<T>::Is1D>
    packBuffer(const T &Array,      // 1D Kokkos array of any type
               const I4 CurNeighbor // current neighbor
    ) {
-      I4 Err = 0;
 
       OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
       OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
@@ -301,16 +300,13 @@ class Halo {
             LocBuffH(IExch) = RVal;
          }
       }
-
-      return Err;
    }
 
    template <typename T>
-   typename std::enable_if_t<ArrayRank<T>::Is2D, int>
+   std::enable_if_t<ArrayRank<T>::Is2D>
    packBuffer(const T &Array,      // 2D Kokkos array of any type
               const I4 CurNeighbor // current neighbor
    ) {
-      I4 Err = 0;
 
       OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
       OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
@@ -342,15 +338,13 @@ class Halo {
             }
          }
       }
-      return Err;
    }
 
    template <typename T>
-   typename std::enable_if_t<ArrayRank<T>::Is3D, int>
+   std::enable_if_t<ArrayRank<T>::Is3D>
    packBuffer(const T &Array,      // 3D Kokkos array of any type
               const I4 CurNeighbor // current neighbor
    ) {
-      I4 Err = 0;
 
       OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
       OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
@@ -387,15 +381,13 @@ class Halo {
             }
          }
       }
-      return Err;
    }
 
    template <typename T>
-   typename std::enable_if_t<ArrayRank<T>::Is4D, int>
+   std::enable_if_t<ArrayRank<T>::Is4D>
    packBuffer(const T &Array,      // 4D Kokkos array of any type
               const I4 CurNeighbor // current neighbor
    ) {
-      I4 Err = 0;
 
       OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
       OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
@@ -437,15 +429,13 @@ class Halo {
             }
          }
       }
-      return Err;
    }
 
    template <typename T>
-   typename std::enable_if_t<ArrayRank<T>::Is5D, int>
+   std::enable_if_t<ArrayRank<T>::Is5D>
    packBuffer(const T &Array,      // 5D Kokkos array of any type
               const I4 CurNeighbor // current neighbor
    ) {
-      I4 Err = 0;
 
       OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
       OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
@@ -492,7 +482,6 @@ class Halo {
             }
          }
       }
-      return Err;
    }
 
    /// Buffer unpack specialized function templates for supported Kokkos array
@@ -500,11 +489,10 @@ class Halo {
    /// elements of the proper receive buffer for that Neighbor into the
    /// corresponding halo elements of the input Array
    template <typename T>
-   typename std::enable_if_t<ArrayRank<T>::Is1D, int>
+   std::enable_if_t<ArrayRank<T>::Is1D>
    unpackBuffer(const T &Array,      // 1D Kokkos array of any type
                 const I4 CurNeighbor // current neighbor
    ) {
-      I4 Err = 0;
 
       using ValType = typename T::non_const_value_type;
 
@@ -527,16 +515,13 @@ class Halo {
             Array(IArr)   = reinterpret_cast<ValType &>(LocBuffH(IExch));
          }
       }
-
-      return Err;
    }
 
    template <typename T>
-   typename std::enable_if_t<ArrayRank<T>::Is2D, int>
+   std::enable_if_t<ArrayRank<T>::Is2D>
    unpackBuffer(const T &Array,      // 2D Kokkos array of any type
                 const I4 CurNeighbor // current neighbor
    ) {
-      I4 Err = 0;
 
       using ValType = typename T::non_const_value_type;
 
@@ -566,16 +551,13 @@ class Halo {
             }
          }
       }
-
-      return Err;
    }
 
    template <typename T>
-   typename std::enable_if_t<ArrayRank<T>::Is3D, int>
+   std::enable_if_t<ArrayRank<T>::Is3D>
    unpackBuffer(const T &Array,      // 3D Kokkos array of any type
                 const I4 CurNeighbor // current neighbor
    ) {
-      I4 Err = 0;
 
       using ValType = typename T::non_const_value_type;
 
@@ -611,16 +593,13 @@ class Halo {
             }
          }
       }
-
-      return Err;
    }
 
    template <typename T>
-   typename std::enable_if_t<ArrayRank<T>::Is4D, int>
+   std::enable_if_t<ArrayRank<T>::Is4D>
    unpackBuffer(const T &Array,      // 4D Kokkos array of any type
                 const I4 CurNeighbor // current neighbor
    ) {
-      I4 Err = 0;
 
       using ValType = typename T::non_const_value_type;
 
@@ -662,16 +641,13 @@ class Halo {
             }
          }
       }
-
-      return Err;
    }
 
    template <typename T>
-   typename std::enable_if_t<ArrayRank<T>::Is5D, int>
+   std::enable_if_t<ArrayRank<T>::Is5D>
    unpackBuffer(const T &Array,      // 5D Kokkos array of any type
                 const I4 CurNeighbor // current neighbor
    ) {
-      I4 Err = 0;
 
       using ValType = typename T::non_const_value_type;
 
@@ -718,8 +694,6 @@ class Halo {
             }
          }
       }
-
-      return Err;
    }
 
    //---------------------------------------------------------------------------
