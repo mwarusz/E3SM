@@ -288,8 +288,8 @@ int main(int argc, char *argv[]) {
       // test MIN, MAX of arrays
       HostArray1DI4 HostA1DI4Work("HostA1DI4Work", NumCells * MySize);
       HostArray1DI4 HostA1DI4Min("HostA1DI4Min", NumCells * MySize);
-      for (i = 0; i < MySize; i++) {
-         for (j = 0; j < NumCells; j++) {
+      for (j = 0; j < NumCells; j++) {
+         for (i = 0; i < MySize; i++) {
             k = i * NumCells + j;
             if (MyTask == i) {
                HostA1DI4Work(k) = (i + 1) * k; // processor-specific work array
