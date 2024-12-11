@@ -192,7 +192,7 @@ int main(int argc, char **argv) {
       // Read restart file for initial temperature and salinity data
       Metadata ReqMetadata; // leave empty for now - no required metadata
       Err1 = IOStream::read("InitialState", ModelClock, ReqMetadata);
-      TestEval("Read restart file", Err1, ErrRef, Err);
+      TestEval("Read restart file", Err1, IOStream::Success, Err);
 
       // Overwrite salinity array with values associated with global cell
       // ID to test proper indexing of IO
@@ -230,7 +230,7 @@ int main(int argc, char **argv) {
       std::this_thread::sleep_for(std::chrono::seconds(5));
       bool ForceRead = true;
       Err1 = IOStream::read("RestartRead", ModelClock, ReqMetadata, ForceRead);
-      TestEval("Restart force read", Err1, ErrRef, Err);
+      TestEval("Restart force read", Err1, IOStream::Success, Err);
 
       Err1             = 0;
       auto DataReducer = Kokkos::Sum<I4>(Err1);

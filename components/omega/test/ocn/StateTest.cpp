@@ -161,7 +161,7 @@ int initStateTest() {
    // Read the state variables from the initial state stream
    Metadata ReqMeta; // no global metadata needed for init state read
    Err = IOStream::read("InitialState", ModelClock, ReqMeta);
-   if (!StreamsValid) {
+   if (Err != IOStream::Success) {
       LOG_CRITICAL("ocnInit: Error reading initial state from stream");
       return Err;
    }
