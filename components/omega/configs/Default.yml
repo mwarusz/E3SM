@@ -30,6 +30,8 @@ Omega:
     EddyDiff2: 10.0
     TracerHyperDiffTendencyEnable: true
     EddyDiff4: 0.0
+    UseCustomTendency: false
+    ManufacturedSolutionTendency: false
   Tracers:
     Base: [Temperature, Salinity]
     Debug: [Debug1, Debug2, Debug3]
@@ -102,3 +104,7 @@ Omega:
       EndTime: 0001-06-30_00:00:00
       Contents:
         - Tracers
+  ManufacturedSolution:
+    WavelengthX: 5.0e6
+    WavelengthY: 4.33013e6
+    Amplitude: 1.0
