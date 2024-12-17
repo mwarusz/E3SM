@@ -62,6 +62,11 @@ enum class TimeUnits {
    Years,    ///< time units in years
 };
 
+/// Utility function to extract time units from a string
+TimeUnits TimeUnitsFromString(
+    const std::string TimeUnitString ///< string describing time units
+);
+
 #define NUM_SUPPORTED_CALENDARS 9
 
 /// This enum represents supported calendar types
@@ -807,7 +812,11 @@ class Alarm {
    /// Get alarm name
    std::string getName(void) const;
 
-   I4 print(void) const;
+   /// Get alarm interval
+   const TimeInterval *getInterval(void) const;
+
+   /// Get last time the alarm rang
+   const TimeInstant *getRingTimePrev(void) const;
 
 }; // end class Alarm
 

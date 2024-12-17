@@ -48,6 +48,39 @@
 namespace OMEGA {
 
 //------------------------------------------------------------------------------
+// Utility function to extract time units from a string
+TimeUnits TimeUnitsFromString(
+    const std::string TimeUnitString ///< string describing time units
+) {
+
+   // First convert to lower case for easier comparison
+   std::string CompStr = TimeUnitString;
+   std::transform(CompStr.begin(), CompStr.end(), CompStr.begin(),
+                  [](unsigned char C) { return std::tolower(C); });
+
+   // Now convert the string to the associated enum TimeUnit
+
+   if (CompStr == "year" or CompStr == "years" or CompStr == "nyears") {
+      return TimeUnits::Years;
+   } else if (CompStr == "month" or CompStr == "months" or
+              CompStr == "nmonths") {
+      return TimeUnits::Months;
+   } else if (CompStr == "day" or CompStr == "days" or CompStr == "ndays") {
+      return TimeUnits::Days;
+   } else if (CompStr == "hour" or CompStr == "hours" or CompStr == "nhours") {
+      return TimeUnits::Hours;
+   } else if (CompStr == "minute" or CompStr == "minutes" or
+              CompStr == "nminutes") {
+      return TimeUnits::Minutes;
+   } else if (CompStr == "second" or CompStr == "seconds" or
+              CompStr == "nseconds") {
+      return TimeUnits::Seconds;
+   } else {
+      return TimeUnits::None;
+   }
+};
+
+//------------------------------------------------------------------------------
 // TimeFrac definitions
 //------------------------------------------------------------------------------
 
@@ -4067,6 +4100,16 @@ I4 Alarm::rename(const std::string NewName ///< [in] new name for alarm
 // Returns the name of an alarm.
 
 std::string Alarm::getName() const { return Name; }
+
+//------------------------------------------------------------------------------
+// Alarm::getInterval - retrieves the time interval for periodic alarms
+
+const TimeInterval *Alarm::getInterval() const { return &RingInterval; }
+
+//------------------------------------------------------------------------------
+// Alarm::getRingTimePrev - get last time the alarm rang
+
+const TimeInstant *Alarm::getRingTimePrev(void) const { return &RingTimePrev; }
 
 //------------------------------------------------------------------------------
 // Clock definitions
