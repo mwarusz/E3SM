@@ -715,7 +715,8 @@ int main(int argc, char *argv[]) {
          LOG_ERROR("IOTest: error writing R4Vert vector FAIL");
       }
 
-      // Write R8 arrays as two time slices
+      // Write R8 arrays as two time slices - the first frame here with
+      // the second frame written after re-open
       std::vector<int> DimLengths(1);
       DimLengths[0] = NVertLevels;
       Err = IO::writeNDVar(RefR8Vert.data(), OutFileID, VarIDR8Time, 0,
@@ -725,15 +726,6 @@ int main(int argc, char *argv[]) {
       } else {
          RetVal += 1;
          LOG_ERROR("IOTest: error writing R8Time vector frame 0 FAIL");
-      }
-
-      Err = IO::writeNDVar(RefR8Time.data(), OutFileID, VarIDR8Time, 1,
-                           &DimLengths);
-      if (Err == 0) {
-         LOG_ERROR("IOTest: writing R8Time vector frame 1 PASS");
-      } else {
-         RetVal += 1;
-         LOG_ERROR("IOTest: error writing R8Time vector frame 1 FAIL");
       }
 
       // Write distributed arrays
@@ -761,7 +753,8 @@ int main(int argc, char *argv[]) {
          RetVal += 1;
          LOG_ERROR("IOTest: error writing R4 array on cells FAIL");
       }
-      // Write R8 cell data as two time slices
+      // Write R8 cell data as two time slices - this is first frame
+      // Second frame written below
       Err = IO::writeArray(RefR8Cell.data(), NCellsSize * NVertLevels, &FillR8,
                            OutFileID, DecompCellR8, VarIDTimeR8, 0);
       if (Err == 0) {
@@ -769,15 +762,6 @@ int main(int argc, char *argv[]) {
       } else {
          RetVal += 1;
          LOG_ERROR("IOTest: error writing R8 array on cells frame 0 FAIL");
-      }
-
-      Err = IO::writeArray(RefR8Tim2.data(), NCellsSize * NVertLevels, &FillR8,
-                           OutFileID, DecompCellR8, VarIDTimeR8, 1);
-      if (Err == 0) {
-         LOG_ERROR("IOTest: writing R8 array on cells frame 1 PASS");
-      } else {
-         RetVal += 1;
-         LOG_ERROR("IOTest: error writing R8 array on cells frame 1 FAIL");
       }
 
       Err = IO::writeArray(RefI4Edge.data(), NEdgesSize * NVertLevels, &FillI4,
@@ -847,6 +831,45 @@ int main(int argc, char *argv[]) {
       }
 
       // Finished writing, close file
+      Err = IO::closeFile(OutFileID);
+      if (Err == 0) {
+         LOG_ERROR("IOTest: closing output file PASS");
+      } else {
+         RetVal += 1;
+         LOG_ERROR("IOTest: error closing output file FAIL");
+      }
+
+      // Re-open to write additional frames for multi-frame fields
+      // Open a file for output
+      Err = IO::openFile(OutFileID, "IOTest.nc", IO::ModeWrite, IO::FmtDefault,
+                         IO::IfExists::Append);
+      if (Err == 0) {
+         LOG_ERROR("IOTest: file re-open PASS");
+      } else {
+         RetVal += 1;
+         LOG_ERROR("IOTest: error re-opening file for output FAIL");
+      }
+
+      // write second frame data
+      Err = IO::writeNDVar(RefR8Time.data(), OutFileID, VarIDR8Time, 1,
+                           &DimLengths);
+      if (Err == 0) {
+         LOG_ERROR("IOTest: writing R8Time vector frame 1 PASS");
+      } else {
+         RetVal += 1;
+         LOG_ERROR("IOTest: error writing R8Time vector frame 1 FAIL");
+      }
+
+      Err = IO::writeArray(RefR8Tim2.data(), NCellsSize * NVertLevels, &FillR8,
+                           OutFileID, DecompCellR8, VarIDTimeR8, 1);
+      if (Err == 0) {
+         LOG_ERROR("IOTest: writing R8 array on cells frame 1 PASS");
+      } else {
+         RetVal += 1;
+         LOG_ERROR("IOTest: error writing R8 array on cells frame 1 FAIL");
+      }
+
+      // Finished writing again, close file
       Err = IO::closeFile(OutFileID);
       if (Err == 0) {
          LOG_ERROR("IOTest: closing output file PASS");
