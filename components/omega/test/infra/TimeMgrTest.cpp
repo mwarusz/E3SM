@@ -3555,6 +3555,25 @@ int testAlarm(void) {
 
    TimeInstant CurTime = StartTime;
 
+   // Test retrieval of the time interval
+   const TimeInterval *NewInterval = AlarmEveryYear.getInterval();
+   if (*NewInterval == IntervalAnnual) {
+      LOG_INFO("TimeMgrTest/Alarm: retrieve interval: PASS");
+   } else {
+      ++ErrAll;
+      LOG_ERROR("TimeMgrTest/Alarm: retrieve interval: FAIL");
+   }
+
+   // Test initial retrieval of the previous ring time (should be time0)
+   TimeInstant PriorRingTimeTest    = Time0;
+   const TimeInstant *PriorRingTime = AlarmEveryYear.getRingTimePrev();
+   if (*PriorRingTime == PriorRingTimeTest) {
+      LOG_INFO("TimeMgrTest/Alarm: retrieve initial ring time: PASS");
+   } else {
+      ++ErrAll;
+      LOG_ERROR("TimeMgrTest/Alarm: retrieve initial ring time: FAIL");
+   }
+
    // quick test of update status function
    Err1 = AlarmNewYear2020.updateStatus(CurTime);
    Err2 = AlarmEveryYear.updateStatus(CurTime);
@@ -3572,6 +3591,12 @@ int testAlarm(void) {
    } else {
       ++ErrAll;
       LOG_ERROR("TimeMgrTest/Alarm: initial reset: FAIL");
+   }
+   // reset the previous ring time to proper value corresponding to current time
+   TimeInstant TestTime = Time0;
+   while (TestTime < CurTime) {
+      PriorRingTimeTest = TestTime;
+      TestTime += IntervalAnnual;
    }
 
    // now integrate forward for 18 months
@@ -3610,6 +3635,13 @@ int testAlarm(void) {
          }
       }
 
+      // Test retrieval of previous ring time
+      const TimeInstant *PriorRingTime = AlarmEveryYear.getRingTimePrev();
+      if (*PriorRingTime != PriorRingTimeTest) {
+         ++ErrAll;
+         LOG_ERROR("TimeMgrTest/Alarm: retrieve prior ring time: FAIL");
+      }
+
       // Test whether interval alarm should be ringing or not
       if (N == 5 || N == 17) {
          if (AlarmEveryYear.isRinging()) {
@@ -3625,6 +3657,7 @@ int testAlarm(void) {
             ++ErrAll;
             LOG_ERROR("TimeMgrTest/Alarm: periodic annual alarm reset: FAIL");
          }
+         PriorRingTimeTest += IntervalAnnual;
       } else {
          if (AlarmEveryYear.isRinging()) {
             ++ErrAll;
