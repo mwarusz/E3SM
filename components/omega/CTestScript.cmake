@@ -21,7 +21,11 @@ if (NOT COMPILER)
 endif ()
 
 if (NOT PARMETIS)
-  message(FATAL_ERROR "Error: COMPILER is not defined.")
+  message(FATAL_ERROR "Error: PARMETIS is not defined.")
+endif ()
+
+if (NOT ARCH)
+  message(FATAL_ERROR "Error: ARCH is not defined.")
 endif ()
 
 if (NOT OCEANMESH)
@@ -45,7 +49,7 @@ execute_process(
 
 set (CTEST_SITE "${MACHINE}")
 set (CTEST_BUILD_GROUP "TEST_BUILD_GROUP")
-set (CTEST_BUILD_NAME "base-${GIT_BRANCH}-${COMPILER}")
+set (CTEST_BUILD_NAME "unitest-${GIT_BRANCH}-${COMPILER}")
 
 #set(CTEST_NOTES_FILES
 #    "${CTEST_SCRIPT_DIRECTORY}/${CTEST_SCRIPT_NAME}")
@@ -74,6 +78,7 @@ set(CTEST_CMAKE_GENERATOR "Unix Makefiles")
 set(CONFIG_OPTIONS
   "-DOMEGA_CIME_MACHINE=${MACHINE};"
   "-DOMEGA_CIME_COMPILER=${COMPILER};"
+  "-DOMEGA_ARCH=${ARCH};"
   "-DOMEGA_BUILD_TEST=ON;"
   "-DOMEGA_PARMETIS_ROOT=${PARMETIS}"
 )
