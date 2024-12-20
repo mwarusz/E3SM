@@ -263,7 +263,9 @@ macro(init_standalone_build)
   # create a env script
   set(_EnvScript ${OMEGA_BUILD_DIR}/omega_env.sh)
   file(WRITE ${_EnvScript}  "#!/usr/bin/env bash\n\n")
-  file(APPEND ${_EnvScript} "source ./e3smcase/.env_mach_specific.sh\n\n")
+
+  file(APPEND ${_EnvScript} "SCRIPT_DIR=$(cd $(dirname $BASH_SOURCE[0]) && pwd)\n\n")
+  file(APPEND ${_EnvScript} "source $SCRIPT_DIR/e3smcase/.env_mach_specific.sh\n\n")
   if("${OMEGA_ARCH}" STREQUAL "OPENMP")
     file(APPEND ${_EnvScript} "export OMP_NUM_THREADS=${THREAD_COUNT}\n\n")
     if(DEFINED ENV{OMP_PROC_BIND})
@@ -276,6 +278,8 @@ macro(init_standalone_build)
     else()
       file(APPEND ${_EnvScript} "export OMP_PLACES=threads\n\n")
     endif()
+
+    file(APPEND ${_EnvScript} "$*")
   endif()
 
   # create a build script
