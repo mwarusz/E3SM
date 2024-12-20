@@ -600,7 +600,7 @@ int readMeta(const std::string &MetaName, // [in] name of metadata
 // Defines a variable for an output file. The name and dimensions of
 // the variable must be supplied. An ID is assigned to the variable
 // for later use in the writing of the variable.
-int defineVar(int FileID,                 // [in] ID of the file containing dim
+int defineVar(int FileID,                 // [in] ID of the file containing var
               const std::string &VarName, // [in] name of variable
               IODataType VarType,         // [in] data type for the variable
               int NDims,                  // [in] number of dimensions
@@ -610,10 +610,21 @@ int defineVar(int FileID,                 // [in] ID of the file containing dim
 
    int Err = 0;
 
-   Err = PIOc_def_var(FileID, VarName.c_str(), VarType, NDims, DimIDs, &VarID);
+   // First check to see if the variable exists (if reading or if appending
+   // to an existing file)
+
+   Err = PIOc_inq_varid(FileID, VarName.c_str(), &VarID);
+
+   // If the variable is not found, define the new variable
    if (Err != PIO_NOERR) {
-      LOG_ERROR("IO::defineVar: PIO error while defining variable {}", VarName);
-      Err = -1;
+
+      Err =
+          PIOc_def_var(FileID, VarName.c_str(), VarType, NDims, DimIDs, &VarID);
+      if (Err != PIO_NOERR) {
+         LOG_ERROR("IO::defineVar: PIO error while defining variable {}",
+                   VarName);
+         Err = 1;
+      }
    }
 
    return Err;
