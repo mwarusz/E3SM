@@ -279,8 +279,8 @@ macro(init_standalone_build)
       file(APPEND ${_EnvScript} "export OMP_PLACES=threads\n\n")
     endif()
 
-    file(APPEND ${_EnvScript} "$*")
   endif()
+  file(APPEND ${_EnvScript} "$*")
 
   # create a build script
   set(_BuildScript ${OMEGA_BUILD_DIR}/omega_build.sh)
