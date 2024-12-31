@@ -280,7 +280,6 @@ macro(init_standalone_build)
     endif()
 
   endif()
-  file(APPEND ${_EnvScript} "$*")
 
   # create a build script
   set(_BuildScript ${OMEGA_BUILD_DIR}/omega_build.sh)
@@ -660,6 +659,8 @@ macro(update_variables)
   if(OMEGA_MPI_ON_DEVICE)
     add_definitions(-DOMEGA_MPI_ON_DEVICE)
   endif()
+
+  file(APPEND ${_EnvScript} "$*\n")
 
   # Include the findParmetis script
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
