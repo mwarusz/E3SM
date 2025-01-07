@@ -69,7 +69,7 @@ execute_process(COMMAND ln -sf ${SPHEREMESH}
 execute_process(COMMAND ln -sf ${PLANARMESH}
   ${CTEST_BINARY_DIRECTORY}/test/OmegaPlanarMesh.nc)
 
-ctest_start(Experimental)
+ctest_start(Nightly GROUP Unit-test)
 
 ctest_update(
   RETURN_VALUE UpdateRetval
