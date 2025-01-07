@@ -69,7 +69,7 @@ execute_process(COMMAND ln -sf ${SPHEREMESH}
 execute_process(COMMAND ln -sf ${PLANARMESH}
   ${CTEST_BINARY_DIRECTORY}/test/OmegaPlanarMesh.nc)
 
-set(CTEST_NIGHTLY_START_TIME "18:00:00 UTC")
+set(CTEST_NIGHTLY_START_TIME "06:00:00 UTC")
 
 ctest_start(Nightly GROUP Unit-test)
 
