@@ -48,7 +48,7 @@ execute_process(
 )
 
 set (CTEST_SITE "${MACHINE}")
-set (CTEST_BUILD_GROUP "TEST_BUILD_GROUP")
+set (CTEST_BUILD_GROUP "Unittest")
 set (CTEST_BUILD_NAME "unitest-${GIT_BRANCH}-${COMPILER}")
 
 #set(CTEST_NOTES_FILES
