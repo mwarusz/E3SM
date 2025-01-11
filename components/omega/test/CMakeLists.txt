@@ -61,6 +61,8 @@ function(add_omega_test test_name exe_name source_files mpi_args)
     )
   endif()
 
+  set_tests_properties(${test_name} PROPERTIES LABELS "${OMEGA_ARCH};Omega-0")
+
 endfunction()
 
 ##################

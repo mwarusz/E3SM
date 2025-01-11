@@ -50,7 +50,6 @@ execute_process(
 set (CTEST_SITE "${MACHINE}")
 set (CTEST_BUILD_GROUP "Unit-test")
 set (CTEST_BUILD_NAME "unitest-${GIT_BRANCH}-${COMPILER}")
-set (CTEST_BUILD_LABEL "${ARCH};Omega-0")
 
 set (CTEST_UPDATE_COMMAND "git")
 set (CTEST_DROP_SITE_CDASH TRUE)
