@@ -533,13 +533,13 @@ int IOStream::create(const std::string &StreamName, //< [in] name of stream
       NewStream->Multiframe = true;
 
       if (Err1 != 0) {
-         LOG_CRITICAL("File frequency units provided but file freq missing"
+         LOG_CRITICAL("File frequency units provided but file freq missing "
                       "for stream {}",
                       StreamName);
          return Fail;
       }
       if (Err2 != 0) {
-         LOG_CRITICAL("File frequency provided by file freq units missing"
+         LOG_CRITICAL("File frequency provided but file freq units missing "
                       "for stream {}",
                       StreamName);
          return Fail;
@@ -2621,7 +2621,7 @@ int IOStream::writeStream(
    std::map<std::string, int> AllDimIDs;
    Err = defineAllDims(OutFileID, AllDimIDs);
    if (Err != 0) {
-      LOG_ERROR("Error defined dimensions for file {}", OutFileName);
+      LOG_ERROR("Error defining dimensions for file {}", OutFileName);
       return Fail;
    }
 
