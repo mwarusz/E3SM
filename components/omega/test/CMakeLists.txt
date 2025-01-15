@@ -405,3 +405,14 @@ add_omega_test(
     ocn/TracersTest.cpp
     "-n;8;"
 )
+
+##################
+# VAdv test
+##################
+
+add_omega_test(
+    VERTICAL_ADV_TEST
+    testVerticalAdv.exe
+    ocn/VerticalAdvTest.cpp
+    "n;8"
+)
