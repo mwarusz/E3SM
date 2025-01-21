@@ -20,7 +20,7 @@ class VerticalAdv {
    Array2DReal VertTransportTop;
    Array1DReal VertCoordWeights;
 
-   VerticalAdv(const HorzMesh *Mesh, int NVertLevels);
+   VerticalAdv(const HorzMesh *Mesh, int NVertLevels, int VectorLength);
 
    int computeVerticalTransport(const OceanState *State,
                                 const AuxiliaryState *AuxState,
@@ -48,7 +48,7 @@ class VerticalAdv {
          for (int K = 0; K < NVertLevels; ++K) {
             const Real Flux = DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
                               FluxLayerThickEdge(JEdge, K) *
-                              NormalVelEdge(JEdge, K);
+                              NormalVelEdge(JEdge, K) * InvAreaCell;
             DivHU(ICell, K) -= Flux;
             BtrDivHU -= Flux;
          }
@@ -92,14 +92,16 @@ class VerticalAdv {
                            const Array2DReal &FluxLayerThickEdge,
                            const Array2DReal &DivHU) {
 
-      const I4 KStart = KChunk * VecLength;
+      const Real InvAreaCell = 1._Real / AreaCell(ICell);
+      const I4 KStart = KChunk * VectorLength;
+
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < VectorLength; ++KVec) {
             const I4 K = KStart + KVec;
             const Real Flux = DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
                               FluxLayerThickEdge(JEdge, K) *
-                              NormalVelEdge(JEdge, K);
+                              NormalVelEdge(JEdge, K) * InvAreaCell;
             DivHU(ICell, K) -= Flux;
          }
       }
@@ -119,6 +121,7 @@ class VerticalAdv {
    computeVertTransportTop2(int ICell, const Array2DReal &NormalVelEdge,
                            const Array2DReal &FluxLayerThickEdge) {
       
+      const Real InvAreaCell = 1._Real / AreaCell(ICell);
       Real TmpDivHU[NVertLevels + 1] = {0};
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
@@ -126,7 +129,7 @@ class VerticalAdv {
          for (int K = 0; K < NVertLevels; ++K) {
             TmpDivHU[K] -= DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
                            FluxLayerThickEdge(JEdge, K) *
-                           NormalVelEdge(JEdge, K);
+                           NormalVelEdge(JEdge, K) * InvAreaCell;
          }
       }
 
@@ -141,6 +144,8 @@ class VerticalAdv {
 
  private:
    const HorzMesh *Mesh;
+
+   I4 VectorLength;
 
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;

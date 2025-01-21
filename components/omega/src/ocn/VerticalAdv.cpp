@@ -6,14 +6,14 @@
 
 namespace OMEGA {
 
-VerticalAdv::VerticalAdv(const HorzMesh *Mesh, int InNVertLevels)
+VerticalAdv::VerticalAdv(const HorzMesh *Mesh, int InNVertLevels, int InVectorLength)
     : Mesh(Mesh), VertTransportTop("VertTransportTop", Mesh->NCellsSize,
-                                     NVertLevels+1),
-      VertCoordWeights("VertCoordWeights", NVertLevels),
+                                     InNVertLevels+1),
+      VertCoordWeights("VertCoordWeights", InNVertLevels),
       NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       EdgeSignOnCell(Mesh->EdgeSignOnCell), AreaCell(Mesh->AreaCell),
       DvEdge(Mesh->DvEdge), NVertLevels(InNVertLevels),
-      NCellsAll(Mesh->NCellsAll) {}
+      NCellsAll(Mesh->NCellsAll), VectorLength(InVectorLength) {}
 
 int VerticalAdv::computeVerticalTransport(const OceanState *State,
                                           const AuxiliaryState *AuxState,
@@ -64,7 +64,7 @@ int VerticalAdv::computeVerticalTransport1(const OceanState *State,
 
    int Err = 0;
 
-   int NChunks = NVertLevels / VecLength;
+   int NChunks = NVertLevels / VectorLength;
 
    Array2DReal NormalVelEdge;
    State->getNormalVelocity(NormalVelEdge, TimeLevel);
