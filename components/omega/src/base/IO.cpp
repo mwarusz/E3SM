@@ -14,6 +14,7 @@
 #include "mpi.h"
 #include "pio.h"
 
+#include <filesystem>
 #include <map>
 #include <string>
 
@@ -270,9 +271,17 @@ int openFile(
          break;
 
       // If the write should append or add to an existing file
-      // we open the file for reading and writing
+      // we open the file for reading and writing, but also must create
+      // the file if it doesn't already exist
       case IfExists::Append:
-         Err = PIOc_openfile(SysID, &FileID, &Format, Filename.c_str(), InMode);
+         if (std::filesystem::exists(Filename)) {
+            Err = PIOc_openfile(SysID, &FileID, &Format, Filename.c_str(),
+                                InMode);
+         } else {
+            Err = PIOc_createfile(SysID, &FileID, &Format, Filename.c_str(),
+                                  InMode);
+         }
+
          if (Err != PIO_NOERR)
             LOG_ERROR("IO::openFile: PIO error opening file {} for writing",
                       Filename);
