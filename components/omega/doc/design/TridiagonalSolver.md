@@ -22,26 +22,27 @@ This requires specialized algorithms that can handle this situation stably.
 
 ### 2.1 Requirement: Modularity
 
-There should be one implementation of batched tridiagonal solver that can be called every time a solution to such a system is needed.
+There should be one module that provides tridiagonal solvers that are sufficiently general to handle every need in Omega.
 
 ### 2.2 Requirement: Stability for vertical mixing problems
 
-The solver must be stable for vertical mixing problems with large variations in mixing coefficients.
+A specialized solver that is stable for vertical mixing problems with large variations in mixing coefficients must be
+provided.
 
 ### 2.3 Requirement: Bottom boundary conditions
 
-When applied to the implicit vertical mixing of momentum, the solver should be
+When applied to the implicit vertical mixing of momentum, the specialized diffusion solver should be
 sufficiently general to be able to incorporate various bottom drag formulations.
 
 ### 2.4 Requirement: Performance
 
-The solver must be performant on CPU and GPU architectures.
+All solvers must be performant on CPU and GPU architectures. On CPUs this means supporting vectorization.
 
 ### 2.5 Desired: Ability to fuse kernels
 
 Implicit vertical mixing will require some pre-processing (e.g. setup of the system) and post-processing work.
 It is desirable to handle all of that in one computational kernel. This requires the ability to call the
-solver inside a `parallelFor`.
+solvers inside a `parallelFor`.
 
 ## 3 Algorithmic Formulation
 A general tridiagonal system has the form:
@@ -173,15 +174,114 @@ These two equations form the basis of stable (parallel) cyclic reduction for dif
 
 ## 4 Design
 
-TODO
+Four different algorithms will be implemented:
+- Thomas algorithm for general tridiagonal systems on CPUs
+- PCR algorithm for general tridiagonal systems on GPUs
+- Thomas algorithm for diffusion systems with improved stability properties on CPUs
+- PCR algorithm for diffusion systems with improved stability properties on GPUs
+
+The algorithms will be designed to work within Kokkos team policies, with each team of threads
+solving one column system on GPUs and `VecLength` column systems on CPUs.
+The user interface for CPU and GPU solvers will be the same. There will be
+two type aliases `TriDiagSolver` and `TriDiagDiffSolver` that will resolve to the
+optimal solver class based on the chosen architecture.
+
+### 4.1 Data types and parameters
+
+#### 4.1.1 Parameters
+
+No parameters are required.
+
+#### 4.1.2 Class/structs/data types
+
+There will be a solver struct for each algorithm. The solvers inputs and outputs will be encapsulated in
+two scratch data structs, one for the general solver and one for the diffusion solver.
+
+#### 4.1.2.1 Scratch data structs
+
+To facilitate constructing the systems on the fly and for performance reasons the solver inputs and outputs will be using the Kokkos scratch memory space. The scratch data for the general tridiagonal solver will be encapsulated in a struct called `TriDiagScratch`
+```c++
+struct TriDiagScratch {
+   ScratchArray2DReal DL;
+   ScratchArray2DReal D;
+   ScratchArray2DReal DU;
+   ScratchArray2DReal X;
+};
+```
+where `DL`, `D`, `DU`, `X` are views of size (`NRow`, `VecLength`) in the scratch memory space. The views
+`DL`, `D`, `DU` are inputs denoting the lower, main, and upper diagonal, respectively. The view `X` should contain
+the rhs at input and will be overwritten with the solution after `solve` is called.
+
+The scratch data for the specialized diffusion tridiagonal solver will be encapsulated in a struct called `TriDiagDiffScratch`
+```c++
+struct TriDiagDiffScratch {
+   ScratchArray2DReal G;
+   ScratchArray2DReal H;
+   ScratchArray2DReal X;
+   ScratchArray2DReal Alpha;
+};
+```
+where `G`, `H`, `X`, `Alpha` are views of size (`NRow`, `VecLength`) in the scratch memory space. The views
+`G` and `H` are inputs corresponding to the variables `g` and `h` introduced in [Section 3](#3-algorithmic-formulation).
+The view `X` has the same meaning as in the general case.
+The view `Alpha` is an internal workspace used by the algorithm.
+
+#### 4.1.2.2 Solver structs
+
+The four solver algorithms will be implemented as four structs `ThomasSolver`, `PCRSolver`, `ThomasDiffusionSolver`, and `PCRDiffusionSolver`. Currently, there is no plan for those structs to have any data members and they will only provide static methods, acting essentially as namespaces.
+
+### 4.2 Methods
+
+#### 4.2.1 Scratch Constructors
+The constructors of scratch spaces take a team member and system size (`NRow`)
+```c++
+    TriDiagScratch(const TeamMember &Member, int NRow);
+    TriDiagDiffScratch(const TeamMember &Member, int NRow);
+```
+
+#### 4.2.2 Policy creation
+Every solver will provide a static method
+```c++
+   static TeamPolicy makeTeamPolicy(int NBatch, int NRow);
+```
+that creates an appropriate team policy for solving `NBatch` systems of size `NRow`.
+
+#### 4.2.3 Solve Methods
+The general solvers `ThomasSolver` and `PCRSolver` will have a static solve method
+```c++
+   static void solve(const TeamMember &Member, const TriDiagScratch &Scratch);
+```
+that takes a team member and an initialized general scratch space. After calling this method `Scratch.X`
+will contain the solution. There will also be a convenience method
+```c++
+static void solve(const TeamMember &Member,
+                  const Array2DReal &DL, const Array2DReal &D, const Array2DReal &DU, const Array2DReal &X);
+```
+that loads the inputs from global arrays.
+
+The diffusion solvers `ThomasDiffusionSolver` and `PCRDiffusionSolver` will provide a similar method
+```c++
+   static void solve(const TeamMember &Member, const TriDiagDiffScratch &Scratch);
+```
+differing only in the type of scratch space. Similarly, there will be a convenience method
+```c++
+   static void solve(const TeamMember &Member,
+                     const Array2DReal &G, const Array2DReal &H, const Array2DReal &X);
+```
+which loads the inputs from global arrays.
 
 ## 5 Verification and Testing
 
-### 5.1 Test correctness
+### 5.1 Test solvers correctness using prescribed matrix
 
-The solver will be compared against exact solution for a variety of (batch size, system size) combinations.
+Given analytically prescribed matrix `A` and vector `y` the solution to the problem `A x = z` with `z = A y` will be
+checked to see if the resulting `x` is equal to the prescribed vector `y`. This will be done for all solvers for a variety of (batch size, system size) combinations.
 
-### 5.2 Test stability
+### 5.2 Test diffusion solvers convergence using manufactured solution
 
-The solver stability will be tested on an idealized vertical mixing problem with abrupt changes in
+The convergence of diffusion solvers will be tested using a manufactured solution.
+
+### 5.3 Test stability
+
+The diffusion solvers stability will be tested on an idealized vertical mixing problem with abrupt changes in
 the diffusion coefficient.
