@@ -28,6 +28,7 @@ macro(common)
 
   option(OMEGA_DEBUG "Turn on error message throwing (default OFF)." OFF)
   option(OMEGA_LOG_FLUSH "Turn on unbuffered logging (default OFF)." OFF)
+  option(OMEGA_TEST_CDASH "Turn on CDash support (default ON)." ON)
 
   if(NOT DEFINED OMEGA_CXX_FLAGS)
     set(OMEGA_CXX_FLAGS "")
@@ -262,7 +263,9 @@ macro(init_standalone_build)
   # create a env script
   set(_EnvScript ${OMEGA_BUILD_DIR}/omega_env.sh)
   file(WRITE ${_EnvScript}  "#!/usr/bin/env bash\n\n")
-  file(APPEND ${_EnvScript} "source ./e3smcase/.env_mach_specific.sh\n\n")
+
+  file(APPEND ${_EnvScript} "SCRIPT_DIR=$(cd $(dirname $BASH_SOURCE[0]) && pwd)\n\n")
+  file(APPEND ${_EnvScript} "source $SCRIPT_DIR/e3smcase/.env_mach_specific.sh\n\n")
   if("${OMEGA_ARCH}" STREQUAL "OPENMP")
     file(APPEND ${_EnvScript} "export OMP_NUM_THREADS=${THREAD_COUNT}\n\n")
     if(DEFINED ENV{OMP_PROC_BIND})
@@ -275,6 +278,7 @@ macro(init_standalone_build)
     else()
       file(APPEND ${_EnvScript} "export OMP_PLACES=threads\n\n")
     endif()
+
   endif()
 
   # create a build script
@@ -655,6 +659,8 @@ macro(update_variables)
   if(OMEGA_MPI_ON_DEVICE)
     add_definitions(-DOMEGA_MPI_ON_DEVICE)
   endif()
+
+  file(APPEND ${_EnvScript} "$*\n")
 
   # Include the findParmetis script
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")

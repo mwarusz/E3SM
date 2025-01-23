@@ -94,6 +94,11 @@ add_subdirectory(src)
 if(OMEGA_BUILD_TEST)
 
   enable_testing()
+
+  if (OMEGA_TEST_CDASH)
+    include(CTest)
+  endif()
+
   add_subdirectory(test)
 
 endif()

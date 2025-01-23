@@ -1,6 +1,5 @@
 # Omega Unit Tests
 
-
 #####################
 # Omega Test Function
 #####################
@@ -52,15 +51,17 @@ function(add_omega_test test_name exe_name source_files mpi_args)
   if (mpi_args)
     add_test(
       NAME ${test_name}
-      COMMAND ${OMEGA_MPI_EXEC} ${OMEGA_MPI_ARGS} ${mpi_args} -- ./${exe_name}
+      COMMAND ../omega_env.sh ${OMEGA_MPI_EXEC} ${OMEGA_MPI_ARGS} ${mpi_args} -- ./${exe_name}
     )
 
   else()
     add_test(
       NAME ${test_name}
-      COMMAND ./${exe_name}
+      COMMAND ../omega_env.sh ./${exe_name}
     )
   endif()
+
+  set_tests_properties(${test_name} PROPERTIES LABELS "${OMEGA_ARCH};Omega-0")
 
 endfunction()
 
