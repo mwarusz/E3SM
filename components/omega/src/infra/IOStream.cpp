@@ -909,7 +909,8 @@ int IOStream::writeFieldMeta(
    int Err = Success; // default return code
 
    // Get the field metadata entries
-   std::shared_ptr<Metadata> AllMeta = Field::getFieldMetadata(FieldName);
+   std::shared_ptr<Field> ThisField  = Field::get(FieldName);
+   std::shared_ptr<Metadata> AllMeta = ThisField->getAllMetadata();
 
    // Loop through all metadata - the Metadata type is an alias for a std::map
    // so we can use map iterators for the loop
@@ -930,7 +931,7 @@ int IOStream::writeFieldMeta(
       } else if (MetaVal.type() == typeid(R8)) {
          R8 MetaValR8 = std::any_cast<R8>(MetaVal);
          // if reduced precision is desired, convert to single (R4)
-         if (ReducePrecision) {
+         if (ReducePrecision and !ThisField->retainPrecision()) {
             R4 MetaValR4 = MetaValR8;
             Err          = IO::writeMeta(MetaName, MetaValR4, FileID, FieldID);
          } else {
@@ -989,6 +990,7 @@ int IOStream::writeFieldData(
    bool OnHost           = FieldPtr->isOnHost();
    bool IsDistributed    = FieldPtr->isDistributed();
    bool IsTimeDependent  = FieldPtr->isTimeDependent();
+   bool RetainPrecision  = FieldPtr->retainPrecision();
    ArrayDataType MyType  = FieldPtr->getType();
    int NDims             = FieldPtr->getNumDims();
    if (NDims < 0) {
@@ -1477,7 +1479,7 @@ int IOStream::writeFieldData(
          return Fail;
       }
       DataR8.resize(LocSize);
-      if (ReducePrecision) {
+      if (ReducePrecision and !RetainPrecision) {
          FillValR4  = FillValR8;
          FillValPtr = &FillValR4;
          DataR4.resize(LocSize);
@@ -1615,7 +1617,7 @@ int IOStream::writeFieldData(
          }
          break;
       } // end switch NDims
-      if (ReducePrecision) {
+      if (ReducePrecision and !RetainPrecision) {
          for (int I = 0; I < LocSize; ++I) {
             DataR4[I] = DataR8[I];
          }
@@ -2766,7 +2768,7 @@ IO::IODataType IOStream::getFieldIOType(
       ReturnType = IO::IOTypeR4;
       break;
    case ArrayDataType::R8:
-      if (ReducePrecision) {
+      if (ReducePrecision and !FieldPtr->retainPrecision()) {
          ReturnType = IO::IOTypeR4;
       } else {
          ReturnType = IO::IOTypeR8;
