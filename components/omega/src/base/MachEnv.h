@@ -29,11 +29,7 @@ namespace OMEGA {
 // blocking the inner loops. This should be set to an appropriate
 // length (typically 32, 64, 128) for CPU-only builds, but set to one for
 // GPU builds to maximize parallelism instead.
-#ifdef OMEGA_VECTOR_LENGTH
 constexpr int VecLength = OMEGA_VECTOR_LENGTH;
-#else
-constexpr int VecLength = 1;
-#endif
 
 /// The MachEnv class is a container that holds information on
 /// the message passing, threading and node environment.

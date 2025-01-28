@@ -21,6 +21,7 @@ target_compile_definitions(
     OmegaLibFlags
     INTERFACE
     OMEGA_ARCH=${OMEGA_ARCH}
+    OMEGA_VECTOR_LENGTH=${OMEGA_VECTOR_LENGTH}
 )
 
 if(OMEGA_SINGLE_PRECISION)
