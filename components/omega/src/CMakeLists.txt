@@ -54,7 +54,7 @@ target_link_libraries(
 if(GKlib_FOUND)
     target_link_libraries(
         OmegaLibFlags
-        PUBLIC
+        INTERFACE
         gklib
     )
 endif()
@@ -107,6 +107,6 @@ if(OMEGA_BUILD_EXECUTABLE)
     OmegaLibFlags
   )
 
-  set_target_properties(${OMEGA_EXE_NAME} PROPERTIES LINKER_LANGUAGE C)
+  set_target_properties(${OMEGA_EXE_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 endif()
