@@ -395,6 +395,17 @@ int writeMeta(const std::string &MetaName, // [in] name of metadata
    IODataType MetaType = IOTypeI4;
    PIO_Offset Length   = 1;
 
+   // Check to see if metadata already exists and has the same value
+   I4 TmpValue;
+   Err = PIOc_get_att(FileID, VarID, MetaName.c_str(), &TmpValue);
+   if (Err == PIO_NOERR) { // Metadata already exists, check value is same
+      if (TmpValue == MetaValue) { // no need to write
+         Err = 0;
+         return Err;
+      }
+   }
+
+   // Write the metadata
    Err = PIOc_put_att(FileID, VarID, MetaName.c_str(), MetaType, Length,
                       &MetaValue);
    if (Err != PIO_NOERR) {
@@ -417,6 +428,17 @@ int writeMeta(const std::string &MetaName, // [in] name of metadata
    IODataType MetaType = IOTypeI8;
    PIO_Offset Length   = 1;
 
+   // Check to see if metadata already exists and has the same value
+   I8 TmpValue;
+   Err = PIOc_get_att(FileID, VarID, MetaName.c_str(), &TmpValue);
+   if (Err == PIO_NOERR) { // Metadata already exists, check value is same
+      if (TmpValue == MetaValue) { // no need to write
+         Err = 0;
+         return Err;
+      }
+   }
+
+   // Write the metadata
    Err = PIOc_put_att(FileID, VarID, MetaName.c_str(), MetaType, Length,
                       &MetaValue);
    if (Err != PIO_NOERR) {
@@ -439,6 +461,17 @@ int writeMeta(const std::string &MetaName, // [in] name of metadata
    IODataType MetaType = IOTypeR4;
    PIO_Offset Length   = 1;
 
+   // Check to see if metadata already exists and has the same value
+   R4 TmpValue;
+   Err = PIOc_get_att(FileID, VarID, MetaName.c_str(), &TmpValue);
+   if (Err == PIO_NOERR) { // Metadata already exists, check value is same
+      if (TmpValue == MetaValue) { // no need to write
+         Err = 0;
+         return Err;
+      }
+   }
+
+   // Write the metadata
    Err = PIOc_put_att(FileID, VarID, MetaName.c_str(), MetaType, Length,
                       &MetaValue);
    if (Err != PIO_NOERR) {
@@ -461,6 +494,17 @@ int writeMeta(const std::string &MetaName, // [in] name of metadata
    IODataType MetaType = IOTypeR8;
    PIO_Offset Length   = 1;
 
+   // Check to see if metadata already exists and has the same value
+   R8 TmpValue;
+   Err = PIOc_get_att(FileID, VarID, MetaName.c_str(), &TmpValue);
+   if (Err == PIO_NOERR) { // Metadata already exists, check value is same
+      if (TmpValue == MetaValue) { // no need to write
+         Err = 0;
+         return Err;
+      }
+   }
+
+   // Write the metadata
    Err = PIOc_put_att(FileID, VarID, MetaName.c_str(), MetaType, Length,
                       &MetaValue);
    if (Err != PIO_NOERR) {
@@ -483,6 +527,18 @@ int writeMeta(const std::string &MetaName,  // [in] name of metadata
    IODataType MetaType = IOTypeChar;
    PIO_Offset Length   = MetaValue.length() + 1; // add 1 for char terminator
 
+   // Check to see if metadata already exists and has the same value
+   std::string TmpValue = MetaValue;
+   Err =
+       PIOc_get_att(FileID, VarID, MetaName.c_str(), (void *)TmpValue.c_str());
+   if (Err == PIO_NOERR) { // Metadata already exists, check value is same
+      if (TmpValue == MetaValue) { // no need to write
+         Err = 0;
+         return Err;
+      }
+   }
+
+   // Write the metadata
    Err = PIOc_put_att(FileID, VarID, MetaName.c_str(), MetaType, Length,
                       (void *)MetaValue.c_str());
    if (Err != PIO_NOERR) {
@@ -621,7 +677,6 @@ int defineVar(int FileID,                 // [in] ID of the file containing var
 
    // First check to see if the variable exists (if reading or if appending
    // to an existing file)
-
    Err = PIOc_inq_varid(FileID, VarName.c_str(), &VarID);
 
    // If the variable is not found, define the new variable
@@ -726,7 +781,7 @@ int readArray(void *Array,                // [out] array to be read
       return Err;
    }
 
-   if (Frame != -1) {
+   if (Frame >= 0) {
       Err = PIOc_setframe(FileID, VarID, Frame);
       if (Err != PIO_NOERR) {
          LOG_ERROR("Error setting frame while reading distributed array");
@@ -765,7 +820,7 @@ int readNDVar(void *Variable,             // [out] array to be read
       return Err;
    }
 
-   if (Frame != -1) { // time dependent field so must use get_vara
+   if (Frame >= 0) { // time dependent field so must use get_vara
 
       int NDims = DimLengths->size();
       // Start and count arguments include the unlimited time dim (Frame)
@@ -810,7 +865,7 @@ int writeArray(void *Array,     // [in] array to be written
 ) {
    int Err = 0;
 
-   if (Frame != -1) {
+   if (Frame >= 0) {
       Err = PIOc_setframe(FileID, VarID, Frame);
       if (Err != PIO_NOERR) {
          LOG_ERROR("Error setting frame while writing distributed array");
@@ -854,7 +909,7 @@ int writeNDVar(void *Variable, // [in] variable to be written
 ) {
    int Err = 0;
 
-   if (Frame != -1) { // time dependent field so must use put_vara
+   if (Frame >= 0) { // time dependent field so must use put_vara
       int NDims = DimLengths->size();
       // Start and count arguments include the unlimited time dim (Frame)
       std::vector<PIO_Offset> Start(NDims + 1, 0);

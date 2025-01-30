@@ -249,6 +249,8 @@ int IOStream::read(
       // Stream found, call the read function
       std::shared_ptr<IOStream> ThisStream = StreamItr->second;
       Err = ThisStream->readStream(ModelClock, ReqMetadata, ForceRead);
+      if (Err != 0)
+         LOG_ERROR("Error reading stream {}", StreamName);
    } else { // Stream not found
       // The response to this case must be determined by the calling routine
       // since a missing stream might be expected in some cases
@@ -567,13 +569,15 @@ int IOStream::create(const std::string &StreamName, //< [in] name of stream
       // Create time interval for files and check compatibility
       // with data IO frequency
       TimeInterval FileInt(FileFreq, FileUnits);
-      const TimeInterval *IOInt = NewStream->MyAlarm.getInterval();
-      if (FileInt < *IOInt) {
-         LOG_CRITICAL(
-             "File IO interval shorter than data IO interval for stream {}",
-             StreamName);
-         return Fail;
-      }
+      // Can't compare calendar and non-calendar intervals, so need
+      // need a better check here
+      // const TimeInterval *IOInt = NewStream->MyAlarm.getInterval();
+      // if (FileInt < *IOInt) {
+      //   LOG_CRITICAL(
+      //       "File IO interval shorter than data IO interval for stream {}",
+      //       StreamName);
+      //   return Fail;
+      //}
 
       // create and attach alarm
       std::string FileAlarmName = StreamName + "File";
@@ -688,45 +692,40 @@ int IOStream::defineAllDims(
       I4 Length = IDim->second->getLengthGlobal();
       I4 DimID;
 
-      // For input files or additional frames of a multi-frame file,
-      // we read the DimID from the file
-      if (Mode == IO::ModeRead or Frame > 0) {
-         // skip reading the unlimited time dimension
-         if (DimName == "time")
+      // First check to see if the dimension already exists in the file
+      I4 InLength;
+      Err = IO::getDimFromFile(FileID, DimName, DimID, InLength);
+      if (Err != 0) { // dim not found
+         // Try again using old name for back compatibility to MPAS
+         Err = IO::getDimFromFile(FileID, OldDimName, DimID, InLength);
+      }
+
+      // If dim is found, use this DimID and check the length for consistency
+      if (Err == 0) {
+         if (InLength != Length and Length != IO::Unlimited) {
+            LOG_ERROR("Inconsistent length for dimension {} in stream {}",
+                      DimName, Name);
+            return Fail;
+         }
+
+         // If dim is not found, define the dimension from the dim class if
+         // it is a write operation, otherwise assume the dimension is not
+         // needed
+      } else {
+
+         if (Mode == IO::Mode::ModeWrite) {
+            Err = IO::defineDim(FileID, DimName, Length, DimID);
+            if (Err != 0) {
+               LOG_ERROR("Error defining dimension {} for stream {}", DimName,
+                         Name);
+               return Fail;
+            }
+         } else {
+            Err = Success;
             continue;
-
-         // If dimension not found, only generate a warning since there
-         // may be some dimensions that are not required
-         I4 InLength;
-         Err = IO::getDimFromFile(FileID, DimName, DimID, InLength);
-         if (Err != 0) { // can't find dim in file
-            // Try again using old name for back compatibility to MPAS
-            Err = IO::getDimFromFile(FileID, OldDimName, DimID, InLength);
-            // If still not found, we skip this dimension, assuming it
-            // is not used for any variables to be read from the file. A later
-            // error check will catch any case where the dimension is actually
-            // needed but missing.
-            if (Err != 0)
-               continue;
          }
-         // Check dimension length in input file matches what is expected
-         if (InLength != Length) {
-            LOG_ERROR("Inconsistent length for dimension {} in input stream {}",
-                      DimName, Name);
-            return Fail;
-         }
-      } // end read case
 
-      // For output files, we need to define the dimension
-      if (Mode == IO::ModeWrite and Frame < 1) {
-
-         Err = IO::defineDim(FileID, DimName, Length, DimID);
-         if (Err != 0) {
-            LOG_ERROR("Error defining dimension {} for output stream {}",
-                      DimName, Name);
-            return Fail;
-         }
-      } // end write case
+      } // end if found in file
 
       // Add the DimID to map for later use
       AllDimIDs[DimName] = DimID;
@@ -1631,10 +1630,16 @@ int IOStream::writeFieldData(
 
    } // end switch data type
 
+   // In the case where the field is not time-dependent but this is
+   // a multi-slice file, we reset the Frame temporarily for this field
+   int FldFrame = Frame; // default time slice for file
+   if (!IsTimeDependent)
+      FldFrame = -1;
+
    // Write the data
    if (IsDistributed) {
       Err = OMEGA::IO::writeArray(DataPtr, LocSize, FillValPtr, FileID,
-                                  MyDecompID, FieldID, Frame);
+                                  MyDecompID, FieldID, FldFrame);
       if (Err != 0) {
          LOG_ERROR("Error writing data array for field {} in stream {}",
                    FieldName, Name);
@@ -1650,7 +1655,8 @@ int IOStream::writeFieldData(
       }
 
    } else {
-      Err = OMEGA::IO::writeNDVar(DataPtr, FileID, FieldID, Frame, &DimLengths);
+      Err = OMEGA::IO::writeNDVar(DataPtr, FileID, FieldID, FldFrame,
+                                  &DimLengths);
       if (Err != 0) {
          LOG_ERROR(
              "Error writing non-distributed data for field {} in stream {}",
@@ -2506,43 +2512,21 @@ int IOStream::writeStream(
       }
    }
 
-   // Get current simulation time and time string
+   // Get start time, current simulation time and time string
+   TimeInstant StartTime  = ModelClock->getStartTime();
    TimeInstant SimTime    = ModelClock->getCurrentTime();
    std::string SimTimeStr = SimTime.getString(4, 0, "_");
 
-   // Determine whether we need to append or create a new file and which
-   // time to use for filename. For streams that do not write multiple frames,
-   // we default to the current time and use the stream's default ExistAction.
+   // Determine the time to use for the filename. The default is to
+   // use the current time.
+   TimeInstant FileTime = ModelClock->getCurrentTime();
    // For streams that need to write multiple frames or time slices per file,
-   // there are two cases. If it is time to open a new file, we use the
-   // current time but must modify the file existence behavior to create a new
-   // file. If we are writing a new frame/slice to an existing file, we keep
-   // the default Append option for file existence, but the filename is
-   // associated with the time the old file was created which should be the
-   // last file alarm time. Is this case, we also need to determine which
-   // frame/slice we are writing.
-   Frame                   = 0;
-   TimeInstant FileTime    = ModelClock->getCurrentTime();
-   IO::IfExists FileExists = ExistAction; // use stream default
-   if (Multiframe) {
-      if (FileAlarm.isRinging()) { // time for a new file
-         FileExists = IO::IfExists::Replace;
-         // keep current time as FileTime
-      } else {
-         FileTime = *(FileAlarm.getRingTimePrev());
-         // keep default ExistAction which should be Append
-         const TimeInterval *DataInterval = MyAlarm.getInterval();
-         const TimeInterval FileInterval  = (SimTime - FileTime);
-         R8 DataIntR8;
-         R8 FileIntR8;
-         Err   = DataInterval->get(DataIntR8, TimeUnits::Seconds);
-         Err   = FileInterval.get(FileIntR8, TimeUnits::Seconds);
-         Frame = std::round(FileIntR8 / DataIntR8);
-      }
-   }
+   // and it is not time for a new file, then we use the time the file was
+   // started which should be the last file alarm time.
+   if (Multiframe and !FileAlarm.isRinging())
+      FileTime = *(FileAlarm.getRingTimePrev());
 
    // Update the time field with elapsed time since simulation start
-   TimeInstant StartTime    = ModelClock->getStartTime();
    TimeInterval ElapsedTime = SimTime - StartTime;
    R8 ElapsedTimeR8;
    Err = ElapsedTime.get(ElapsedTimeR8, TimeUnits::Seconds);
@@ -2570,12 +2554,59 @@ int IOStream::writeStream(
    // Open output file
    int OutFileID;
    Err = OMEGA::IO::openFile(OutFileID, OutFileName, Mode, IO::FmtDefault,
-                             FileExists);
+                             ExistAction);
    if (Err != 0) {
       LOG_ERROR("IOStream::write: error opening file {} for output",
                 OutFileName);
       return Fail;
    }
+
+   // For files with multiple frames or time slices, we need to determine the
+   // default Frame number for time-dependent fields. If the frame/time already
+   // exists in the file, we assume we are re-running the time period and
+   // should over-write the existing frame. Otherwise, the new frame is the
+   // next frame in the sequence.
+   Frame = 0; // default is one frame in file
+   if (Multiframe) {
+      // Get the current number of frames in the file - the length of the
+      // unlimited time dimension
+      I4 TimeDimID;
+      I4 NFrames;
+      Err = IO::getDimFromFile(OutFileID, "time", TimeDimID, NFrames);
+      if (Err != 0 or NFrames == 0) {
+         // If there is an error, we assume this is a new file in which
+         // the dimension has not yet been written. Similarly, if NFrames is 0,
+         // no frames have yet been written. In both cases, this is the first
+         // frame in the file.
+         Frame = 0;
+      } else {
+         // If there are frames in the file, we read the elapsed time for each
+         // frame to determine whether the current slice already exists. If
+         // equal (within roundoff), the slice exists and we overwrite with
+         // the current frame. Otherwise, increment to the next frame
+         R8 FrameTime;
+         int TmpID;
+         std::vector<int> TmpDimLengths; // empty dim length for scalar time
+         for (int IFrame = 0; IFrame < NFrames; ++IFrame) {
+            Err = IO::readNDVar(&FrameTime, "time", OutFileID, TmpID, IFrame,
+                                &TmpDimLengths);
+            if (Err != 0)
+               LOG_ERROR("Error reading frame time in {}", OutFileName);
+            if (std::abs(ElapsedTimeR8 - FrameTime) < 1.e-5) { // overwrite
+               Frame = IFrame;
+               break;
+            } else if (ElapsedTimeR8 > FrameTime) { // move to next frame
+               Frame = IFrame + 1;
+            } else { // time is earlier but doesn't match any frames
+               LOG_CRITICAL("Existing multiframe file {} appears to be using "
+                            "different time intervals or is from the wrong "
+                            "time period",
+                            OutFileName);
+               return Fail;
+            } // end if elapsed time matches
+         } // end loop over existing frames
+      } // end if nframes
+   } // end if multiframe
 
    // Write Metadata for global metadata (Code and Simulation)
    // Only needs to be written for a new file
@@ -2685,13 +2716,6 @@ int IOStream::writeStream(
             return Fail;
          }
       }
-   }
-
-   // End define mode
-   Err = IO::endDefinePhase(OutFileID);
-   if (Err != 0) {
-      LOG_ERROR("Error ending define phase for stream {}", Name);
-      return Fail;
    }
 
    // Now write data arrays for all fields in contents
