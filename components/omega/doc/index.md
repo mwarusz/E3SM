@@ -80,6 +80,7 @@ devGuide/TimeMgr
 devGuide/TimeStepping
 devGuide/Reductions
 devGuide/Tracers
+devGuide/TridiagonalSolvers
 ```
 
 ```{toctree}
