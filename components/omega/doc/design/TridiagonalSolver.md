@@ -29,10 +29,10 @@ There should be one module that provides tridiagonal solvers that are sufficient
 A specialized solver that is stable for vertical mixing problems with large variations in mixing coefficients must be
 provided.
 
-### 2.3 Requirement: Bottom boundary conditions
+### 2.3 Requirement: Top and bottom boundary conditions
 
 When applied to the implicit vertical mixing of momentum, the specialized diffusion solver should be
-sufficiently general to be able to incorporate various bottom drag formulations.
+sufficiently general to be able to incorporate various bottom drag and wind stress formulations.
 
 ### 2.4 Requirement: Performance
 
