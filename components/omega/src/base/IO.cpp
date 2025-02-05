@@ -528,13 +528,20 @@ int writeMeta(const std::string &MetaName,  // [in] name of metadata
    PIO_Offset Length   = MetaValue.length() + 1; // add 1 for char terminator
 
    // Check to see if metadata already exists and has the same value
-   std::string TmpValue = MetaValue;
-   Err =
-       PIOc_get_att(FileID, VarID, MetaName.c_str(), (void *)TmpValue.c_str());
-   if (Err == PIO_NOERR) { // Metadata already exists, check value is same
-      if (TmpValue == MetaValue) { // no need to write
-         Err = 0;
-         return Err;
+   // For strings, we need to get the length first to make sure the
+   // string is long enough to read the value
+   PIO_Offset TmpLength;
+   Err = PIOc_inq_attlen(FileID, VarID, MetaName.c_str(), &TmpLength);
+   if (Err == PIO_NOERR and TmpLength > 0) { // Metadata exists and has length
+      std::string TmpValue;
+      TmpValue.resize(TmpLength);
+      Err = PIOc_get_att(FileID, VarID, MetaName.c_str(),
+                         (void *)TmpValue.c_str());
+      if (Err == PIO_NOERR) {
+         if (TmpValue == MetaValue) { // no need to write
+            Err = 0;
+            return Err;
+         }
       }
    }
 
