@@ -45,6 +45,7 @@ userGuide/TimeMgr
 userGuide/TimeStepping
 userGuide/Reductions
 userGuide/Tracers
+userGuide/TridiagonalSolvers
 ```
 
 ```{toctree}
