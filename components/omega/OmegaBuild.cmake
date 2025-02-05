@@ -82,7 +82,9 @@ macro(read_cime_config)
     set(NEWCASE_COMMAND "${NEWCASE_COMMAND} --project ${OMEGA_CIME_PROJECT}")
   endif()
 
-  run_bash_command("${NEWCASE_COMMAND}" NEWCASE_OUTPUT)
+  if(NOT IS_DIRECTORY "${CASEROOT}")
+    run_bash_command("${NEWCASE_COMMAND}" NEWCASE_OUTPUT)
+  endif()
   run_bash_command("cd ${CASEROOT} && ./case.setup" CASESETUP_OUTPUT)
   run_bash_command("source ${CASEROOT}/.env_mach_specific.sh && env" ENV_OUTPUT)
 
@@ -301,7 +303,7 @@ macro(init_standalone_build)
   file(WRITE ${_RunScript}  "#!/usr/bin/env bash\n\n")
   file(APPEND ${_RunScript} "source ./omega_env.sh\n\n")
   list(JOIN OMEGA_MPI_ARGS " " OMEGA_MPI_ARGS_STR)
-  file(APPEND ${_RunScript} "${OMEGA_MPI_EXEC} ${OMEGA_MPI_ARGS_STR} -n 8 -- ./src/omega.exe\n\n")
+  file(APPEND ${_RunScript} "cd test; ${OMEGA_MPI_EXEC} ${OMEGA_MPI_ARGS_STR} -n 8 -- ../src/omega.exe\n\n")
 
   # create a ctest script
   set(_CtestScript ${OMEGA_BUILD_DIR}/omega_ctest.sh)
@@ -663,10 +665,6 @@ macro(update_variables)
   endif()
 
   add_definitions(-DOMEGA_ENABLE_${OMEGA_ARCH})
-
-  if(OMEGA_MPI_ON_DEVICE AND OMEGA_TARGET_DEVICE AND "${MPILIB_NAME}" STREQUAL "mpich")
-    file(APPEND ${_EnvScript} "export MPICH_GPU_SUPPORT_ENABLED=1\n\n")
-  endif()
 
   if(OMEGA_TARGET_DEVICE)
     add_definitions(-DOMEGA_TARGET_DEVICE)
