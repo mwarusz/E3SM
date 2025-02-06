@@ -48,7 +48,7 @@ execute_process(
 )
 
 set (CTEST_SITE "${MACHINE}")
-set (CTEST_BUILD_GROUP "Unit-test")
+set (CTEST_BUILD_GROUP "Omega Unit-test")
 set (CTEST_BUILD_NAME "unitest-${GIT_BRANCH}-${COMPILER}")
 
 set (CTEST_UPDATE_COMMAND "git")
@@ -102,7 +102,8 @@ ctest_test(
   CAPTURE_CMAKE_ERROR TestResult
 )
 
-set(CTEST_SUBMIT_URL "https://my.cdash.org/submit.php?project=omega")
+#set(CTEST_SUBMIT_URL "https://my.cdash.org/submit.php?project=omega")
+set(CTEST_SUBMIT_URL "https://my.cdash.org/submit.php?project=e3sm")
 ctest_submit(
   RETURN_VALUE SubmitRetval
   CAPTURE_CMAKE_ERROR SubmitResult
