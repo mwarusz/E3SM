@@ -220,7 +220,12 @@ the MetaValue is the value of the MetaData. All supported Omega data types are
 allowed except boolean which must be converted to an integer type. The FileID
 is once again the ID of the open data file and VarID is the variable to which
 this metadata is attached. For global file and simulation metadata not attached
-to a variable, the ID ``IO::GlobalID`` is used to denote global metadata.
+to a variable, the ID ``IO::GlobalID`` is used to denote global metadata. If
+data is being appended to a file (eg for multiple time slices), writeMeta will
+check first to see if metadata already exists with the same value. If the
+entry is absent, new metadata will be written. If it exists but with a
+different value, the writeMeta function will replace the current entry with
+the new value.
 
 For an example of the full read/write process, the IO unit test contains
 the full reading and writing of a data file and associated metadata. We

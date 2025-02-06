@@ -95,7 +95,8 @@ a template can be:
    - Fail if you want the code to exit with an error
    - Replace if you want to replace the existing file with the new file
    - Append if you want to append (eg multiple time slices) to the existing
-     file
+     file. When re-running an interval, this will also over-write existing
+     slices corresponding to the simulation time if they exist in the file.
 - **Precision:** A field that determines whether floating point numbers are
    written in full (double) precision or reduced (single). Acceptable values
    are double or single. If not present, double is assumed, but a warning
@@ -118,7 +119,7 @@ a template can be:
    - Seconds for a frequency every Freq seconds (*not* Freq times per seconds)
 - **FileFreq:** An optional entry for including multiple time slices in a
    single file (only supported for output presently)
-- **FreqUnits:** A field that, combined with the integer frequency,
+- **FileFreqUnits:** A field that, combined with the integer frequency,
    determines the frequency of new files when multiple time slices are
    included in a file. The file frequency must be less than or equal to
    the data frequency. Acceptable values include all of the frequency values
