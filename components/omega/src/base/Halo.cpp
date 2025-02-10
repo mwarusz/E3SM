@@ -671,10 +671,10 @@ int Halo::startReceives(const bool UseDevBuffer) {
          // If both flags  are true, the device buffer will receive the message,
          // otherwise the host buffer will.
          if (UseDevBuffer && ExchOnDev) {
-            Kokkos::resize(LocNeighbor.RecvBuffer, BufferSize);
+            expandBuffer(LocNeighbor.RecvBuffer, BufferSize);
             DataPtr = LocNeighbor.RecvBuffer.data();
          } else {
-            Kokkos::resize(LocNeighbor.RecvBufferH, BufferSize);
+            expandBuffer(LocNeighbor.RecvBufferH, BufferSize);
             DataPtr = LocNeighbor.RecvBufferH.data();
          }
 
@@ -723,8 +723,15 @@ int Halo::startSends(const bool UseDevBuffer) {
             if (ExchOnDev) {
                DataPtr = LocNeighbor.SendBuffer.data();
             } else {
-               Kokkos::resize(LocNeighbor.SendBufferH, BufferSize);
-               deepCopy(LocNeighbor.SendBufferH, LocNeighbor.SendBuffer);
+               expandBuffer(LocNeighbor.SendBufferH, BufferSize);
+
+               // The number of elements we need to copy is different
+               // than the buffer allocation size
+               auto CopyRange = Kokkos::make_pair(0, BufferSize);
+
+               deepCopy(Kokkos::subview(LocNeighbor.SendBufferH, CopyRange),
+                        Kokkos::subview(LocNeighbor.SendBuffer, CopyRange));
+
                DataPtr = LocNeighbor.SendBufferH.data();
             }
          } else {
