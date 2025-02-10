@@ -773,9 +773,11 @@ class Halo {
       startSends(UseDevBuffer);
 
       // Wait for all sends to complete before proceeding
+      std::vector<MPI_Request> SendReqs;
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
          if (SendFlags[CurElem][INghbr]) {
-            MPI_Wait(&Neighbors[INghbr].SReq, MPI_STATUS_IGNORE);
+            // MPI_Wait(&Neighbors[INghbr].SReq, MPI_STATUS_IGNORE);
+            SendReqs.push_back(Neighbors[INghbr].SReq);
          }
       }
 
@@ -834,6 +836,7 @@ class Halo {
       }
 
       Kokkos::fence();
+      MPI_Waitall(SendReqs.size(), SendReqs.data(), MPI_STATUS_IGNORE);
 
       return IErr;
    } // end exchangeFullArrayHalo
