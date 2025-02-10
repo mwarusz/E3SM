@@ -86,8 +86,8 @@ auto createDeviceMirrorCopy(const V &view)
 }
 
 // function alias to follow Camel Naming Convention
-template <typename D, typename S> void deepCopy(D &dst, const S &src) {
-   Kokkos::deep_copy(dst, src);
+template <typename D, typename S> void deepCopy(D &&dst, S &&src) {
+   Kokkos::deep_copy(std::forward<D>(dst), std::forward<S>(src));
 }
 
 template <typename E, typename D, typename S>
