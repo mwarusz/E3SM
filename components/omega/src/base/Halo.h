@@ -93,6 +93,8 @@ class Halo {
    /// exchange in any index space.
    std::vector<Neighbor> Neighbors;
 
+   std::vector<ExecSpace> Spaces;
+
    /// Sorted list of Task IDs of all neighboring tasks in ascending order.
    /// Another task is considered a neighbor if a mesh element owned by that
    /// task is in the halo of the local task in at least one index space, or if
@@ -294,8 +296,8 @@ class Halo {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          expandBuffer(LocNeighbor.SendBuffer, BufferSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
-         parallelFor(
-             {LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
+         parallelForSpace(
+             Spaces[CurNeighbor], {LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
                 auto Val       = Array(LocIndex(IExch));
                 const R8 RVal  = reinterpret_cast<R8 &>(Val);
                 LocBuff(IExch) = RVal;
@@ -329,8 +331,9 @@ class Halo {
          expandBuffer(LocNeighbor.SendBuffer, BufferSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
 
-         parallelFor(
-             {LocList.NTot, NJ}, KOKKOS_LAMBDA(int IExch, int J) {
+         parallelForSpace(
+             Spaces[CurNeighbor], {LocList.NTot, NJ},
+             KOKKOS_LAMBDA(int IExch, int J) {
                 auto Val       = Array(LocIndex(IExch), J);
                 const R8 RVal  = reinterpret_cast<R8 &>(Val);
                 const I4 IBuff = IExch * NJ + J;
@@ -371,8 +374,9 @@ class Halo {
          expandBuffer(LocNeighbor.SendBuffer, BufferSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
 
-         parallelFor(
-             {NK, NTotList, NJ}, KOKKOS_LAMBDA(int K, int IExch, int J) {
+         parallelForSpace(
+             Spaces[CurNeighbor], {NK, NTotList, NJ},
+             KOKKOS_LAMBDA(int K, int IExch, int J) {
                 auto Val       = Array(K, LocIndex(IExch), J);
                 const R8 RVal  = reinterpret_cast<R8 &>(Val);
                 const I4 IBuff = (K * NTotList + IExch) * NJ + J;
@@ -416,8 +420,8 @@ class Halo {
          expandBuffer(LocNeighbor.SendBuffer, BufferSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
 
-         parallelFor(
-             {NL, NK, NTotList, NJ},
+         parallelForSpace(
+             Spaces[CurNeighbor], {NL, NK, NTotList, NJ},
              KOKKOS_LAMBDA(int L, int K, int IExch, int J) {
                 auto Val       = Array(L, K, LocIndex(IExch), J);
                 const R8 RVal  = reinterpret_cast<R8 &>(Val);
@@ -466,8 +470,8 @@ class Halo {
          expandBuffer(LocNeighbor.SendBuffer, BufferSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
 
-         parallelFor(
-             {NM, NL, NK, NTotList, NJ},
+         parallelForSpace(
+             Spaces[CurNeighbor], {NM, NL, NK, NTotList, NJ},
              KOKKOS_LAMBDA(int M, int L, int K, int IExch, int J) {
                 auto Val      = Array(M, L, K, LocIndex(IExch), J);
                 const R8 RVal = reinterpret_cast<R8 &>(Val);
@@ -516,8 +520,8 @@ class Halo {
       if (devBufferPUP(Array)) {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
-         parallelFor(
-             {LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
+         parallelForSpace(
+             Spaces[CurNeighbor], {LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
                 const I4 IArr = LocIndex(IExch);
                 Array(IArr)   = reinterpret_cast<ValType &>(LocBuff(IExch));
              });
@@ -548,8 +552,9 @@ class Halo {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
 
-         parallelFor(
-             {LocList.NTot, NJ}, KOKKOS_LAMBDA(int IExch, int J) {
+         parallelForSpace(
+             Spaces[CurNeighbor], {LocList.NTot, NJ},
+             KOKKOS_LAMBDA(int IExch, int J) {
                 const I4 IBuff = IExch * NJ + J;
                 const I4 IArr  = LocIndex(IExch);
                 Array(IArr, J) = reinterpret_cast<ValType &>(LocBuff(IBuff));
@@ -587,8 +592,9 @@ class Halo {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
 
-         parallelFor(
-             {NK, NTotList, NJ}, KOKKOS_LAMBDA(int K, int IExch, int J) {
+         parallelForSpace(
+             Spaces[CurNeighbor], {NK, NTotList, NJ},
+             KOKKOS_LAMBDA(int K, int IExch, int J) {
                 const I4 IBuff    = (K * NTotList + IExch) * NJ + J;
                 const I4 IArr     = LocIndex(IExch);
                 Array(K, IArr, J) = reinterpret_cast<ValType &>(LocBuff(IBuff));
@@ -630,8 +636,8 @@ class Halo {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
 
-         parallelFor(
-             {NL, NK, NTotList, NJ},
+         parallelForSpace(
+             Spaces[CurNeighbor], {NL, NK, NTotList, NJ},
              KOKKOS_LAMBDA(int L, int K, int IExch, int J) {
                 const I4 IBuff = ((L * NK + K) * NTotList + IExch) * NJ + J;
                 const I4 IArr  = LocIndex(IExch);
@@ -679,8 +685,8 @@ class Halo {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
 
-         parallelFor(
-             {NM, NL, NK, NTotList, NJ},
+         parallelForSpace(
+             Spaces[CurNeighbor], {NM, NL, NK, NTotList, NJ},
              KOKKOS_LAMBDA(int M, int L, int K, int IExch, int J) {
                 const I4 IBuff =
                     (((M * NL + L) * NK + K) * NTotList + IExch) * NJ + J;
@@ -835,7 +841,11 @@ class Halo {
          }
       }
 
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         Spaces[INghbr].fence();
+      }
       Kokkos::fence();
+
       MPI_Waitall(SendReqs.size(), SendReqs.data(), MPI_STATUS_IGNORE);
 
       return IErr;

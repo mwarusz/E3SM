@@ -138,6 +138,24 @@ inline void parallelFor(const int (&upper_bounds)[N], const F &f,
    parallelFor("", upper_bounds, f, tile);
 }
 
+// parallelFor: with space
+template <class Exec, int N, class F, class... Args>
+inline void parallelForSpace(const Exec &exec, const int (&upper_bounds)[N],
+                             const F &f,
+                             const int (&tile)[N] = DefaultTile<N>::value) {
+   if constexpr (N == 1) {
+      const auto policy =
+          Kokkos::RangePolicy<Args...>(exec, 0, upper_bounds[0]);
+      Kokkos::parallel_for("", policy, f);
+
+   } else {
+      const int lower_bounds[N] = {0};
+      const auto policy =
+          Bounds<N, Args...>(exec, lower_bounds, upper_bounds, tile);
+      Kokkos::parallel_for("", policy, f);
+   }
+}
+
 // parallelReduce: with label
 template <int N, class F, class R, class... Args>
 inline void parallelReduce(const std::string &label,

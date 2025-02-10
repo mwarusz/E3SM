@@ -198,6 +198,8 @@ Halo::Halo(const std::string &Name, const MachEnv *InEnv,
                                    NeighborList[INghbr]));
    }
 
+   std::vector<I4> SpaceWeights(NNghbr, 1);
+   Spaces = Kokkos::Experimental::partition_space(ExecSpace(), SpaceWeights);
 } // end Halo constructor
 
 /// Creates a new halo by calling the constructor and puts it in the AllHalos
@@ -703,8 +705,12 @@ int Halo::startSends(const bool UseDevBuffer) {
 
    I4 Err{0}; // Error code to return
 
-   if (UseDevBuffer)
+   if (UseDevBuffer) {
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         Spaces[INghbr].fence();
+      }
       Kokkos::fence();
+   }
 
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
       if (SendFlags[CurElem][INghbr]) {
