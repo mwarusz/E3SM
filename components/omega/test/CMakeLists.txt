@@ -433,3 +433,14 @@ add_omega_test(
     base/TriDiagSolversTest.cpp
     "-n;1"
 )
+
+##################
+# Perf test
+##################
+
+add_omega_test(
+    PERF_TEST
+    testPerf.exe
+    perf/PerfTest.cpp
+    "-n;8"
+)
