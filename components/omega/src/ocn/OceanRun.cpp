@@ -8,6 +8,7 @@
 #include "IOStream.h"
 #include "OceanDriver.h"
 #include "OceanState.h"
+#include "Pacer.h"
 #include "TimeMgr.h"
 #include "TimeStepper.h"
 
@@ -32,8 +33,14 @@ int ocnRun(TimeInstant &CurrTime ///< [inout] current sim time
    // Get Simulation metadata field for later updates
    std::shared_ptr<Field> SimInfo = Field::get(SimMeta);
 
+   DefTimeStepper->doStep(DefOceanState, SimTime);
+
    // time loop, integrate until EndAlarm or error encountered
    I8 IStep = 0;
+
+   MPI_Barrier(MPI_COMM_WORLD);
+   Kokkos::fence();
+   Pacer::start("TimeLoop");
    while (Err == 0 && !(EndAlarm->isRinging())) {
 
       // track step count
@@ -55,6 +62,9 @@ int ocnRun(TimeInstant &CurrTime ///< [inout] current sim time
       LOG_INFO("ocnRun: Time step {} complete, clock time: {}", IStep,
                SimTime.getString(4, 4, "-"));
    }
+   Kokkos::fence();
+   MPI_Barrier(MPI_COMM_WORLD);
+   Pacer::stop("TimeLoop");
 
    return Err;
 
