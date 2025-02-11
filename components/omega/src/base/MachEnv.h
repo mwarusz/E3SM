@@ -30,6 +30,8 @@ namespace OMEGA {
 // length (typically 32, 64, 128) for CPU-only builds, but set to one for
 // GPU builds to maximize parallelism instead.
 constexpr int VecLength = OMEGA_VECTOR_LENGTH;
+#define OMEGA_SIMD_PRAGMA
+// #define OMEGA_SIMD_PRAGMA _Pragma("omp simd")
 
 /// The MachEnv class is a container that holds information on
 /// the message passing, threading and node environment.
