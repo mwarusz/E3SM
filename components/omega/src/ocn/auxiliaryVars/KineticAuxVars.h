@@ -29,6 +29,7 @@ class KineticAuxVars {
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const int JEdge     = EdgesOnCell(ICell, J);
          const Real AreaEdge = 0.5_Real * DvEdge(JEdge) * DcEdge(JEdge);
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const int K = KStart + KVec;
             KineticEnergyCellTmp[KVec] += AreaEdge * 0.5_Real * InvAreaCell *
@@ -39,6 +40,7 @@ class KineticAuxVars {
                                         NormalVelEdge(JEdge, K);
          }
       }
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const int K                 = KStart + KVec;
          KineticEnergyCell(ICell, K) = KineticEnergyCellTmp[KVec];

@@ -32,6 +32,7 @@ class VelocityDel2AuxVars {
       const Real InvDvEdge =
           1._Real / Kokkos::max(DvEdge(IEdge), 0.25_Real * DcEdge(IEdge));
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const int K = KStart + KVec;
          const Real GradDiv =
@@ -53,6 +54,7 @@ class VelocityDel2AuxVars {
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const int JEdge     = EdgesOnCell(ICell, J);
          const Real AreaEdge = 0.5_Real * DvEdge(JEdge) * DcEdge(JEdge);
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const int K = KStart + KVec;
             Del2DivCellTmp[KVec] -= DvEdge(JEdge) * InvAreaCell *
@@ -60,6 +62,7 @@ class VelocityDel2AuxVars {
                                     Del2Edge(JEdge, K);
          }
       }
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const int K           = KStart + KVec;
          Del2DivCell(ICell, K) = Del2DivCellTmp[KVec];
@@ -74,6 +77,7 @@ class VelocityDel2AuxVars {
 
       for (int J = 0; J < VertexDegree; ++J) {
          const int JEdge = EdgesOnVertex(IVertex, J);
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const int K = KStart + KVec;
             Del2RelVortVertexTmp[KVec] += InvAreaTriangle * DcEdge(JEdge) *
@@ -82,6 +86,7 @@ class VelocityDel2AuxVars {
          }
       }
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const int K                   = KStart + KVec;
          Del2RelVortVertex(IVertex, K) = Del2RelVortVertexTmp[KVec];
