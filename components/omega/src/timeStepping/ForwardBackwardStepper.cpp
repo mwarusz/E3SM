@@ -68,17 +68,25 @@ void ForwardBackwardStepper::doStep(
    // Update time levels (New -> Old) of prognostic variables with halo
    // exchanges
 
-   const auto Comm = MachEnv::getDefault()->getComm();
-   MPI_Barrier(Comm);
-   Kokkos::fence();
-   Pacer::start("updateTimeLevels");
+   static int step = 0;
 
-   State->updateTimeLevels();
-   Tracers::updateTimeLevels();
+   if (step == 0) {
+      State->updateTimeLevels();
+      Tracers::updateTimeLevels();
+      step++;
+   } else {
+      const auto Comm = MachEnv::getDefault()->getComm();
+      MPI_Barrier(Comm);
+      Kokkos::fence();
+      Pacer::start("updateTimeLevels");
 
-   Pacer::stop("updateTimeLevels");
-   Kokkos::fence();
-   MPI_Barrier(Comm);
+      State->updateTimeLevels();
+      Tracers::updateTimeLevels();
+
+      Pacer::stop("updateTimeLevels");
+      Kokkos::fence();
+      MPI_Barrier(Comm);
+   }
 
    // Advance the clock and update the simulation time
    Err     = StepClock->advance();
