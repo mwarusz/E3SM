@@ -32,6 +32,7 @@ class TracerAuxVars {
 
       switch (TracersOnEdgeChoice) {
       case FluxTracerEdgeOption::Center:
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const int K = KStart + KVec;
             HTracersEdge(L, IEdge, K) =
@@ -40,6 +41,7 @@ class TracerAuxVars {
          }
          break;
       case FluxTracerEdgeOption::Upwind:
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const int K = KStart + KVec;
             if (NormalVelEdge(IEdge, K) > 0) {
@@ -76,6 +78,7 @@ class TracerAuxVars {
 
          const Real DvDcEdge = DvEdge(JEdge) / DcEdge(JEdge);
 
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const int K           = KStart + KVec;
             const Real TracerGrad = TrCell(L, JCell1, K) - TrCell(L, JCell0, K);
@@ -83,6 +86,7 @@ class TracerAuxVars {
                                    LayerThickEdgeMean(JEdge, K) * TracerGrad;
          }
       }
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const int K                  = KStart + KVec;
          Del2TracersCell(L, ICell, K) = Del2TrCellTmp[KVec] * InvAreaCell;

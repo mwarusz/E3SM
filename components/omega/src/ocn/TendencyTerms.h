@@ -43,6 +43,7 @@ class ThicknessFluxDivOnCell {
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const I4 K = KStart + KVec;
             DivTmp[KVec] -= DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
@@ -51,6 +52,7 @@ class ThicknessFluxDivOnCell {
          }
       }
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(ICell, K) -= DivTmp[KVec];
@@ -89,6 +91,7 @@ class PotentialVortHAdvOnEdge {
 
       for (int J = 0; J < NEdgesOnEdge(IEdge); ++J) {
          I4 JEdge = EdgesOnEdge(IEdge, J);
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const I4 K    = KStart + KVec;
             Real NormVort = (NormRVortEdge(IEdge, K) + NormFEdge(IEdge, K) +
@@ -101,6 +104,7 @@ class PotentialVortHAdvOnEdge {
          }
       }
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(IEdge, K) += VortTmp[KVec];
@@ -131,6 +135,7 @@ class KEGradOnEdge {
       const I4 JCell1      = CellsOnEdge(IEdge, 1);
       const Real InvDcEdge = 1._Real / DcEdge(IEdge);
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(IEdge, K) -= (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
@@ -161,6 +166,7 @@ class SSHGradOnEdge {
       const I4 ICell1      = CellsOnEdge(IEdge, 1);
       const Real InvDcEdge = 1._Real / DcEdge(IEdge);
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(IEdge, K) -=
@@ -201,6 +207,7 @@ class VelocityDiffusionOnEdge {
       const Real DcEdgeInv = 1._Real / DcEdge(IEdge);
       const Real DvEdgeInv = 1._Real / DvEdge(IEdge);
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
          const Real Del2U =
@@ -250,6 +257,7 @@ class VelocityHyperDiffOnEdge {
       const Real DcEdgeInv = 1._Real / DcEdge(IEdge);
       const Real DvEdgeInv = 1._Real / DvEdge(IEdge);
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
          const Real Del2U =
@@ -291,6 +299,7 @@ class TracerHorzAdvOnCell {
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
 
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const I4 K = KStart + KVec;
             HAdvTmp[KVec] -= DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
@@ -298,6 +307,7 @@ class TracerHorzAdvOnCell {
                              NormVelEdge(JEdge, K) * InvAreaCell;
          }
       }
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(L, ICell, K) -= HAdvTmp[KVec];
@@ -341,6 +351,7 @@ class TracerDiffOnCell {
          const Real RTemp =
              MeshScalingDel2(JEdge) * DvEdge(JEdge) / DcEdge(JEdge);
 
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const I4 K = KStart + KVec;
             const Real TracerGrad =
@@ -350,6 +361,7 @@ class TracerDiffOnCell {
                              MeanLayerThickEdge(JEdge, K) * TracerGrad;
          }
       }
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(L, ICell, K) += EddyDiff2 * DiffTmp[KVec] * InvAreaCell;
@@ -394,6 +406,7 @@ class TracerHyperDiffOnCell {
          const Real RTemp =
              MeshScalingDel4(JEdge) * DvEdge(JEdge) / DcEdge(JEdge);
 
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const I4 K = KStart + KVec;
             const Real Del2TrGrad =
@@ -402,6 +415,7 @@ class TracerHyperDiffOnCell {
             HypTmp[KVec] -= EdgeSignOnCell(ICell, J) * RTemp * Del2TrGrad;
          }
       }
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(L, ICell, K) -= EddyDiff4 * HypTmp[KVec] * InvAreaCell;

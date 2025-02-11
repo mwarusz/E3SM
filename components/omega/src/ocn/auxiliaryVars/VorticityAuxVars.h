@@ -35,6 +35,7 @@ class VorticityAuxVars {
          const int JCell = CellsOnVertex(IVertex, J);
          const int JEdge = EdgesOnVertex(IVertex, J);
 
+         OMEGA_SIMD_PRAGMA
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const int K = KStart + KVec;
             LayerThickVertex[KVec] += InvAreaTriangle *
@@ -46,6 +47,7 @@ class VorticityAuxVars {
          }
       }
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const int K                    = KStart + KVec;
          const Real InvLayerThickVertex = 1._Real / LayerThickVertex[KVec];
@@ -63,6 +65,7 @@ class VorticityAuxVars {
       const int JVertex0 = VerticesOnEdge(IEdge, 0);
       const int JVertex1 = VerticesOnEdge(IEdge, 1);
 
+      OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const int K = KStart + KVec;
          NormRelVortEdge(IEdge, K) =
