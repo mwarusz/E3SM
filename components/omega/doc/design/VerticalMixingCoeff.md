@@ -41,13 +41,13 @@ $$
 where $N^2$ is the Brunt Vaisala Frequency, which for non Boussinesq flows is defined as
 
 $$
-N^2 = \frac{g}{\rho}\frac{\partial \rho}{\partial z}
+N^2 = \frac{g}{\rho_0}\frac{\partial \rho}{\partial z}
 $$
 
 This term is discretized as
 
 $$
-N^2(k) = g \frac{\ln \rho_{DD}(k) - \ln \rho(k)}{z_m(k-1) - z_m(k)}
+N^2(k) = g \rho_0 \frac{\rho_{DD}(k) - \rho(k)}{z_m(k-1) - z_m(k)}
 $$
 
 Here $\rho_{DD}$ is the density of the fluid of layer k-1 displaced to layer k adiabatically.
