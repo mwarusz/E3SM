@@ -6,7 +6,7 @@ Representation of unresolved vertical fluxes of momentum, heat, salt, and biogeo
 
 ## 2 Requirements
 
-### 2.1 Requirement: Vertical mixing interface should be modular
+### 2.1 Requirement: Vertical mixing coefficient interface should be modular
 
 To prepare for additional mixing closures and later improvements, the interface to vertical mixing must allow for easy connection of closures. It is assumed that the strength of vertical mixing from each closure is additive, such that the final vertical diffusion coefficient is the sum of the coefficients and potential non local terms from each closure.
 
@@ -28,7 +28,7 @@ Many standard vertical mixing libraries (e.g. CVMix) receive and operate on one 
 
 ## 3 Algorithmic Formulation
 
-For Omega-0 a few simple vertical mixing algorithms will be used.  
+For Omega-1 a few simple vertical mixing algorithms will be used.  
 
 ### 3.1 Richardson number dependent mixing
 
@@ -98,9 +98,9 @@ $N^2_{crit}$ is typically chosen to be 0.
 
 ## 4 Design
 
-The current vertical chunking does not work well for vertical derivatives due to the potential for single layers in each chunk, so a first design of the vertical mixing coefficients computation does not do vertical chunking and just computes with the whole column. 
+Vertical chunking, as is, does not work well for vertical derivatives, so a first design of the vertical mixing coefficients computation does not do vertical chunking and just computes with the full-depth column. 
 
-To start, only the down gradient contribution to vertical mixing will be added, with contributions to the vertical viscosity and diffusivity coming from the shear (Richardson number mixing), convective, and background mixing models detailed in the prior section. In future developments, the K Profile Parameterization [(KPP; Large et al., 1994)](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/94rg01872) and other non-local and/or higher-order mixing models will be added. Note that these parameterizations require vertical derivatives and integrals, similarly to those detailed here, thus a solution that allows chunking and vertical operations such as derivatives and integrals would be advantageous.
+Additionally, to start, only the down gradient contribution to vertical mixing will be added, with contributions to the vertical viscosity and diffusivity coming from the shear (Richardson number mixing), convective, and background mixing models detailed in the prior section. However, in future developments, the K Profile Parameterization [(KPP; Large et al., 1994)](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/94rg01872) and other non-local and/or higher-order mixing models will be added. Some of these parameterizations require vertical derivatives and full-depth integrals, which require the full-depth column, thus we design the mixing coefficients routine with this in mind. A solution that allows chunking and vertical operations such as derivatives and integrals would be advantageous, but outside of the scope of this design document.
 
 ### 4.1 Data types and parameters
 
@@ -108,80 +108,75 @@ To start, only the down gradient contribution to vertical mixing will be added, 
 
 The following config options should be included for the Richardson number dependent -- Pacanowski and Philander (1981) based -- vertical mixing:
 
-1. `config_use_vmix_shear_mixing`. If true, shear-based mixing is computed based upon Pacanowski and Philander (1981) and applied to velocity components and tracer quantities. \[.true./.false.\]
-2. `config_vmix_shear_nu_zero`. Numerator of Pacanowski and Philander (1981) Eq (1). \[0.005 $m^2 s^{-1}$\]
-3. `config_vmix_shear_alpha`. Alpha value used in Pacanowski and Philander (1981) Eqs (1) and (2). \[5\]
-4. `config_vmix_shear_exp`. Exponent used in denominator of Pacanowski and Philander (1981) Eqs (1). \[2\]
+1. `EnableShearMix`. If true, shear-based mixing is computed based upon Pacanowski and Philander (1981) and applied to velocity components and tracer quantities. \[.true./.false.\]
+2. `ShearNuZero`. Numerator of Pacanowski and Philander (1981) Eq (1). \[0.005 $m^2 s^{-1}$\]
+3. `ShearAlpha`. Alpha value used in Pacanowski and Philander (1981) Eqs (1) and (2). \[5\]
+4. `ShearExponent`. Exponent used in denominator of Pacanowski and Philander (1981) Eqs (1). \[2\]
 
-The following config options should be included for  convective vertical mixing:
+The following config options should be included for convective vertical mixing:
 
-1. `config_use_vmix_conv_mixing`. If true, convective mixing is computed and applied to velocity components and tracer quantities. \[.true./.false.\]
-2. `config_vmix_convective_diffusion`. Convective vertical diffusion applied to tracer quantities. \[1.0 $m^2 s^{-1}$\]
-3. `config_vmix_convective_viscosity`. Convective vertical viscosity applied to velocity components. \[1.0 $m^2 s^{-1}$\]
-4. `config_vmix_convective_triggerBVF`. Value of Brunt Viasala frequency squared below which convective mixing is triggered. \[0.0\]
+1. `EnableConvectiveMix`. If true, convective mixing is computed and applied to velocity components and tracer quantities. \[.true./.false.\]
+2. `ConvectiveDiffusivity`. Convective vertical viscosity and diffusivity applied to velocity components and tracer quantities, respectively. \[1.0 $m^2 s^{-1}$\]
+3. `ConvectiveTriggerBVF`. Value of Brunt Viasala frequency squared below which convective mixing is triggered. \[0.0\]
 
 The following config options should be included for background vertical mixing:
 
-1. `config_vmix_background_viscosity`. Background vertical viscosity applied to velocity components. \[1.0e-4 $m^2 s^{-1}$\]
-2. `config_vmix_background_diffusion`. Background vertical diffusion applied to all tracer quantities. \[1.0e-5 $m^2 s^{-1}$\]
+1. `BackgroundViscosity`. Background vertical viscosity applied to velocity components. \[1.0e-4 $m^2 s^{-1}$\]
+2. `BackgroundDiffusivity`. Background vertical diffusivity applied to all tracer quantities. \[1.0e-5 $m^2 s^{-1}$\]
 
 ### 4.2 Methods
 
 <!--- List and describe all public methods and their interfaces (actual code for
 interface that would be in header file). Describe typical use cases. -->
 
-It is assumed that viscosity and diffusivity will be stored at cell centers and that the displaced density is computed in the density routine prior.
+It is assumed that viscosity and diffusivity will be stored at cell centers. Additionally, since they will be used elsewhere, it is assumed that zMid and N2 have been computed elsewhere (N2 in the density routine) and stored. Quantities such as squared shear and Richardson number are not be needed outside of the vertical mixing routines, so are computed locally.
 
 ```c++
 parallelFor(
     {NCellsAll, NVertLevels}, KOKKOS_LAMBDA(int ICell, int K) {
 
-        vertVisc(ICell, K) = 0.0
-        vertDiff(ICell, K) = 0.0
+        VertViscosity(ICell, K) = 0._Real;
+        VertDiffusivity(ICell, K) = 0._Real;
 
         // If shear mixing true, add shear contribution to viscosity and diffusivity 
-        if (config_use_vmix_shear_mixing) {
-            invAreaCell = 1.0 / areaCell(ICell)
-
+        if (EnableShearMix) {
+            const Real InvAreaCell = 1._Real / AreaCell(ICell);
             // Calculate the square of the shear
-            for (i = 0; i < NEdgesOnCell(ICell), ++i) {
-                IEdge = edgesOnCell(ICell, i)
-                factor = 0.5 * dcEdge(IEdge) * dvEdge(IEdge) * invAreaCell  
-                delU2 = pow(normalVelocity(IEdge,K-1) - normalVelocity(IEdge,K), 2) + pow(tangentialVelocity(IEdge,K-1) - tangentialVelocity(IEdge,K), 2)
-                shearSquaredTop(ICell, K) = shearSquaredTop(ICell, K) + factor * delU2
+            for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
+                const I4 JEdge = EdgesOnCell(ICell, J);
+                const Real Factor = 0.5_Real * DcEdge(JEdge) * DvEdge(JEdge) * InvAreaCell;
+                const Real DelU2 = pow(NormalVelocity(JEdge,K-1) - NormalVelocity(JEdge,K), 2._Real) + pow(TangentialVelocity(JEdge,K-1) - TangentialVelocity(JEdge,K), 2._Real);
+                ShearSquared(ICell, K) = ShearSquared(ICell, K) + Factor * DelU2;
             }
-            shearSquaredTop(ICell, K) = shearSquaredTop(ICell, K) / pow(zCoor(ICell, K-1) - zCoor(ICell, K), 2);
-
-            // Calculate Brunt Vaisala Frequency
-            BruntVaisalaFreqTop(ICell, K) = (-gravity / rho_sw) * (displacedDensity(K) - density(K)) / (zCoor(ICell, K-1) - zCoor(ICell, K))
+            ShearSquared(ICell, K) = ShearSquared(ICell, K) / pow(zMid(ICell, K-1) - zMid(ICell, K), 2._Real);
 
             // Calculate Richardson number
-            RiTopOfCell(ICell, K) = BruntVaisalaFreqTop(ICell, K) / (shearSquaredTop(ICell, K) + 1.0e-12)
+            RichardsonNum(ICell, K) = BruntVaisalaFreq(ICell, K) / max(ShearSquared(ICell, K), 1.0e-12_Real);
 
             // Add in shear contribution to vertical mixing
-            vertViscTopOfCell(ICell, K) = vertViscTopOfCell(ICell, K) + nu_zero / pow(1 + alpha * RiTopOfCell(ICell, K), n) + nu_b
-            vertDiffTopOfCell(ICell, K) = vertDiffTopOfCell(ICell, K) + vertViscTopOfCell(ICell, K) / (1 + alpha * RiTopOfCell(ICell, K)) + kappa_b
+            VertViscosity(ICell, K) = VertViscosity(ICell, K) + ShearNuZero / pow(1._Real + ShearAlpha * RichardsonNum(ICell, K), ShearExponent);
+            VertDiffusivity(ICell, K) = VertDiffusivity(ICell, K) + VertViscosity(ICell, K) / (1 + ShearAlpha * RichardsonNum(ICell, K));
         }
 
         // If conv mixing true, add conv contribution to viscosity and diffusivity 
-        if (config_use_vmix_conv_mixing) {
-            if (BruntVaisalaFreqTop(ICell, K) < config_vmix_convective_triggerBVF) {
-                vertViscTopOfCell(ICell, K) = vertViscTopOfCell(ICell, K) + convVisc
-                vertDiffTopOfCell(ICell, K) = vertDiffTopOfCell(ICell, K) + convDiff
+        if (EnableConvectiveMix) {
+            if (BruntVaisalaFreq(ICell, K) < ConvectiveTriggerBVF) {
+                VertViscosity(ICell, K) = VertViscosity(ICell, K) + ConvectiveDiffusivity;
+                VertDiffusivity(ICell, K) = VertDiffusivity(ICell, K) + ConvectiveDiffusivity;
             }
         }
 
         // Add background contribution to viscosity and diffusivity 
-        vertViscTopOfCell(ICell, K) = vertViscTopOfCell(ICell, K) + config_vmix_background_viscosity
-        vertDiffTopOfCell(ICell, K) = vertDiffTopOfCell(ICell, K) + config_vmix_background_diffusion
+        VertViscosity(ICell, K) = VertViscosity(ICell, K) + BackgroundViscosity;
+        VertDiffusivity(ICell, K) = VertDiffusivity(ICell, K) + BackgroundDiffusivity;
     });
 ```
 
-From here, the vertical viscosity and vertical diffusivity will enter into the tridiagonal solver to compute the vertical flux of momentum and tracers.
+From here, the vertical viscosity and vertical diffusivity will enter into the [tridiagonal solver](./TridiagonalSolver.md) to compute the vertical flux of momentum and tracers.
 
 ## 5 Verification and Testing
 
 Unit tests can be initialized with linear-with-depth initial conditions (velocity and density) and use a linear equation of state. Expected values of the Richardson number, vertical viscosity, and vertical diffusion coefficients can be computed and compared to. Tests for both the shear, convective, and combined mixing contributions should be made to test requirement 2.1.
 
-This assumes that the displaced density has already been tested. Vertical fluxes of momentum and tracers will be tested separately with the tridiagonal solver.
+This assumes that the displaced density has already been tested. Vertical fluxes of momentum and tracers will be tested separately with the [tridiagonal solver](./TridiagonalSolver.md).
 
