@@ -488,13 +488,11 @@ int main(int argc, char *argv[]) {
    // Test setting of compile-time vector length
 
 #ifdef OMEGA_VECTOR_LENGTH
-   if (OMEGA::VecLength == 16)
+   if (OMEGA::VecLength == OMEGA_VECTOR_LENGTH)
       std::cout << "MPI vector length test: PASS" << std::endl;
    else {
       RetVal += 1;
       std::cout << "MPI vector length test: FAIL" << std::endl;
-      std::cout << "Was test driver built with -D OMEGA_VECTOR_LENGTH=16 ?"
-                << std::endl;
    }
 #endif
 
