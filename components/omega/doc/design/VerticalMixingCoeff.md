@@ -1,36 +1,36 @@
 # Vertical Mixing Coefficients
 
-## 1 Overview \label{sec:overview}
+## 1 Overview
 
 Representation of unresolved vertical fluxes of momentum, heat, salt, and biogeochemical tracers in ocean models is essential to simulations fidelity. Models of turbulent fluxes spans a wide range of complexity, but the models generally fall into a few categories: simply polynomial relationships, equilibrium turbulence models, and prognostic turbulence models.  
 
-## 2 Requirements \label{sec:requirements}
+## 2 Requirements
 
-### 2.1 Requirement: Vertical mixing coefficient interface should be modular \label{sec:require_modular}
+### 2.1 Requirement: Vertical mixing coefficient interface should be modular
 
 To prepare for additional mixing closures and later improvements, the interface to vertical mixing must allow for easy connection of closures. It is assumed that the strength of vertical mixing from each closure is additive, such that the final vertical diffusion coefficient is the sum of the coefficients and potential non local terms from each closure.
 
-### 2.2 Requirement: Vertical mixing models should be have local and/or gradient free terms \label{sec:require_gradfree}
+### 2.2 Requirement: Vertical mixing models should be have local and/or gradient free terms
 
 For optimal performance, initial models of vertical turbulent fluxes for Omega should be cast as an implicit, down gradient mixing and an explicit, gradient free, component, e.g.,
 
 $$
-\overline{w' \phi'}\approx \kappa(\overline{\rho},\overline{u},\overline{v}) \left(\frac{\partial \overline{\phi}}{\partial z} + \gamma(\overline{\rho},\overline{u},\overline{v}) \right) \label{eq:vertimix}
+\overline{w' \phi'}\approx \kappa(\overline{\rho},\overline{u},\overline{v}) \left(\frac{\partial \overline{\phi}}{\partial z} + \gamma(\overline{\rho},\overline{u},\overline{v}) \right)
 $$
 
 Here, $\phi$ is a generic tracer, $\overline{w'\phi'}$ is the vertical turbulent flux of that tracer, and $\gamma$ is the gradient free portion of the flux (often referred to as 'non-local'). The vertical diffusivity can be as simple as a constant value, to complex functions of quantities like shear and stratification. A similar equation can be written for turbulent momentum fluxes.
 
 The use of a flux term proportional to the local gradient allows this problem to be cast implicitly, allowing for larger time steps, reducing the cost of the mixing model.  When more complex schemes are considered, other techniques such as subcycling can be considered to improve performance.
 
-### 2.3 Requirement: Vertical mixing models cannot ingest single columns at a time \label{sec:require_column}
+### 2.3 Requirement: Vertical mixing models cannot ingest single columns at a time
 
 Many standard vertical mixing libraries (e.g. CVMix) receive and operate on one column at a time. This results in poor performance, especially on accelerators. Any utilized model of vertical mixing must ingest and operate on multiple columns concurrently.
 
-## 3 Algorithmic Formulation \label{sec:formula}
+## 3 Algorithmic Formulation
 
 For Omega-1 a few simple vertical mixing algorithms will be used.  
 
-### 3.1 Richardson number dependent mixing \label{sec:formula_shear_mix}
+### 3.1 Richardson number dependent mixing
 
 One of the simplest class of models of vertical turbulence are polynomial functions of the gradient Richardson number. As in MPAS-Ocean, we choose to define the Richardson number as
 
@@ -72,7 +72,7 @@ $$
 
 in these formulae, $\alpha$ and *n* are tunable parameters, most often chosen as 5 and 2 respectively. $\nu_b$ and $\kappa_b$ are the background viscosity and diffusivity respectively. MPAS-Ocean has a $\kappa_{b,passive}$ for applying to just the passive tracers, leaving the active tracers with $\kappa_b$.
 
-### 3.2 Convective Instability Mixing \label{sec:formula_conv_mix}
+### 3.2 Convective Instability Mixing
 
 Commonly, mixing due to convective instability is treated as a step function for the diffusivity and viscosity. This is often represented as
 
@@ -96,15 +96,15 @@ $$
 
 $N^2_{crit}$ is typically chosen to be 0.
 
-## 4 Design \label{sec:design}
+## 4 Design
 
 Vertical chunking, as is, does not work well for vertical derivatives, so a first design of the vertical mixing coefficients computation does not do vertical chunking and just computes with the full-depth column. 
 
-Additionally, to start, only the down gradient contribution to vertical mixing will be added, with contributions to the vertical viscosity and diffusivity coming from the shear (Richardson number mixing), convective, and background mixing models detailed in the prior section. However, in future developments, the K Profile Parameterization [(KPP; Large et al., 1994)](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/94rg01872) and other non-local and/or higher-order mixing models will be added. Some of these parameterizations require vertical derivatives, full-depth integrals, and/or formulate $\kappa$ and $\gamma$ in Eq. (\ref{eq:vertmix}) as functions of surface forcing, which require either full-depth column or surface forcing information at depth, thus we design the mixing coefficients routine with this in mind. A solution that allows chunking with vertical operations such as derivatives and integrals and/or surface forcing values would be advantageous, but is outside of the scope of this design document.
+Additionally, to start, only the down gradient contribution to vertical mixing will be added, with contributions to the vertical viscosity and diffusivity coming from the shear (Richardson number mixing), convective, and background mixing models detailed in the prior section. However, in future developments, the K Profile Parameterization [(KPP; Large et al., 1994)](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/94rg01872) and other non-local and/or higher-order mixing models will be added. Some of these parameterizations require vertical derivatives, full-depth integrals, and/or formulate $\kappa$ and $\gamma$ in Eq. (1) Section 2.1 as functions of surface forcing, which require either full-depth column or surface forcing information at depth, thus we design the mixing coefficients routine with this in mind. A solution that allows chunking with vertical operations such as derivatives and integrals and/or surface forcing values would be advantageous, but is outside of the scope of this design document.
 
 ### 4.1 Data types and parameters 
 
-#### 4.1.1 Parameters \label{sec:design_params}
+#### 4.1.1 Parameters
 
 The following config options should be included for the Richardson number dependent -- Pacanowski and Philander (1981) based -- vertical mixing:
 
@@ -124,7 +124,7 @@ The following config options should be included for background vertical mixing:
 1. `BackgroundViscosity`. Background vertical viscosity applied to velocity components. \[1.0e-4 $m^2 s^{-1}$\]
 2. `BackgroundDiffusivity`. Background vertical diffusivity applied to all tracer quantities. \[1.0e-5 $m^2 s^{-1}$\]
 
-### 4.2 Methods \label{sec:design_methods}
+### 4.2 Methods
 
 <!--- List and describe all public methods and their interfaces (actual code for
 interface that would be in header file). Describe typical use cases. -->
@@ -174,9 +174,9 @@ parallelFor(
 
 From here, the vertical viscosity and vertical diffusivity will enter into the [tridiagonal solver](./TridiagonalSolver.md) to compute the vertical flux of momentum and tracers.
 
-## 5 Verification and Testing \label{sec:testing}
+## 5 Verification and Testing
 
-Unit tests can be initialized with linear-with-depth initial conditions (velocity and density) and use a linear equation of state. Expected values of the Richardson number, vertical viscosity, and vertical diffusion coefficients can be computed and compared to. Tests for both the shear, convective, and combined mixing contributions should be made to test requirement (\ref{sec:require_modular}).
+Unit tests can be initialized with linear-with-depth initial conditions (velocity and density) and use a linear equation of state. Expected values of the Richardson number, vertical viscosity, and vertical diffusion coefficients can be computed and compared to. Tests for both the shear, convective, and combined mixing contributions should be made to test requirement (2.1).
 
 This assumes that the displaced density has already been tested. Vertical fluxes of momentum and tracers will be tested separately with the [tridiagonal solver](./TridiagonalSolver.md).
 
