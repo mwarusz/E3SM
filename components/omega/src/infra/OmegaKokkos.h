@@ -115,6 +115,59 @@ using Bounds = Kokkos::MDRangePolicy<
 
 #endif
 
+template <class F, int N> struct LinF {
+
+   LinF(const F &f, const int (&Bounds)[N]) : f(f) {
+      Strides[N - 2] = Bounds[N - 1];
+      for (int I = N - 3; I >= 0; --I) {
+         Strides[I] = Bounds[I + 1] * Strides[I + 1];
+      }
+   }
+
+   template <int N_ = N> std::enable_if_t<N_ == 2> operator()(int Idx) const {
+      const int I1 = Idx / Strides[0];
+      const int I2 = Idx - I1 * Strides[0];
+
+      f(I1, I2);
+   }
+
+   template <int N_ = N> std::enable_if_t<N_ == 3> operator()(int Idx) const {
+      const int I1 = Idx / Strides[0];
+      Idx -= I1 * Strides[0];
+      const int I2 = Idx / Strides[1];
+      const int I3 = Idx - I2 * Strides[1];
+
+      f(I1, I2, I3);
+   }
+
+   template <int N_ = N> std::enable_if_t<N_ == 4> operator()(int Idx) const {
+      const int I1 = Idx / Strides[0];
+      Idx -= I1 * Strides[0];
+      const int I2 = Idx / Strides[1];
+      Idx -= I2 * Strides[1];
+      const int I3 = Idx / Strides[2];
+      const int I4 = Idx - I3 * Strides[2];
+
+      f(I1, I2, I3, I4);
+   }
+
+   template <int N_ = N> std::enable_if_t<N_ == 5> operator()(int Idx) const {
+      const int I1 = Idx / Strides[0];
+      Idx -= I1 * Strides[0];
+      const int I2 = Idx / Strides[1];
+      Idx -= I2 * Strides[1];
+      const int I3 = Idx / Strides[2];
+      Idx -= I3 * Strides[2];
+      const int I4 = Idx / Strides[3];
+      const int I5 = Idx - I4 * Strides[3];
+
+      f(I1, I2, I3, I4, I5);
+   }
+
+   int Strides[N - 1];
+   F f;
+};
+
 // parallelFor: with label
 template <int N, class F, class... Args>
 inline void parallelFor(const std::string &label, const int (&upper_bounds)[N],
@@ -125,9 +178,18 @@ inline void parallelFor(const std::string &label, const int (&upper_bounds)[N],
       Kokkos::parallel_for(label, policy, f);
 
    } else {
-      const int lower_bounds[N] = {0};
-      const auto policy = Bounds<N, Args...>(lower_bounds, upper_bounds, tile);
-      Kokkos::parallel_for(label, policy, f);
+      // const int lower_bounds[N] = {0};
+      // const auto policy = Bounds<N, Args...>(lower_bounds, upper_bounds,
+      // tile); Kokkos::parallel_for(label, policy, f);
+
+      int Total = 1;
+      for (int I = 0; I < N; ++I) {
+         Total *= upper_bounds[I];
+      }
+
+      const auto policy =
+          Kokkos::RangePolicy<Kokkos::IndexType<int>, Args...>(0, Total);
+      Kokkos::parallel_for(label, policy, LinF{f, upper_bounds});
    }
 }
 
