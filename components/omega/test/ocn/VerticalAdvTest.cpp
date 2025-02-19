@@ -40,44 +40,44 @@ int initVadvTest() {
    Config("Omega");
    Err = Config::readAll("omega.yml");
    if (Err != 0) {
-      LOG_CRITICAL("AuxStateTest: Error reading config file");
+      LOG_CRITICAL("VertAdvTest: Error reading config file");
       return Err;
    }
 
    int TimeStepperErr = TimeStepper::init1();
    if (TimeStepperErr != 0) {
       Err++;
-      LOG_ERROR("AuxStateTest: error initializing default time stepper");
+      LOG_ERROR("VertAdvTest: error initializing default time stepper");
    }
 
    int IOErr = IO::init(DefComm);
    if (IOErr != 0) {
       Err++;
-      LOG_ERROR("AuxStateTest: error initializing parallel IO");
+      LOG_ERROR("VertAdvTest: error initializing parallel IO");
    }
 
    int DecompErr = Decomp::init();
    if (DecompErr != 0) {
       Err++;
-      LOG_ERROR("AuxStateTest: error initializing default decomposition");
+      LOG_ERROR("VertAdvTest: error initializing default decomposition");
    }
 
    int HaloErr = Halo::init();
    if (HaloErr != 0) {
       Err++;
-      LOG_ERROR("AuxStateTest: error initializing default halo");
+      LOG_ERROR("VertAdvTest: error initializing default halo");
    }
 
    int MeshErr = HorzMesh::init();
    if (MeshErr != 0) {
       Err++;
-      LOG_ERROR("AuxStateTest: error initializing default mesh");
+      LOG_ERROR("VertAdvTest: error initializing default mesh");
    }
 
    int TracerErr = Tracers::init();
    if (TracerErr != 0) {
       Err++;
-      LOG_ERROR("AuxStateTest: error initializing tracer infrastructure");
+      LOG_ERROR("VertAdvTest: error initializing tracer infrastructure");
    }
 
    const auto &Mesh = HorzMesh::getDefault();
@@ -87,13 +87,13 @@ int initVadvTest() {
    int StateErr = OceanState::init();
    if (StateErr != 0) {
       Err++;
-      LOG_ERROR("AuxStateTest: error initializing default state");
+      LOG_ERROR("VertAdvTest: error initializing default state");
    }
 
    int AuxStateErr = AuxiliaryState::init();
    if (AuxStateErr != 0) {
       Err++;
-      LOG_ERROR("AuxStateTest: error initializing default aux state");
+      LOG_ERROR("VertAdvTest: error initializing default aux state");
    }
 
 
@@ -125,40 +125,79 @@ void initArrays() {
    State->getLayerThicknessH(LayerThicknessH, TimeLevel);
    HostArray2DReal NormalVelocityH;
    State->getNormalVelocityH(NormalVelocityH, TimeLevel);
+   Array2DReal LayerThickness;
+   State->getLayerThickness(LayerThickness, TimeLevel);
+   Array2DReal NormalVelocity;
+   State->getNormalVelocity(NormalVelocity, TimeLevel);
+
+   AuxiliaryState *AuxState = AuxiliaryState::getDefault();
 
    OMEGA_SCOPE(LocEdgeSignOnCell, Mesh->EdgeSignOnCellH);
 
-   int NCells = LayerThicknessH.extent(0);
-   int NLevels = LayerThicknessH.extent(1);
-   for (int ICell = 0; ICell < NCells; ++ICell) {
-      for (int K = 0; K < NLevels; ++K) {
-//         Real NewVal = DefDecomp->CellIDH(ICell) * NLevels + K;
+//   int NCells = LayerThicknessH.extent(0);
+//   int NLevels = LayerThicknessH.extent(1);
+   int NCells = LayerThickness.extent(0);
+   int NLevels = LayerThickness.extent(1);
+//   for (int ICell = 0; ICell < NCells; ++ICell) {
+//      for (int K = 0; K < NLevels; ++K) {
+////         Real NewVal = DefDecomp->CellIDH(ICell) * NLevels + K;
+//         Real NewVal = 100._Real * (K + 1);
+//         LayerThicknessH(ICell, K) = NewVal;
+////         std::cout << ICell << " " << K << " " << LayerThicknessH(ICell, K) << std::endl;
+//      }
+//      for (int J = 0; J < LocEdgeSignOnCell.extent(1); ++J) {
+////         std::cout << ICell << " " << J << " " << LocEdgeSignOnCell(ICell, J) << std::endl;
+//      }
+//   }
+   parallelFor("initLayThick",
+      {NCells, NLevels}, KOKKOS_LAMBDA(int ICell, int K) {
          Real NewVal = 100._Real * (K + 1);
-         LayerThicknessH(ICell, K) = NewVal;
-//         std::cout << ICell << " " << K << " " << LayerThicknessH(ICell, K) << std::endl;
-      }
-      for (int J = 0; J < LocEdgeSignOnCell.extent(1); ++J) {
-//         std::cout << ICell << " " << J << " " << LocEdgeSignOnCell(ICell, J) << std::endl;
-      }
-   }
+         LayerThickness(ICell, K) = NewVal;
+   });
+   
 
-   for (int IEdge = 0; IEdge < DefDecomp->NEdgesAll; ++IEdge) {
-//      std::cout << IEdge << " " << Mesh->DvEdgeH(IEdge) << std::endl;
-      Real Sign;
-      if (IEdge % 2 == 0) {
-        Sign = 1.; 
-      } else {
-        Sign = -1.;
-      }
-      Real Mod = 0.1_Real * double(IEdge % 10);
-      for (int K = 0; K < NLevels; ++K) {
-         NormalVelocityH(IEdge, K) = Sign * (5._Real + Mod);
-//         std::cout << IEdge << " " << K << " " << NormalVelocityH(IEdge, K)  << std::endl;
-      }
-   }
+//   for (int IEdge = 0; IEdge < DefDecomp->NEdgesAll; ++IEdge) {
+////      std::cout << IEdge << " " << Mesh->DvEdgeH(IEdge) << std::endl;
+//      Real Sign;
+//      if (IEdge % 2 == 0) {
+//        Sign = 1.; 
+//      } else {
+//        Sign = -1.;
+//      }
+//      Real Mod = 0.1_Real * double(IEdge % 10);
+//      for (int K = 0; K < NLevels; ++K) {
+//         NormalVelocityH(IEdge, K) = Sign * (5._Real + Mod);
+////         std::cout << IEdge << " " << K << " " << NormalVelocityH(IEdge, K)  << std::endl;
+//      }
+//   }
 
-   State->copyToDevice(TimeLevel);
+   parallelFor("intNormVel",
+      {DefDecomp->NEdgesAll, NLevels}, KOKKOS_LAMBDA(int IEdge, int K) {
+         Real Sign;
+         if (IEdge % 2 == 0) {
+            Sign = 1.;
+         } else {
+            Sign = -1.;
+         }
+         Real Mod = 0.1_Real * double(IEdge % 10);
+         NormalVelocity(IEdge, K) = Sign * (5._Real + Mod);
+   });
 
+//   State->copyToDevice(TimeLevel);
+   State->copyToHost(TimeLevel);
+   Kokkos::fence();
+
+   AuxState->computeMomAux(State, TimeLevel, TimeLevel);
+   Kokkos::fence();
+
+//   auto FluxLayerThickEdgeH = createHostMirrorCopy(AuxState->LayerThicknessAux.FluxLayerThickEdge);
+//   for (int I1 = 0; I1 < FluxLayerThickEdgeH.extent(0); ++I1) {
+//      for (int I2 = 0; I2 < FluxLayerThickEdgeH.extent(1); ++I2) {
+////         std::cout << I1 << " " << I2 << " " << FluxLayerThickEdgeH(I1, I2) << std::endl;
+//      }
+//   }
+
+//   std::cout << FluxLayerThickEdgeH.extent(0) << " " << FluxLayerThickEdgeH.extent(1) << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -183,50 +222,212 @@ int main(int argc, char *argv[]) {
 
       const auto *Mesh = HorzMesh::getDefault();
 
-      int VectorLength = 32;
-      VerticalAdv VadvObj(Mesh, NVertLevels, VectorLength);
+      int VectorLength = 1;
+//      int VectorLength = 2;
+//      int VectorLength = 4;
+//      int VectorLength = 8;
+//      int VectorLength = 16;
+//      int VectorLength = 32;
+//      int VectorLength = 64;
+//      int VadvErr = VerticalAdv::init(NVertLevels, VectorLength);
+//      VerticalAdv VadvObj(Mesh, NVertLevels, VectorLength);
+//      VerticalAdv VadvObj; 
+//      VadvObj.init(NVertLevels, VectorLength);
 
       int TimeLev = 0;
       std::string TimeStepStr = "0000_00:10:00";
       TimeInterval TimeStep(TimeStepStr);
 
-      Kokkos::fence();
-      Pacer::stop("Init");
 
-      Pacer::start("Run");
 
       OceanState *State = OceanState::getDefault();
       AuxiliaryState *AuxState = AuxiliaryState::getDefault();
 
-      Pacer::start("1stVadv1");
-      VadvObj.computeVerticalTransport1(State, AuxState, TimeLev, TimeStep);
+      Array2DReal NormalVelEdge;
+      State->getNormalVelocity(NormalVelEdge, TimeLev);
+      const Array2DReal &FluxLayerThickEdge =
+          AuxState->LayerThicknessAux.FluxLayerThickEdge;
+
+      Array2DReal TmpArray("Tmp", Mesh->NCellsSize, NVertLevels);
+      Array2DReal DivHU("DivHU", Mesh->NCellsSize, NVertLevels);
+      Array2DReal VertTransportTop("VertTranspTop", Mesh->NCellsSize, NVertLevels + 1);
+      std::cout << 0 << std::endl;
+
+      OMEGA_SCOPE(LocAreaCell, Mesh->AreaCell);
+      OMEGA_SCOPE(LocNEonC, Mesh->NEdgesOnCell);
+      OMEGA_SCOPE(LocEonC, Mesh->EdgesOnCell);
+      OMEGA_SCOPE(LocESonC, Mesh->EdgeSignOnCell);
+      OMEGA_SCOPE(LocDvE, Mesh->DvEdge);
+
       Kokkos::fence();
+      Pacer::stop("Init");
+
+      Pacer::start("Run");
+      Pacer::start("1stVadv1");
+      {
+         const int NVertLs = Mesh->NVertLevels;
+         const int NChunks = NVertLevels / VectorLength;
+         parallelFor("Run1-0",
+            {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
+               const int KStart = KChunk * VectorLength;
+               for (int KVec = 0; KVec < VectorLength; ++KVec) {
+                  const I4 K = KStart + KVec;
+                  DivHU(ICell, K) = 0;
+               }
+         });
+         Kokkos::fence();
+
+         parallelFor("Run1-1",
+            {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
+               const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
+               const I4 KStart = KChunk * VectorLength;
+
+               for (int J = 0; J < LocNEonC(ICell); ++ J) {
+                  const I4 JEdge = LocEonC(ICell, J);
+                  for (int KVec = 0; KVec < VectorLength; ++KVec) {
+                     const I4 K = KStart + KVec;
+                     const Real Flux = LocDvE(JEdge) * LocESonC(ICell, J) *
+                                       FluxLayerThickEdge(JEdge, K) *
+                                       NormalVelEdge(JEdge, K) * InvAreaCell;
+                     DivHU(ICell, K) -= Flux;
+                  }
+               }
+         });
+         Kokkos::fence();
+
+         parallelFor("Run1-2",
+            {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
+               const int NVertLs = DivHU.extent(1);
+               VertTransportTop(ICell, NVertLevels) = 0.;
+               for (int K = NVertLevels - 1; K > 0; --K) {
+                  VertTransportTop(ICell, K) = VertTransportTop(ICell, K + 1) -
+                                               DivHU(ICell, K);
+               }
+               VertTransportTop(ICell, 0) = 0.;
+         });
+         Kokkos::fence();
+      }
       Pacer::stop("1stVadv1");
 
 
-
       Pacer::start("1stVadv2");
-      VadvObj.computeVerticalTransport2(State, AuxState, TimeLev, TimeStep);
-      Kokkos::fence();
+      {
+         const int NVertLs = Mesh->NVertLevels;
+         Array1DReal TmpDivHU("TmpDivHU", NVertLs);
+
+         parallelFor("Run2",
+            {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
+               const int NVertLs = NormalVelEdge.extent(1);
+               const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
+               for (int J = 0; J < LocNEonC(ICell); ++J) {
+                  const I4 JEdge = LocEonC(ICell, J);
+                  for (int K = 0; K < NVertLs; ++K) {
+                     Real TmpVal = LocDvE(JEdge) * LocESonC(ICell, J) *
+                                   FluxLayerThickEdge(JEdge, K) * 
+                                   NormalVelEdge(JEdge, K) * InvAreaCell;
+                     TmpDivHU(K) -= TmpVal;
+                  }
+               }
+            VertTransportTop(ICell, NVertLevels) = 0.;
+            for (int K = NVertLevels - 1; K > 0; --K) {
+               VertTransportTop(ICell, K) = VertTransportTop(ICell, K + 1) -
+                                            TmpDivHU(K);
+            }
+            VertTransportTop(ICell, 0) = 0.;
+         });
+         Kokkos::fence();
+      }
       Pacer::stop("1stVadv2");
 
+
+
       for (int Istep = 0; Istep < 100; ++Istep) {
+         std::cout << Istep + 1 << std::endl;
 
          Pacer::start("vadv1");
-         VadvObj.computeVerticalTransport1(State, AuxState, TimeLev, TimeStep);
+         {
+            const int NVertLs = Mesh->NVertLevels;
+            const int NChunks = NVertLevels / VectorLength;
+            parallelFor("Run1-0",
+               {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
+                  const int KStart = KChunk * VectorLength;
+                  for (int KVec = 0; KVec < VectorLength; ++KVec) {
+                     const I4 K = KStart + KVec;
+                     DivHU(ICell, K) = 0;
+                  }
+            });
+            Kokkos::fence();
+
+            parallelFor("Run1-1",
+               {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
+                  const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
+                  const I4 KStart = KChunk * VectorLength;
+
+                  for (int J = 0; J < LocNEonC(ICell); ++ J) {
+                     const I4 JEdge = LocEonC(ICell, J);
+                     for (int KVec = 0; KVec < VectorLength; ++KVec) {
+                        const I4 K = KStart + KVec;
+                        const Real Flux = LocDvE(JEdge) * LocESonC(ICell, J) *
+                                          FluxLayerThickEdge(JEdge, K) *
+                                          NormalVelEdge(JEdge, K) * InvAreaCell;
+                        DivHU(ICell, K) -= Flux;
+                     }
+                  }
+            });
+            Kokkos::fence();
+
+            parallelFor("Run1-2",
+               {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
+                  const int NVertLs = DivHU.extent(1);
+                  VertTransportTop(ICell, NVertLevels) = 0.;
+                  for (int K = NVertLevels - 1; K > 0; --K) {
+                     VertTransportTop(ICell, K) = VertTransportTop(ICell, K + 1) -
+                                                  DivHU(ICell, K);
+                  }
+                  VertTransportTop(ICell, 0) = 0.;
+            });
+         }
+
          Kokkos::fence();
          Pacer::stop("vadv1");
 
          Pacer::start("vadv2");
-         VadvObj.computeVerticalTransport2(State, AuxState, TimeLev, TimeStep);
-         Kokkos::fence();
+         {
+            const int NVertLs = Mesh->NVertLevels;
+            Array1DReal TmpDivHU("TmpDivHU", NVertLs);
+
+            parallelFor("Run2",
+               {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
+                  const int NVertLs = NormalVelEdge.extent(1);
+                  const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
+                  for (int J = 0; J < LocNEonC(ICell); ++J) {
+                     const I4 JEdge = LocEonC(ICell, J);
+                     for (int K = 0; K < NVertLs; ++K) {
+                        Real TmpVal = LocDvE(JEdge) * LocESonC(ICell, J) *
+                                      FluxLayerThickEdge(JEdge, K) * 
+                                      NormalVelEdge(JEdge, K) * InvAreaCell;
+                        TmpDivHU(K) -= TmpVal;
+                     }
+                  }
+               VertTransportTop(ICell, NVertLevels) = 0.;
+               for (int K = NVertLevels - 1; K > 0; --K) {
+                  VertTransportTop(ICell, K) = VertTransportTop(ICell, K + 1) -
+                                               TmpDivHU(K);
+               }
+               VertTransportTop(ICell, 0) = 0.;
+            });
+            Kokkos::fence();
+         }
          Pacer::stop("vadv2");
 
       }
 
       Pacer::stop("Run");
 
+
+
       Pacer::start("Finalize");
+//      VerticalAdv::clear();
       finalizeVadvTest();
       Pacer::stop("Finalize");
    }

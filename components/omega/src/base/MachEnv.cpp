@@ -450,6 +450,9 @@ void MachEnv::print() const {
    LOG_INFO("  NumThreads     = {}", NumThreads);
    LOG_INFO("  VecLength      = {}", VecLength);
 
+
+
+
 } // end print
 
 } // end namespace OMEGA

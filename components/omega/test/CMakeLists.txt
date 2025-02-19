@@ -414,5 +414,5 @@ add_omega_test(
     VERTICAL_ADV_TEST
     testVerticalAdv.exe
     ocn/VerticalAdvTest.cpp
-    "n;8"
+    "-n;8"
 )
