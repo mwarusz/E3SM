@@ -27,7 +27,6 @@ enum class ArrayDataType { Unknown, I4, I8, R4, R8 };
 /// to the CPU-only case where the host and device are identical.
 enum class ArrayMemLoc { Unknown, Device, Host, Both };
 
-namespace Impl {
 // determine ArrayDataType from Kokkos array type
 template <class T> constexpr ArrayDataType checkArrayType() {
    if (std::is_same_v<typename T::non_const_value_type, I4>) {
@@ -59,7 +58,6 @@ template <class T> constexpr ArrayMemLoc findArrayMemLoc() {
       return ArrayMemLoc::Device;
    }
 }
-} // namespace Impl
 
 /// Struct template to specify the rank of a supported Array
 template <class T> struct ArrayRank {
