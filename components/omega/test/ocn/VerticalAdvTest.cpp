@@ -22,6 +22,14 @@ using namespace OMEGA;
 
 constexpr int NVertLevels = 128;
 
+constexpr int VLength = 64;
+//constexpr int VLength = 32;
+//constexpr int VLength = 16;
+//constexpr int VLength = 8;
+//constexpr int VLength = 4;
+//constexpr int VLength = 2;
+//constexpr int VLength = 1;
+
 int initVadvTest() {
 
    int Err = 0;
@@ -266,11 +274,11 @@ int main(int argc, char *argv[]) {
       Pacer::start("1stVadv1");
       {
          const int NVertLs = Mesh->NVertLevels;
-         const int NChunks = NVertLevels / VectorLength;
+         const int NChunks = NVertLevels / VLength;
          parallelFor("Run1-0",
             {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
-               const int KStart = KChunk * VectorLength;
-               for (int KVec = 0; KVec < VectorLength; ++KVec) {
+               const int KStart = KChunk * VLength;
+               for (int KVec = 0; KVec < VLength; ++KVec) {
                   const I4 K = KStart + KVec;
                   DivHU(ICell, K) = 0;
                }
@@ -280,11 +288,11 @@ int main(int argc, char *argv[]) {
          parallelFor("Run1-1",
             {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
                const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
-               const I4 KStart = KChunk * VectorLength;
+               const I4 KStart = KChunk * VLength;
 
                for (int J = 0; J < LocNEonC(ICell); ++ J) {
                   const I4 JEdge = LocEonC(ICell, J);
-                  for (int KVec = 0; KVec < VectorLength; ++KVec) {
+                  for (int KVec = 0; KVec < VLength; ++KVec) {
                      const I4 K = KStart + KVec;
                      const Real Flux = LocDvE(JEdge) * LocESonC(ICell, J) *
                                        FluxLayerThickEdge(JEdge, K) *
@@ -347,31 +355,28 @@ int main(int argc, char *argv[]) {
          Pacer::start("vadv1");
          {
             const int NVertLs = Mesh->NVertLevels;
-            const int NChunks = NVertLevels / VectorLength;
-            parallelFor("Run1-0",
-               {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
-                  const int KStart = KChunk * VectorLength;
-                  for (int KVec = 0; KVec < VectorLength; ++KVec) {
-                     const I4 K = KStart + KVec;
-                     DivHU(ICell, K) = 0;
-                  }
-            });
-            Kokkos::fence();
+            const int NChunks = NVertLevels / VLength;
 
             parallelFor("Run1-1",
                {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
                   const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
-                  const I4 KStart = KChunk * VectorLength;
+                  const I4 KStart = KChunk * VLength;
+
+                  Real DivHUTmp[VLength] = {0};
 
                   for (int J = 0; J < LocNEonC(ICell); ++ J) {
                      const I4 JEdge = LocEonC(ICell, J);
-                     for (int KVec = 0; KVec < VectorLength; ++KVec) {
+                     for (int KVec = 0; KVec < VLength; ++KVec) {
                         const I4 K = KStart + KVec;
-                        const Real Flux = LocDvE(JEdge) * LocESonC(ICell, J) *
+                        DivHUTmp[KVec] -= LocDvE(JEdge) * LocESonC(ICell, J) *
                                           FluxLayerThickEdge(JEdge, K) *
                                           NormalVelEdge(JEdge, K) * InvAreaCell;
-                        DivHU(ICell, K) -= Flux;
+
                      }
+                  }
+                  for (int KVec = 0; KVec < VecLength; ++KVec) {
+                     const int K     = KStart + KVec;
+                     DivHU(ICell, K) = DivHUTmp[KVec];
                   }
             });
             Kokkos::fence();
@@ -394,27 +399,29 @@ int main(int argc, char *argv[]) {
          Pacer::start("vadv2");
          {
             const int NVertLs = Mesh->NVertLevels;
-            Array1DReal TmpDivHU("TmpDivHU", NVertLs);
 
             parallelFor("Run2",
                {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
-                  const int NVertLs = NormalVelEdge.extent(1);
                   const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
+                  Real DivHUTmp[NVertLevels] = {0};
                   for (int J = 0; J < LocNEonC(ICell); ++J) {
                      const I4 JEdge = LocEonC(ICell, J);
                      for (int K = 0; K < NVertLs; ++K) {
-                        Real TmpVal = LocDvE(JEdge) * LocESonC(ICell, J) *
-                                      FluxLayerThickEdge(JEdge, K) * 
-                                      NormalVelEdge(JEdge, K) * InvAreaCell;
-                        TmpDivHU(K) -= TmpVal;
+                        DivHUTmp[K] -=  LocDvE(JEdge) * LocESonC(ICell, J) *
+                                        FluxLayerThickEdge(JEdge, K) * 
+                                        NormalVelEdge(JEdge, K) * InvAreaCell;
                      }
+                  
                   }
-               VertTransportTop(ICell, NVertLevels) = 0.;
-               for (int K = NVertLevels - 1; K > 0; --K) {
-                  VertTransportTop(ICell, K) = VertTransportTop(ICell, K + 1) -
-                                               TmpDivHU(K);
-               }
-               VertTransportTop(ICell, 0) = 0.;
+                  for (int K = 0; K < NVertLevels; ++K) {
+                     DivHU(ICell, K) = DivHUTmp[K];
+                  }
+                  VertTransportTop(ICell, NVertLevels) = 0.;
+                  for (int K = NVertLevels - 1; K > 0; --K) {
+                     VertTransportTop(ICell, K) = VertTransportTop(ICell, K + 1) -
+                                                  DivHU(ICell,K);
+                  }
+                  VertTransportTop(ICell, 0) = 0.;
             });
             Kokkos::fence();
          }
