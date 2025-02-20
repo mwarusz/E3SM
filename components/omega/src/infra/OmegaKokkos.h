@@ -10,6 +10,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "DataTypes.h"
+#include <functional>
+#include <numeric>
 #include <type_traits>
 #include <utility>
 
@@ -71,6 +73,70 @@ template <class T> struct ArrayRank {
 using ExecSpace     = MemSpace::execution_space;
 using HostExecSpace = HostMemSpace::execution_space;
 
+// Takes a functor that uses multidimensional indexing
+// and converts it into one that also accepts linear index
+template <class F, int Rank> struct LinearIdxWrapper : F {
+   using F::operator();
+
+   LinearIdxWrapper(F &&Functor, const int (&Bounds)[Rank])
+       : F(std::move(Functor)) {
+      Strides[Rank - 2] = Bounds[Rank - 1];
+      for (int I = Rank - 3; I >= 0; --I) {
+         Strides[I] = Bounds[I + 1] * Strides[I + 1];
+      }
+   }
+
+   template <int N = Rank, class... Args>
+   KOKKOS_FORCEINLINE_FUNCTION std::enable_if_t<N == 2>
+   operator()(int Idx, Args &&...OtherArgs) const {
+      const int I1 = Idx / Strides[0];
+      const int I2 = Idx - I1 * Strides[0];
+
+      (*this)(I1, I2, std::forward<Args>(OtherArgs)...);
+   }
+
+   template <int N = Rank, class... Args>
+   KOKKOS_FORCEINLINE_FUNCTION std::enable_if_t<N == 3>
+   operator()(int Idx, Args &&...OtherArgs) const {
+      const int I1 = Idx / Strides[0];
+      Idx -= I1 * Strides[0];
+      const int I2 = Idx / Strides[1];
+      const int I3 = Idx - I2 * Strides[1];
+
+      (*this)(I1, I2, I3, std::forward<Args>(OtherArgs)...);
+   }
+
+   template <int N = Rank, class... Args>
+   KOKKOS_FORCEINLINE_FUNCTION std::enable_if_t<N == 4>
+   operator()(int Idx, Args &&...OtherArgs) const {
+      const int I1 = Idx / Strides[0];
+      Idx -= I1 * Strides[0];
+      const int I2 = Idx / Strides[1];
+      Idx -= I2 * Strides[1];
+      const int I3 = Idx / Strides[2];
+      const int I4 = Idx - I3 * Strides[2];
+
+      (*this)(I1, I2, I3, I4, std::forward<Args>(OtherArgs)...);
+   }
+
+   template <int N = Rank, class... Args>
+   KOKKOS_FORCEINLINE_FUNCTION std::enable_if_t<N == 5>
+   operator()(int Idx, Args &&...OtherArgs) const {
+      const int I1 = Idx / Strides[0];
+      Idx -= I1 * Strides[0];
+      const int I2 = Idx / Strides[1];
+      Idx -= I2 * Strides[1];
+      const int I3 = Idx / Strides[2];
+      Idx -= I3 * Strides[2];
+      const int I4 = Idx / Strides[3];
+      const int I5 = Idx - I4 * Strides[3];
+
+      (*this)(I1, I2, I3, I4, I5, std::forward<Args>(OtherArgs)...);
+   }
+
+   int Strides[Rank - 1];
+};
+
 template <typename V>
 auto createHostMirrorCopy(const V &View)
     -> Kokkos::View<typename V::data_type, HostMemLayout, HostMemSpace> {
@@ -123,9 +189,20 @@ inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
       Kokkos::parallel_for(Label, Policy, Functor);
 
    } else {
+#ifdef OMEGA_TARGET_DEVICE
+      // On device convert the functor to use one dimensional indexing and use
+      // 1D RangePolicy
+      const auto LinFunctor = LinearIdxWrapper{std::move(Functor), UpperBounds};
+      const int LinBound    = std::reduce(
+          std::begin(UpperBounds), std::end(UpperBounds), 1, std::multiplies{});
+      const auto Policy = Kokkos::RangePolicy<Args...>(0, LinBound);
+      Kokkos::parallel_for(Label, Policy, LinFunctor);
+#else
+      // On host use MDRangePolicy
       const int LowerBounds[N] = {0};
       const auto Policy = Bounds<N, Args...>(LowerBounds, UpperBounds, Tile);
       Kokkos::parallel_for(Label, Policy, Functor);
+#endif
    }
 }
 
@@ -147,9 +224,22 @@ inline void parallelReduce(const std::string &Label,
       Kokkos::parallel_reduce(Label, Policy, Functor, std::forward<R>(Reducer));
 
    } else {
+
+#ifdef OMEGA_TARGET_DEVICE
+      // On device convert the functor to use one dimensional indexing and use
+      // 1D RangePolicy
+      const auto LinFunctor = LinearIdxWrapper{std::move(Functor), UpperBounds};
+      const int LinBound    = std::reduce(
+          std::begin(UpperBounds), std::end(UpperBounds), 1, std::multiplies{});
+      const auto Policy = Kokkos::RangePolicy<Args...>(0, LinBound);
+      Kokkos::parallel_reduce(Label, Policy, LinFunctor,
+                              std::forward<R>(Reducer));
+#else
+      // On host use MDRangePolicy
       const int LowerBounds[N] = {0};
       const auto Policy = Bounds<N, Args...>(LowerBounds, UpperBounds, Tile);
       Kokkos::parallel_reduce(Label, Policy, Functor, std::forward<R>(Reducer));
+#endif
    }
 }
 
