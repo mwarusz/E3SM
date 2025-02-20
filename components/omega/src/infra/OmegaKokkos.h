@@ -74,25 +74,25 @@ using ExecSpace     = MemSpace::execution_space;
 using HostExecSpace = HostMemSpace::execution_space;
 
 template <typename V>
-auto createHostMirrorCopy(const V &view)
+auto createHostMirrorCopy(const V &View)
     -> Kokkos::View<typename V::data_type, HostMemLayout, HostMemSpace> {
-   return Kokkos::create_mirror_view_and_copy(HostExecSpace(), view);
+   return Kokkos::create_mirror_view_and_copy(HostExecSpace(), View);
 }
 
 template <typename V>
-auto createDeviceMirrorCopy(const V &view)
+auto createDeviceMirrorCopy(const V &View)
     -> Kokkos::View<typename V::data_type, MemLayout, MemSpace> {
-   return Kokkos::create_mirror_view_and_copy(ExecSpace(), view);
+   return Kokkos::create_mirror_view_and_copy(ExecSpace(), View);
 }
 
 // function alias to follow Camel Naming Convention
-template <typename D, typename S> void deepCopy(D &&dst, S &&src) {
-   Kokkos::deep_copy(std::forward<D>(dst), std::forward<S>(src));
+template <typename D, typename S> void deepCopy(D &&Dst, S &&Src) {
+   Kokkos::deep_copy(std::forward<D>(Dst), std::forward<S>(Src));
 }
 
 template <typename E, typename D, typename S>
-void deepCopy(E &space, D &dst, const S &src) {
-   Kokkos::deep_copy(space, dst, src);
+void deepCopy(E &Space, D &Dst, const S &Src) {
+   Kokkos::deep_copy(Space, Dst, Src);
 }
 
 #if OMEGA_LAYOUT_RIGHT
@@ -117,50 +117,50 @@ using Bounds = Kokkos::MDRangePolicy<
 
 // parallelFor: with label
 template <int N, class F, class... Args>
-inline void parallelFor(const std::string &label, const int (&upper_bounds)[N],
-                        const F &f,
-                        const int (&tile)[N] = DefaultTile<N>::value) {
+inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
+                        const F &Functor,
+                        const int (&Tile)[N] = DefaultTile<N>::value) {
    if constexpr (N == 1) {
-      const auto policy = Kokkos::RangePolicy<Args...>(0, upper_bounds[0]);
-      Kokkos::parallel_for(label, policy, f);
+      const auto Policy = Kokkos::RangePolicy<Args...>(0, UpperBounds[0]);
+      Kokkos::parallel_for(Label, Policy, Functor);
 
    } else {
-      const int lower_bounds[N] = {0};
-      const auto policy = Bounds<N, Args...>(lower_bounds, upper_bounds, tile);
-      Kokkos::parallel_for(label, policy, f);
+      const int LowerBounds[N] = {0};
+      const auto Policy = Bounds<N, Args...>(LowerBounds, UpperBounds, Tile);
+      Kokkos::parallel_for(Label, Policy, Functor);
    }
 }
 
 // parallelFor: without label
 template <int N, class F>
-inline void parallelFor(const int (&upper_bounds)[N], const F &f,
-                        const int (&tile)[N] = DefaultTile<N>::value) {
-   parallelFor("", upper_bounds, f, tile);
+inline void parallelFor(const int (&UpperBounds)[N], const F &Functor,
+                        const int (&Tile)[N] = DefaultTile<N>::value) {
+   parallelFor("", UpperBounds, Functor, Tile);
 }
 
 // parallelReduce: with label
 template <int N, class F, class R, class... Args>
-inline void parallelReduce(const std::string &label,
-                           const int (&upper_bounds)[N], const F &f,
-                           R &&reducer,
-                           const int (&tile)[N] = DefaultTile<N>::value) {
+inline void parallelReduce(const std::string &Label,
+                           const int (&UpperBounds)[N], const F &Functor,
+                           R &&Reducer,
+                           const int (&Tile)[N] = DefaultTile<N>::value) {
    if constexpr (N == 1) {
-      const auto policy = Kokkos::RangePolicy<Args...>(0, upper_bounds[0]);
-      Kokkos::parallel_reduce(label, policy, f, std::forward<R>(reducer));
+      const auto Policy = Kokkos::RangePolicy<Args...>(0, UpperBounds[0]);
+      Kokkos::parallel_reduce(Label, Policy, Functor, std::forward<R>(Reducer));
 
    } else {
-      const int lower_bounds[N] = {0};
-      const auto policy = Bounds<N, Args...>(lower_bounds, upper_bounds, tile);
-      Kokkos::parallel_reduce(label, policy, f, std::forward<R>(reducer));
+      const int LowerBounds[N] = {0};
+      const auto Policy = Bounds<N, Args...>(LowerBounds, UpperBounds, Tile);
+      Kokkos::parallel_reduce(Label, Policy, Functor, std::forward<R>(Reducer));
    }
 }
 
 // parallelReduce: without label
 template <int N, class F, class R, class... Args>
-inline void parallelReduce(const int (&upper_bounds)[N], const F &f,
-                           R &&reducer,
-                           const int (&tile)[N] = DefaultTile<N>::value) {
-   parallelReduce("", upper_bounds, f, std::forward<R>(reducer), tile);
+inline void parallelReduce(const int (&UpperBounds)[N], const F &Functor,
+                           R &&Reducer,
+                           const int (&Tile)[N] = DefaultTile<N>::value) {
+   parallelReduce("", UpperBounds, Functor, std::forward<R>(Reducer), Tile);
 }
 
 } // end namespace OMEGA
