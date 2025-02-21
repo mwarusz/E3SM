@@ -186,8 +186,7 @@ using Bounds = Kokkos::MDRangePolicy<
 // parallelFor: with label
 template <int N, class F, class... Args>
 inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
-                        const F &Functor,
-                        const int (&Tile)[N] = DefaultTile<N>::value) {
+                        const F &Functor) {
    if constexpr (N == 1) {
       const auto Policy = Bounds1D<Args...>(0, UpperBounds[0]);
       Kokkos::parallel_for(Label, Policy, Functor);
@@ -204,7 +203,7 @@ inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
 #else
       // On host use MDRangePolicy
       const int LowerBounds[N] = {0};
-      const auto Policy = Bounds<N, Args...>(LowerBounds, UpperBounds, Tile);
+      const auto Policy        = Bounds<N, Args...>(LowerBounds, UpperBounds);
       Kokkos::parallel_for(Label, Policy, Functor);
 #endif
    }
@@ -212,17 +211,15 @@ inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
 
 // parallelFor: without label
 template <int N, class F>
-inline void parallelFor(const int (&UpperBounds)[N], const F &Functor,
-                        const int (&Tile)[N] = DefaultTile<N>::value) {
-   parallelFor("", UpperBounds, Functor, Tile);
+inline void parallelFor(const int (&UpperBounds)[N], const F &Functor) {
+   parallelFor("", UpperBounds, Functor);
 }
 
 // parallelReduce: with label
 template <int N, class F, class R, class... Args>
 inline void parallelReduce(const std::string &Label,
                            const int (&UpperBounds)[N], const F &Functor,
-                           R &&Reducer,
-                           const int (&Tile)[N] = DefaultTile<N>::value) {
+                           R &&Reducer) {
    if constexpr (N == 1) {
       const auto Policy = Bounds1D<Args...>(0, UpperBounds[0]);
       Kokkos::parallel_reduce(Label, Policy, Functor, std::forward<R>(Reducer));
@@ -241,7 +238,7 @@ inline void parallelReduce(const std::string &Label,
 #else
       // On host use MDRangePolicy
       const int LowerBounds[N] = {0};
-      const auto Policy = Bounds<N, Args...>(LowerBounds, UpperBounds, Tile);
+      const auto Policy        = Bounds<N, Args...>(LowerBounds, UpperBounds);
       Kokkos::parallel_reduce(Label, Policy, Functor, std::forward<R>(Reducer));
 #endif
    }
@@ -250,9 +247,8 @@ inline void parallelReduce(const std::string &Label,
 // parallelReduce: without label
 template <int N, class F, class R, class... Args>
 inline void parallelReduce(const int (&UpperBounds)[N], const F &Functor,
-                           R &&Reducer,
-                           const int (&Tile)[N] = DefaultTile<N>::value) {
-   parallelReduce("", UpperBounds, Functor, std::forward<R>(Reducer), Tile);
+                           R &&Reducer) {
+   parallelReduce("", UpperBounds, Functor, std::forward<R>(Reducer));
 }
 
 } // end namespace OMEGA
