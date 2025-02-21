@@ -214,13 +214,14 @@ inline void parallelFor(const int (&UpperBounds)[N], const F &Functor) {
 }
 
 // parallelReduce: with label
-template <int N, class F, class R>
+template <int N, class F, class... R>
 inline void parallelReduce(const std::string &Label,
                            const int (&UpperBounds)[N], const F &Functor,
-                           R &&Reducer) {
+                           R &&...Reducers) {
    if constexpr (N == 1) {
       const auto Policy = Bounds1D(0, UpperBounds[0]);
-      Kokkos::parallel_reduce(Label, Policy, Functor, std::forward<R>(Reducer));
+      Kokkos::parallel_reduce(Label, Policy, Functor,
+                              std::forward<R>(Reducers)...);
 
    } else {
 
@@ -232,21 +233,22 @@ inline void parallelReduce(const std::string &Label,
           std::begin(UpperBounds), std::end(UpperBounds), 1, std::multiplies{});
       const auto Policy = Bounds1D(0, LinBound);
       Kokkos::parallel_reduce(Label, Policy, LinFunctor,
-                              std::forward<R>(Reducer));
+                              std::forward<R>(Reducers)...);
 #else
       // On host use MDRangePolicy
       const int LowerBounds[N] = {0};
       const auto Policy        = Bounds<N>(LowerBounds, UpperBounds);
-      Kokkos::parallel_reduce(Label, Policy, Functor, std::forward<R>(Reducer));
+      Kokkos::parallel_reduce(Label, Policy, Functor,
+                              std::forward<R>(Reducers)...);
 #endif
    }
 }
 
 // parallelReduce: without label
-template <int N, class F, class R>
+template <int N, class F, class... R>
 inline void parallelReduce(const int (&UpperBounds)[N], const F &Functor,
-                           R &&Reducer) {
-   parallelReduce("", UpperBounds, Functor, std::forward<R>(Reducer));
+                           R &&...Reducers) {
+   parallelReduce("", UpperBounds, Functor, std::forward<R>(Reducers)...);
 }
 
 } // end namespace OMEGA
