@@ -54,67 +54,16 @@ using MemSpace = Kokkos::HostSpace;
 OMEGA_ENABLE_SERIAL is defined."
 #endif
 
-// Set default tile length
-#ifndef OMEGA_TILE_LENGTH
-#define OMEGA_TILE_LENGTH 64
-#endif
-
 // Aliases for Kokkos memory layouts
 #ifdef OMEGA_LAYOUT_RIGHT
 
 using MemLayout    = Kokkos::LayoutRight;
 using MemInvLayout = Kokkos::LayoutLeft;
 
-// Default tile configurations
-template <int N> struct DefaultTile;
-
-template <> struct DefaultTile<1> {
-   static constexpr int value[] = {OMEGA_TILE_LENGTH};
-};
-
-template <> struct DefaultTile<2> {
-   static constexpr int value[] = {1, OMEGA_TILE_LENGTH};
-};
-
-template <> struct DefaultTile<3> {
-   static constexpr int value[] = {1, 1, OMEGA_TILE_LENGTH};
-};
-
-template <> struct DefaultTile<4> {
-   static constexpr int value[] = {1, 1, 1, OMEGA_TILE_LENGTH};
-};
-
-template <> struct DefaultTile<5> {
-   static constexpr int value[] = {1, 1, 1, 1, OMEGA_TILE_LENGTH};
-};
-
 #elif OMEGA_LAYOUT_LEFT
 
 using MemLayout    = Kokkos::LayoutLeft;
 using MemInvLayout = Kokkos::LayoutRight;
-
-// Default tile configurations
-template <int N> struct DefaultTile;
-
-template <> struct DefaultTile<1> {
-   static constexpr int value[] = {OMEGA_TILE_LENGTH};
-};
-
-template <> struct DefaultTile<2> {
-   static constexpr int value[] = {OMEGA_TILE_LENGTH, 1};
-};
-
-template <> struct DefaultTile<3> {
-   static constexpr int value[] = {OMEGA_TILE_LENGTH, 1, 1};
-};
-
-template <> struct DefaultTile<4> {
-   static constexpr int value[] = {OMEGA_TILE_LENGTH, 1, 1, 1};
-};
-
-template <> struct DefaultTile<5> {
-   static constexpr int value[] = {OMEGA_TILE_LENGTH, 1, 1, 1, 1};
-};
 
 #else
 #error "OMEGA Memory Layout is not defined."
