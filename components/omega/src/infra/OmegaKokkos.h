@@ -159,23 +159,21 @@ void deepCopy(E &Space, D &Dst, const S &Src) {
    Kokkos::deep_copy(Space, Dst, Src);
 }
 
-template <class... Args>
-using Bounds1D =
-    Kokkos::RangePolicy<ExecSpace, Kokkos::IndexType<int>, Args...>;
+using Bounds1D = Kokkos::RangePolicy<ExecSpace, Kokkos::IndexType<int>>;
 
 #if OMEGA_LAYOUT_RIGHT
 
-template <int N, class... Args>
+template <int N>
 using Bounds = Kokkos::MDRangePolicy<
     ExecSpace, Kokkos::Rank<N, Kokkos::Iterate::Right, Kokkos::Iterate::Right>,
-    Kokkos::IndexType<int>, Args...>;
+    Kokkos::IndexType<int>>;
 
 #elif OMEGA_LAYOUT_LEFT
 
-template <int N, class... Args>
+template <int N>
 using Bounds = Kokkos::MDRangePolicy<
     ExecSpace, Kokkos::Rank<N, Kokkos::Iterate::Left, Kokkos::Iterate::Left>,
-    Kokkos::IndexType<int>, Args...>;
+    Kokkos::IndexType<int>>;
 
 #else
 
@@ -184,11 +182,11 @@ using Bounds = Kokkos::MDRangePolicy<
 #endif
 
 // parallelFor: with label
-template <int N, class F, class... Args>
+template <int N, class F>
 inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
                         const F &Functor) {
    if constexpr (N == 1) {
-      const auto Policy = Bounds1D<Args...>(0, UpperBounds[0]);
+      const auto Policy = Bounds1D(0, UpperBounds[0]);
       Kokkos::parallel_for(Label, Policy, Functor);
 
    } else {
@@ -198,12 +196,12 @@ inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
       const auto LinFunctor = LinearIdxWrapper{std::move(Functor), UpperBounds};
       const int LinBound    = std::reduce(
           std::begin(UpperBounds), std::end(UpperBounds), 1, std::multiplies{});
-      const auto Policy = Bounds1D<Args...>(0, LinBound);
+      const auto Policy = Bounds1D(0, LinBound);
       Kokkos::parallel_for(Label, Policy, LinFunctor);
 #else
       // On host use MDRangePolicy
       const int LowerBounds[N] = {0};
-      const auto Policy        = Bounds<N, Args...>(LowerBounds, UpperBounds);
+      const auto Policy        = Bounds<N>(LowerBounds, UpperBounds);
       Kokkos::parallel_for(Label, Policy, Functor);
 #endif
    }
@@ -216,12 +214,12 @@ inline void parallelFor(const int (&UpperBounds)[N], const F &Functor) {
 }
 
 // parallelReduce: with label
-template <int N, class F, class R, class... Args>
+template <int N, class F, class R>
 inline void parallelReduce(const std::string &Label,
                            const int (&UpperBounds)[N], const F &Functor,
                            R &&Reducer) {
    if constexpr (N == 1) {
-      const auto Policy = Bounds1D<Args...>(0, UpperBounds[0]);
+      const auto Policy = Bounds1D(0, UpperBounds[0]);
       Kokkos::parallel_reduce(Label, Policy, Functor, std::forward<R>(Reducer));
 
    } else {
@@ -232,20 +230,20 @@ inline void parallelReduce(const std::string &Label,
       const auto LinFunctor = LinearIdxWrapper{std::move(Functor), UpperBounds};
       const int LinBound    = std::reduce(
           std::begin(UpperBounds), std::end(UpperBounds), 1, std::multiplies{});
-      const auto Policy = Bounds1D<Args...>(0, LinBound);
+      const auto Policy = Bounds1D(0, LinBound);
       Kokkos::parallel_reduce(Label, Policy, LinFunctor,
                               std::forward<R>(Reducer));
 #else
       // On host use MDRangePolicy
       const int LowerBounds[N] = {0};
-      const auto Policy        = Bounds<N, Args...>(LowerBounds, UpperBounds);
+      const auto Policy        = Bounds<N>(LowerBounds, UpperBounds);
       Kokkos::parallel_reduce(Label, Policy, Functor, std::forward<R>(Reducer));
 #endif
    }
 }
 
 // parallelReduce: without label
-template <int N, class F, class R, class... Args>
+template <int N, class F, class R>
 inline void parallelReduce(const int (&UpperBounds)[N], const F &Functor,
                            R &&Reducer) {
    parallelReduce("", UpperBounds, Functor, std::forward<R>(Reducer));
