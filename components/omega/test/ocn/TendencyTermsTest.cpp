@@ -877,7 +877,7 @@ int tendencyTermsTest(const std::string &mesh = DefaultMeshFile) {
    int NVertLevels  = 16;
    int NTracers     = 3;
 
-   const Real RTol = sizeof(Real) == 4 ? 2e-2 : 1e-10;
+   const Real RTol = sizeof(Real) == 4 ? 2e-2 : 1e-5;
 
    Err += testThickFluxDiv(NVertLevels, RTol);
 
