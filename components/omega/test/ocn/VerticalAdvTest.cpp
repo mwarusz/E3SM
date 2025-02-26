@@ -2,6 +2,7 @@
 //
 //===-----------------------------------------------------------------------===/
 
+#include "VerticalAdv.h"
 #include "Config.h"
 #include "DataTypes.h"
 #include "Decomp.h"
@@ -12,23 +13,27 @@
 #include "MachEnv.h"
 #include "OmegaKokkos.h"
 #include "TimeStepper.h"
-#include "VerticalAdv.h"
 
 #include "Pacer.h"
-#include <mpi.h>
 #include <iostream>
+#include <mpi.h>
 
 using namespace OMEGA;
+
+using TeamPolicy = Kokkos::TeamPolicy<ExecSpace>;
+using TeamMember = TeamPolicy::member_type;
+using Kokkos::PerTeam;
+using Kokkos::TeamThreadRange;
 
 constexpr int NVertLevels = 128;
 
 constexpr int VLength = 64;
-//constexpr int VLength = 32;
-//constexpr int VLength = 16;
-//constexpr int VLength = 8;
-//constexpr int VLength = 4;
-//constexpr int VLength = 2;
-//constexpr int VLength = 1;
+// constexpr int VLength = 32;
+// constexpr int VLength = 16;
+// constexpr int VLength = 8;
+// constexpr int VLength = 4;
+// constexpr int VLength = 2;
+// constexpr int VLength = 1;
 
 int initVadvTest() {
 
@@ -104,7 +109,6 @@ int initVadvTest() {
       LOG_ERROR("VertAdvTest: error initializing default aux state");
    }
 
-
    return Err;
 }
 
@@ -123,9 +127,9 @@ void finalizeVadvTest() {
 
 void initArrays() {
 
-   const auto *Mesh = HorzMesh::getDefault();
+   const auto *Mesh      = HorzMesh::getDefault();
    const auto *DefDecomp = Decomp::getDefault();
-   auto *State = OceanState::getDefault();
+   auto *State           = OceanState::getDefault();
 
    int TimeLevel = 0;
    State->copyToHost(TimeLevel);
@@ -142,70 +146,76 @@ void initArrays() {
 
    OMEGA_SCOPE(LocEdgeSignOnCell, Mesh->EdgeSignOnCellH);
 
-//   int NCells = LayerThicknessH.extent(0);
-//   int NLevels = LayerThicknessH.extent(1);
-   int NCells = LayerThickness.extent(0);
+   //   int NCells = LayerThicknessH.extent(0);
+   //   int NLevels = LayerThicknessH.extent(1);
+   int NCells  = LayerThickness.extent(0);
    int NLevels = LayerThickness.extent(1);
-//   for (int ICell = 0; ICell < NCells; ++ICell) {
-//      for (int K = 0; K < NLevels; ++K) {
-////         Real NewVal = DefDecomp->CellIDH(ICell) * NLevels + K;
-//         Real NewVal = 100._Real * (K + 1);
-//         LayerThicknessH(ICell, K) = NewVal;
-////         std::cout << ICell << " " << K << " " << LayerThicknessH(ICell, K) << std::endl;
-//      }
-//      for (int J = 0; J < LocEdgeSignOnCell.extent(1); ++J) {
-////         std::cout << ICell << " " << J << " " << LocEdgeSignOnCell(ICell, J) << std::endl;
-//      }
-//   }
-   parallelFor("initLayThick",
-      {NCells, NLevels}, KOKKOS_LAMBDA(int ICell, int K) {
-         Real NewVal = 100._Real * (K + 1);
-         LayerThickness(ICell, K) = NewVal;
-   });
-   
+   //   for (int ICell = 0; ICell < NCells; ++ICell) {
+   //      for (int K = 0; K < NLevels; ++K) {
+   ////         Real NewVal = DefDecomp->CellIDH(ICell) * NLevels + K;
+   //         Real NewVal = 100._Real * (K + 1);
+   //         LayerThicknessH(ICell, K) = NewVal;
+   ////         std::cout << ICell << " " << K << " " << LayerThicknessH(ICell,
+   /// K) << std::endl;
+   //      }
+   //      for (int J = 0; J < LocEdgeSignOnCell.extent(1); ++J) {
+   ////         std::cout << ICell << " " << J << " " <<
+   /// LocEdgeSignOnCell(ICell, J) << std::endl;
+   //      }
+   //   }
+   parallelFor(
+       "initLayThick", {NCells, NLevels}, KOKKOS_LAMBDA(int ICell, int K) {
+          Real NewVal              = 100._Real * (K + 1);
+          LayerThickness(ICell, K) = NewVal;
+       });
 
-//   for (int IEdge = 0; IEdge < DefDecomp->NEdgesAll; ++IEdge) {
-////      std::cout << IEdge << " " << Mesh->DvEdgeH(IEdge) << std::endl;
-//      Real Sign;
-//      if (IEdge % 2 == 0) {
-//        Sign = 1.; 
-//      } else {
-//        Sign = -1.;
-//      }
-//      Real Mod = 0.1_Real * double(IEdge % 10);
-//      for (int K = 0; K < NLevels; ++K) {
-//         NormalVelocityH(IEdge, K) = Sign * (5._Real + Mod);
-////         std::cout << IEdge << " " << K << " " << NormalVelocityH(IEdge, K)  << std::endl;
-//      }
-//   }
+   //   for (int IEdge = 0; IEdge < DefDecomp->NEdgesAll; ++IEdge) {
+   ////      std::cout << IEdge << " " << Mesh->DvEdgeH(IEdge) << std::endl;
+   //      Real Sign;
+   //      if (IEdge % 2 == 0) {
+   //        Sign = 1.;
+   //      } else {
+   //        Sign = -1.;
+   //      }
+   //      Real Mod = 0.1_Real * double(IEdge % 10);
+   //      for (int K = 0; K < NLevels; ++K) {
+   //         NormalVelocityH(IEdge, K) = Sign * (5._Real + Mod);
+   ////         std::cout << IEdge << " " << K << " " << NormalVelocityH(IEdge,
+   /// K)  << std::endl;
+   //      }
+   //   }
 
-   parallelFor("intNormVel",
-      {DefDecomp->NEdgesAll, NLevels}, KOKKOS_LAMBDA(int IEdge, int K) {
-         Real Sign;
-         if (IEdge % 2 == 0) {
-            Sign = 1.;
-         } else {
-            Sign = -1.;
-         }
-         Real Mod = 0.1_Real * double(IEdge % 10);
-         NormalVelocity(IEdge, K) = Sign * (5._Real + Mod);
-   });
+   parallelFor(
+       "intNormVel", {DefDecomp->NEdgesAll, NLevels},
+       KOKKOS_LAMBDA(int IEdge, int K) {
+          Real Sign;
+          if (IEdge % 2 == 0) {
+             Sign = 1.;
+          } else {
+             Sign = -1.;
+          }
+          Real Mod                 = 0.1_Real * double(IEdge % 10);
+          NormalVelocity(IEdge, K) = Sign * (5._Real + Mod);
+       });
 
-//   State->copyToDevice(TimeLevel);
+   //   State->copyToDevice(TimeLevel);
    State->copyToHost(TimeLevel);
    Kokkos::fence();
 
    AuxState->computeMomAux(State, TimeLevel, TimeLevel);
    Kokkos::fence();
 
-//   auto FluxLayerThickEdgeH = createHostMirrorCopy(AuxState->LayerThicknessAux.FluxLayerThickEdge);
-//   for (int I1 = 0; I1 < FluxLayerThickEdgeH.extent(0); ++I1) {
-//      for (int I2 = 0; I2 < FluxLayerThickEdgeH.extent(1); ++I2) {
-////         std::cout << I1 << " " << I2 << " " << FluxLayerThickEdgeH(I1, I2) << std::endl;
-//      }
-//   }
+   //   auto FluxLayerThickEdgeH =
+   //   createHostMirrorCopy(AuxState->LayerThicknessAux.FluxLayerThickEdge);
+   //   for (int I1 = 0; I1 < FluxLayerThickEdgeH.extent(0); ++I1) {
+   //      for (int I2 = 0; I2 < FluxLayerThickEdgeH.extent(1); ++I2) {
+   ////         std::cout << I1 << " " << I2 << " " << FluxLayerThickEdgeH(I1,
+   /// I2) << std::endl;
+   //      }
+   //   }
 
-//   std::cout << FluxLayerThickEdgeH.extent(0) << " " << FluxLayerThickEdgeH.extent(1) << std::endl;
+   //   std::cout << FluxLayerThickEdgeH.extent(0) << " " <<
+   //   FluxLayerThickEdgeH.extent(1) << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -223,7 +233,7 @@ int main(int argc, char *argv[]) {
       Pacer::start("Init");
       initVadvTest();
 
-//      std::cout << " main " << std::endl;
+      //      std::cout << " main " << std::endl;
       Pacer::start("SetArrays");
       initArrays();
       Pacer::stop("SetArrays");
@@ -231,24 +241,22 @@ int main(int argc, char *argv[]) {
       const auto *Mesh = HorzMesh::getDefault();
 
       int VectorLength = 1;
-//      int VectorLength = 2;
-//      int VectorLength = 4;
-//      int VectorLength = 8;
-//      int VectorLength = 16;
-//      int VectorLength = 32;
-//      int VectorLength = 64;
-//      int VadvErr = VerticalAdv::init(NVertLevels, VectorLength);
-//      VerticalAdv VadvObj(Mesh, NVertLevels, VectorLength);
-//      VerticalAdv VadvObj; 
-//      VadvObj.init(NVertLevels, VectorLength);
+      //      int VectorLength = 2;
+      //      int VectorLength = 4;
+      //      int VectorLength = 8;
+      //      int VectorLength = 16;
+      //      int VectorLength = 32;
+      //      int VectorLength = 64;
+      //      int VadvErr = VerticalAdv::init(NVertLevels, VectorLength);
+      //      VerticalAdv VadvObj(Mesh, NVertLevels, VectorLength);
+      //      VerticalAdv VadvObj;
+      //      VadvObj.init(NVertLevels, VectorLength);
 
-      int TimeLev = 0;
+      int TimeLev             = 0;
       std::string TimeStepStr = "0000_00:10:00";
       TimeInterval TimeStep(TimeStepStr);
 
-
-
-      OceanState *State = OceanState::getDefault();
+      OceanState *State        = OceanState::getDefault();
       AuxiliaryState *AuxState = AuxiliaryState::getDefault();
 
       Array2DReal NormalVelEdge;
@@ -258,7 +266,8 @@ int main(int argc, char *argv[]) {
 
       Array2DReal TmpArray("Tmp", Mesh->NCellsSize, NVertLevels);
       Array2DReal DivHU("DivHU", Mesh->NCellsSize, NVertLevels);
-      Array2DReal VertTransportTop("VertTranspTop", Mesh->NCellsSize, NVertLevels + 1);
+      Array2DReal VertTransportTop("VertTranspTop", Mesh->NCellsSize,
+                                   NVertLevels + 1);
       std::cout << 0 << std::endl;
 
       OMEGA_SCOPE(LocAreaCell, Mesh->AreaCell);
@@ -275,79 +284,135 @@ int main(int argc, char *argv[]) {
       {
          const int NVertLs = Mesh->NVertLevels;
          const int NChunks = NVertLevels / VLength;
-         parallelFor("Run1-0",
-            {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
-               const int KStart = KChunk * VLength;
-               for (int KVec = 0; KVec < VLength; ++KVec) {
-                  const I4 K = KStart + KVec;
-                  DivHU(ICell, K) = 0;
-               }
-         });
+         parallelFor(
+             "Run1-0", {Mesh->NCellsAll, NChunks},
+             KOKKOS_LAMBDA(int ICell, int KChunk) {
+                const int KStart = KChunk * VLength;
+                for (int KVec = 0; KVec < VLength; ++KVec) {
+                   const I4 K      = KStart + KVec;
+                   DivHU(ICell, K) = 0;
+                }
+             });
          Kokkos::fence();
 
-         parallelFor("Run1-1",
-            {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
-               const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
-               const I4 KStart = KChunk * VLength;
+         parallelFor(
+             "Run1-1", {Mesh->NCellsAll, NChunks},
+             KOKKOS_LAMBDA(int ICell, int KChunk) {
+                const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
+                const I4 KStart        = KChunk * VLength;
 
-               for (int J = 0; J < LocNEonC(ICell); ++ J) {
-                  const I4 JEdge = LocEonC(ICell, J);
-                  for (int KVec = 0; KVec < VLength; ++KVec) {
-                     const I4 K = KStart + KVec;
-                     const Real Flux = LocDvE(JEdge) * LocESonC(ICell, J) *
-                                       FluxLayerThickEdge(JEdge, K) *
-                                       NormalVelEdge(JEdge, K) * InvAreaCell;
-                     DivHU(ICell, K) -= Flux;
-                  }
-               }
-         });
+                for (int J = 0; J < LocNEonC(ICell); ++J) {
+                   const I4 JEdge = LocEonC(ICell, J);
+                   for (int KVec = 0; KVec < VLength; ++KVec) {
+                      const I4 K      = KStart + KVec;
+                      const Real Flux = LocDvE(JEdge) * LocESonC(ICell, J) *
+                                        FluxLayerThickEdge(JEdge, K) *
+                                        NormalVelEdge(JEdge, K) * InvAreaCell;
+                      DivHU(ICell, K) -= Flux;
+                   }
+                }
+             });
          Kokkos::fence();
 
-         parallelFor("Run1-2",
-            {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
-               const int NVertLs = DivHU.extent(1);
-               VertTransportTop(ICell, NVertLevels) = 0.;
-               for (int K = NVertLevels - 1; K > 0; --K) {
-                  VertTransportTop(ICell, K) = VertTransportTop(ICell, K + 1) -
-                                               DivHU(ICell, K);
-               }
-               VertTransportTop(ICell, 0) = 0.;
-         });
+         parallelFor(
+             "Run1-2", {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
+                const int NVertLs                    = DivHU.extent(1);
+                VertTransportTop(ICell, NVertLevels) = 0.;
+                for (int K = NVertLevels - 1; K > 0; --K) {
+                   VertTransportTop(ICell, K) =
+                       VertTransportTop(ICell, K + 1) - DivHU(ICell, K);
+                }
+                VertTransportTop(ICell, 0) = 0.;
+             });
          Kokkos::fence();
       }
       Pacer::stop("1stVadv1");
-
 
       Pacer::start("1stVadv2");
       {
          const int NVertLs = Mesh->NVertLevels;
          Array1DReal TmpDivHU("TmpDivHU", NVertLs);
 
-         parallelFor("Run2",
-            {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
-               const int NVertLs = NormalVelEdge.extent(1);
-               const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
-               for (int J = 0; J < LocNEonC(ICell); ++J) {
-                  const I4 JEdge = LocEonC(ICell, J);
-                  for (int K = 0; K < NVertLs; ++K) {
-                     Real TmpVal = LocDvE(JEdge) * LocESonC(ICell, J) *
-                                   FluxLayerThickEdge(JEdge, K) * 
-                                   NormalVelEdge(JEdge, K) * InvAreaCell;
-                     TmpDivHU(K) -= TmpVal;
-                  }
-               }
-            VertTransportTop(ICell, NVertLevels) = 0.;
-            for (int K = NVertLevels - 1; K > 0; --K) {
-               VertTransportTop(ICell, K) = VertTransportTop(ICell, K + 1) -
-                                            TmpDivHU(K);
-            }
-            VertTransportTop(ICell, 0) = 0.;
-         });
+         parallelFor(
+             "Run2", {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
+                const int NVertLs      = NormalVelEdge.extent(1);
+                const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
+                for (int J = 0; J < LocNEonC(ICell); ++J) {
+                   const I4 JEdge = LocEonC(ICell, J);
+                   for (int K = 0; K < NVertLs; ++K) {
+                      Real TmpVal = LocDvE(JEdge) * LocESonC(ICell, J) *
+                                    FluxLayerThickEdge(JEdge, K) *
+                                    NormalVelEdge(JEdge, K) * InvAreaCell;
+                      TmpDivHU(K) -= TmpVal;
+                   }
+                }
+                VertTransportTop(ICell, NVertLevels) = 0.;
+                for (int K = NVertLevels - 1; K > 0; --K) {
+                   VertTransportTop(ICell, K) =
+                       VertTransportTop(ICell, K + 1) - TmpDivHU(K);
+                }
+                VertTransportTop(ICell, 0) = 0.;
+             });
          Kokkos::fence();
       }
       Pacer::stop("1stVadv2");
 
+      Pacer::start("1stVadv3");
+      {
+         const int NVertLs = Mesh->NVertLevels;
+         const int NChunks = NVertLevels / VLength;
 
+#ifdef OMEGA_TARGET_DEVICE
+         const int TeamSize = 64;
+#else
+         const int TeamSize = 1;
+#endif
+         const auto Policy = TeamPolicy(Mesh->NCellsAll, TeamSize, 1);
+         Kokkos::parallel_for(
+             "Run3", Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+                const int ICell = Member.league_rank();
+
+                Kokkos::parallel_for(
+                    TeamThreadRange(Member, NChunks), [&](int KChunk) {
+                       const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
+                       const I4 KStart        = KChunk * VLength;
+
+                       Real DivHUTmp[VLength] = {0};
+
+                       for (int J = 0; J < LocNEonC(ICell); ++J) {
+                          const I4 JEdge = LocEonC(ICell, J);
+                          for (int KVec = 0; KVec < VLength; ++KVec) {
+                             const I4 K = KStart + KVec;
+                             DivHUTmp[KVec] -=
+                                 LocDvE(JEdge) * LocESonC(ICell, J) *
+                                 FluxLayerThickEdge(JEdge, K) *
+                                 NormalVelEdge(JEdge, K) * InvAreaCell;
+                          }
+                       }
+                       for (int KVec = 0; KVec < VLength; ++KVec) {
+                          const int K     = KStart + KVec;
+                          DivHU(ICell, K) = DivHUTmp[KVec];
+                       }
+                    });
+
+                Member.team_barrier();
+
+                Kokkos::parallel_scan(TeamThreadRange(Member, NVertLs),
+                                      [&](int K, Real &Accum, bool IsFinal) {
+                                         const int KRev = NVertLs - 1 - K;
+                                         if (IsFinal) {
+                                            VertTransportTop(ICell, KRev + 1) =
+                                                Accum;
+                                         }
+                                         Accum -= DivHU(ICell, KRev);
+                                      });
+
+                Kokkos::single(PerTeam(Member),
+                               [&]() { VertTransportTop(ICell, 0) = 0; });
+             });
+         Kokkos::fence();
+      }
+      Pacer::stop("1stVadv3");
 
       for (int Istep = 0; Istep < 100; ++Istep) {
          std::cout << Istep + 1 << std::endl;
@@ -357,40 +422,41 @@ int main(int argc, char *argv[]) {
             const int NVertLs = Mesh->NVertLevels;
             const int NChunks = NVertLevels / VLength;
 
-            parallelFor("Run1-1",
-               {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
-                  const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
-                  const I4 KStart = KChunk * VLength;
+            parallelFor(
+                "Run1-1", {Mesh->NCellsAll, NChunks},
+                KOKKOS_LAMBDA(int ICell, int KChunk) {
+                   const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
+                   const I4 KStart        = KChunk * VLength;
 
-                  Real DivHUTmp[VLength] = {0};
+                   Real DivHUTmp[VLength] = {0};
 
-                  for (int J = 0; J < LocNEonC(ICell); ++ J) {
-                     const I4 JEdge = LocEonC(ICell, J);
-                     for (int KVec = 0; KVec < VLength; ++KVec) {
-                        const I4 K = KStart + KVec;
-                        DivHUTmp[KVec] -= LocDvE(JEdge) * LocESonC(ICell, J) *
-                                          FluxLayerThickEdge(JEdge, K) *
-                                          NormalVelEdge(JEdge, K) * InvAreaCell;
-
-                     }
-                  }
-                  for (int KVec = 0; KVec < VecLength; ++KVec) {
-                     const int K     = KStart + KVec;
-                     DivHU(ICell, K) = DivHUTmp[KVec];
-                  }
-            });
+                   for (int J = 0; J < LocNEonC(ICell); ++J) {
+                      const I4 JEdge = LocEonC(ICell, J);
+                      for (int KVec = 0; KVec < VLength; ++KVec) {
+                         const I4 K = KStart + KVec;
+                         DivHUTmp[KVec] -= LocDvE(JEdge) * LocESonC(ICell, J) *
+                                           FluxLayerThickEdge(JEdge, K) *
+                                           NormalVelEdge(JEdge, K) *
+                                           InvAreaCell;
+                      }
+                   }
+                   for (int KVec = 0; KVec < VLength; ++KVec) {
+                      const int K     = KStart + KVec;
+                      DivHU(ICell, K) = DivHUTmp[KVec];
+                   }
+                });
             Kokkos::fence();
 
-            parallelFor("Run1-2",
-               {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
-                  const int NVertLs = DivHU.extent(1);
-                  VertTransportTop(ICell, NVertLevels) = 0.;
-                  for (int K = NVertLevels - 1; K > 0; --K) {
-                     VertTransportTop(ICell, K) = VertTransportTop(ICell, K + 1) -
-                                                  DivHU(ICell, K);
-                  }
-                  VertTransportTop(ICell, 0) = 0.;
-            });
+            parallelFor(
+                "Run1-2", {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
+                   const int NVertLs                    = DivHU.extent(1);
+                   VertTransportTop(ICell, NVertLevels) = 0.;
+                   for (int K = NVertLevels - 1; K > 0; --K) {
+                      VertTransportTop(ICell, K) =
+                          VertTransportTop(ICell, K + 1) - DivHU(ICell, K);
+                   }
+                   VertTransportTop(ICell, 0) = 0.;
+                });
          }
 
          Kokkos::fence();
@@ -400,41 +466,93 @@ int main(int argc, char *argv[]) {
          {
             const int NVertLs = Mesh->NVertLevels;
 
-            parallelFor("Run2",
-               {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
-                  const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
-                  Real DivHUTmp[NVertLevels] = {0};
-                  for (int J = 0; J < LocNEonC(ICell); ++J) {
-                     const I4 JEdge = LocEonC(ICell, J);
-                     for (int K = 0; K < NVertLs; ++K) {
-                        DivHUTmp[K] -=  LocDvE(JEdge) * LocESonC(ICell, J) *
-                                        FluxLayerThickEdge(JEdge, K) * 
+            parallelFor(
+                "Run2", {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
+                   const Real InvAreaCell     = 1._Real / LocAreaCell(ICell);
+                   Real DivHUTmp[NVertLevels] = {0};
+                   for (int J = 0; J < LocNEonC(ICell); ++J) {
+                      const I4 JEdge = LocEonC(ICell, J);
+                      for (int K = 0; K < NVertLs; ++K) {
+                         DivHUTmp[K] -= LocDvE(JEdge) * LocESonC(ICell, J) *
+                                        FluxLayerThickEdge(JEdge, K) *
                                         NormalVelEdge(JEdge, K) * InvAreaCell;
-                     }
-                  
-                  }
-                  for (int K = 0; K < NVertLevels; ++K) {
-                     DivHU(ICell, K) = DivHUTmp[K];
-                  }
-                  VertTransportTop(ICell, NVertLevels) = 0.;
-                  for (int K = NVertLevels - 1; K > 0; --K) {
-                     VertTransportTop(ICell, K) = VertTransportTop(ICell, K + 1) -
-                                                  DivHU(ICell,K);
-                  }
-                  VertTransportTop(ICell, 0) = 0.;
-            });
+                      }
+                   }
+                   for (int K = 0; K < NVertLevels; ++K) {
+                      DivHU(ICell, K) = DivHUTmp[K];
+                   }
+                   VertTransportTop(ICell, NVertLevels) = 0.;
+                   for (int K = NVertLevels - 1; K > 0; --K) {
+                      VertTransportTop(ICell, K) =
+                          VertTransportTop(ICell, K + 1) - DivHU(ICell, K);
+                   }
+                   VertTransportTop(ICell, 0) = 0.;
+                });
             Kokkos::fence();
          }
          Pacer::stop("vadv2");
 
+         Pacer::start("vadv3");
+         {
+            const int NVertLs = Mesh->NVertLevels;
+            const int NChunks = NVertLevels / VLength;
+#ifdef OMEGA_TARGET_DEVICE
+            const int TeamSize = 64;
+#else
+            const int TeamSize = 1;
+#endif
+            const auto Policy = TeamPolicy(Mesh->NCellsAll, TeamSize, 1);
+            Kokkos::parallel_for(
+                "Run3", Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+                   const int ICell = Member.league_rank();
+
+                   Kokkos::parallel_for(
+                       TeamThreadRange(Member, NChunks), [&](int KChunk) {
+                          const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
+                          const I4 KStart        = KChunk * VLength;
+
+                          Real DivHUTmp[VLength] = {0};
+
+                          for (int J = 0; J < LocNEonC(ICell); ++J) {
+                             const I4 JEdge = LocEonC(ICell, J);
+                             for (int KVec = 0; KVec < VLength; ++KVec) {
+                                const I4 K = KStart + KVec;
+                                DivHUTmp[KVec] -=
+                                    LocDvE(JEdge) * LocESonC(ICell, J) *
+                                    FluxLayerThickEdge(JEdge, K) *
+                                    NormalVelEdge(JEdge, K) * InvAreaCell;
+                             }
+                          }
+                          for (int KVec = 0; KVec < VLength; ++KVec) {
+                             const int K     = KStart + KVec;
+                             DivHU(ICell, K) = DivHUTmp[KVec];
+                          }
+                       });
+
+                   Member.team_barrier();
+
+                   Kokkos::parallel_scan(TeamThreadRange(Member, NVertLs),
+                                         [&](int K, Real &Accum, bool IsFinal) {
+                                            const int KRev = NVertLs - 1 - K;
+                                            if (IsFinal) {
+                                               VertTransportTop(
+                                                   ICell, KRev + 1) = Accum;
+                                            }
+                                            Accum -= DivHU(ICell, KRev);
+                                         });
+
+                   Kokkos::single(PerTeam(Member),
+                                  [&]() { VertTransportTop(ICell, 0) = 0; });
+                });
+            Kokkos::fence();
+         }
+         Pacer::stop("vadv3");
       }
 
       Pacer::stop("Run");
 
-
-
       Pacer::start("Finalize");
-//      VerticalAdv::clear();
+      //      VerticalAdv::clear();
       finalizeVadvTest();
       Pacer::stop("Finalize");
    }
