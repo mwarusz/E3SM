@@ -11,7 +11,6 @@
 
 #include "DataTypes.h"
 #include <functional>
-#include <numeric>
 #include <type_traits>
 #include <utility>
 
@@ -194,8 +193,10 @@ inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
       // On device convert the functor to use one dimensional indexing and use
       // 1D RangePolicy
       const auto LinFunctor = LinearIdxWrapper{std::move(Functor), UpperBounds};
-      const int LinBound    = std::reduce(
-          std::begin(UpperBounds), std::end(UpperBounds), 1, std::multiplies{});
+      int LinBound          = 1;
+      for (int Rank = 0; Rank < N; ++Rank) {
+         LinBound *= UpperBounds[Rank];
+      }
       const auto Policy = Bounds1D(0, LinBound);
       Kokkos::parallel_for(Label, Policy, LinFunctor);
 #else
@@ -229,8 +230,10 @@ inline void parallelReduce(const std::string &Label,
       // On device convert the functor to use one dimensional indexing and use
       // 1D RangePolicy
       const auto LinFunctor = LinearIdxWrapper{std::move(Functor), UpperBounds};
-      const int LinBound    = std::reduce(
-          std::begin(UpperBounds), std::end(UpperBounds), 1, std::multiplies{});
+      int LinBound          = 1;
+      for (int Rank = 0; Rank < N; ++Rank) {
+         LinBound *= UpperBounds[Rank];
+      }
       const auto Policy = Bounds1D(0, LinBound);
       Kokkos::parallel_reduce(Label, Policy, LinFunctor,
                               std::forward<R>(Reducers)...);
