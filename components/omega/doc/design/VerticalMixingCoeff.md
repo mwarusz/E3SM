@@ -18,9 +18,11 @@ $$
 \overline{w' \phi'}\approx \kappa(\overline{\rho},\overline{u},\overline{v}) \left(\frac{\partial \overline{\phi}}{\partial z} + \gamma(\overline{\rho},\overline{u},\overline{v}) \right)
 $$
 
-Here, $\phi$ is a generic tracer, $\overline{w'\phi'}$ is the vertical turbulent flux of that tracer, and $\gamma$ is the gradient free portion of the flux (often referred to as 'non-local'). The vertical diffusivity can be as simple as a constant value, to complex functions of quantities like shear and stratification. A similar equation can be written for turbulent momentum fluxes.
+Here, $\phi$ is a generic tracer, $\overline{w'\phi'}$ is the vertical turbulent flux of that tracer, $\kappa$ is the vertical diffusivity, and $\gamma$ is the gradient free portion of the flux (often referred to as 'non-local'). The vertical diffusivity $\kappa$ can be as simple as a constant value, to complex functions of quantities like shear and stratification. A similar equation can be written for turbulent momentum fluxes and vertical viscosity ($\nu$).
 
 The use of a flux term proportional to the local gradient allows this problem to be cast implicitly, allowing for larger time steps, reducing the cost of the mixing model.  When more complex schemes are considered, other techniques such as subcycling can be considered to improve performance.
+
+The initial design and implementation of these vertical mixing coefficients will include only the local, down gradient portion of the flux (first right-hand-side term in Eq. (1)). Implementation of the non-local, gradient free portion of the vertical flux will come later. However, it is important to note here that $\gamma$ is only non-zero within the boundary layer, and when non-local flux formulations (such as [KPP (Large et al., 1994)](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/94rg01872)) are being used, $\kappa$ value contributions such as the convective mixing flux detailed in Section 3.2 are only computed outside of the boundary layer and remain zero within the boundary layer.
 
 ### 2.3 Requirement: Vertical mixing models cannot ingest single columns at a time
 
@@ -28,7 +30,7 @@ Many standard vertical mixing libraries (e.g. CVMix) receive and operate on one 
 
 ## 3 Algorithmic Formulation
 
-For Omega-1 a few simple vertical mixing algorithms will be used.  
+For Omega-1 a few simple vertical mixing algorithms will be used. When computing $\kappa$ and $\nu$, linear superposition when combining the various parameterizations is assumed.
 
 ### 3.1 Richardson number dependent mixing
 
@@ -90,11 +92,11 @@ $$
 \kappa =
 \begin{cases}
 \kappa_{conv} \quad \text{ if } N^2 < N^2_{crit}\\
-0 \quad \text{ if } N^2 \geq N^2_{crit}
+0 \quad \text{ if } N^2 \geq N^2_{crit} \,,
 \end{cases}
 $$
 
-$N^2_{crit}$ is typically chosen to be 0.
+where $N^2_{crit}$ is typically chosen to be 0. Values for $\kappa_{conv}$ are typically large ($\sim 1 \, \mathrm{m^2/s}$). Again, when non-local, gradient free flux formulations are included in Eq. (1), this convective instability contribution to the mixing is not calculated within the boundary layer where $\gamma$ is active.
 
 ## 4 Design
 
@@ -102,7 +104,9 @@ Vertical chunking, as is, does not work well for vertical derivatives, so a firs
 
 Additionally, to start, only the down gradient contribution to vertical mixing will be added, with contributions to the vertical viscosity and diffusivity coming from the shear (Richardson number mixing), convective, and background mixing models detailed in the prior section. However, in future developments, the K Profile Parameterization [(KPP; Large et al., 1994)](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/94rg01872) and other non-local and/or higher-order mixing models will be added. Some of these parameterizations require vertical derivatives, full-depth integrals, and/or formulate $\kappa$ and $\gamma$ in Eq. (1) Section 2.1 as functions of surface forcing, which require either full-depth column or surface forcing information at depth, thus we design the mixing coefficients routine with this in mind. A solution that allows chunking with vertical operations such as derivatives and integrals and/or surface forcing values would be advantageous, but is outside of the scope of this design document.
 
-### 4.1 Data types and parameters 
+### 4.1 Data types and parameters
+
+Several parameters will be needed for the three different contributions to the local, down gradient vertical mixing coefficients. These parameters should be run-time configurable through the YAML config. A new section in the YAML config should be made for these parameters, as more run-time configurable vertical mixing parameters will be added to this section when the non-local formulations are added.
 
 #### 4.1.1 Parameters
 
@@ -135,8 +139,9 @@ It is assumed that viscosity and diffusivity will be stored at cell centers. Add
 parallelFor(
     {NCellsAll, NVertLevels}, KOKKOS_LAMBDA(int ICell, int K) {
 
-        VertViscosity(ICell, K) = 0._Real;
-        VertDiffusivity(ICell, K) = 0._Real;
+        // Add background contribution to viscosity and diffusivity 
+        VertViscosity(ICell, K) = BackgroundViscosity;
+        VertDiffusivity(ICell, K) = BackgroundDiffusivity;
 
         // If shear mixing true, add shear contribution to viscosity and diffusivity 
         if (EnableShearMix) {
@@ -166,9 +171,6 @@ parallelFor(
             }
         }
 
-        // Add background contribution to viscosity and diffusivity 
-        VertViscosity(ICell, K) = VertViscosity(ICell, K) + BackgroundViscosity;
-        VertDiffusivity(ICell, K) = VertDiffusivity(ICell, K) + BackgroundDiffusivity;
     });
 ```
 
