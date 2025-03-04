@@ -15,7 +15,7 @@ To prepare for additional mixing closures and later improvements, the interface 
 For optimal performance, initial models of vertical turbulent fluxes for Omega should be cast as an implicit, down gradient mixing and an explicit, gradient free, component, e.g.,
 
 $$
-\overline{w' \phi'}\approx \kappa(\overline{\rho},\overline{u},\overline{v}) \left(\frac{\partial \overline{\phi}}{\partial z} + \gamma(\overline{\rho},\overline{u},\overline{v}) \right)
+\overline{w' \phi'}\approx \kappa(\overline{\rho},\overline{u},\overline{v}) \left(\frac{\partial \overline{\phi}}{\partial z} + \gamma(\overline{\rho},\overline{u},\overline{v}) \right)\,.
 $$
 
 Here, $\phi$ is a generic tracer, $\overline{w'\phi'}$ is the vertical turbulent flux of that tracer, $\kappa$ is the vertical diffusivity, and $\gamma$ is the gradient free portion of the flux (often referred to as 'non-local'). The vertical diffusivity $\kappa$ can be as simple as a constant value, to complex functions of quantities like shear and stratification. A similar equation can be written for turbulent momentum fluxes and vertical viscosity ($\nu$).
@@ -37,27 +37,27 @@ For Omega-1 a few simple vertical mixing algorithms will be used. When computing
 One of the simplest class of models of vertical turbulence are polynomial functions of the gradient Richardson number. As in MPAS-Ocean, we choose to define the Richardson number as
 
 $$
-Ri = \frac{N^2}{\left|\frac{\partial \mathbf{U}}{\partial z}\right|^2}
+Ri = \frac{N^2}{\left|\frac{\partial \mathbf{U}}{\partial z}\right|^2}\,,
 $$
 
 where $N^2$ is the Brunt Vaisala Frequency, which for non Boussinesq flows is defined as
 
 $$
-N^2 = \frac{g}{\rho_0}\frac{\partial \rho}{\partial z}
+N^2 = \frac{g}{\rho_0}\frac{\partial \rho}{\partial z}\,.
 $$
 
-This term is discretized as
+If we assume this term is defined at the top of the cell, it is discretized as
 
 $$
-N^2(k) = g \rho_0 \frac{\rho_{DD}(k) - \rho(k)}{z_m(k-1) - z_m(k)}
+N^2(k) = g \rho_0 \frac{\rho_{DD}(k) - \rho(k)}{z_m(k-1) - z_m(k)}\,.
 $$
 
 Here $\rho_{DD}$ is the density of the fluid of layer k-1 displaced to layer k adiabatically.
 
-The shear in the denominator is discretized as
+The shear in the denominator, also defined at the top of the cell, is discretized as
 
 $$
-\left| \frac{\partial \mathbf{U}}{\partial z}\right|^2 = \left(\frac{U_n(k-1)-U_n(k)}{z_m(k-1) - z_m(k)}\right)^2 + \left(\frac{U_t(k-1)-U_t(k)}{z_m(k-1) - z_m(k)}\right)^2
+\left| \frac{\partial \mathbf{U}}{\partial z}\right|^2 = \left(\frac{U_n(k-1)-U_n(k)}{z_m(k-1) - z_m(k)}\right)^2 + \left(\frac{U_t(k-1)-U_t(k)}{z_m(k-1) - z_m(k)}\right)^2\,.
 $$
 
 Where the subscripts *n* and *t* are the normal and tangential velocities respectively.
@@ -65,14 +65,14 @@ Where the subscripts *n* and *t* are the normal and tangential velocities respec
 With the definition of the gradient richardson number, the viscosity and diffusivity are defined according to [Pacanowski and Philander (1981)](https://journals.ametsoc.org/view/journals/phoc/11/11/1520-0485_1981_011_1443_povmin_2_0_co_2.xml?tab_body=pdf) as
 
 $$
-\nu = \frac{\nu_o}{(1+\alpha Ri)^n} + \nu_b
+\nu = \frac{\nu_o}{(1+\alpha Ri)^n} + \nu_b\,,
 $$
 
 $$
-\kappa = \frac{\nu}{(1+\alpha Ri)} + \kappa_b
+\kappa = \frac{\nu}{(1+\alpha Ri)} + \kappa_b\,.
 $$
 
-in these formulae, $\alpha$ and *n* are tunable parameters, most often chosen as 5 and 2 respectively. $\nu_b$ and $\kappa_b$ are the background viscosity and diffusivity respectively. MPAS-Ocean has a $\kappa_{b,passive}$ for applying to just the passive tracers, leaving the active tracers with $\kappa_b$.
+$\nu$ and $\kappa$ are defined at the top of the cell, similarly to $Ri$ and $N^2$. In these formulae, $\alpha$ and *n* are tunable parameters, most often chosen as 5 and 2 respectively. $\nu_b$ and $\kappa_b$ are the background viscosity and diffusivity respectively. MPAS-Ocean has an additional $\kappa_{b,passive}$ for applying to just the passive tracers, leaving the active tracers with $\kappa_b$.
 
 ### 3.2 Convective Instability Mixing
 
@@ -92,7 +92,7 @@ $$
 \kappa =
 \begin{cases}
 \kappa_{conv} \quad \text{ if } N^2 < N^2_{crit}\\
-0 \quad \text{ if } N^2 \geq N^2_{crit} \,,
+0 \quad \text{ if } N^2 \geq N^2_{crit}
 \end{cases}
 $$
 
