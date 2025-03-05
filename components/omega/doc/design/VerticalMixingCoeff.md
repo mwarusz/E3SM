@@ -76,7 +76,7 @@ $\nu$ and $\kappa$ are defined at the top of the cell, similarly to $Ri$ and $N^
 
 ### 3.2 Convective Instability Mixing
 
-Commonly, mixing due to convective instability is treated as a step function for the diffusivity and viscosity. This is often represented as
+Commonly (and how this is currently handled by CVMix in MPAS-O), mixing due to convective instability is treated as a step function for the diffusivity and viscosity. This is often represented as
 
 $$
 \kappa =
@@ -86,7 +86,7 @@ $$
 \end{cases}
 $$
 
-A similar expression is utilized for viscosity. The effect of this formula is to homogenize T, S, passive tracers, and normal velocity, for unstable stratification, but also in neutral stratification. The behavior in unstable stratification is likely correct, but for neutral stratification, homogenization of momentum is questionable. To allow for a different behavior, we slightly modifty the algorithm above to,
+A similar expression is utilized for viscosity. The effect of this formula is to homogenize T, S, passive tracers, and normal velocity, for unstable stratification, but also in neutral stratification, as $N^2_{crit}$ is typically chosen to be 0. The behavior in unstable stratification is likely correct, but for neutral stratification, homogenization of momentum is questionable. In Omega, we will slightly modify the algorithm above to,
 
 $$
 \kappa =
@@ -96,7 +96,7 @@ $$
 \end{cases}
 $$
 
-where $N^2_{crit}$ is typically chosen to be 0. Values for $\kappa_{conv}$ are typically large ($\sim 1 \, \mathrm{m^2/s}$). Again, when non-local, gradient free flux formulations are included in Eq. (1), this convective instability contribution to the mixing is not calculated within the boundary layer where $\gamma$ is active.
+So that homogenization only occurs for unstable stratification (assuming $N^2_{crit} = 0$). Values for $\kappa_{conv}$ are typically large ($\sim 1 \, \mathrm{m^2/s}$). Again, when non-local, gradient free flux formulations are included in Eq. (1) in future developments, this convective instability contribution to the mixing will not be calculated within the boundary layer where $\gamma$ is active.
 
 ## 4 Design
 
