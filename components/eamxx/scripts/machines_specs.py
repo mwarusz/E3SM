@@ -124,7 +124,7 @@ class PM(CrayMachine):
             cls.batch += "--time 00:30:00 --nodes=1 -q debug"
         else:
             cls.batch += "--time 02:00:00 --nodes=4 --gpus-per-node=4 --gpu-bind=none --exclusive -q regular"
-        
+
         cls.baselines_dir = f"/global/cfs/cdirs/e3sm/baselines/{compiler}/scream/{cls.name}"
 
 ###############################################################################
@@ -202,8 +202,11 @@ class Compy(Machine):
     @classmethod
     def setup(cls):
         super().setup_base("compy")
-
-        cls.env_setup = ["module purge", "module load cmake/3.19.6 gcc/8.1.0  mvapich2/2.3.1 python/3.7.3"]
+        compiler = "intel"
+        cls.cxx_compiler = "mpiicpc"
+        cls.c_compiler   = "mpiicc"
+        cls.ftn_compiler = "mpiifort"
+        cls.env_setup = ["export PROJECT=e3sm", f"eval $({CIMEROOT}/CIME/Tools/get_case_env -c SMS.ne4pg2_ne4pg2.F2010-SCREAMv1.{cls.name}_{compiler})"]
         cls.batch = "srun --time 02:00:00 --nodes=1 -p short --exclusive --account e3sm"
 
 ###############################################################################
