@@ -15,6 +15,7 @@
 #include "auxiliaryVars/TracerAuxVars.h"
 #include "auxiliaryVars/VelocityDel2AuxVars.h"
 #include "auxiliaryVars/VorticityAuxVars.h"
+#include "auxiliaryVars/WindForcingAuxVars.h"
 #include "mpi.h"
 
 #include <cmath>
@@ -62,6 +63,9 @@ struct TestSetupPlane {
    ErrorMeasures ExpectedDel2TracerErrors = {0.0033346711042859123,
                                              0.0029202923731303323};
 
+   ErrorMeasures ExpectedWindRelNormErrors = {0.08631062450530963,
+                                              0.023935006998849644};
+
    KOKKOS_FUNCTION Real layerThickness(Real X, Real Y) const {
       return 2 + std::cos(2 * Pi * X / Lx) * std::cos(2 * Pi * Y / Ly);
    }
@@ -72,6 +76,20 @@ struct TestSetupPlane {
 
    KOKKOS_FUNCTION Real velocityY(Real X, Real Y) const {
       return std::cos(2 * Pi * X / Lx) * std::sin(2 * Pi * Y / Ly);
+   }
+
+   KOKKOS_FUNCTION Real windX(Real X, Real Y) const {
+      return std::cos(2 * Pi * X / Lx) * std::sin(2 * Pi * Y / Ly);
+   }
+
+   KOKKOS_FUNCTION Real windY(Real X, Real Y) const {
+      return std::sin(2 * Pi * X / Lx) * std::cos(2 * Pi * Y / Ly);
+   }
+
+   KOKKOS_FUNCTION Real windRelNorm(Real X, Real Y) const {
+      const Real U = velocityX(X, Y) - windX(X, Y);
+      const Real V = velocityY(X, Y) - windY(X, Y);
+      return std::sqrt(U * U + V * V);
    }
 
    KOKKOS_FUNCTION Real divergence(Real X, Real Y) const {
@@ -178,6 +196,9 @@ struct TestSetupSphere {
    ErrorMeasures ExpectedDel2TracerErrors = {0.0081206665417422382,
                                              0.004917863312407276};
 
+   ErrorMeasures ExpectedWindRelNormErrors = {0.05287047291170306,
+                                              0.016662395735343366};
+
    KOKKOS_FUNCTION Real layerThickness(Real Lon, Real Lat) const {
       return (2 + std::cos(Lon) * std::pow(std::cos(Lat), 4));
    }
@@ -189,6 +210,23 @@ struct TestSetupSphere {
    KOKKOS_FUNCTION Real velocityY(Real Lon, Real Lat) const {
       return -4 * std::sin(Lon) * std::cos(Lon) * std::pow(std::cos(Lat), 3) *
              std::sin(Lat);
+   }
+   KOKKOS_FUNCTION Real windX(Real Lon, Real Lat) const {
+      return -4 * std::sin(Lon) * std::cos(Lon) * std::pow(std::cos(Lat), 3) *
+             std::sin(Lat);
+   }
+
+   KOKKOS_FUNCTION Real windY(Real Lon, Real Lat) const {
+      return -std::pow(std::sin(Lon), 2) * std::pow(std::cos(Lat), 3);
+   }
+
+   KOKKOS_FUNCTION Real windRelNorm(Real Lon, Real Lat) const {
+      const Real U = windX(Lon, Lat) - velocityX(Lon, Lat);
+      const Real V = windY(Lon, Lat) - velocityY(Lon, Lat);
+
+      Real CV[3];
+      sphereToCartVec(CV, {U, V}, Lon, Lat);
+      return std::sqrt(CV[0] * CV[0] + CV[1] * CV[1] + CV[2] * CV[2]);
    }
 
    KOKKOS_FUNCTION Real relativeVorticity(Real Lon, Real Lat) const {
@@ -363,6 +401,53 @@ int testKineticAuxVars(const Array2DReal &LayerThicknessCell,
 
    if (Err == 0) {
       LOG_INFO("AuxVarsTest: KineticAuxVars PASS");
+   }
+
+   return Err;
+}
+
+int testWindForcingAuxVars(const Array2DReal &LayerThicknessCell,
+                           const Array2DReal &NormalVelocityEdge, Real RTol) {
+   int Err = 0;
+   TestSetup Setup;
+
+   const auto Mesh = HorzMesh::getDefault();
+
+   // Compute exact result
+
+   Array1DReal ExactWindRelNormCell("ExactWindRelNormCell", Mesh->NCellsOwned);
+   Err += setScalar(
+       KOKKOS_LAMBDA(Real X, Real Y) { return Setup.windRelNorm(X, Y); },
+       ExactWindRelNormCell, Geom, Mesh, OnCell, ExchangeHalos::No);
+
+   WindForcingAuxVars WindForcingAux("", Mesh, NVertLevels);
+
+   // Set normal wind
+   const auto &NormalWindEdge = WindForcingAux.NormalWindEdge;
+   Err += setVectorEdge(
+       KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
+          VecField[0] = Setup.windX(X, Y);
+          VecField[1] = Setup.windY(X, Y);
+       },
+       NormalWindEdge, EdgeComponent::Normal, Geom, Mesh);
+
+   // Compute numerical result
+   parallelFor(
+       {Mesh->NCellsOwned}, KOKKOS_LAMBDA(int ICell) {
+          WindForcingAux.computeVarsOnCell(ICell, 0, NormalVelocityEdge);
+       });
+   const auto &NumWindRelNormCell = WindForcingAux.WindRelNormCell;
+
+   // Compute error measures and check error values
+   ErrorMeasures WindRelNormErrors;
+   Err += computeErrors(WindRelNormErrors, NumWindRelNormCell,
+                        ExactWindRelNormCell, Mesh, OnCell);
+
+   Err += checkErrors("AuxVarsTest", "WindRelNorm", WindRelNormErrors,
+                      Setup.ExpectedWindRelNormErrors, RTol);
+
+   if (Err == 0) {
+      LOG_INFO("AuxVarsTest: WindForcingAuxVars PASS");
    }
 
    return Err;
@@ -801,6 +886,8 @@ int auxVarsTest(const std::string &mesh = DefaultMeshFile) {
    Err += testVelocityDel2AuxVars(RTol);
 
    Err += testTracerAuxVars(LayerThickCell, NormalVelEdge, RTol);
+
+   Err += testWindForcingAuxVars(LayerThickCell, NormalVelEdge, RTol);
 
    if (Err == 0) {
       LOG_INFO("AuxVarsTest: Successful completion");
