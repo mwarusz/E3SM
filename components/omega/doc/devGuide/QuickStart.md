@@ -214,8 +214,6 @@ supported E3SM machines. The pattern is:
 +--------------+------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | frontier     | craygnu          | /ccs/proj/cli115/software/polaris/frontier/spack/dev_polaris_0_6_0_craygnu_mpich/var/spack/environments/dev_polaris_0_6_0_craygnu_mpich/.spack-env/view                   |
 |              +------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|              | craygnu-hipcc    | /ccs/proj/cli115/software/polaris/frontier/spack/dev_polaris_0_6_0_craygnu-hipcc_mpich/var/spack/environments/dev_polaris_0_6_0_craygnu-hipcc_mpich/.spack-env/view       |
-|              +------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 |              | craygnu-mphipcc  | /ccs/proj/cli115/software/polaris/frontier/spack/dev_polaris_0_6_0_craygnu-mphipcc_mpich/var/spack/environments/dev_polaris_0_6_0_craygnu-mphipcc_mpich/.spack-env/view   |
 |              +------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 |              | craycray         | /ccs/proj/cli115/software/polaris/frontier/spack/dev_polaris_0_6_0_craycray_mpich/var/spack/environments/dev_polaris_0_6_0_craycray_mpich/.spack-env/view                 |
