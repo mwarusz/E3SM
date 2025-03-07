@@ -229,12 +229,8 @@ supported E3SM machines. The pattern is:
 | pm-cpu       | gnu              | /global/cfs/cdirs/e3sm/software/polaris/pm-cpu/spack/dev_polaris_0_6_0_gnu_mpich/var/spack/environments/dev_polaris_0_6_0_gnu_mpich/.spack-env/view                       |
 |              +------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 |              | intel            | /global/cfs/cdirs/e3sm/software/polaris/pm-cpu/spack/dev_polaris_0_6_0_intel_mpich/var/spack/environments/dev_polaris_0_6_0_intel_mpich/.spack-env/view                   |
-|              +------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|              | nvidia           | /global/cfs/cdirs/e3sm/software/polaris/pm-cpu/spack/dev_polaris_0_6_0_nvidia_mpich/var/spack/environments/dev_polaris_0_6_0_nvidia_mpich/.spack-env/view                 |
 +--------------+------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | pm-gpu       | gnugpu           | /global/cfs/cdirs/e3sm/software/polaris/pm-gpu/spack/dev_polaris_0_6_0_gnugpu_mpich/var/spack/environments/dev_polaris_0_6_0_gnugpu_mpich/.spack-env/view                 |
-|              +------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-|              | nvidiagpu        | /global/cfs/cdirs/e3sm/software/polaris/pm-gpu/spack/dev_polaris_0_6_0_nvidiagpu_mpich/var/spack/environments/dev_polaris_0_6_0_nvidiagpu_mpich/.spack-env/view           |
 +--------------+------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 ```
 
