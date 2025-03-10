@@ -311,8 +311,8 @@ class Field {
       DataArray = std::make_shared<T>(InDataArray);
 
       // Determine type and location
-      DataType = Impl::checkArrayType<T>();
-      MemLoc   = Impl::findArrayMemLoc<T>();
+      DataType = checkArrayType<T>();
+      MemLoc   = findArrayMemLoc<T>();
 
       return Err;
    };

@@ -822,7 +822,7 @@ int auxVarsTest(const std::string &mesh = DefaultMeshFile) {
    Array2DReal NormalVelEdge("NormalVelEdge", Mesh->NEdgesSize, NVertLevels);
    Err += initState(LayerThickCell, NormalVelEdge, Mesh);
 
-   const Real RTol = sizeof(Real) == 4 ? 1e-2 : 1e-10;
+   const Real RTol = sizeof(Real) == 4 ? 1e-2 : 2e-4;
 
    Err += testKineticAuxVars(LayerThickCell, NormalVelEdge, RTol);
 

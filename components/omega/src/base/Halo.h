@@ -237,8 +237,8 @@ class Halo {
    /// space. Used to determine if buffer packs and unpacks are done within
    /// Kokkos parallelFor kernels.
    template <typename T> bool devBufferPUP(const T &Array) {
-      bool OnDev = Impl::findArrayMemLoc<T>() == ArrayMemLoc::Both ||
-                   Impl::findArrayMemLoc<T>() == ArrayMemLoc::Device;
+      bool OnDev = findArrayMemLoc<T>() == ArrayMemLoc::Both ||
+                   findArrayMemLoc<T>() == ArrayMemLoc::Device;
       return OnDev;
    }
 

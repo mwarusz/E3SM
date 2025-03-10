@@ -10,6 +10,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "DataTypes.h"
+#include <functional>
 #include <type_traits>
 #include <utility>
 
@@ -27,7 +28,6 @@ enum class ArrayDataType { Unknown, I4, I8, R4, R8 };
 /// to the CPU-only case where the host and device are identical.
 enum class ArrayMemLoc { Unknown, Device, Host, Both };
 
-namespace Impl {
 // determine ArrayDataType from Kokkos array type
 template <class T> constexpr ArrayDataType checkArrayType() {
    if (std::is_same_v<typename T::non_const_value_type, I4>) {
@@ -59,7 +59,6 @@ template <class T> constexpr ArrayMemLoc findArrayMemLoc() {
       return ArrayMemLoc::Device;
    }
 }
-} // namespace Impl
 
 /// Struct template to specify the rank of a supported Array
 template <class T> struct ArrayRank {
@@ -73,41 +72,107 @@ template <class T> struct ArrayRank {
 using ExecSpace     = MemSpace::execution_space;
 using HostExecSpace = HostMemSpace::execution_space;
 
+// Takes a functor that uses multidimensional indexing
+// and converts it into one that also accepts linear index
+template <class F, int Rank> struct LinearIdxWrapper : F {
+   using F::operator();
+
+   LinearIdxWrapper(F &&Functor, const int (&Bounds)[Rank])
+       : F(std::move(Functor)) {
+      Strides[Rank - 2] = Bounds[Rank - 1];
+      for (int I = Rank - 3; I >= 0; --I) {
+         Strides[I] = Bounds[I + 1] * Strides[I + 1];
+      }
+   }
+
+   template <int N = Rank, class... Args>
+   KOKKOS_FORCEINLINE_FUNCTION std::enable_if_t<N == 2>
+   operator()(int Idx, Args &&...OtherArgs) const {
+      const int I1 = Idx / Strides[0];
+      const int I2 = Idx - I1 * Strides[0];
+
+      (*this)(I1, I2, std::forward<Args>(OtherArgs)...);
+   }
+
+   template <int N = Rank, class... Args>
+   KOKKOS_FORCEINLINE_FUNCTION std::enable_if_t<N == 3>
+   operator()(int Idx, Args &&...OtherArgs) const {
+      const int I1 = Idx / Strides[0];
+      Idx -= I1 * Strides[0];
+      const int I2 = Idx / Strides[1];
+      const int I3 = Idx - I2 * Strides[1];
+
+      (*this)(I1, I2, I3, std::forward<Args>(OtherArgs)...);
+   }
+
+   template <int N = Rank, class... Args>
+   KOKKOS_FORCEINLINE_FUNCTION std::enable_if_t<N == 4>
+   operator()(int Idx, Args &&...OtherArgs) const {
+      const int I1 = Idx / Strides[0];
+      Idx -= I1 * Strides[0];
+      const int I2 = Idx / Strides[1];
+      Idx -= I2 * Strides[1];
+      const int I3 = Idx / Strides[2];
+      const int I4 = Idx - I3 * Strides[2];
+
+      (*this)(I1, I2, I3, I4, std::forward<Args>(OtherArgs)...);
+   }
+
+   template <int N = Rank, class... Args>
+   KOKKOS_FORCEINLINE_FUNCTION std::enable_if_t<N == 5>
+   operator()(int Idx, Args &&...OtherArgs) const {
+      const int I1 = Idx / Strides[0];
+      Idx -= I1 * Strides[0];
+      const int I2 = Idx / Strides[1];
+      Idx -= I2 * Strides[1];
+      const int I3 = Idx / Strides[2];
+      Idx -= I3 * Strides[2];
+      const int I4 = Idx / Strides[3];
+      const int I5 = Idx - I4 * Strides[3];
+
+      (*this)(I1, I2, I3, I4, I5, std::forward<Args>(OtherArgs)...);
+   }
+
+   int Strides[Rank - 1];
+};
+
 template <typename V>
-auto createHostMirrorCopy(const V &view)
+auto createHostMirrorCopy(const V &View)
     -> Kokkos::View<typename V::data_type, HostMemLayout, HostMemSpace> {
-   return Kokkos::create_mirror_view_and_copy(HostExecSpace(), view);
+   return Kokkos::create_mirror_view_and_copy(HostExecSpace(), View);
 }
 
 template <typename V>
-auto createDeviceMirrorCopy(const V &view)
+auto createDeviceMirrorCopy(const V &View)
     -> Kokkos::View<typename V::data_type, MemLayout, MemSpace> {
-   return Kokkos::create_mirror_view_and_copy(ExecSpace(), view);
+   return Kokkos::create_mirror_view_and_copy(ExecSpace(), View);
 }
 
 // function alias to follow Camel Naming Convention
-template <typename D, typename S> void deepCopy(D &&dst, S &&src) {
-   Kokkos::deep_copy(std::forward<D>(dst), std::forward<S>(src));
+template <typename D, typename S> void deepCopy(D &&Dst, S &&Src) {
+   Kokkos::deep_copy(std::forward<D>(Dst), std::forward<S>(Src));
 }
 
 template <typename E, typename D, typename S>
-void deepCopy(E &space, D &dst, const S &src) {
-   Kokkos::deep_copy(space, dst, src);
+void deepCopy(E &Space, D &Dst, const S &Src) {
+   Kokkos::deep_copy(Space, Dst, Src);
 }
+
+using Bounds1D = Kokkos::RangePolicy<ExecSpace, Kokkos::IndexType<int>>;
 
 #if OMEGA_LAYOUT_RIGHT
 
-template <int N, class... Args>
+template <int N>
 using Bounds = Kokkos::MDRangePolicy<
     ExecSpace, Kokkos::Rank<N, Kokkos::Iterate::Right, Kokkos::Iterate::Right>,
-    Args...>;
+    Kokkos::IndexType<int>>;
 
 #elif OMEGA_LAYOUT_LEFT
 
-template <int N, class... Args>
+template <int N>
 using Bounds = Kokkos::MDRangePolicy<
     ExecSpace, Kokkos::Rank<N, Kokkos::Iterate::Left, Kokkos::Iterate::Left>,
-    Args...>;
+    Kokkos::IndexType<int>>;
 
 #else
 
@@ -116,51 +181,77 @@ using Bounds = Kokkos::MDRangePolicy<
 #endif
 
 // parallelFor: with label
-template <int N, class F, class... Args>
-inline void parallelFor(const std::string &label, const int (&upper_bounds)[N],
-                        const F &f,
-                        const int (&tile)[N] = DefaultTile<N>::value) {
+template <int N, class F>
+inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
+                        const F &Functor) {
    if constexpr (N == 1) {
-      const auto policy = Kokkos::RangePolicy<Args...>(0, upper_bounds[0]);
-      Kokkos::parallel_for(label, policy, f);
+      const auto Policy = Bounds1D(0, UpperBounds[0]);
+      Kokkos::parallel_for(Label, Policy, Functor);
 
    } else {
-      const int lower_bounds[N] = {0};
-      const auto policy = Bounds<N, Args...>(lower_bounds, upper_bounds, tile);
-      Kokkos::parallel_for(label, policy, f);
+#ifdef OMEGA_TARGET_DEVICE
+      // On device convert the functor to use one dimensional indexing and use
+      // 1D RangePolicy
+      const auto LinFunctor = LinearIdxWrapper{std::move(Functor), UpperBounds};
+      int LinBound          = 1;
+      for (int Rank = 0; Rank < N; ++Rank) {
+         LinBound *= UpperBounds[Rank];
+      }
+      const auto Policy = Bounds1D(0, LinBound);
+      Kokkos::parallel_for(Label, Policy, LinFunctor);
+#else
+      // On host use MDRangePolicy
+      const int LowerBounds[N] = {0};
+      const auto Policy        = Bounds<N>(LowerBounds, UpperBounds);
+      Kokkos::parallel_for(Label, Policy, Functor);
+#endif
    }
 }
 
 // parallelFor: without label
 template <int N, class F>
-inline void parallelFor(const int (&upper_bounds)[N], const F &f,
-                        const int (&tile)[N] = DefaultTile<N>::value) {
-   parallelFor("", upper_bounds, f, tile);
+inline void parallelFor(const int (&UpperBounds)[N], const F &Functor) {
+   parallelFor("", UpperBounds, Functor);
 }
 
 // parallelReduce: with label
-template <int N, class F, class R, class... Args>
-inline void parallelReduce(const std::string &label,
-                           const int (&upper_bounds)[N], const F &f,
-                           R &&reducer,
-                           const int (&tile)[N] = DefaultTile<N>::value) {
+template <int N, class F, class... R>
+inline void parallelReduce(const std::string &Label,
+                           const int (&UpperBounds)[N], const F &Functor,
+                           R &&...Reducers) {
    if constexpr (N == 1) {
-      const auto policy = Kokkos::RangePolicy<Args...>(0, upper_bounds[0]);
-      Kokkos::parallel_reduce(label, policy, f, std::forward<R>(reducer));
+      const auto Policy = Bounds1D(0, UpperBounds[0]);
+      Kokkos::parallel_reduce(Label, Policy, Functor,
+                              std::forward<R>(Reducers)...);
 
    } else {
-      const int lower_bounds[N] = {0};
-      const auto policy = Bounds<N, Args...>(lower_bounds, upper_bounds, tile);
-      Kokkos::parallel_reduce(label, policy, f, std::forward<R>(reducer));
+
+#ifdef OMEGA_TARGET_DEVICE
+      // On device convert the functor to use one dimensional indexing and use
+      // 1D RangePolicy
+      const auto LinFunctor = LinearIdxWrapper{std::move(Functor), UpperBounds};
+      int LinBound          = 1;
+      for (int Rank = 0; Rank < N; ++Rank) {
+         LinBound *= UpperBounds[Rank];
+      }
+      const auto Policy = Bounds1D(0, LinBound);
+      Kokkos::parallel_reduce(Label, Policy, LinFunctor,
+                              std::forward<R>(Reducers)...);
+#else
+      // On host use MDRangePolicy
+      const int LowerBounds[N] = {0};
+      const auto Policy        = Bounds<N>(LowerBounds, UpperBounds);
+      Kokkos::parallel_reduce(Label, Policy, Functor,
+                              std::forward<R>(Reducers)...);
+#endif
    }
 }
 
 // parallelReduce: without label
-template <int N, class F, class R, class... Args>
-inline void parallelReduce(const int (&upper_bounds)[N], const F &f,
-                           R &&reducer,
-                           const int (&tile)[N] = DefaultTile<N>::value) {
-   parallelReduce("", upper_bounds, f, std::forward<R>(reducer), tile);
+template <int N, class F, class... R>
+inline void parallelReduce(const int (&UpperBounds)[N], const F &Functor,
+                           R &&...Reducers) {
+   parallelReduce("", UpperBounds, Functor, std::forward<R>(Reducers)...);
 }
 
 } // end namespace OMEGA
