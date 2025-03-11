@@ -184,6 +184,17 @@ class Halo {
 
    }; // end class Neighbor
 
+   /// The halo buffer is of type R8, but we want to exchange arrays
+   /// of different, possibly smaller, data types, such as I4 or R4
+   /// The BufferValue union is used to convert between R8 and other supported
+   /// data types
+   template <class T> union alignas(R8) BufferValue {
+      KOKKOS_FUNCTION BufferValue() = default;
+      KOKKOS_FUNCTION BufferValue(T Value) : Val{Value} {}
+      T Val[sizeof(R8) / sizeof(T)];
+      R8 R8Val;
+   };
+
    // Private methods
 
    /// Uses info from Decomp to generate a sorted list of tasks that own
@@ -297,17 +308,16 @@ class Halo {
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
          parallelFor(
              {LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
-                auto Val       = Array(LocIndex(IExch));
-                const R8 RVal  = reinterpret_cast<R8 &>(Val);
-                LocBuff(IExch) = RVal;
+                const auto BufferVal = BufferValue(Array(LocIndex(IExch)));
+                LocBuff(IExch)       = BufferVal.R8Val;
              });
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
          expandBuffer(LocNeighbor.SendBufferH, BufferSize);
          OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].SendBufferH);
          for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
-            const R8 RVal   = reinterpret_cast<R8 &>(Array(LocIndexH(IExch)));
-            LocBuffH(IExch) = RVal;
+            const auto BufferVal = BufferValue(Array(LocIndexH(IExch)));
+            LocBuffH(IExch)      = BufferVal.R8Val;
          }
       }
    }
@@ -332,10 +342,9 @@ class Halo {
 
          parallelFor(
              {LocList.NTot, NJ}, KOKKOS_LAMBDA(int IExch, int J) {
-                auto Val       = Array(LocIndex(IExch), J);
-                const R8 RVal  = reinterpret_cast<R8 &>(Val);
-                const I4 IBuff = IExch * NJ + J;
-                LocBuff(IBuff) = RVal;
+                const auto BufferVal = BufferValue(Array(LocIndex(IExch), J));
+                const I4 IBuff       = IExch * NJ + J;
+                LocBuff(IBuff)       = BufferVal.R8Val;
              });
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
@@ -343,10 +352,9 @@ class Halo {
          OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].SendBufferH);
          for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
             for (int J = 0; J < NJ; ++J) {
-               const I4 IBuff = IExch * NJ + J;
-               const R8 RVal =
-                   reinterpret_cast<R8 &>(Array(LocIndexH(IExch), J));
-               LocBuffH(IBuff) = RVal;
+               const auto BufferVal = BufferValue(Array(LocIndexH(IExch), J));
+               const I4 IBuff       = IExch * NJ + J;
+               LocBuffH(IBuff)      = BufferVal.R8Val;
             }
          }
       }
@@ -374,10 +382,10 @@ class Halo {
 
          parallelFor(
              {NK, NTotList, NJ}, KOKKOS_LAMBDA(int K, int IExch, int J) {
-                auto Val       = Array(K, LocIndex(IExch), J);
-                const R8 RVal  = reinterpret_cast<R8 &>(Val);
+                const auto BufferVal =
+                    BufferValue(Array(K, LocIndex(IExch), J));
                 const I4 IBuff = (K * NTotList + IExch) * NJ + J;
-                LocBuff(IBuff) = RVal;
+                LocBuff(IBuff) = BufferVal.R8Val;
              });
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
@@ -386,10 +394,10 @@ class Halo {
          for (int K = 0; K < NK; ++K) {
             for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
                for (int J = 0; J < NJ; ++J) {
-                  const I4 IBuff = (K * LocList.NTot + IExch) * NJ + J;
-                  const R8 RVal =
-                      reinterpret_cast<R8 &>(Array(K, LocIndexH(IExch), J));
-                  LocBuffH(IBuff) = RVal;
+                  const auto BufferVal =
+                      BufferValue(Array(K, LocIndexH(IExch), J));
+                  const I4 IBuff  = (K * LocList.NTot + IExch) * NJ + J;
+                  LocBuffH(IBuff) = BufferVal.R8Val;
                }
             }
          }
@@ -420,10 +428,10 @@ class Halo {
          parallelFor(
              {NL, NK, NTotList, NJ},
              KOKKOS_LAMBDA(int L, int K, int IExch, int J) {
-                auto Val       = Array(L, K, LocIndex(IExch), J);
-                const R8 RVal  = reinterpret_cast<R8 &>(Val);
+                const auto BufferVal =
+                    BufferValue(Array(L, K, LocIndex(IExch), J));
                 const I4 IBuff = ((L * NK + K) * NTotList + IExch) * NJ + J;
-                LocBuff(IBuff) = RVal;
+                LocBuff(IBuff) = BufferVal.R8Val;
              });
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
@@ -433,11 +441,11 @@ class Halo {
             for (int K = 0; K < NK; ++K) {
                for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
                   for (int J = 0; J < NJ; ++J) {
+                     const auto BufferVal =
+                         BufferValue(Array(L, K, LocIndexH(IExch), J));
                      const I4 IBuff =
                          ((L * NK + K) * NTotList + IExch) * NJ + J;
-                     const R8 RVal = reinterpret_cast<R8 &>(
-                         Array(L, K, LocIndexH(IExch), J));
-                     LocBuffH(IBuff) = RVal;
+                     LocBuffH(IBuff) = BufferVal.R8Val;
                   }
                }
             }
@@ -470,11 +478,11 @@ class Halo {
          parallelFor(
              {NM, NL, NK, NTotList, NJ},
              KOKKOS_LAMBDA(int M, int L, int K, int IExch, int J) {
-                auto Val      = Array(M, L, K, LocIndex(IExch), J);
-                const R8 RVal = reinterpret_cast<R8 &>(Val);
+                const auto BufferVal =
+                    BufferValue(Array(M, L, K, LocIndex(IExch), J));
                 const I4 IBuff =
                     (((M * NL + L) * NK + K) * NTotList + IExch) * NJ + J;
-                LocBuff(IBuff) = RVal;
+                LocBuff(IBuff) = BufferVal.R8Val;
              });
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
@@ -488,9 +496,9 @@ class Halo {
                         const I4 IBuff =
                             (((M * NL + L) * NK + K) * NTotList + IExch) * NJ +
                             J;
-                        const R8 RVal = reinterpret_cast<R8 &>(
-                            Array(M, L, K, LocIndexH(IExch), J));
-                        LocBuffH(IBuff) = RVal;
+                        const auto BufferVal =
+                            BufferValue(Array(M, L, K, LocIndexH(IExch), J));
+                        LocBuffH(IBuff) = BufferVal.R8Val;
                      }
                   }
                }
@@ -520,14 +528,18 @@ class Halo {
          parallelFor(
              {LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
                 const I4 IArr = LocIndex(IExch);
-                Array(IArr)   = reinterpret_cast<ValType &>(LocBuff(IExch));
+                BufferValue<ValType> BufferVal;
+                BufferVal.R8Val = LocBuff(IExch);
+                Array(IArr)     = BufferVal.Val[0];
              });
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
          OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].RecvBufferH);
          for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
             const I4 IArr = LocIndexH(IExch);
-            Array(IArr)   = reinterpret_cast<ValType &>(LocBuffH(IExch));
+            BufferValue<ValType> BufferVal;
+            BufferVal.R8Val = LocBuffH(IExch);
+            Array(IArr)     = BufferVal.Val[0];
          }
       }
    }
@@ -553,7 +565,9 @@ class Halo {
              {LocList.NTot, NJ}, KOKKOS_LAMBDA(int IExch, int J) {
                 const I4 IBuff = IExch * NJ + J;
                 const I4 IArr  = LocIndex(IExch);
-                Array(IArr, J) = reinterpret_cast<ValType &>(LocBuff(IBuff));
+                BufferValue<ValType> BufferVal;
+                BufferVal.R8Val = LocBuff(IBuff);
+                Array(IArr, J)  = BufferVal.Val[0];
              });
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
@@ -562,7 +576,9 @@ class Halo {
             for (int J = 0; J < NJ; ++J) {
                const I4 IBuff = IExch * NJ + J;
                const I4 IArr  = LocIndexH(IExch);
-               Array(IArr, J) = reinterpret_cast<ValType &>(LocBuffH(IBuff));
+               BufferValue<ValType> BufferVal;
+               BufferVal.R8Val = LocBuffH(IBuff);
+               Array(IArr, J)  = BufferVal.Val[0];
             }
          }
       }
@@ -590,9 +606,11 @@ class Halo {
 
          parallelFor(
              {NK, NTotList, NJ}, KOKKOS_LAMBDA(int K, int IExch, int J) {
-                const I4 IBuff    = (K * NTotList + IExch) * NJ + J;
-                const I4 IArr     = LocIndex(IExch);
-                Array(K, IArr, J) = reinterpret_cast<ValType &>(LocBuff(IBuff));
+                const I4 IBuff = (K * NTotList + IExch) * NJ + J;
+                const I4 IArr  = LocIndex(IExch);
+                BufferValue<ValType> BufferVal;
+                BufferVal.R8Val   = LocBuff(IBuff);
+                Array(K, IArr, J) = BufferVal.Val[0];
              });
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
@@ -602,8 +620,9 @@ class Halo {
                for (int J = 0; J < NJ; ++J) {
                   const I4 IBuff = (K * LocList.NTot + IExch) * NJ + J;
                   const I4 IArr  = LocIndexH(IExch);
-                  Array(K, IArr, J) =
-                      reinterpret_cast<ValType &>(LocBuffH(IBuff));
+                  BufferValue<ValType> BufferVal;
+                  BufferVal.R8Val   = LocBuffH(IBuff);
+                  Array(K, IArr, J) = BufferVal.Val[0];
                }
             }
          }
@@ -636,8 +655,9 @@ class Halo {
              KOKKOS_LAMBDA(int L, int K, int IExch, int J) {
                 const I4 IBuff = ((L * NK + K) * NTotList + IExch) * NJ + J;
                 const I4 IArr  = LocIndex(IExch);
-                Array(L, K, IArr, J) =
-                    reinterpret_cast<ValType &>(LocBuff(IBuff));
+                BufferValue<ValType> BufferVal;
+                BufferVal.R8Val      = LocBuff(IBuff);
+                Array(L, K, IArr, J) = BufferVal.Val[0];
              });
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
@@ -649,8 +669,9 @@ class Halo {
                      const I4 IBuff =
                          ((L * NK + K) * NTotList + IExch) * NJ + J;
                      const I4 IArr = LocIndexH(IExch);
-                     Array(L, K, IArr, J) =
-                         reinterpret_cast<ValType &>(LocBuffH(IBuff));
+                     BufferValue<ValType> BufferVal;
+                     BufferVal.R8Val      = LocBuffH(IBuff);
+                     Array(L, K, IArr, J) = BufferVal.Val[0];
                   }
                }
             }
@@ -686,8 +707,9 @@ class Halo {
                 const I4 IBuff =
                     (((M * NL + L) * NK + K) * NTotList + IExch) * NJ + J;
                 const I4 IArr = LocIndex(IExch);
-                Array(M, L, K, IArr, J) =
-                    reinterpret_cast<ValType &>(LocBuff(IBuff));
+                BufferValue<ValType> BufferVal;
+                BufferVal.R8Val         = LocBuff(IBuff);
+                Array(M, L, K, IArr, J) = BufferVal.Val[0];
              });
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
@@ -701,8 +723,9 @@ class Halo {
                             (((M * NL + L) * NK + K) * NTotList + IExch) * NJ +
                             J;
                         const I4 IArr = LocIndexH(IExch);
-                        Array(M, L, K, IArr, J) =
-                            reinterpret_cast<ValType &>(LocBuffH(IBuff));
+                        BufferValue<ValType> BufferVal;
+                        BufferVal.R8Val         = LocBuffH(IBuff);
+                        Array(M, L, K, IArr, J) = BufferVal.Val[0];
                      }
                   }
                }
