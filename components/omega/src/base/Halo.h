@@ -23,6 +23,7 @@
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OmegaKokkos.h"
+#include "Pacer.h"
 #include "mpi.h"
 #include <memory>
 #include <numeric>
@@ -766,7 +767,11 @@ class Halo {
          Neighbors[INghbr].Received = false;
          Neighbors[INghbr].Unpacked = false;
          if (SendFlags[CurElem][INghbr]) {
+            Kokkos::fence();
+            Pacer::start("Pack");
             packBuffer(Array, INghbr);
+            Kokkos::fence();
+            Pacer::stop("Pack");
          }
       }
 
@@ -821,7 +826,11 @@ class Halo {
                               Kokkos::subview(Neighbors[INghbr].RecvBufferH,
                                               CopyRange));
                   }
+                  Kokkos::fence();
+                  Pacer::start("Unpack");
                   unpackBuffer(Array, INghbr);
+                  Kokkos::fence();
+                  Pacer::stop("Unpack");
                   Neighbors[INghbr].Unpacked = true;
                }
             }
