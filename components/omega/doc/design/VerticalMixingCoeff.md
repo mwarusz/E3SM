@@ -18,9 +18,9 @@ $$
 \overline{w' \phi'}\approx \kappa(\overline{\rho},\overline{u},\overline{v}) \left(\frac{\partial \overline{\phi}}{\partial z} + \gamma(\overline{\rho},\overline{u},\overline{v}) \right)\,.
 $$
 
-Here, $\phi$ is a generic tracer, $\overline{w'\phi'}$ is the vertical turbulent flux of that tracer, $\kappa$ is the vertical diffusivity, and $\gamma$ is the gradient free portion of the flux (often referred to as 'non-local'). The vertical diffusivity $\kappa$ can be as simple as a constant value, to complex functions of quantities like shear and stratification. A similar equation can be written for turbulent momentum fluxes and vertical viscosity ($\nu$).
+Here, $\phi$ is a generic tracer, $\overline{w'\phi'}$ is the vertical turbulent flux of that tracer, $\kappa$ is the vertical diffusivity, and $\gamma$ is the gradient free portion of the flux (often referred to as 'non-local'). The vertical diffusivity $\kappa$ can be as simple as a constant value, to complex functions of quantities like shear and stratification. A similar equation can be written for turbulent momentum fluxes and vertical viscosity ($\nu$). 
 
-The use of a flux term proportional to the local gradient allows this problem to be cast implicitly, allowing for larger time steps, reducing the cost of the mixing model.  When more complex schemes are considered, other techniques such as subcycling can be considered to improve performance.
+Invocation of the gradient diffusion hypothesis is a simplifying assumption for turbulence closures that casts turbulence as a purely diffusive process and allows the mixing problem to be cast implicitly in a tridagonal solve.  For more physical mixing closures, other methods can be explored, e.g., direct and iterative implicit solvers or subcycling.
 
 The initial design and implementation of these vertical mixing coefficients will include only the local, down gradient portion of the flux (first right-hand-side term in Eq. (1)). Implementation of the non-local, gradient free portion of the vertical flux will come later. However, it is important to note here that $\gamma$ is only non-zero within the boundary layer, and when non-local flux formulations (such as [KPP (Large et al., 1994)](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/94rg01872)) are being used, $\kappa$ value contributions such as the convective mixing flux detailed in Section 3.2 are only computed outside of the boundary layer and remain zero within the boundary layer.
 
@@ -133,7 +133,7 @@ The following config options should be included for background vertical mixing:
 <!--- List and describe all public methods and their interfaces (actual code for
 interface that would be in header file). Describe typical use cases. -->
 
-It is assumed that viscosity and diffusivity will be stored at cell centers. Additionally, since they will be used elsewhere, it is assumed that zMid and N2 have been computed elsewhere (N2 in the density routine) and stored. Quantities such as squared shear and Richardson number are not be needed outside of the vertical mixing routines, so are computed locally.
+It is assumed that viscosity and diffusivity will be stored at cell centers. Additionally, since they will be used elsewhere, it is assumed that zMid and N2 have been computed elsewhere (N2 in the density routine) and stored. Quantities such as squared shear and Richardson number are not needed outside of the vertical mixing routines, so are computed locally. Note: how topography will be dealt with has not been finalized yet, but will be adopted into the following once finalized.
 
 ```c++
 parallelFor(
@@ -174,7 +174,7 @@ parallelFor(
     });
 ```
 
-From here, the vertical viscosity and vertical diffusivity will enter into the [tridiagonal solver](./TridiagonalSolver.md) to compute the vertical flux of momentum and tracers.
+A no-flux condition should be applied to both the vertical mixing of momentum and tracers through setting the vertical viscosity and diffusivity to zero at the boundaries. From here, the vertical viscosity and vertical diffusivity will enter into the [tridiagonal solver](./TridiagonalSolver.md) to compute the vertical flux of momentum and tracers.
 
 ## 5 Verification and Testing
 
