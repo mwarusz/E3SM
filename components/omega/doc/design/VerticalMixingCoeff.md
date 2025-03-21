@@ -91,8 +91,8 @@ A similar expression is utilized for viscosity. The effect of this formula is to
 $$
 \kappa =
 \begin{cases}
-\kappa_{conv} \quad \text{ if } N^2 < N^2_{crit}\\
-0 \quad \text{ if } N^2 \geq N^2_{crit}
+\kappa_{b} + \kappa_{conv} \quad \text{ if } N^2 < N^2_{crit}\\
+\kappa_{b} \quad \text{ if } N^2 \geq N^2_{crit}
 \end{cases}
 $$
 
