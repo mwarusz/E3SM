@@ -81,8 +81,8 @@ Commonly (and how this is currently handled by CVMix in MPAS-O), mixing due to c
 $$
 \kappa =
 \begin{cases}
-\kappa_{conv} \quad \text{ if } N^2 \leq N^2_{crit}\\
-0 \quad \text{ if } N^2 > N^2_{crit}
+\kappa_{b} + \kappa_{conv} \quad \text{ if } N^2 \leq N^2_{crit}\\
+\kappa_{b} \quad \text{ if } N^2 > N^2_{crit}
 \end{cases}
 $$
 
