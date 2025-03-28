@@ -517,6 +517,7 @@ contains
     ! Main timestepping loop
     ! ===================================
     tot_iter=0.0       
+    call t_startf('swe_tsloop')
     do while(tl%nstep<nmax)
 
        ! =================================
@@ -790,6 +791,7 @@ contains
        endif
 
     end do
+    call t_stopf('swe_tsloop')
 
      if (integration == "full_imp") then ! closeout trilinos assignments
 #ifdef TRILINOS

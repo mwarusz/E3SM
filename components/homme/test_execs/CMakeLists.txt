@@ -174,6 +174,7 @@ IF(${BUILD_HOMME_SWEQX})
   ADD_SUBDIRECTORY(swtcA)
   ADD_SUBDIRECTORY(swtcB)
   ADD_SUBDIRECTORY(swtcC)
+  ADD_SUBDIRECTORY(swtcP)
 ENDIF()
 
 
@@ -263,7 +264,7 @@ IF(${BUILD_HOMME_SWIM})
 ENDIF()
 
 # Test some stuff in the shared folder
-ADD_SUBDIRECTORY (share_kokkos_ut)
+#ADD_SUBDIRECTORY (share_kokkos_ut)
 
 IF (${BUILD_HOMME_PREQX_KOKKOS})
   ADD_SUBDIRECTORY(preqx-nlev26-kokkos)
