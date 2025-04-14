@@ -137,6 +137,16 @@ class Decomp {
        const std::vector<I4> &EdgesOnVertexInit  ///< [in] edges at each vertex
    );
 
+   void reorderOwnedCells(const MachEnv *InEnv ///< [in] MachEnv with MPI info
+   );
+
+   void reorderOwnedEdges(const MachEnv *InEnv ///< [in] MachEnv with MPI info
+   );
+
+   void
+   reorderOwnedVertices(const MachEnv *InEnv ///< [in] MachEnv with MPI info
+   );
+
    /// Construct a new decomposition across an input MachEnv with
    /// NPart partitions of a mesh that is read from a mesh file.
    Decomp(const std::string &Name, ///< [in] Name for new decomposition

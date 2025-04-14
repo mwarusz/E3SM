@@ -26,9 +26,16 @@
 #include "parmetis.h"
 
 #include <algorithm>
+#include <iostream>
+#include <numeric>
 #include <set>
 #include <string>
 #include <vector>
+
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/bandwidth.hpp>
+#include <boost/graph/cuthill_mckee_ordering.hpp>
+#include <boost/graph/properties.hpp>
 
 namespace OMEGA {
 
@@ -769,6 +776,10 @@ Decomp::Decomp(
    }
    TimerFlag = Pacer::stop("Decomp construct global to local");
 
+   reorderOwnedCells(InEnv);
+   reorderOwnedEdges(InEnv);
+   reorderOwnedVertices(InEnv);
+
    // Create device copies of all arrays
 
    TimerFlag  = Pacer::start("Decomp construct device copy");
@@ -1169,7 +1180,14 @@ int Decomp::partCellsKWay(
       CellIDHTmp(Cell)     = CellIDTmp[Cell];
       CellLocHTmp(Cell, 0) = CellLocTmp[2 * Cell];     // task owning this cell
       CellLocHTmp(Cell, 1) = CellLocTmp[2 * Cell + 1]; // local address on task
+      // if (MyTask == 0) {
+      //   std::cout << Cell
+      //     << " " << CellIDHTmp(Cell)
+      //     << " " <<  CellLocHTmp(Cell, 0)
+      //     << " " <<   CellLocHTmp(Cell, 1) << std::endl;
+      // }
    }
+
    CellIDH  = CellIDHTmp;
    CellLocH = CellLocHTmp;
 
@@ -2132,6 +2150,338 @@ PartMethod getPartMethodFromStr(const std::string &InMethod) {
    } // end branch on method string
 
 } // End getPartMethodFromStr
+
+static void permuteTo(const HostArray2DI4 &Array,
+                      const std::vector<int> &Perm) {
+   HostArray2DI4 PermArray("PermArray", Array.layout());
+
+   deepCopy(PermArray, Array);
+
+   for (int I = 0; I < Array.extent_int(0); ++I) {
+      for (int J = 0; J < Array.extent_int(1); ++J) {
+         const int Idx = Array(I, J);
+         if (Idx < Perm.size()) {
+            PermArray(I, J) = Perm[Idx];
+         }
+      }
+   }
+   deepCopy(Array, PermArray);
+}
+
+static void permuteFrom(const HostArray1DI4 &Array,
+                        const std::vector<int> &Perm) {
+   HostArray1DI4 PermArray("PermArray", Array.layout());
+
+   deepCopy(PermArray, Array);
+
+   for (int I = 0; I < Perm.size(); ++I) {
+      PermArray(Perm[I]) = Array(I);
+   }
+
+   deepCopy(Array, PermArray);
+}
+
+static void permuteFrom(const HostArray2DI4 &Array,
+                        const std::vector<int> &Perm) {
+   HostArray2DI4 PermArray("PermArray", Array.layout());
+
+   deepCopy(PermArray, Array);
+
+   for (int I = 0; I < Perm.size(); ++I) {
+      for (int J = 0; J < Array.extent_int(1); ++J) {
+         PermArray(Perm[I], J) = Array(I, J);
+      }
+   }
+
+   deepCopy(Array, PermArray);
+}
+
+void Decomp::reorderOwnedCells(const MachEnv *InEnv) {
+   MPI_Comm MyComm = InEnv->getComm();
+   I4 MyTask       = InEnv->getMyTask();
+   I4 NumTasks     = InEnv->getNumTasks();
+
+   std::vector<int> CellPerm(NCellsOwned);
+
+   for (int Cell = 0; Cell < NCellsOwned; ++Cell) {
+      CellPerm[Cell] = NCellsOwned - 1 - Cell;
+   }
+
+   using namespace boost;
+   using Graph = adjacency_list<vecS, vecS, undirectedS,
+                                property<vertex_color_t, default_color_type,
+                                         property<vertex_degree_t, int>>>;
+
+   using Vertex   = graph_traits<Graph>::vertex_descriptor;
+   using SizeType = graph_traits<Graph>::vertices_size_type;
+
+   Graph graph(NCellsOwned);
+   for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
+      int Cell0 = CellsOnEdgeH(Edge, 0);
+      int Cell1 = CellsOnEdgeH(Edge, 1);
+
+      if (Cell0 < NCellsOwned && Cell1 < NCellsOwned) {
+         add_edge(Cell0, Cell1, graph);
+      }
+   }
+
+   if (MyTask == 0) {
+      std::cout << "MW original bandwidth: " << bandwidth(graph) << std::endl;
+      std::cout << "MW test: " << num_vertices(graph) << " " << NCellsOwned
+                << std::endl;
+   }
+
+   std::vector<Vertex> InvCellPerm(num_vertices(graph));
+
+   using IndexMap     = property_map<Graph, vertex_index_t>::type;
+   IndexMap index_map = boost::get(vertex_index, graph);
+
+   cuthill_mckee_ordering(graph, InvCellPerm.rbegin(),
+                          boost::get(vertex_color, graph),
+                          make_degree_map(graph));
+
+   for (int Cell = 0; Cell != InvCellPerm.size(); ++Cell) {
+      CellPerm[index_map[InvCellPerm[Cell]]] = Cell;
+   }
+
+   if (MyTask == 0) {
+      std::cout << "MW final bandwidth: "
+                << bandwidth(graph, make_iterator_property_map(
+                                        &CellPerm[0], index_map, CellPerm[0]))
+                << std::endl;
+   }
+
+   std::set<int> HaloTasks;
+   for (int Cell = 0; Cell < NCellsAll; ++Cell) {
+      HaloTasks.insert(CellLocH(Cell, 0));
+   }
+
+   for (int Task = 0; Task < NumTasks; ++Task) {
+      int NCellsOwnedTask;
+
+      if (Task == MyTask) {
+         NCellsOwnedTask = NCellsOwned;
+      }
+
+      MPI_Bcast(&NCellsOwnedTask, 1, MPI_INT32_T, Task, MyComm);
+
+      std::vector<int> CellPermTask(NCellsOwnedTask);
+
+      if (Task == MyTask) {
+         CellPermTask = CellPerm;
+      }
+
+      MPI_Bcast(CellPermTask.data(), CellPermTask.size(), MPI_INT32_T, Task,
+                MyComm);
+
+      if (Task != MyTask && (HaloTasks.find(Task) != HaloTasks.end())) {
+         for (int Cell = 0; Cell < NCellsAll; ++Cell) {
+            if (CellLocH(Cell, 0) == Task) {
+               CellLocH(Cell, 1) = CellPermTask[CellLocH(Cell, 1)];
+            }
+         }
+      }
+   }
+
+   // for (int Task : HaloTasks) {
+   //    if (Task != MyTask) {
+   //       int NCellsOwnedTask;
+   //       MPI_Sendrecv(&NCellsOwned, 1, MPI_INT32_T, Task, 44,
+   //       &NCellsOwnedTask,
+   //                    1, MPI_INT32_T, Task, 44, MyComm, MPI_STATUS_IGNORE);
+
+   //      std::vector<int> CellPermTask(NCellsOwnedTask);
+
+   //      MPI_Sendrecv(CellPerm.data(), NCellsOwned, MPI_INT32_T, Task, 45,
+   //                   CellPermTask.data(), NCellsOwnedTask, MPI_INT32_T, Task,
+   //                   45, MyComm, MPI_STATUS_IGNORE);
+
+   //      for (int Cell = 0; Cell < NCellsAll; ++Cell) {
+   //         if (CellLocH(Cell, 0) == Task) {
+   //            CellLocH(Cell, 1) = CellPermTask[CellLocH(Cell, 1)];
+   //         }
+   //      }
+   //   }
+   //}
+
+   permuteFrom(CellIDH, CellPerm);
+   permuteFrom(CellsOnCellH, CellPerm);
+   permuteFrom(NEdgesOnCellH, CellPerm);
+   permuteFrom(EdgesOnCellH, CellPerm);
+   permuteFrom(VerticesOnCellH, CellPerm);
+
+   permuteTo(CellsOnCellH, CellPerm);
+   permuteTo(CellsOnEdgeH, CellPerm);
+   permuteTo(CellsOnVertexH, CellPerm);
+}
+
+void Decomp::reorderOwnedEdges(const MachEnv *InEnv) {
+   MPI_Comm MyComm = InEnv->getComm();
+   I4 MyTask       = InEnv->getMyTask();
+   I4 NumTasks     = InEnv->getNumTasks();
+
+   std::vector<int> InvEdgePerm(NEdgesOwned);
+
+   std::iota(InvEdgePerm.begin(), InvEdgePerm.end(), 0);
+   std::sort(InvEdgePerm.begin(), InvEdgePerm.end(),
+             [&](const int &a, const int &b) {
+                return std::pair(CellsOnEdgeH(a, 0), CellsOnEdgeH(a, 1)) <
+                       std::pair(CellsOnEdgeH(b, 0), CellsOnEdgeH(b, 1));
+             });
+
+   std::vector<int> EdgePerm(NEdgesOwned);
+   for (int Edge = 0; Edge < NEdgesOwned; ++Edge) {
+      EdgePerm[InvEdgePerm[Edge]] = Edge;
+   }
+
+   std::set<int> HaloTasks;
+
+   for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
+      HaloTasks.insert(EdgeLocH(Edge, 0));
+   }
+
+   for (int Task = 0; Task < NumTasks; ++Task) {
+      int NEdgesOwnedTask;
+
+      if (Task == MyTask) {
+         NEdgesOwnedTask = NEdgesOwned;
+      }
+
+      MPI_Bcast(&NEdgesOwnedTask, 1, MPI_INT32_T, Task, MyComm);
+
+      std::vector<int> EdgePermTask(NEdgesOwnedTask);
+
+      if (Task == MyTask) {
+         EdgePermTask = EdgePerm;
+      }
+
+      MPI_Bcast(EdgePermTask.data(), EdgePermTask.size(), MPI_INT32_T, Task,
+                MyComm);
+
+      if (Task != MyTask && (HaloTasks.find(Task) != HaloTasks.end())) {
+         for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
+            if (EdgeLocH(Edge, 0) == Task) {
+               EdgeLocH(Edge, 1) = EdgePermTask[EdgeLocH(Edge, 1)];
+            }
+         }
+      }
+   }
+
+   // for (int Task : HaloTasks) {
+   //    if (Task != MyTask) {
+   //       int NEdgesOwnedTask;
+   //       MPI_Sendrecv(&NEdgesOwned, 1, MPI_INT32_T, Task, 44,
+   //       &NEdgesOwnedTask,
+   //                    1, MPI_INT32_T, Task, 44, MyComm, MPI_STATUS_IGNORE);
+
+   //      std::vector<int> EdgePermTask(NEdgesOwnedTask);
+
+   //      MPI_Sendrecv(EdgePerm.data(), NEdgesOwned, MPI_INT32_T, Task, 45,
+   //                   EdgePermTask.data(), NEdgesOwnedTask, MPI_INT32_T, Task,
+   //                   45, MyComm, MPI_STATUS_IGNORE);
+
+   //      for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
+   //         if (EdgeLocH(Edge, 0) == Task) {
+   //            EdgeLocH(Edge, 1) = EdgePermTask[EdgeLocH(Edge, 1)];
+   //         }
+   //      }
+   //   }
+   //}
+
+   permuteFrom(EdgeIDH, EdgePerm);
+
+   permuteFrom(EdgesOnEdgeH, EdgePerm);
+   permuteFrom(NEdgesOnEdgeH, EdgePerm);
+   permuteFrom(CellsOnEdgeH, EdgePerm);
+   permuteFrom(VerticesOnEdgeH, EdgePerm);
+
+   permuteTo(EdgesOnVertexH, EdgePerm);
+   permuteTo(EdgesOnCellH, EdgePerm);
+   permuteTo(EdgesOnEdgeH, EdgePerm);
+}
+
+void Decomp::reorderOwnedVertices(const MachEnv *InEnv) {
+   MPI_Comm MyComm = InEnv->getComm();
+   I4 MyTask       = InEnv->getMyTask();
+   I4 NumTasks     = InEnv->getNumTasks();
+
+   std::vector<int> InvVertexPerm(NVerticesOwned);
+
+   std::iota(InvVertexPerm.begin(), InvVertexPerm.end(), 0);
+   std::sort(InvVertexPerm.begin(), InvVertexPerm.end(),
+             [&](const int &a, const int &b) {
+                return std::pair(CellsOnVertexH(a, 0), CellsOnVertexH(a, 1)) <
+                       std::pair(CellsOnVertexH(b, 0), CellsOnVertexH(b, 1));
+             });
+
+   std::vector<int> VertexPerm(NVerticesOwned);
+   for (int Vertex = 0; Vertex < NVerticesOwned; ++Vertex) {
+      VertexPerm[InvVertexPerm[Vertex]] = Vertex;
+   }
+
+   std::set<int> HaloTasks;
+
+   for (int Vertex = 0; Vertex < NVerticesAll; ++Vertex) {
+      HaloTasks.insert(VertexLocH(Vertex, 0));
+   }
+
+   for (int Task = 0; Task < NumTasks; ++Task) {
+      int NVerticesOwnedTask;
+
+      if (Task == MyTask) {
+         NVerticesOwnedTask = NVerticesOwned;
+      }
+
+      MPI_Bcast(&NVerticesOwnedTask, 1, MPI_INT32_T, Task, MyComm);
+
+      std::vector<int> VertexPermTask(NVerticesOwnedTask);
+
+      if (Task == MyTask) {
+         VertexPermTask = VertexPerm;
+      }
+
+      MPI_Bcast(VertexPermTask.data(), VertexPermTask.size(), MPI_INT32_T, Task,
+                MyComm);
+
+      if (Task != MyTask && (HaloTasks.find(Task) != HaloTasks.end())) {
+         for (int Vertex = 0; Vertex < NVerticesAll; ++Vertex) {
+            if (VertexLocH(Vertex, 0) == Task) {
+               VertexLocH(Vertex, 1) = VertexPermTask[VertexLocH(Vertex, 1)];
+            }
+         }
+      }
+   }
+
+   // for (int Task : HaloTasks) {
+   //    if (Task != MyTask) {
+   //       int NVerticesOwnedTask;
+   //       MPI_Sendrecv(&NVerticesOwned, 1, MPI_INT32_T, Task, 44,
+   //                    &NVerticesOwnedTask, 1, MPI_INT32_T, Task, 44, MyComm,
+   //                    MPI_STATUS_IGNORE);
+
+   //      std::vector<int> VertexPermTask(NVerticesOwnedTask);
+
+   //      MPI_Sendrecv(VertexPerm.data(), NVerticesOwned, MPI_INT32_T, Task,
+   //      45,
+   //                   VertexPermTask.data(), NVerticesOwnedTask, MPI_INT32_T,
+   //                   Task, 45, MyComm, MPI_STATUS_IGNORE);
+
+   //      for (int Vertex = 0; Vertex < NVerticesAll; ++Vertex) {
+   //         if (VertexLocH(Vertex, 0) == Task) {
+   //            VertexLocH(Vertex, 1) = VertexPermTask[VertexLocH(Vertex, 1)];
+   //         }
+   //      }
+   //   }
+   //}
+
+   permuteFrom(VertexIDH, VertexPerm);
+
+   permuteFrom(CellsOnVertexH, VertexPerm);
+   permuteFrom(EdgesOnVertexH, VertexPerm);
+
+   permuteTo(VerticesOnCellH, VertexPerm);
+   permuteTo(VerticesOnEdgeH, VertexPerm);
+}
 
 //------------------------------------------------------------------------------
 // end Decomp methods
