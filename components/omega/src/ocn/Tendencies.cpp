@@ -301,11 +301,18 @@ void Tendencies::computeThicknessTendenciesOnly(
    Array2DReal NormalVelEdge;
    State->getNormalVelocity(NormalVelEdge, VelTimeLevel);
 
-   deepCopy(LocLayerThicknessTend, 0);
-
    // Compute thickness flux divergence
    const Array2DReal &ThickFluxEdge =
        AuxState->LayerThicknessAux.FluxLayerThickEdge;
+
+   parallelFor(
+       {NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
+          const int KStart = KChunk * VecLength;
+          for (int KVec = 0; KVec < VecLength; ++KVec) {
+             const int K                     = KStart + KVec;
+             LocLayerThicknessTend(ICell, K) = 0;
+          }
+       });
 
    if (LocThicknessFluxDiv.Enabled) {
       parallelFor(
@@ -339,7 +346,14 @@ void Tendencies::computeVelocityTendenciesOnly(
    OMEGA_SCOPE(LocVelocityDiffusion, VelocityDiffusion);
    OMEGA_SCOPE(LocVelocityHyperDiff, VelocityHyperDiff);
 
-   deepCopy(LocNormalVelocityTend, 0);
+   parallelFor(
+       {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          const int KStart = KChunk * VecLength;
+          for (int KVec = 0; KVec < VecLength; ++KVec) {
+             const int K                     = KStart + KVec;
+             LocNormalVelocityTend(IEdge, K) = 0;
+          }
+       });
 
    // Compute potential vorticity horizontal advection
    const Array2DReal &FluxLayerThickEdge =
