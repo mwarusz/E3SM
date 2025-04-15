@@ -79,9 +79,13 @@ template <class F, int Rank> struct LinearIdxWrapper : F {
 
    LinearIdxWrapper(F &&Functor, const int (&Bounds)[Rank])
        : F(std::move(Functor)) {
-      Strides[Rank - 2] = Bounds[Rank - 1];
-      for (int I = Rank - 3; I >= 0; --I) {
-         Strides[I] = Bounds[I + 1] * Strides[I + 1];
+      if (Rank > 1) {
+         Strides[Rank - 2] = Bounds[Rank - 1];
+         for (int I = Rank - 3; I >= 0; --I) {
+            Strides[I] = Bounds[I + 1] * Strides[I + 1];
+         }
+      } else {
+         Strides[0] = Bounds[0];
       }
    }
 
@@ -200,10 +204,28 @@ inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
       const auto Policy = Bounds1D(0, LinBound);
       Kokkos::parallel_for(Label, Policy, LinFunctor);
 #else
-      // On host use MDRangePolicy
-      const int LowerBounds[N] = {0};
-      const auto Policy        = Bounds<N>(LowerBounds, UpperBounds);
-      Kokkos::parallel_for(Label, Policy, Functor);
+      // On host convert the functor to use one dimensional indexing for the
+      // first N - 1 indices and use 1D RangePolicy with a serial loop over the
+      // last dimension
+
+      int LinearBounds[N - 1];
+      int LinBound = 1;
+      for (int Rank = 0; Rank < N - 1; ++Rank) {
+         LinearBounds[Rank] = UpperBounds[Rank];
+         LinBound *= UpperBounds[Rank];
+      }
+
+      const auto LinFunctor =
+          LinearIdxWrapper{std::move(Functor), LinearBounds};
+      const auto Policy   = Bounds1D(0, LinBound);
+      const int LastBound = UpperBounds[N - 1];
+
+      Kokkos::parallel_for(
+          Label, Policy, KOKKOS_LAMBDA(int I) {
+             for (int J = 0; J < LastBound; ++J) {
+                LinFunctor(I, J);
+             }
+          });
 #endif
    }
 }
