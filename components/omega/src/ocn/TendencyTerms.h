@@ -20,10 +20,54 @@
 
 namespace OMEGA {
 
+template <class T, int N> struct AddArrayOp;
+
+template <class T> struct AddArrayOp<T, 2> {
+   template <class... Args>
+   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IElem, I4 KChunk,
+                                   Args &&...OtherArgs) const {
+
+      const I4 KStart = KChunk * VecLength;
+
+      Real ChunkTend[VecLength] = {0};
+
+      (*static_cast<T const *>(this))(ChunkTend, IElem, KChunk,
+                                      std::forward<Args>(OtherArgs)...);
+
+      OMEGA_SIMD_PRAGMA
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const I4 K = KStart + KVec;
+         Tend(IElem, K) += ChunkTend[KVec];
+      }
+   }
+};
+
+template <class T> struct AddArrayOp<T, 3> {
+   template <class... Args>
+   KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 IElem,
+                                   I4 KChunk, Args &&...OtherArgs) const {
+
+      const I4 KStart = KChunk * VecLength;
+
+      Real ChunkTend[VecLength] = {0};
+
+      (*static_cast<T const *>(this))(ChunkTend, L, IElem, KChunk,
+                                      std::forward<Args>(OtherArgs)...);
+
+      OMEGA_SIMD_PRAGMA
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const I4 K = KStart + KVec;
+         Tend(L, IElem, K) += ChunkTend[KVec];
+      }
+   }
+};
+
 /// Divergence of thickness flux at cell centers, for updating layer thickness
 /// arrays
-class ThicknessFluxDivOnCell {
+class ThicknessFluxDivOnCell : public AddArrayOp<ThicknessFluxDivOnCell, 2> {
  public:
+   using AddArrayOp<ThicknessFluxDivOnCell, 2>::operator();
+
    bool Enabled;
 
    /// constructor declaration
@@ -31,7 +75,7 @@ class ThicknessFluxDivOnCell {
 
    /// The functor takes cell index, vertical chunk index, and thickness flux
    /// array as inputs, outputs the tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 ICell, I4 KChunk,
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 ICell, I4 KChunk,
                                    const Array2DReal &ThicknessFlux,
                                    const Array2DReal &NormalVelEdge) const {
 
@@ -54,7 +98,7 @@ class ThicknessFluxDivOnCell {
       OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(ICell, K) -= DivTmp[KVec];
+         Tend[KVec] -= DivTmp[KVec];
       }
    }
 
@@ -68,8 +112,9 @@ class ThicknessFluxDivOnCell {
 
 /// Horizontal advection of potential vorticity defined on edges, for
 /// momentum equation
-class PotentialVortHAdvOnEdge {
+class PotentialVortHAdvOnEdge : public AddArrayOp<PotentialVortHAdvOnEdge, 2> {
  public:
+   using AddArrayOp<PotentialVortHAdvOnEdge, 2>::operator();
    bool Enabled;
 
    /// constructor declaration
@@ -79,7 +124,7 @@ class PotentialVortHAdvOnEdge {
    /// normalized relative vorticity, normalized planetary vorticity, layer
    /// thickness on edges, and normal velocity on edges as inputs,
    /// outputs the tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
                                    const Array2DReal &NormRVortEdge,
                                    const Array2DReal &NormFEdge,
                                    const Array2DReal &FluxLayerThickEdge,
@@ -106,7 +151,7 @@ class PotentialVortHAdvOnEdge {
       OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(IEdge, K) += EdgeMask(IEdge, K) * VortTmp[KVec];
+         Tend[KVec] += EdgeMask(IEdge, K) * VortTmp[KVec];
       }
    }
 
@@ -118,8 +163,9 @@ class PotentialVortHAdvOnEdge {
 };
 
 /// Gradient of kinetic energy defined on edges, for momentum equation
-class KEGradOnEdge {
+class KEGradOnEdge : public AddArrayOp<KEGradOnEdge, 2> {
  public:
+   using AddArrayOp<KEGradOnEdge, 2>::operator();
    bool Enabled;
 
    /// constructor declaration
@@ -127,7 +173,7 @@ class KEGradOnEdge {
 
    /// The functor takes edge index, vertical chunk index, and kinetic energy
    /// array as inputs, outputs the tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
                                    const Array2DReal &KECell) const {
 
       const I4 KStart      = KChunk * VecLength;
@@ -138,8 +184,7 @@ class KEGradOnEdge {
       OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(IEdge, K) -= EdgeMask(IEdge, K) *
-                           (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
+         Tend[KVec] -= EdgeMask(IEdge, K) * (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
       }
    }
 
@@ -151,8 +196,9 @@ class KEGradOnEdge {
 
 /// Gradient of sea surface height defined on edges multipled by gravitational
 /// acceleration, for momentum equation
-class SSHGradOnEdge {
+class SSHGradOnEdge : public AddArrayOp<SSHGradOnEdge, 2> {
  public:
+   using AddArrayOp<SSHGradOnEdge, 2>::operator();
    bool Enabled;
 
    /// constructor declaration
@@ -160,7 +206,7 @@ class SSHGradOnEdge {
 
    /// The functor takes edge index, vertical chunk index, and array of
    /// layer thickness/SSH, outputs tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
                                    const Array2DReal &SshCell) const {
 
       const I4 KStart      = KChunk * VecLength;
@@ -171,9 +217,8 @@ class SSHGradOnEdge {
       OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(IEdge, K) -= EdgeMask(IEdge, K) * Grav *
-                           (SshCell(ICell1, K) - SshCell(ICell0, K)) *
-                           InvDcEdge;
+         Tend[KVec] -= EdgeMask(IEdge, K) *
+             Grav * (SshCell(ICell1, K) - SshCell(ICell0, K)) * InvDcEdge;
       }
    }
 
@@ -185,8 +230,9 @@ class SSHGradOnEdge {
 };
 
 /// Laplacian horizontal mixing, for momentum equation
-class VelocityDiffusionOnEdge {
+class VelocityDiffusionOnEdge : public AddArrayOp<VelocityDiffusionOnEdge, 2> {
  public:
+   using AddArrayOp<VelocityDiffusionOnEdge, 2>::operator();
    bool Enabled;
 
    Real ViscDel2;
@@ -197,7 +243,7 @@ class VelocityDiffusionOnEdge {
    /// The functor takes edge index, vertical chunk index, and arrays for
    /// divergence of horizontal velocity (defined at cell centers) and relative
    /// vorticity (defined at vertices), outputs tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
                                    const Array2DReal &DivCell,
                                    const Array2DReal &RVortVertex) const {
 
@@ -219,7 +265,7 @@ class VelocityDiffusionOnEdge {
               (RVortVertex(IVertex1, K) - RVortVertex(IVertex0, K)) *
                   DvEdgeInv);
 
-         Tend(IEdge, K) +=
+         Tend[KVec] +=
              EdgeMask(IEdge, K) * ViscDel2 * MeshScalingDel2(IEdge) * Del2U;
       }
    }
@@ -234,8 +280,9 @@ class VelocityDiffusionOnEdge {
 };
 
 /// Biharmonic horizontal mixing, for momentum equation
-class VelocityHyperDiffOnEdge {
+class VelocityHyperDiffOnEdge : public AddArrayOp<VelocityHyperDiffOnEdge, 2> {
  public:
+   using AddArrayOp<VelocityHyperDiffOnEdge, 2>::operator();
    bool Enabled;
 
    Real ViscDel4;
@@ -247,7 +294,7 @@ class VelocityHyperDiffOnEdge {
    /// The functor takes the edge index, vertical chunk index, and arrays for
    /// the laplacian of divergence of horizontal velocity and the laplacian of
    /// the relative vorticity, outputs tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 IEdge, I4 KChunk,
                                    const Array2DReal &Del2DivCell,
                                    const Array2DReal &Del2RVortVertex) const {
 
@@ -270,7 +317,7 @@ class VelocityHyperDiffOnEdge {
               (Del2RVortVertex(IVertex1, K) - Del2RVortVertex(IVertex0, K)) *
                   DvEdgeInv);
 
-         Tend(IEdge, K) -=
+         Tend[KVec] -=
              EdgeMask(IEdge, K) * ViscDel4 * MeshScalingDel4(IEdge) * Del2U;
       }
    }
@@ -347,13 +394,14 @@ class BottomDragOnEdge {
 };
 
 // Tracer horizontal advection term
-class TracerHorzAdvOnCell {
+class TracerHorzAdvOnCell : public AddArrayOp<TracerHorzAdvOnCell, 3> {
  public:
+   using AddArrayOp<TracerHorzAdvOnCell, 3>::operator();
    bool Enabled;
 
    TracerHorzAdvOnCell(const HorzMesh *Mesh);
 
-   KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 L, I4 ICell,
                                    I4 KChunk, const Array2DReal &NormVelEdge,
                                    const Array3DReal &HTracersOnEdge) const {
 
@@ -377,7 +425,7 @@ class TracerHorzAdvOnCell {
       OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(L, ICell, K) -= HAdvTmp[KVec];
+         Tend[KVec] -= HAdvTmp[KVec];
       }
    }
 
@@ -392,8 +440,10 @@ class TracerHorzAdvOnCell {
 };
 
 // Tracer horizontal diffusion term
-class TracerDiffOnCell {
+class TracerDiffOnCell : public AddArrayOp<TracerDiffOnCell, 3> {
  public:
+   using AddArrayOp<TracerDiffOnCell, 3>::operator();
+
    bool Enabled;
 
    Real EddyDiff2;
@@ -401,7 +451,7 @@ class TracerDiffOnCell {
    TracerDiffOnCell(const HorzMesh *Mesh);
 
    KOKKOS_FUNCTION void
-   operator()(const Array3DReal &Tend, I4 L, I4 ICell, I4 KChunk,
+   operator()(Real (&Tend)[VecLength], I4 L, I4 ICell, I4 KChunk,
               const Array3DReal &TracerCell,
               const Array2DReal &MeanLayerThickEdge) const {
 
@@ -432,7 +482,7 @@ class TracerDiffOnCell {
       OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(L, ICell, K) += EddyDiff2 * DiffTmp[KVec] * InvAreaCell;
+         Tend[KVec] += EddyDiff2 * DiffTmp[KVec] * InvAreaCell;
       }
    }
 
@@ -449,15 +499,17 @@ class TracerDiffOnCell {
 };
 
 // Tracer biharmonic horizontal mixing term
-class TracerHyperDiffOnCell {
+class TracerHyperDiffOnCell : public AddArrayOp<TracerHyperDiffOnCell, 3> {
  public:
+   using AddArrayOp<TracerHyperDiffOnCell, 3>::operator();
+
    bool Enabled;
 
    Real EddyDiff4;
 
    TracerHyperDiffOnCell(const HorzMesh *Mesh);
 
-   KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
+   KOKKOS_FUNCTION void operator()(Real (&Tend)[VecLength], I4 L, I4 ICell,
                                    I4 KChunk,
                                    const Array3DReal &TrDel2Cell) const {
 
@@ -488,7 +540,7 @@ class TracerHyperDiffOnCell {
       OMEGA_SIMD_PRAGMA
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(L, ICell, K) -= EddyDiff4 * HypTmp[KVec] * InvAreaCell;
+         Tend[KVec] -= EddyDiff4 * HypTmp[KVec] * InvAreaCell;
       }
    }
 
