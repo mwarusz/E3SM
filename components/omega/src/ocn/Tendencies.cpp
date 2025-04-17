@@ -269,6 +269,22 @@ void Tendencies::computeThicknessTendenciesOnly(
    const Array2DReal &ThickFluxEdge =
        AuxState->LayerThicknessAux.FluxLayerThickEdge;
 
+#ifdef OMEGA_FUSED_TEND
+   parallelFor(
+       {NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
+          Real ChunkTend[VecLength] = {0};
+          if (LocThicknessFluxDiv.Enabled) {
+             LocThicknessFluxDiv(ChunkTend, ICell, KChunk, ThickFluxEdge,
+                                 NormalVelEdge);
+          }
+
+          const int KStart = KChunk * VecLength;
+          for (int KVec = 0; KVec < VecLength; ++KVec) {
+             const int K                     = KStart + KVec;
+             LocLayerThicknessTend(ICell, K) = ChunkTend[KVec];
+          }
+       });
+#else
    parallelFor(
        {NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
           const int KStart = KChunk * VecLength;
@@ -285,6 +301,7 @@ void Tendencies::computeThicknessTendenciesOnly(
                                  ThickFluxEdge, NormalVelEdge);
           });
    }
+#endif
 
    if (CustomThicknessTend) {
       CustomThicknessTend(LocLayerThicknessTend, State, AuxState,
@@ -312,6 +329,54 @@ void Tendencies::computeVelocityTendenciesOnly(
    OMEGA_SCOPE(LocWindForcing, WindForcing);
    OMEGA_SCOPE(LocBottomDrag, BottomDrag);
 
+   const Array2DReal &FluxLayerThickEdge =
+       AuxState->LayerThicknessAux.FluxLayerThickEdge;
+   const Array2DReal &NormRVortEdge = AuxState->VorticityAux.NormRelVortEdge;
+   const Array2DReal &NormFEdge     = AuxState->VorticityAux.NormPlanetVortEdge;
+   Array2DReal NormVelEdge;
+   State->getNormalVelocity(NormVelEdge, VelTimeLevel);
+   const Array2DReal &KECell      = AuxState->KineticAux.KineticEnergyCell;
+   const Array2DReal &SSHCell     = AuxState->LayerThicknessAux.SshCell;
+   const Array2DReal &DivCell     = AuxState->KineticAux.VelocityDivCell;
+   const Array2DReal &RVortVertex = AuxState->VorticityAux.RelVortVertex;
+   const Array2DReal &Del2DivCell = AuxState->VelocityDel2Aux.Del2DivCell;
+   const Array2DReal &Del2RVortVertex =
+       AuxState->VelocityDel2Aux.Del2RelVortVertex;
+
+#ifdef OMEGA_FUSED_TEND
+   parallelFor(
+       {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          Real ChunkTend[VecLength] = {0};
+
+          if (LocPotientialVortHAdv.Enabled) {
+             LocPotientialVortHAdv(ChunkTend, IEdge, KChunk, NormRVortEdge,
+                                   NormFEdge, FluxLayerThickEdge, NormVelEdge);
+          }
+          if (LocKEGrad.Enabled) {
+             LocKEGrad(ChunkTend, IEdge, KChunk, KECell);
+          }
+
+          if (LocSSHGrad.Enabled) {
+             LocSSHGrad(ChunkTend, IEdge, KChunk, SSHCell);
+          }
+
+          if (LocVelocityDiffusion.Enabled) {
+             LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk, DivCell,
+                                  RVortVertex);
+          }
+
+          if (LocVelocityHyperDiff.Enabled) {
+             LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
+                                  Del2DivCell, Del2RVortVertex);
+          }
+
+          const int KStart = KChunk * VecLength;
+          for (int KVec = 0; KVec < VecLength; ++KVec) {
+             const int K                     = KStart + KVec;
+             LocNormalVelocityTend(IEdge, K) = ChunkTend[KVec];
+          }
+       });
+#else
    parallelFor(
        {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
           const int KStart = KChunk * VecLength;
@@ -324,12 +389,6 @@ void Tendencies::computeVelocityTendenciesOnly(
    const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
 
    // Compute potential vorticity horizontal advection
-   const Array2DReal &FluxLayerThickEdge =
-       AuxState->LayerThicknessAux.FluxLayerThickEdge;
-   const Array2DReal &NormRVortEdge = AuxState->VorticityAux.NormRelVortEdge;
-   const Array2DReal &NormFEdge     = AuxState->VorticityAux.NormPlanetVortEdge;
-   Array2DReal NormVelEdge;
-   State->getNormalVelocity(NormVelEdge, VelTimeLevel);
    if (LocPotientialVortHAdv.Enabled) {
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
@@ -340,7 +399,6 @@ void Tendencies::computeVelocityTendenciesOnly(
    }
 
    // Compute kinetic energy gradient
-   const Array2DReal &KECell = AuxState->KineticAux.KineticEnergyCell;
    if (LocKEGrad.Enabled) {
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
@@ -349,7 +407,6 @@ void Tendencies::computeVelocityTendenciesOnly(
    }
 
    // Compute sea surface height gradient
-   const Array2DReal &SSHCell = AuxState->LayerThicknessAux.SshCell;
    if (LocSSHGrad.Enabled) {
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
@@ -358,8 +415,6 @@ void Tendencies::computeVelocityTendenciesOnly(
    }
 
    // Compute del2 horizontal diffusion
-   const Array2DReal &DivCell     = AuxState->KineticAux.VelocityDivCell;
-   const Array2DReal &RVortVertex = AuxState->VorticityAux.RelVortVertex;
    if (LocVelocityDiffusion.Enabled) {
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
@@ -369,9 +424,6 @@ void Tendencies::computeVelocityTendenciesOnly(
    }
 
    // Compute del4 horizontal diffusion
-   const Array2DReal &Del2DivCell = AuxState->VelocityDel2Aux.Del2DivCell;
-   const Array2DReal &Del2RVortVertex =
-       AuxState->VelocityDel2Aux.Del2RelVortVertex;
    if (LocVelocityHyperDiff.Enabled) {
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
@@ -379,6 +431,7 @@ void Tendencies::computeVelocityTendenciesOnly(
                                   Del2DivCell, Del2RVortVertex);
           });
    }
+#endif
 
    // Compute wind forcing
    const auto &NormalStressEdge = AuxState->WindForcingAux.NormalStressEdge;
@@ -421,6 +474,39 @@ void Tendencies::computeTracerTendenciesOnly(
    OMEGA_SCOPE(LocTracerDiffusion, TracerDiffusion);
    OMEGA_SCOPE(LocTracerHyperDiff, TracerHyperDiff);
 
+   const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
+   const Array3DReal &HTracersEdge  = AuxState->TracerAux.HTracersEdge;
+   const Array2DReal &MeanLayerThickEdge =
+       AuxState->LayerThicknessAux.MeanLayerThickEdge;
+   const Array3DReal &Del2TracersCell = AuxState->TracerAux.Del2TracersCell;
+
+#ifdef OMEGA_FUSED_TEND
+   parallelFor(
+       {NTracers, NCellsAll, NChunks},
+       KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
+          Real ChunkTend[VecLength] = {0};
+
+          if (LocTracerHorzAdv.Enabled) {
+             LocTracerHorzAdv(ChunkTend, L, ICell, KChunk, NormalVelEdge,
+                              HTracersEdge);
+          }
+
+          if (LocTracerDiffusion.Enabled) {
+             LocTracerDiffusion(ChunkTend, L, ICell, KChunk, TracerArray,
+                                MeanLayerThickEdge);
+          }
+
+          if (LocTracerHyperDiff.Enabled) {
+             LocTracerHyperDiff(ChunkTend, L, ICell, KChunk, Del2TracersCell);
+          }
+
+          const int KStart = KChunk * VecLength;
+          for (int KVec = 0; KVec < VecLength; ++KVec) {
+             const int K                = KStart + KVec;
+             LocTracerTend(L, ICell, K) = ChunkTend[KVec];
+          }
+       });
+#else
    parallelFor(
        {NTracers, NCellsAll, NChunks},
        KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
@@ -432,8 +518,6 @@ void Tendencies::computeTracerTendenciesOnly(
        });
 
    // compute tracer horizotal advection
-   const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
-   const Array3DReal &HTracersEdge  = AuxState->TracerAux.HTracersEdge;
    if (LocTracerHorzAdv.Enabled) {
       parallelFor(
           {NTracers, NCellsAll, NChunks},
@@ -444,8 +528,6 @@ void Tendencies::computeTracerTendenciesOnly(
    }
 
    // compute tracer diffusion
-   const Array2DReal &MeanLayerThickEdge =
-       AuxState->LayerThicknessAux.MeanLayerThickEdge;
    if (LocTracerDiffusion.Enabled) {
       parallelFor(
           {NTracers, NCellsAll, NChunks},
@@ -456,7 +538,6 @@ void Tendencies::computeTracerTendenciesOnly(
    }
 
    // compute tracer hyperdiffusion
-   const Array3DReal &Del2TracersCell = AuxState->TracerAux.Del2TracersCell;
    if (LocTracerHyperDiff.Enabled) {
       parallelFor(
           {NTracers, NCellsAll, NChunks},
@@ -465,6 +546,7 @@ void Tendencies::computeTracerTendenciesOnly(
                                 Del2TracersCell);
           });
    }
+#endif
 
 } // end tracer tendency compute
 

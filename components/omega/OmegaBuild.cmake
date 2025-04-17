@@ -43,6 +43,7 @@ macro(common)
   endif()
 
   set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "Omega vector length")
+  option(OMEGA_FUSED_TEND "Turn on fused tendecies." OFF)
 
 endmacro()
 

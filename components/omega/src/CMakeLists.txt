@@ -32,6 +32,14 @@ if(OMEGA_SINGLE_PRECISION)
   )
 endif()
 
+if(OMEGA_FUSED_TEND)
+  target_compile_definitions(
+      OmegaLibFlags
+      INTERFACE
+      OMEGA_FUSED_TEND=1
+  )
+endif()
+
 target_link_options(
     OmegaLibFlags
     INTERFACE
