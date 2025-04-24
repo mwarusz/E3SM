@@ -192,7 +192,9 @@ template <int N, class F>
 inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
                         const F &Functor) {
    if constexpr (N == 1) {
-      const auto Policy = Bounds1D(0, UpperBounds[0]);
+      auto Policy        = Bounds1D(0, UpperBounds[0]);
+      const int NThreads = ExecSpace::concurrency();
+      Policy.set_chunk_size((UpperBounds[0] + NThreads - 1) / NThreads);
       Kokkos::parallel_for(Label, Policy, Functor);
 
    } else {
@@ -220,8 +222,11 @@ inline void parallelFor(const std::string &Label, const int (&UpperBounds)[N],
 
       const auto LinFunctor =
           LinearIdxWrapper{std::move(Functor), LinearBounds};
-      const auto Policy   = Bounds1D(0, LinBound);
+      auto Policy         = Bounds1D(0, LinBound);
       const int LastBound = UpperBounds[N - 1];
+
+      const int NThreads = ExecSpace::concurrency();
+      Policy.set_chunk_size((LinBound + NThreads - 1) / NThreads);
 
       Kokkos::parallel_for(
           Label, Policy, KOKKOS_LAMBDA(int I) {
