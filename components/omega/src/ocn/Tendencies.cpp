@@ -14,7 +14,19 @@
 #include "Pacer.h"
 #include "Tracers.h"
 
+#define ESIMD_TEND
+
+#ifdef ESIMD_TEND
+#include <experimental/simd>
+namespace stdx = std::experimental;
+#endif
+
 namespace OMEGA {
+
+#ifdef ESIMD_TEND
+using Vec    = stdx::fixed_size_simd<Real, VecLength>;
+using VecTag = stdx::element_aligned_tag;
+#endif
 
 Tendencies *Tendencies::DefaultTendencies = nullptr;
 std::map<std::string, std::unique_ptr<Tendencies>> Tendencies::AllTendencies;
@@ -271,6 +283,36 @@ void Tendencies::computeThicknessTendenciesOnly(
        AuxState->LayerThicknessAux.FluxLayerThickEdge;
 
 #ifdef OMEGA_FUSED_TEND
+#ifdef ESIMD_TEND
+   const auto &NEdgesOnCell   = ThicknessFluxDiv.NEdgesOnCell;
+   const auto &EdgesOnCell    = ThicknessFluxDiv.EdgesOnCell;
+   const auto &AreaCell       = ThicknessFluxDiv.AreaCell;
+   const auto &DvEdge         = ThicknessFluxDiv.DvEdge;
+   const auto &EdgeSignOnCell = ThicknessFluxDiv.EdgeSignOnCell;
+
+   parallelFor(
+       {NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
+          const int K            = KChunk * VecLength;
+          const Real InvAreaCell = 1._Real / AreaCell(ICell);
+          Vec HTendICell         = 0;
+          for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
+             const int JEdge = EdgesOnCell(ICell, J);
+
+             const Real Sgn     = EdgeSignOnCell(ICell, J);
+             const Real DvJedge = DvEdge(JEdge);
+
+             Vec VnJedge;
+             VnJedge.copy_from(&NormalVelEdge(JEdge, K), VecTag{});
+
+             Vec HJedge;
+             HJedge.copy_from(&ThickFluxEdge(JEdge, K), VecTag{});
+
+             HTendICell += Sgn * DvJedge * VnJedge * HJedge;
+          }
+          HTendICell *= InvAreaCell;
+          HTendICell.copy_to(&LocLayerThicknessTend(ICell, K), VecTag{});
+       });
+#else
    parallelFor(
        {NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
           Real ChunkTend[VecLength] = {0};
@@ -285,6 +327,7 @@ void Tendencies::computeThicknessTendenciesOnly(
              LocLayerThicknessTend(ICell, K) = ChunkTend[KVec];
           }
        });
+#endif
 #else
    parallelFor(
        {NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
