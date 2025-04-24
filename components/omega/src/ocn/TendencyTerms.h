@@ -102,7 +102,7 @@ class ThicknessFluxDivOnCell : public AddArrayOp<ThicknessFluxDivOnCell, 2> {
       }
    }
 
-   // private:
+ private:
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array1DReal DvEdge;
