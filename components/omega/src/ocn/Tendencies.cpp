@@ -11,7 +11,6 @@
 #include "Tendencies.h"
 #include "CustomTendencyTerms.h"
 #include "Error.h"
-#include "Pacer.h"
 #include "Tracers.h"
 
 #define ESIMD_TEND
@@ -617,10 +616,8 @@ void Tendencies::computeThicknessTendencies(
                                               NormalVelEdge);
        });
 
-   Pacer::start("thickTend");
    computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
                                   Time);
-   Pacer::stop("thickTend");
 }
 
 void Tendencies::computeVelocityTendencies(
@@ -631,10 +628,8 @@ void Tendencies::computeVelocityTendencies(
     TimeInstant Time                ///< [in] Time
 ) {
    AuxState->computeMomAux(State, ThickTimeLevel, VelTimeLevel);
-   Pacer::start("velTend");
    computeVelocityTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
                                  Time);
-   Pacer::stop("velTend");
 }
 
 void Tendencies::computeTracerTendencies(
