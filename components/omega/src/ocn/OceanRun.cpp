@@ -38,8 +38,8 @@ int ocnRun(TimeInstant &CurrTime ///< [inout] current sim time
    // time loop, integrate until EndAlarm or error encountered
    I8 IStep = 0;
 
-   MPI_Barrier(MPI_COMM_WORLD);
    Kokkos::fence();
+   MPI_Barrier(MPI_COMM_WORLD);
    Pacer::start("TimeLoop");
    while (Err == 0 && !(EndAlarm->isRinging())) {
 
@@ -63,7 +63,6 @@ int ocnRun(TimeInstant &CurrTime ///< [inout] current sim time
                SimTime.getString(4, 4, "-"));
    }
    Kokkos::fence();
-   MPI_Barrier(MPI_COMM_WORLD);
    Pacer::stop("TimeLoop");
 
    return Err;
