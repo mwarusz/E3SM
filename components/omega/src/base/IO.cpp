@@ -11,6 +11,7 @@
 #include "DataTypes.h"
 #include "Logging.h"
 // include "Config.h"
+#include "MachEnv.h"
 #include "mpi.h"
 #include "pio.h"
 
@@ -199,7 +200,7 @@ int init(const MPI_Comm &InComm // [in] MPI communicator to use
    // extern int SysID;
 
    FileFmt DefaultFileFmt = FileFmtFromString("netcdf4c");
-   int NumIOTasks         = 1;
+   int NumIOTasks         = MachEnv::getDefault()->getNumTasks();
    int IOStride           = 1;
    int IOBaseTask         = 0;
    Rearranger Rearrange   = RearrDefault;
