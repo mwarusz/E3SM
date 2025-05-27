@@ -287,6 +287,10 @@ class Decomp {
    bool validVertexID(I4 InVertexID ///< [in] a vertex ID to check
    );
 
+   void reorderCellArrays(std::vector<int> CellPerm);
+   void reorderEdgeArrays(std::vector<int> EdgePerm);
+   void reorderVertexArrays(std::vector<int> VertexPerm);
+
 }; // end class Decomp
 
 } // end namespace OMEGA

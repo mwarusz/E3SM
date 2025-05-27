@@ -2133,6 +2133,70 @@ PartMethod getPartMethodFromStr(const std::string &InMethod) {
 
 } // End getPartMethodFromStr
 
+void Decomp::reorderCellArrays(std::vector<int> CellPerm) {
+   permuteFrom(CellIDH, CellPerm);
+   permuteFrom(CellLocH, CellPerm);
+   permuteFrom(CellsOnCellH, CellPerm);
+   permuteFrom(NEdgesOnCellH, CellPerm);
+   permuteFrom(EdgesOnCellH, CellPerm);
+   permuteFrom(VerticesOnCellH, CellPerm);
+
+   permuteTo(CellsOnCellH, CellPerm);
+   permuteTo(CellsOnEdgeH, CellPerm);
+   permuteTo(CellsOnVertexH, CellPerm);
+
+   deepCopy(CellID, CellIDH);
+   deepCopy(CellLoc, CellLocH);
+   deepCopy(CellsOnCell, CellsOnCellH);
+   deepCopy(NEdgesOnCell, NEdgesOnCellH);
+   deepCopy(EdgesOnCell, EdgesOnCellH);
+   deepCopy(VerticesOnCell, VerticesOnCellH);
+   deepCopy(CellsOnEdge, CellsOnEdgeH);
+   deepCopy(CellsOnVertex, CellsOnVertexH);
+}
+
+void Decomp::reorderEdgeArrays(std::vector<int> EdgePerm) {
+   permuteFrom(EdgeIDH, EdgePerm);
+   permuteFrom(EdgeLocH, EdgePerm);
+
+   permuteFrom(EdgesOnEdgeH, EdgePerm);
+   permuteFrom(NEdgesOnEdgeH, EdgePerm);
+   permuteFrom(CellsOnEdgeH, EdgePerm);
+   permuteFrom(VerticesOnEdgeH, EdgePerm);
+
+   permuteTo(EdgesOnVertexH, EdgePerm);
+   permuteTo(EdgesOnCellH, EdgePerm);
+   permuteTo(EdgesOnEdgeH, EdgePerm);
+
+   deepCopy(EdgeID, EdgeIDH);
+   deepCopy(EdgeLoc, EdgeLocH);
+   deepCopy(EdgesOnEdge, EdgesOnEdgeH);
+   deepCopy(NEdgesOnEdge, NEdgesOnEdgeH);
+   deepCopy(CellsOnEdge, CellsOnEdgeH);
+   deepCopy(VerticesOnEdge, VerticesOnEdgeH);
+
+   deepCopy(EdgesOnVertex, EdgesOnVertexH);
+   deepCopy(EdgesOnCell, EdgesOnCellH);
+}
+
+void Decomp::reorderVertexArrays(std::vector<int> VertexPerm) {
+   permuteFrom(VertexIDH, VertexPerm);
+   permuteFrom(VertexLocH, VertexPerm);
+
+   permuteFrom(CellsOnVertexH, VertexPerm);
+   permuteFrom(EdgesOnVertexH, VertexPerm);
+
+   permuteTo(VerticesOnCellH, VertexPerm);
+   permuteTo(VerticesOnEdgeH, VertexPerm);
+
+   deepCopy(VertexID, VertexIDH);
+   deepCopy(VertexLoc, VertexLocH);
+   deepCopy(CellsOnVertex, CellsOnVertexH);
+   deepCopy(EdgesOnVertex, EdgesOnVertexH);
+
+   deepCopy(VerticesOnCell, VerticesOnCellH);
+   deepCopy(VerticesOnEdge, VerticesOnEdgeH);
+}
 //------------------------------------------------------------------------------
 // end Decomp methods
 

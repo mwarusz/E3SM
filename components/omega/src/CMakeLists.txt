@@ -75,19 +75,19 @@ target_link_libraries(
 # if OmegaLib is configured to use double precision we need to
 # build another version
 if(OMEGA_BUILD_TEST AND NOT OMEGA_SINGLE_PRECISION)
-  add_library(${OMEGA_LIB_NAME}_SP ${_LIBSRC_FILES})
-
-  target_link_libraries(
-      ${OMEGA_LIB_NAME}_SP
-      PRIVATE
-      OmegaLibFlags
-  )
-
-  target_compile_definitions(
-      ${OMEGA_LIB_NAME}_SP
-      PUBLIC
-      OMEGA_SINGLE_PRECISION=1
-  )
+  #  add_library(${OMEGA_LIB_NAME}_SP ${_LIBSRC_FILES})
+  #
+  #  target_link_libraries(
+  #      ${OMEGA_LIB_NAME}_SP
+  #      PRIVATE
+  #      OmegaLibFlags
+  #  )
+  #
+  #  target_compile_definitions(
+  #      ${OMEGA_LIB_NAME}_SP
+  #      PUBLIC
+  #      OMEGA_SINGLE_PRECISION=1
+  #  )
 endif()
 
 

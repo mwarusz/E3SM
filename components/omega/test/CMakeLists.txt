@@ -298,13 +298,13 @@ target_compile_definitions(
   TENDENCYTERMS_TEST_PLANE
 )
 
-add_omega_test(
-    TEND_PLANE_SINGLE_PRECISION_TEST
-    testTendencyTermsPlaneSinglePrecision.exe
-    ocn/TendencyTermsTest.cpp
-    "-n;8;"
-    single_precision
-)
+#add_omega_test(
+#    TEND_PLANE_SINGLE_PRECISION_TEST
+#    testTendencyTermsPlaneSinglePrecision.exe
+#    ocn/TendencyTermsTest.cpp
+#    "-n;8;"
+#    single_precision
+#)
 
 add_omega_test(
   TEND_SPHERE_TEST

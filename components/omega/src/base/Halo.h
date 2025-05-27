@@ -32,6 +32,8 @@
 
 namespace OMEGA {
 
+constexpr bool BufferedRecv = false;
+
 // Set the default MPI real data type as single or double precision based on
 // the default real data type used by OMEGA.
 #ifdef OMEGA_SINGLE_PRECISION
@@ -77,7 +79,7 @@ class Halo {
    /// name for later retrieval.
    static std::map<std::string, std::unique_ptr<Halo>> AllHalos;
 
-   const Decomp *MyDecomp{nullptr}; /// Pointer to decomposition object
+   Decomp *MyDecomp{nullptr}; /// Pointer to decomposition object
 
    I4 NNghbr;           /// number of neighboring tasks
    I4 MyTask;           /// local MPI Task ID
@@ -226,7 +228,7 @@ class Halo {
    /// Allocate the recieve buffers and call MPI_Irecv for each Neighbor.
    /// The input bool UseDevBuffer specifies whether or not the device buffer
    /// will be used in the unpackBuffer functionfor unpacking into the array.
-   int startReceives(bool UseDevBuffer);
+   int startReceives(bool UseDevBuffer, double *HaloBegin);
 
    /// Call MPI_Isend for each Neighbor to send the packed buffers to the
    /// neighboring tasks. The input bool UseDevBuffer specifies whether or not
@@ -244,7 +246,7 @@ class Halo {
    }
 
    /// Construct a new halo labeled Name for the input MachEnv and Decomp
-   Halo(const std::string &Name, const MachEnv *InEnv, const Decomp *InDecomp);
+   Halo(const std::string &Name, const MachEnv *InEnv, Decomp *InDecomp);
 
    // Forbid copy and move construction
    Halo(const Halo &) = delete;
@@ -259,7 +261,7 @@ class Halo {
    /// Creates a new halo by calling the constructor and puts it in the AllHalos
    /// map
    static Halo *create(const std::string &Name, const MachEnv *Env,
-                       const Decomp *Decomp);
+                       Decomp *Decomp);
 
    /// Destructor
    ~Halo();
@@ -797,6 +799,19 @@ class Halo {
          TotSize *= Array.extent(NDims - 1);
       }
 
+      int NOwned;
+      if (CurElem == OnCell) {
+         NOwned = MyDecomp->NCellsOwned;
+      }
+      if (CurElem == OnEdge) {
+         NOwned = MyDecomp->NEdgesOwned;
+      }
+      if (CurElem == OnVertex) {
+         NOwned = MyDecomp->NVerticesOwned;
+      }
+      double *HaloBegin =
+          reinterpret_cast<double *>(Array.data() + TotSize * NOwned);
+
       // If the Array is in device memory space, the buffer pack and unpack
       // functions will use device buffers
       bool UseDevBuffer = devBufferPUP(Array);
@@ -804,7 +819,15 @@ class Halo {
       // Allocate the receive buffers and Call MPI_Irecv for each Neighbor
       // so the local task is ready to accept messages from each
       // neighboring task
-      startReceives(UseDevBuffer);
+      startReceives(UseDevBuffer, HaloBegin);
+
+      // Collect all recv requests
+      std::vector<MPI_Request> RecvReqs;
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         if (RecvFlags[CurElem][INghbr]) {
+            RecvReqs.push_back(Neighbors[INghbr].RReq);
+         }
+      }
 
       // Loop through each Neighbor, resetting communication flags and packing
       // buffers if there are elements to be sent to the neighboring task
@@ -835,55 +858,60 @@ class Halo {
       I4 NMessages = std::accumulate(RecvFlags[CurElem].begin(),
                                      RecvFlags[CurElem].end(), 0);
 
-      // Until all messages from neighboring tasks are received, loop
-      // through Neighbor objects and use MPI_Test to check if the message
-      // has been received. Unpack buffers upon receipt of each message
-      while (!AllReceived) {
-         for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-            if (RecvFlags[CurElem][INghbr]) {
-               if (!Neighbors[INghbr].Received) {
-                  MPI_Test(&Neighbors[INghbr].RReq, &Neighbors[INghbr].Received,
-                           MPI_STATUS_IGNORE);
-                  if (Neighbors[INghbr].Received) {
-                     ++NRcvd;
+      if (BufferedRecv) {
+         // Until all messages from neighboring tasks are received, loop
+         // through Neighbor objects and use MPI_Test to check if the message
+         // has been received. Unpack buffers upon receipt of each message
+         while (!AllReceived) {
+            for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+               if (RecvFlags[CurElem][INghbr]) {
+                  if (!Neighbors[INghbr].Received) {
+                     MPI_Test(&Neighbors[INghbr].RReq,
+                              &Neighbors[INghbr].Received, MPI_STATUS_IGNORE);
+                     if (Neighbors[INghbr].Received) {
+                        ++NRcvd;
+                     }
                   }
-               }
-               if (Neighbors[INghbr].Received && !Neighbors[INghbr].Unpacked) {
-                  // If the device buffer will be used in unpackBuffer, but the
-                  // exchange was done with the host buffer, a deep copy from
-                  // host to device is needed.
-                  if (UseDevBuffer && !ExchOnDev) {
-                     expandBuffer(Neighbors[INghbr].RecvBuffer,
-                                  Neighbors[INghbr].RecvBufferH.size());
+                  if (Neighbors[INghbr].Received &&
+                      !Neighbors[INghbr].Unpacked) {
+                     // If the device buffer will be used in unpackBuffer, but
+                     // the exchange was done with the host buffer, a deep copy
+                     // from host to device is needed.
+                     if (UseDevBuffer && !ExchOnDev) {
+                        expandBuffer(Neighbors[INghbr].RecvBuffer,
+                                     Neighbors[INghbr].RecvBufferH.size());
 
-                     // The number of elements we need to copy is different
-                     // than the buffer allocation size
-                     const I4 BufferSize =
-                         TotSize * Neighbors[INghbr].RecvLists[CurElem].NTot;
-                     auto CopyRange = Kokkos::make_pair(0, BufferSize);
+                        // The number of elements we need to copy is different
+                        // than the buffer allocation size
+                        const I4 BufferSize =
+                            TotSize * Neighbors[INghbr].RecvLists[CurElem].NTot;
+                        auto CopyRange = Kokkos::make_pair(0, BufferSize);
 
-                     deepCopy(Kokkos::subview(Neighbors[INghbr].RecvBuffer,
-                                              CopyRange),
-                              Kokkos::subview(Neighbors[INghbr].RecvBufferH,
-                                              CopyRange));
+                        deepCopy(Kokkos::subview(Neighbors[INghbr].RecvBuffer,
+                                                 CopyRange),
+                                 Kokkos::subview(Neighbors[INghbr].RecvBufferH,
+                                                 CopyRange));
+                     }
+                     unpackBuffer(Array, INghbr);
+                     Neighbors[INghbr].Unpacked = true;
                   }
-                  unpackBuffer(Array, INghbr);
-                  Neighbors[INghbr].Unpacked = true;
                }
             }
-         }
 
-         if (NRcvd == NMessages) {
-            AllReceived = true;
+            if (NRcvd == NMessages) {
+               AllReceived = true;
+            }
+            ++IPass;
+            if (IPass == MaxIter) {
+               LOG_ERROR(
+                   "Halo: Maximum iterations reached during halo exchange");
+               IErr = -1;
+               break;
+            }
          }
-         ++IPass;
-         if (IPass == MaxIter) {
-            LOG_ERROR("Halo: Maximum iterations reached during halo exchange");
-            IErr = -1;
-            break;
-         }
+      } else {
+         MPI_Waitall(RecvReqs.size(), RecvReqs.data(), MPI_STATUS_IGNORE);
       }
-
       // We need to fence here because we are reusing buffers and GPU work is
       // async
       if (UseDevBuffer) {

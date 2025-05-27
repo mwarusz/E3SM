@@ -15,6 +15,7 @@
 #include "Halo.h"
 #include "mpi.h"
 #include <algorithm>
+#include <iostream>
 #include <iterator>
 #include <numeric>
 
@@ -147,8 +148,7 @@ int Halo::init() {
 //------------------------------------------------------------------------------
 // Construct a Halo for the input Name, MachEnv, and Decomp.
 
-Halo::Halo(const std::string &Name, const MachEnv *InEnv,
-           const Decomp *InDecomp) {
+Halo::Halo(const std::string &Name, const MachEnv *InEnv, Decomp *InDecomp) {
 
    I4 IErr{0}; // error code
 
@@ -198,12 +198,92 @@ Halo::Halo(const std::string &Name, const MachEnv *InEnv,
                                    NeighborList[INghbr]));
    }
 
+   if (!BufferedRecv) {
+      std::vector<int> CellPerm(MyDecomp->NCellsAll);
+      int ICell;
+      for (ICell = 0; ICell < MyDecomp->NCellsOwned; ++ICell) {
+         CellPerm[ICell] = ICell;
+      }
+
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         const auto &RecvList = Neighbors[INghbr].RecvLists[OnCell];
+         for (int J = 0; J < RecvList.NTot; ++J) {
+            CellPerm[RecvList.IndexH(J)] = ICell++;
+         }
+      }
+
+      // for (int ICell = MyDecomp->NCellsOwned; ICell < MyDecomp->NCellsAll;
+      //      ++ICell) {
+      //    CellPerm[ICell] =
+      //        MyDecomp->NCellsAll - (1 + ICell - MyDecomp->NCellsOwned);
+      // }
+
+      std::vector<int> EdgePerm(MyDecomp->NEdgesAll);
+
+      int IEdge;
+      for (IEdge = 0; IEdge < MyDecomp->NEdgesOwned; ++IEdge) {
+         EdgePerm[IEdge] = IEdge;
+      }
+
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         const auto &RecvList = Neighbors[INghbr].RecvLists[OnEdge];
+         for (int J = 0; J < RecvList.NTot; ++J) {
+            EdgePerm[RecvList.IndexH(J)] = IEdge++;
+         }
+      }
+
+      // for (int IEdge = MyDecomp->NEdgesOwned; IEdge < MyDecomp->NEdgesAll;
+      //      ++IEdge) {
+      //    EdgePerm[IEdge] =
+      //        MyDecomp->NEdgesAll - (1 + IEdge - MyDecomp->NEdgesOwned);
+      // }
+
+      std::vector<int> VertexPerm(MyDecomp->NVerticesAll);
+
+      int IVertex;
+      for (IVertex = 0; IVertex < MyDecomp->NVerticesOwned; ++IVertex) {
+         VertexPerm[IVertex] = IVertex;
+      }
+
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         const auto &RecvList = Neighbors[INghbr].RecvLists[OnVertex];
+         for (int J = 0; J < RecvList.NTot; ++J) {
+            VertexPerm[RecvList.IndexH(J)] = IVertex++;
+         }
+      }
+
+      // for (int IVertex = MyDecomp->NVerticesOwned;
+      //      IVertex < MyDecomp->NVerticesAll; ++IVertex) {
+      //    VertexPerm[IVertex] =
+      //        MyDecomp->NVerticesAll - (1 + IVertex -
+      //        MyDecomp->NVerticesOwned);
+      // }
+
+      MyDecomp->reorderCellArrays(CellPerm);
+      MyDecomp->reorderEdgeArrays(EdgePerm);
+      MyDecomp->reorderVertexArrays(VertexPerm);
+
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         permuteTo(Neighbors[INghbr].RecvLists[OnCell].IndexH, CellPerm);
+         deepCopy(Neighbors[INghbr].RecvLists[OnCell].Index,
+                  Neighbors[INghbr].RecvLists[OnCell].IndexH);
+
+         permuteTo(Neighbors[INghbr].RecvLists[OnEdge].IndexH, EdgePerm);
+         deepCopy(Neighbors[INghbr].RecvLists[OnEdge].Index,
+                  Neighbors[INghbr].RecvLists[OnEdge].IndexH);
+
+         permuteTo(Neighbors[INghbr].RecvLists[OnVertex].IndexH, VertexPerm);
+         deepCopy(Neighbors[INghbr].RecvLists[OnVertex].Index,
+                  Neighbors[INghbr].RecvLists[OnVertex].IndexH);
+      }
+   }
+
 } // end Halo constructor
 
 /// Creates a new halo by calling the constructor and puts it in the AllHalos
 /// map
 Halo *Halo::create(const std::string &Name, const MachEnv *Env,
-                   const Decomp *Decomp) {
+                   Decomp *Decomp) {
    // Check to see if a halo of the same name already exists and
    // if so, exit with an error
    if (AllHalos.find(Name) != AllHalos.end()) {
@@ -653,38 +733,60 @@ int Halo::exchangeVectorInt(
 // Allocate the required receive buffer and prepare for MPI communication by
 // calling MPI_Irecv for each Neighbor
 
-int Halo::startReceives(const bool UseDevBuffer) {
+int Halo::startReceives(const bool UseDevBuffer, double *HaloBegin) {
 
    // Initialize vector to track MPI errors for each MPI_Irecv
    std::vector<I4> IErr(NNghbr, 0);
 
    I4 Err{0}; // Error code to return
 
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      if (RecvFlags[CurElem][INghbr]) {
-         auto &LocNeighbor = Neighbors[INghbr];
+   if (BufferedRecv) {
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         if (RecvFlags[CurElem][INghbr]) {
+            auto &LocNeighbor = Neighbors[INghbr];
 
-         I4 BufferSize = TotSize * LocNeighbor.RecvLists[CurElem].NTot;
+            I4 BufferSize = TotSize * LocNeighbor.RecvLists[CurElem].NTot;
 
-         void *DataPtr{nullptr};
+            void *DataPtr{nullptr};
 
-         // If both flags  are true, the device buffer will receive the message,
-         // otherwise the host buffer will.
-         if (UseDevBuffer && ExchOnDev) {
-            expandBuffer(LocNeighbor.RecvBuffer, BufferSize);
-            DataPtr = LocNeighbor.RecvBuffer.data();
-         } else {
-            expandBuffer(LocNeighbor.RecvBufferH, BufferSize);
-            DataPtr = LocNeighbor.RecvBufferH.data();
+            // If both flags  are true, the device buffer will receive the
+            // message, otherwise the host buffer will.
+            if (UseDevBuffer && ExchOnDev) {
+               expandBuffer(LocNeighbor.RecvBuffer, BufferSize);
+               DataPtr = LocNeighbor.RecvBuffer.data();
+            } else {
+               expandBuffer(LocNeighbor.RecvBufferH, BufferSize);
+               DataPtr = LocNeighbor.RecvBufferH.data();
+            }
+
+            IErr[INghbr] =
+                MPI_Irecv(DataPtr, BufferSize, MPI_DOUBLE, LocNeighbor.TaskID,
+                          MPI_ANY_TAG, MyComm, &LocNeighbor.RReq);
+            if (IErr[INghbr] != 0) {
+               LOG_ERROR("MPI error {} on task {} receive from task {}",
+                         IErr[INghbr], MyTask, LocNeighbor.TaskID);
+               Err = -1;
+            }
          }
+      }
+   } else {
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         if (RecvFlags[CurElem][INghbr]) {
 
-         IErr[INghbr] =
-             MPI_Irecv(DataPtr, BufferSize, MPI_DOUBLE, LocNeighbor.TaskID,
-                       MPI_ANY_TAG, MyComm, &LocNeighbor.RReq);
-         if (IErr[INghbr] != 0) {
-            LOG_ERROR("MPI error {} on task {} receive from task {}",
-                      IErr[INghbr], MyTask, LocNeighbor.TaskID);
-            Err = -1;
+            auto &LocNeighbor = Neighbors[INghbr];
+
+            I4 BufferSize = TotSize * LocNeighbor.RecvLists[CurElem].NTot;
+
+            IErr[INghbr] =
+                MPI_Irecv(HaloBegin, BufferSize, MPI_DOUBLE, LocNeighbor.TaskID,
+                          MPI_ANY_TAG, MyComm, &LocNeighbor.RReq);
+            if (IErr[INghbr] != 0) {
+               LOG_ERROR("MPI error {} on task {} receive from task {}",
+                         IErr[INghbr], MyTask, LocNeighbor.TaskID);
+               Err = -1;
+            }
+
+            HaloBegin += BufferSize;
          }
       }
    }

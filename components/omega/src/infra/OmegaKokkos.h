@@ -254,6 +254,66 @@ inline void parallelReduce(const int (&UpperBounds)[N], const F &Functor,
    parallelReduce("", UpperBounds, Functor, std::forward<R>(Reducers)...);
 }
 
+inline void permuteTo(const HostArray1DI4 &Array,
+                      const std::vector<int> &Perm) {
+   HostArray1DI4 PermArray("PermArray", Array.layout());
+
+   deepCopy(PermArray, Array);
+
+   for (int I = 0; I < Array.extent_int(0); ++I) {
+      const int Idx = Array(I);
+      if (Idx < Perm.size()) {
+         PermArray(I) = Perm[Idx];
+      }
+   }
+   deepCopy(Array, PermArray);
+}
+
+inline void permuteTo(const HostArray2DI4 &Array,
+                      const std::vector<int> &Perm) {
+   HostArray2DI4 PermArray("PermArray", Array.layout());
+
+   deepCopy(PermArray, Array);
+
+   for (int I = 0; I < Array.extent_int(0); ++I) {
+      for (int J = 0; J < Array.extent_int(1); ++J) {
+         const int Idx = Array(I, J);
+         if (Idx < Perm.size()) {
+            PermArray(I, J) = Perm[Idx];
+         }
+      }
+   }
+   deepCopy(Array, PermArray);
+}
+
+inline void permuteFrom(const HostArray1DI4 &Array,
+                        const std::vector<int> &Perm) {
+   HostArray1DI4 PermArray("PermArray", Array.layout());
+
+   deepCopy(PermArray, Array);
+
+   for (int I = 0; I < Perm.size(); ++I) {
+      PermArray(Perm[I]) = Array(I);
+   }
+
+   deepCopy(Array, PermArray);
+}
+
+inline void permuteFrom(const HostArray2DI4 &Array,
+                        const std::vector<int> &Perm) {
+   HostArray2DI4 PermArray("PermArray", Array.layout());
+
+   deepCopy(PermArray, Array);
+
+   for (int I = 0; I < Perm.size(); ++I) {
+      for (int J = 0; J < Array.extent_int(1); ++J) {
+         PermArray(Perm[I], J) = Array(I, J);
+      }
+   }
+
+   deepCopy(Array, PermArray);
+}
+
 } // end namespace OMEGA
 
 //===----------------------------------------------------------------------===//

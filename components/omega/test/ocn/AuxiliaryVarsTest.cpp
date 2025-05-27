@@ -477,7 +477,7 @@ int testVorticityAuxVars(const Array2DReal &LayerThickCell,
    // Compute numerical results for vertex variables
 
    parallelFor(
-       {Decomp->NVerticesHaloH(0), NVertLevels},
+       {Decomp->NVerticesAll, NVertLevels},
        KOKKOS_LAMBDA(int IVertex, int KLevel) {
           VorticityAux.computeVarsOnVertex(IVertex, KLevel, LayerThickCell,
                                            NormalVelEdge);
@@ -596,8 +596,7 @@ int testVelocityDel2AuxVars(Real RTol) {
    // Compute numerical Del2
 
    parallelFor(
-       {Decomp->NEdgesHaloH(1), NVertLevels},
-       KOKKOS_LAMBDA(int IEdge, int KLevel) {
+       {Decomp->NEdgesAll, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int KLevel) {
           VelocityDel2Aux.computeVarsOnEdge(IEdge, KLevel, ExactVelocityDivCell,
                                             ExactRelVortVertex);
        });
