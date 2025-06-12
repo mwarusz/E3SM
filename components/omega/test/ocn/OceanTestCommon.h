@@ -10,9 +10,14 @@
 
 namespace OMEGA {
 
-// check if two real numbers are equal with a given relative tolerance
+// check if two real numbers are equal with a given relative tolerance (CPU)
 inline bool isApprox(Real X, Real Y, Real RTol) {
    return std::abs(X - Y) <= RTol * std::max(std::abs(X), std::abs(Y));
+}
+
+// check if two real numbers are equal with a given relative tolerance (GPU)
+KOKKOS_INLINE_FUNCTION bool isApproxGPU(Real X, Real Y, Real RTol) {
+   return (X > Y ? X - Y : Y - X) <= RTol * (X > Y ? X : Y);
 }
 
 // convert spherical components of a vector to Cartesian
