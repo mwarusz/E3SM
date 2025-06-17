@@ -15,11 +15,28 @@ ExternalProject_Add(
     BUILD_BYPRODUCTS ${OMEGA_BUILD_DIR}/external/GSW-C/libgswteos-10.so
 		${OMEGA_BUILD_DIR}/external/GSW-C/gsw_check
 )
+if (${CMAKE_SYSTEM_NAME} STREQUAL Darwin)
+  ExternalProject_Add_Step(
+      gswteos
+      gswteos-add-rpath
+      DEPENDEES build
+      ALWAYS TRUE
+      WORKING_DIRECTORY ${OMEGA_BUILD_DIR}/external/GSW-C
+      COMMAND install_name_tool -id @rpath/libgswteos-10.so libgswteos-10.so
+  )
+endif()
+
 
 add_library(gswteos-10 SHARED IMPORTED)
 set_target_properties(gswteos-10 PROPERTIES
     IMPORTED_LOCATION ${OMEGA_BUILD_DIR}/external/GSW-C/libgswteos-10.so
 )
+
+if (${CMAKE_SYSTEM_NAME} STREQUAL Darwin)
+  set_target_properties(gswteos-10 PROPERTIES
+      IMPORTED_SONAME "@rpath/libgswteos-10.so"
+  )
+endif()
 
 # Add the spdlog library
 if (NOT TARGET spdlog::spdlog)
