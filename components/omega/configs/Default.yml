@@ -1,7 +1,8 @@
 Omega:
   TimeIntegration:
     CalendarType: No Leap
-    TimeStepper: Forward-Backward
+    TimeStepper: SplitForward-Backward
+    BarotropicStepper: Unsplit
     TimeStep: 0000_00:10:00
     StartTime: 0001-01-01_00:00:00
     StopTime: 0001-01-01_02:00:00

@@ -58,6 +58,7 @@ enum class TimeStepperType {
    ForwardBackward,
    RungeKutta4,
    RungeKutta2,
+   SplitForwardBackward,
    Invalid
 };
 

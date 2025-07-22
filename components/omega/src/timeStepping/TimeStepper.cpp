@@ -10,6 +10,7 @@
 #include "ForwardBackwardStepper.h"
 #include "RungeKutta2Stepper.h"
 #include "RungeKutta4Stepper.h"
+#include "SplitForwardBackwardStepper.h"
 
 namespace OMEGA {
 
@@ -35,6 +36,8 @@ TimeStepperType getTimeStepperFromStr(const std::string &InString) {
       TimeStepperChoice = TimeStepperType::RungeKutta4;
    } else if (InString == "RungeKutta2") {
       TimeStepperChoice = TimeStepperType::RungeKutta2;
+   } else if (InString == "SplitForward-Backward") {
+      TimeStepperChoice = TimeStepperType::SplitForwardBackward;
    } else {
       ABORT_ERROR("TimeStepper should be one of 'Forward-Backward', "
                   "'RungeKutta4' or 'RungeKutta2' but got {}:",
@@ -106,6 +109,10 @@ TimeStepper *TimeStepper::create(
       NewTimeStepper = new ForwardBackwardStepper(InName, InStartTime,
                                                   InStopTime, InTimeStep);
       break;
+   case TimeStepperType::SplitForwardBackward:
+      NewTimeStepper = new SplitForwardBackwardStepper(InName, InStartTime,
+                                                       InStopTime, InTimeStep);
+      break;
    case TimeStepperType::RungeKutta4:
       NewTimeStepper =
           new RungeKutta4Stepper(InName, InStartTime, InStopTime, InTimeStep);
@@ -156,6 +163,10 @@ TimeStepper *TimeStepper::create(
    case TimeStepperType::ForwardBackward:
       NewTimeStepper = new ForwardBackwardStepper(InName, InStartTime,
                                                   InStopTime, InTimeStep);
+      break;
+   case TimeStepperType::SplitForwardBackward:
+      NewTimeStepper = new SplitForwardBackwardStepper(InName, InStartTime,
+                                                       InStopTime, InTimeStep);
       break;
    case TimeStepperType::RungeKutta4:
       NewTimeStepper =
