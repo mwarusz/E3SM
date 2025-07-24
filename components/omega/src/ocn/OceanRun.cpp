@@ -10,6 +10,7 @@
 #include "OceanState.h"
 #include "TimeMgr.h"
 #include "TimeStepper.h"
+#include "Timing.h"
 
 namespace OMEGA {
 
@@ -41,8 +42,16 @@ int ocnRun(TimeInstant &CurrTime ///< [inout] current sim time
 
       // call forcing routines, anything needed pre-timestep
 
+      // first call to doStep can sometimes take very long
+      // we want to time it separately and disable child timers
+      // for that timer
+      const std::string DoStepTimerName =
+          IStep == 1 ? "Stepper:firstDoStep" : "Stepper:doStep";
+      const int DoStepTimerFlags = IStep == 1 ? DisableChildTimers : 0;
+      timerStart(DoStepTimerName, 1, DoStepTimerFlags);
       // do forward time step
       DefTimeStepper->doStep(DefOceanState, SimTime);
+      timerStop(DoStepTimerName, 1, DoStepTimerFlags);
 
       // write restart file/output, anything needed post-timestep
 

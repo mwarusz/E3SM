@@ -23,6 +23,7 @@
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OmegaKokkos.h"
+#include "Timing.h"
 #include "mpi.h"
 #include <cstring>
 #include <memory>
@@ -808,6 +809,7 @@ class Halo {
 
       // Loop through each Neighbor, resetting communication flags and packing
       // buffers if there are elements to be sent to the neighboring task
+      timerStart("Halo:packBuffers", 4, PrefixParent);
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
          Neighbors[INghbr].Received = false;
          Neighbors[INghbr].Unpacked = false;
@@ -815,6 +817,7 @@ class Halo {
             packBuffer(Array, INghbr);
          }
       }
+      timerStop("Halo:packBuffers", 4, PrefixParent);
 
       // Call MPI_Isend for each Neighbor to send the packed buffers
       startSends(UseDevBuffer);
@@ -838,6 +841,7 @@ class Halo {
       // Until all messages from neighboring tasks are received, loop
       // through Neighbor objects and use MPI_Test to check if the message
       // has been received. Unpack buffers upon receipt of each message
+      timerStart("Halo:receiveUnpack", 4, PrefixParent);
       while (!AllReceived) {
          for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
             if (RecvFlags[CurElem][INghbr]) {
@@ -883,6 +887,7 @@ class Halo {
             break;
          }
       }
+      timerStop("Halo:receiveUnpack", 4, PrefixParent);
 
       // We need to fence here because we are reusing buffers and GPU work is
       // async
@@ -890,8 +895,10 @@ class Halo {
          Kokkos::fence();
       }
 
+      timerStart("Halo:waitSends", 4, PrefixParent);
       // Wait for all sends to complete before proceeding
       MPI_Waitall(SendReqs.size(), SendReqs.data(), MPI_STATUS_IGNORE);
+      timerStop("Halo:waitSends", 4, PrefixParent);
 
       return IErr;
    } // end exchangeFullArrayHalo

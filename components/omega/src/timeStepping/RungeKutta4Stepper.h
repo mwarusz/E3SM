@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TimeStepper.h"
+#include "Timing.h"
 
 namespace OMEGA {
 

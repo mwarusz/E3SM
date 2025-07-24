@@ -11,6 +11,7 @@
 #include "Tendencies.h"
 #include "CustomTendencyTerms.h"
 #include "Error.h"
+#include "Timing.h"
 #include "Tracers.h"
 
 namespace OMEGA {
@@ -265,6 +266,8 @@ void Tendencies::computeThicknessTendenciesOnly(
    Array2DReal NormalVelEdge;
    State->getNormalVelocity(NormalVelEdge, VelTimeLevel);
 
+   timerStart("Tend:computeThicknessTendenciesOnly", 1);
+
    deepCopy(LocLayerThicknessTend, 0);
 
    // Compute thickness flux divergence
@@ -272,17 +275,23 @@ void Tendencies::computeThicknessTendenciesOnly(
        AuxState->LayerThicknessAux.FluxLayerThickEdge;
 
    if (LocThicknessFluxDiv.Enabled) {
+      timerStart("Tend:thicknessFluxDiv", 2);
       parallelFor(
           {NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
              LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KChunk,
                                  ThickFluxEdge, NormalVelEdge);
           });
+      timerStop("Tend:thicknessFluxDiv", 2);
    }
 
    if (CustomThicknessTend) {
+      timerStart("Tend:customThicknessTend", 2);
       CustomThicknessTend(LocLayerThicknessTend, State, AuxState,
                           ThickTimeLevel, VelTimeLevel, Time);
+      timerStop("Tend:customThicknessTend", 2);
    }
+
+   timerStop("Tend:computeThicknessTendenciesOnly", 1);
 
 } // end thickness tendency compute
 
@@ -305,6 +314,8 @@ void Tendencies::computeVelocityTendenciesOnly(
    OMEGA_SCOPE(LocWindForcing, WindForcing);
    OMEGA_SCOPE(LocBottomDrag, BottomDrag);
 
+   timerStart("Tend:computeVelocityTendenciesOnly", 1);
+
    deepCopy(LocNormalVelocityTend, 0);
 
    const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
@@ -317,41 +328,49 @@ void Tendencies::computeVelocityTendenciesOnly(
    Array2DReal NormVelEdge;
    State->getNormalVelocity(NormVelEdge, VelTimeLevel);
    if (LocPotientialVortHAdv.Enabled) {
+      timerStart("Tend:potientialVortHAdv", 2);
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
                                    NormRVortEdge, NormFEdge, FluxLayerThickEdge,
                                    NormVelEdge);
           });
+      timerStop("Tend:potientialVortHAdv", 2);
    }
 
    // Compute kinetic energy gradient
    const Array2DReal &KECell = AuxState->KineticAux.KineticEnergyCell;
    if (LocKEGrad.Enabled) {
+      timerStart("Tend:KEGrad", 2);
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocKEGrad(LocNormalVelocityTend, IEdge, KChunk, KECell);
           });
+      timerStop("Tend:KEGrad", 2);
    }
 
    // Compute sea surface height gradient
    const Array2DReal &SSHCell = AuxState->LayerThicknessAux.SshCell;
    if (LocSSHGrad.Enabled) {
+      timerStart("Tend:SSHGrad", 2);
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocSSHGrad(LocNormalVelocityTend, IEdge, KChunk, SSHCell);
           });
+      timerStop("Tend:SSHGrad", 2);
    }
 
    // Compute del2 horizontal diffusion
    const Array2DReal &DivCell     = AuxState->KineticAux.VelocityDivCell;
    const Array2DReal &RVortVertex = AuxState->VorticityAux.RelVortVertex;
    if (LocVelocityDiffusion.Enabled) {
+      timerStart("Tend:velocityDiffusion", 2);
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk, DivCell,
                                   RVortVertex);
           });
+      timerStop("Tend:velocityDiffusion", 2);
    }
 
    // Compute del4 horizontal diffusion
@@ -359,11 +378,13 @@ void Tendencies::computeVelocityTendenciesOnly(
    const Array2DReal &Del2RVortVertex =
        AuxState->VelocityDel2Aux.Del2RelVortVertex;
    if (LocVelocityHyperDiff.Enabled) {
+      timerStart("Tend:velocityHyperDiff", 2);
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
                                   Del2DivCell, Del2RVortVertex);
           });
+      timerStop("Tend:velocityHyperDiff", 2);
    }
 
    // Compute wind forcing
@@ -371,26 +392,34 @@ void Tendencies::computeVelocityTendenciesOnly(
    const auto &MeanLayerThickEdge =
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
    if (LocWindForcing.Enabled) {
+      timerStart("Tend:windForcing", 2);
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocWindForcing(LocNormalVelocityTend, IEdge, KChunk,
                             NormalStressEdge, MeanLayerThickEdge);
           });
+      timerStop("Tend:windForcing", 2);
    }
 
    // Compute bottom drag
    if (LocBottomDrag.Enabled) {
+      timerStart("Tend:bottomDrag", 2);
       parallelFor(
           {NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
              LocBottomDrag(LocNormalVelocityTend, IEdge, NormalVelEdge, KECell,
                            MeanLayerThickEdge);
           });
+      timerStop("Tend:bottomDrag", 2);
    }
 
    if (CustomVelocityTend) {
+      timerStart("Tend:customVelocityTend", 2);
       CustomVelocityTend(LocNormalVelocityTend, State, AuxState, ThickTimeLevel,
                          VelTimeLevel, Time);
+      timerStop("Tend:customVelocityTend", 2);
    }
+
+   timerStop("Tend:computeVelocityTendenciesOnly", 1);
 
 } // end velocity tendency compute
 
@@ -407,43 +436,52 @@ void Tendencies::computeTracerTendenciesOnly(
    OMEGA_SCOPE(LocTracerDiffusion, TracerDiffusion);
    OMEGA_SCOPE(LocTracerHyperDiff, TracerHyperDiff);
 
+   timerStart("Tend:computeTracerTendenciesOnly", 1);
+
    deepCopy(LocTracerTend, 0);
 
    // compute tracer horizotal advection
    const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
    const Array3DReal &HTracersEdge  = AuxState->TracerAux.HTracersEdge;
    if (LocTracerHorzAdv.Enabled) {
+      timerStart("Tend:tracerHorzAdv", 2);
       parallelFor(
           {NTracers, NCellsAll, NChunks},
           KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
              LocTracerHorzAdv(LocTracerTend, L, ICell, KChunk, NormalVelEdge,
                               HTracersEdge);
           });
+      timerStop("Tend:tracerHorzAdv", 2);
    }
 
    // compute tracer diffusion
    const Array2DReal &MeanLayerThickEdge =
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
    if (LocTracerDiffusion.Enabled) {
+      timerStart("Tend:tracerDiffusion", 2);
       parallelFor(
           {NTracers, NCellsAll, NChunks},
           KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
              LocTracerDiffusion(LocTracerTend, L, ICell, KChunk, TracerArray,
                                 MeanLayerThickEdge);
           });
+      timerStop("Tend:tracerDiffusion", 2);
    }
 
    // compute tracer hyperdiffusion
    const Array3DReal &Del2TracersCell = AuxState->TracerAux.Del2TracersCell;
    if (LocTracerHyperDiff.Enabled) {
+      timerStart("Tend:tracerHyperDiff", 2);
       parallelFor(
           {NTracers, NCellsAll, NChunks},
           KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
              LocTracerHyperDiff(LocTracerTend, L, ICell, KChunk,
                                 Del2TracersCell);
           });
+      timerStop("Tend:tracerHyperDiff", 2);
    }
 
+   timerStop("Tend:computeTracerTendenciesOnly", 1);
 } // end tracer tendency compute
 
 void Tendencies::computeThicknessTendencies(
@@ -462,15 +500,21 @@ void Tendencies::computeThicknessTendencies(
    OMEGA_SCOPE(LayerThickCell, LayerThick);
    OMEGA_SCOPE(NormalVelEdge, NormVel);
 
+   timerStart("Tend:computeThicknessTendencies", 1);
+
+   timerStart("Tend:computeLayerThickAux", 2);
    parallelFor(
        "computeLayerThickAux", {NEdgesAll, NChunks},
        KOKKOS_LAMBDA(int IEdge, int KChunk) {
           LayerThicknessAux.computeVarsOnEdge(IEdge, KChunk, LayerThickCell,
                                               NormalVelEdge);
        });
+   timerStop("Tend:computeLayerThickAux", 2);
 
    computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
                                   Time);
+
+   timerStop("Tend:computeThicknessTendencies", 1);
 }
 
 void Tendencies::computeVelocityTendencies(
@@ -480,9 +524,13 @@ void Tendencies::computeVelocityTendencies(
     int VelTimeLevel,               ///< [in] Time level
     TimeInstant Time                ///< [in] Time
 ) {
+   timerStart("Tend:computeVelocityTendencies", 1);
+
    AuxState->computeMomAux(State, ThickTimeLevel, VelTimeLevel);
    computeVelocityTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
                                  Time);
+
+   timerStop("Tend:computeVelocityTendencies", 1);
 }
 
 void Tendencies::computeTracerTendencies(
@@ -497,24 +545,32 @@ void Tendencies::computeTracerTendencies(
    OMEGA_SCOPE(LayerThickCell, State->LayerThickness[ThickTimeLevel]);
    OMEGA_SCOPE(NormalVelEdge, State->NormalVelocity[VelTimeLevel]);
 
+   timerStart("Tend:computeTracerTendencies", 1);
+
+   timerStart("Tend:computeTracerAuxEdge", 2);
    parallelFor(
        "computeTracerAuxEdge", {NTracers, NEdgesAll, NChunks},
        KOKKOS_LAMBDA(int LTracer, int IEdge, int KChunk) {
           TracerAux.computeVarsOnEdge(LTracer, IEdge, KChunk, NormalVelEdge,
                                       LayerThickCell, TracerArray);
        });
+   timerStop("Tend:computeTracerAuxEdge", 2);
 
    const auto &MeanLayerThickEdge =
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
+   timerStart("Tend:computeTracerAuxCell", 2);
    parallelFor(
        "computeTracerAuxCell", {NTracers, NCellsAll, NChunks},
        KOKKOS_LAMBDA(int LTracer, int ICell, int KChunk) {
           TracerAux.computeVarsOnCells(LTracer, ICell, KChunk,
                                        MeanLayerThickEdge, TracerArray);
        });
+   timerStop("Tend:computeTracerAuxCell", 2);
 
    computeTracerTendenciesOnly(State, AuxState, TracerArray, ThickTimeLevel,
                                VelTimeLevel, Time);
+
+   timerStop("Tend:computeTracerTendencies", 1);
 }
 
 //------------------------------------------------------------------------------
@@ -528,6 +584,8 @@ void Tendencies::computeAllTendencies(
     TimeInstant Time                ///< [in] Time
 ) {
 
+   timerStart("Tend:computeAllTendencies", 1);
+
    AuxState->computeAll(State, TracerArray, ThickTimeLevel, VelTimeLevel);
    computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
                                   Time);
@@ -535,6 +593,8 @@ void Tendencies::computeAllTendencies(
                                  Time);
    computeTracerTendenciesOnly(State, AuxState, TracerArray, ThickTimeLevel,
                                VelTimeLevel, Time);
+
+   timerStop("Tend:computeAllTendencies", 1);
 
 } // end all tendency compute
 

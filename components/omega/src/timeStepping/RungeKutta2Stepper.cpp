@@ -5,6 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "RungeKutta2Stepper.h"
+#include "Timing.h"
 
 namespace OMEGA {
 
@@ -59,8 +60,10 @@ void RungeKutta2Stepper::doStep(OceanState *State,   // model state
 
    // Update time levels (New -> Old) of prognostic variables with halo
    // exchanges
+   timerStart("RK2:haloExchange", 3, AddMpiBarrier);
    State->updateTimeLevels();
    Tracers::updateTimeLevels();
+   timerStop("RK2:haloExchange", 3);
 
    // Advance the clock and update the simulation time
    StepClock->advance();
