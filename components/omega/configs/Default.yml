@@ -1,4 +1,7 @@
 Omega:
+  Timing:
+    Level: 1
+    AutoFence: true
   TimeIntegration:
     CalendarType: No Leap
     TimeStepper: Forward-Backward

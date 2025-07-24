@@ -24,6 +24,7 @@
 #include "Tendencies.h"
 #include "TimeMgr.h"
 #include "TimeStepper.h"
+#include "Timing.h"
 #include "Tracers.h"
 
 #include "mpi.h"
@@ -46,6 +47,8 @@ int ocnInit(MPI_Comm Comm ///< [in] ocean MPI communicator
    Config("Omega");
    Config::readAll("omega.yml");
    Config *OmegaConfig = Config::getOmegaConfig();
+
+   readTimingConfig();
 
    // initialize remaining Omega modules
    Err = initOmegaModules(Comm);

@@ -101,8 +101,10 @@ void RungeKutta4Stepper::doStep(OceanState *State,   // model state
 
          // TODO(mwarusz) this depends on halo width actually
          if (Stage == 2) {
+            timerStart("RK4:haloExchangeProvis", 3, AddMpiBarrier);
             ProvisState->exchangeHalo(CurLevel);
             MeshHalo->exchangeFullArrayHalo(ProvisTracers, OnCell);
+            timerStop("RK4:haloExchangeProvis", 3);
          }
 
          Tend->computeAllTendencies(ProvisState, AuxState, ProvisTracers,
@@ -117,8 +119,10 @@ void RungeKutta4Stepper::doStep(OceanState *State,   // model state
 
    // Update time levels (New -> Old) of prognostic variables with halo
    // exchanges
+   timerStart("RK4:haloExchange", 3, AddMpiBarrier);
    State->updateTimeLevels();
    Tracers::updateTimeLevels();
+   timerStop("RK4:haloExchange", 3);
 
    // Advance the clock and update the simulation time
    Err     = StepClock->advance();

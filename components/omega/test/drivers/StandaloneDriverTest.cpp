@@ -13,9 +13,9 @@
 
 #include "OceanDriver.h"
 #include "OmegaKokkos.h"
-#include "Pacer.h"
 #include "TimeMgr.h"
 #include "TimeStepper.h"
+#include "Timing.h"
 #include <mpi.h>
 
 //------------------------------------------------------------------------------
@@ -29,17 +29,16 @@ int main(int argc, char *argv[]) {
 
    MPI_Init(&argc, &argv); // initialize MPI
    Kokkos::initialize();   // initialize Kokkos
-   Pacer::initialize(MPI_COMM_WORLD);
-   Pacer::setPrefix("Omega:");
+   OMEGA::initTiming();
 
-   Pacer::start("Init");
+   OMEGA::timerStart("Init", 0, OMEGA::AddMpiBarrier);
    ErrCurr = OMEGA::ocnInit(MPI_COMM_WORLD);
    if (ErrCurr == 0) {
       LOG_INFO("DriverTest: Omega initialize PASS");
    } else {
       LOG_INFO("DriverTest: Omega initialize FAIL");
    }
-   Pacer::stop("Init");
+   OMEGA::timerStop("Init", 0);
 
    // Time management objects
    OMEGA::TimeStepper *DefStepper = OMEGA::TimeStepper::getDefault();
@@ -47,7 +46,7 @@ int main(int argc, char *argv[]) {
    OMEGA::Alarm *EndAlarm         = DefStepper->getEndAlarm();
    OMEGA::TimeInstant CurrTime    = ModelClock->getCurrentTime();
 
-   Pacer::start("RunLoop");
+   OMEGA::timerStart("RunLoop", 0, OMEGA::AddMpiBarrier);
    if (ErrCurr == 0) {
       ErrCurr = OMEGA::ocnRun(CurrTime);
    }
@@ -56,24 +55,23 @@ int main(int argc, char *argv[]) {
    } else {
       LOG_INFO("DriverTest: Omega model run FAIL");
    }
-   Pacer::stop("RunLoop");
+   OMEGA::timerStop("RunLoop", 0);
 
-   Pacer::start("Finalize");
+   OMEGA::timerStart("Finalize", 0, OMEGA::AddMpiBarrier);
    ErrFinalize = OMEGA::ocnFinalize(CurrTime);
    if (ErrFinalize == 0) {
       LOG_INFO("DriverTest: Omega finalize PASS");
    } else {
       LOG_INFO("DriverTest: Omega finalize FAIL");
    }
-   Pacer::stop("Finalize");
+   OMEGA::timerStop("Finalize", 0);
 
    ErrAll = abs(ErrCurr) + abs(ErrFinalize);
    if (ErrAll == 0) {
       LOG_INFO("DriverTest: Successful completion");
    }
 
-   Pacer::print("omega_driver_test");
-   Pacer::finalize();
+   OMEGA::finalizeTiming("omega_driver_test");
 
    Kokkos::finalize();
    MPI_Finalize();
