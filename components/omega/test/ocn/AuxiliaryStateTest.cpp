@@ -25,20 +25,21 @@ struct TestSetup {
    Real Radius = 6371220;
 
    KOKKOS_FUNCTION Real layerThickness(Real Lon, Real Lat) const {
-      return (2 + std::cos(Lon) * std::pow(std::cos(Lat), 4));
+      return (2 + Kokkos::cos(Lon) * Kokkos::pow(Kokkos::cos(Lat), 4));
    }
 
    KOKKOS_FUNCTION Real velocityX(Real Lon, Real Lat) const {
-      return -Radius * std::pow(std::sin(Lon), 2) * std::pow(std::cos(Lat), 3);
+      return -Radius * Kokkos::pow(Kokkos::sin(Lon), 2) *
+             Kokkos::pow(Kokkos::cos(Lat), 3);
    }
 
    KOKKOS_FUNCTION Real velocityY(Real Lon, Real Lat) const {
-      return -4 * Radius * std::sin(Lon) * std::cos(Lon) *
-             std::pow(std::cos(Lat), 3) * std::sin(Lat);
+      return -4 * Radius * Kokkos::sin(Lon) * Kokkos::cos(Lon) *
+             Kokkos::pow(Kokkos::cos(Lat), 3) * Kokkos::sin(Lat);
    }
 
    KOKKOS_FUNCTION Real tracer(Real Lon, Real Lat) const {
-      return (2 - std::cos(Lon) * std::pow(std::cos(Lat), 4));
+      return (2 - Kokkos::cos(Lon) * Kokkos::pow(Kokkos::cos(Lat), 4));
    }
 };
 

@@ -298,8 +298,8 @@ int main(int argc, char *argv[]) {
       parallelReduce(
           "reduce1", {NTracers, NCellsOwned, NVertLevels},
           KOKKOS_LAMBDA(I4 Tracer, I4 Cell, I4 Vert, I4 & Accum) {
-             if (std::abs(CurArray(Tracer, Cell, Vert) -
-                          RefArray(Tracer, Cell, Vert)) > 1e-9) {
+             if (Kokkos::abs(CurArray(Tracer, Cell, Vert) -
+                             RefArray(Tracer, Cell, Vert)) > 1e-9) {
                 Accum++;
              }
           },
@@ -333,8 +333,8 @@ int main(int argc, char *argv[]) {
          parallelReduce(
              "reduce2", {NCellsOwned, NVertLevels},
              KOKKOS_LAMBDA(I4 Cell, I4 Vert, I4 & Accum) {
-                if (std::abs(CurTracer(Cell, Vert) -
-                             (RefReal + Tracer + Cell + Vert + 1)) > 1e-9) {
+                if (Kokkos::abs(CurTracer(Cell, Vert) -
+                                (RefReal + Tracer + Cell + Vert + 1)) > 1e-9) {
                    Accum++;
                 }
              },
@@ -364,8 +364,8 @@ int main(int argc, char *argv[]) {
          parallelReduce(
              "reduce3", {NCellsOwned, NVertLevels},
              KOKKOS_LAMBDA(I4 Cell, I4 Vert, I4 & Accum) {
-                if (std::abs(RefFieldData(Cell, Vert) -
-                             TestFieldData(Cell, Vert)) > 1e-9) {
+                if (Kokkos::abs(RefFieldData(Cell, Vert) -
+                                TestFieldData(Cell, Vert)) > 1e-9) {
                    Accum++;
                 }
              },
@@ -400,8 +400,8 @@ int main(int argc, char *argv[]) {
          parallelReduce(
              "reduce4", {NCellsOwned, NVertLevels},
              KOKKOS_LAMBDA(I4 Cell, I4 Vert, I4 & Accum) {
-                if (std::abs(RefFieldData(Cell, Vert) -
-                             TestFieldData(Cell, Vert)) > 1e-9) {
+                if (Kokkos::abs(RefFieldData(Cell, Vert) -
+                                TestFieldData(Cell, Vert)) > 1e-9) {
                    Accum++;
                 }
              },
@@ -430,8 +430,8 @@ int main(int argc, char *argv[]) {
       parallelReduce(
           "reduce5", {NCellsOwned, NVertLevels},
           KOKKOS_LAMBDA(I4 Cell, I4 Vert, I4 & Accum) {
-             if (std::abs(SaltTracerByName(Cell, Vert) -
-                          SaltTracerByIndexVar(Cell, Vert)) > 1e-9) {
+             if (Kokkos::abs(SaltTracerByName(Cell, Vert) -
+                             SaltTracerByIndexVar(Cell, Vert)) > 1e-9) {
                 Accum++;
              }
           },
@@ -464,8 +464,8 @@ int main(int argc, char *argv[]) {
 
          for (I4 Cell = 0; Cell < NCellsOwned; Cell++) {
             for (I4 Vert = 0; Vert < NVertLevels; Vert++) {
-               if (std::abs(RefHostArray(Tracer, Cell, Vert) -
-                            TestHostArray(Cell, Vert)) > 1e-9)
+               if (Kokkos::abs(RefHostArray(Tracer, Cell, Vert) -
+                               TestHostArray(Cell, Vert)) > 1e-9)
                   ++count;
             }
          }

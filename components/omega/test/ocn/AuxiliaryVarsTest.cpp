@@ -28,7 +28,7 @@ struct TestSetupPlane {
    Real Pi = M_PI;
 
    Real Lx = 1;
-   Real Ly = std::sqrt(3) / 2;
+   Real Ly = Kokkos::sqrt(3) / 2;
 
    ErrorMeasures ExpectedKineticEnergyErrors = {0.00994439065100057897,
                                                 0.00703403756741667954};
@@ -68,33 +68,33 @@ struct TestSetupPlane {
                                                0.0039954090464502795};
 
    KOKKOS_FUNCTION Real layerThickness(Real X, Real Y) const {
-      return 2 + std::cos(2 * Pi * X / Lx) * std::cos(2 * Pi * Y / Ly);
+      return 2 + Kokkos::cos(2 * Pi * X / Lx) * Kokkos::cos(2 * Pi * Y / Ly);
    }
 
    KOKKOS_FUNCTION Real velocityX(Real X, Real Y) const {
-      return std::sin(2 * Pi * X / Lx) * std::cos(2 * Pi * Y / Ly);
+      return Kokkos::sin(2 * Pi * X / Lx) * Kokkos::cos(2 * Pi * Y / Ly);
    }
 
    KOKKOS_FUNCTION Real velocityY(Real X, Real Y) const {
-      return std::cos(2 * Pi * X / Lx) * std::sin(2 * Pi * Y / Ly);
+      return Kokkos::cos(2 * Pi * X / Lx) * Kokkos::sin(2 * Pi * Y / Ly);
    }
 
    KOKKOS_FUNCTION Real windStressX(Real X, Real Y) const {
-      return std::cos(2 * Pi * X / Lx) * std::sin(2 * Pi * Y / Ly);
+      return Kokkos::cos(2 * Pi * X / Lx) * Kokkos::sin(2 * Pi * Y / Ly);
    }
 
    KOKKOS_FUNCTION Real windStressY(Real X, Real Y) const {
-      return std::sin(2 * Pi * X / Lx) * std::cos(2 * Pi * Y / Ly);
+      return Kokkos::sin(2 * Pi * X / Lx) * Kokkos::cos(2 * Pi * Y / Ly);
    }
 
    KOKKOS_FUNCTION Real divergence(Real X, Real Y) const {
-      return 2 * Pi * (1. / Lx + 1. / Ly) * std::cos(2 * Pi * X / Lx) *
-             std::cos(2 * Pi * Y / Ly);
+      return 2 * Pi * (1. / Lx + 1. / Ly) * Kokkos::cos(2 * Pi * X / Lx) *
+             Kokkos::cos(2 * Pi * Y / Ly);
    }
 
    KOKKOS_FUNCTION Real relativeVorticity(Real X, Real Y) const {
-      return 2 * Pi * (-1. / Lx + 1. / Ly) * std::sin(2 * Pi * X / Lx) *
-             std::sin(2 * Pi * Y / Ly);
+      return 2 * Pi * (-1. / Lx + 1. / Ly) * Kokkos::sin(2 * Pi * X / Lx) *
+             Kokkos::sin(2 * Pi * Y / Ly);
    }
 
    KOKKOS_FUNCTION Real velocityDel2X(Real X, Real Y) const {
@@ -115,7 +115,7 @@ struct TestSetupPlane {
    }
 
    KOKKOS_FUNCTION Real planetaryVorticity(Real X, Real Y) const {
-      return std::sin(2 * Pi * X / Lx) * std::sin(2 * Pi * Y / Ly);
+      return Kokkos::sin(2 * Pi * X / Lx) * Kokkos::sin(2 * Pi * Y / Ly);
    }
 
    KOKKOS_FUNCTION Real normalizedRelativeVorticity(Real X, Real Y) const {
@@ -133,23 +133,23 @@ struct TestSetupPlane {
    }
 
    KOKKOS_FUNCTION Real tracer(Real X, Real Y) const {
-      return 2 - std::cos(2 * Pi * X / Lx) * std::cos(2 * Pi * Y / Ly);
+      return 2 - Kokkos::cos(2 * Pi * X / Lx) * Kokkos::cos(2 * Pi * Y / Ly);
    }
 
    KOKKOS_FUNCTION Real thickTracer(Real X, Real Y) const {
-      return 4 - std::pow(std::cos(2 * Pi * X / Lx), 2) *
-                     std::pow(std::cos(2 * Pi * Y / Ly), 2);
+      return 4 - Kokkos::pow(Kokkos::cos(2 * Pi * X / Lx), 2) *
+                     Kokkos::pow(Kokkos::cos(2 * Pi * Y / Ly), 2);
    }
 
    KOKKOS_FUNCTION Real del2Tracer(Real X, Real Y) const {
       return 2 * Pi * Pi *
-             (4 * (1 / Lx / Lx + 1 / Ly / Ly) * std::cos(2 * Pi * X / Lx) *
-                  std::cos(2 * Pi * Y / Ly) +
-              std::pow(std::cos(2 * Pi * X / Lx), 2) *
+             (4 * (1 / Lx / Lx + 1 / Ly / Ly) * Kokkos::cos(2 * Pi * X / Lx) *
+                  Kokkos::cos(2 * Pi * Y / Ly) +
+              Kokkos::pow(Kokkos::cos(2 * Pi * X / Lx), 2) *
                   (1 / Lx / Lx +
-                   (2 / Ly / Ly + 1 / Lx / Lx) * std::cos(4 * Pi * Y / Ly)) -
-              (2 / Lx / Lx) * std::pow(std::sin(2 * Pi * X / Lx), 2) *
-                  std::pow(std::cos(2 * Pi * Y / Ly), 2));
+                   (2 / Ly / Ly + 1 / Lx / Lx) * Kokkos::cos(4 * Pi * Y / Ly)) -
+              (2 / Lx / Lx) * Kokkos::pow(Kokkos::sin(2 * Pi * X / Lx), 2) *
+                  Kokkos::pow(Kokkos::cos(2 * Pi * Y / Ly), 2));
    }
 };
 
@@ -195,76 +195,82 @@ struct TestSetupSphere {
                                                0.003813760171030077};
 
    KOKKOS_FUNCTION Real layerThickness(Real Lon, Real Lat) const {
-      return (2 + std::cos(Lon) * std::pow(std::cos(Lat), 4));
+      return (2 + Kokkos::cos(Lon) * Kokkos::pow(Kokkos::cos(Lat), 4));
    }
 
    KOKKOS_FUNCTION Real velocityX(Real Lon, Real Lat) const {
-      return -std::pow(std::sin(Lon), 2) * std::pow(std::cos(Lat), 3);
+      return -Kokkos::pow(Kokkos::sin(Lon), 2) *
+             Kokkos::pow(Kokkos::cos(Lat), 3);
    }
 
    KOKKOS_FUNCTION Real velocityY(Real Lon, Real Lat) const {
-      return -4 * std::sin(Lon) * std::cos(Lon) * std::pow(std::cos(Lat), 3) *
-             std::sin(Lat);
+      return -4 * Kokkos::sin(Lon) * Kokkos::cos(Lon) *
+             Kokkos::pow(Kokkos::cos(Lat), 3) * Kokkos::sin(Lat);
    }
    KOKKOS_FUNCTION Real windStressX(Real Lon, Real Lat) const {
-      return -4 * std::sin(Lon) * std::cos(Lon) * std::pow(std::cos(Lat), 3) *
-             std::sin(Lat);
+      return -4 * Kokkos::sin(Lon) * Kokkos::cos(Lon) *
+             Kokkos::pow(Kokkos::cos(Lat), 3) * Kokkos::sin(Lat);
    }
 
    KOKKOS_FUNCTION Real windStressY(Real Lon, Real Lat) const {
-      return -std::pow(std::sin(Lon), 2) * std::pow(std::cos(Lat), 3);
+      return -Kokkos::pow(Kokkos::sin(Lon), 2) *
+             Kokkos::pow(Kokkos::cos(Lat), 3);
    }
 
    KOKKOS_FUNCTION Real relativeVorticity(Real Lon, Real Lat) const {
-      return -4 * std::pow(std::cos(Lon), 2) * std::pow(std::cos(Lat), 2) *
-             std::sin(Lat) / Radius;
+      return -4 * Kokkos::pow(Kokkos::cos(Lon), 2) *
+             Kokkos::pow(Kokkos::cos(Lat), 2) * Kokkos::sin(Lat) / Radius;
    }
 
    KOKKOS_FUNCTION Real divergence(Real Lon, Real Lat) const {
-      return std::sin(Lon) * std::cos(Lon) * std::pow(std::cos(Lat), 2) *
-             (20 * std::pow(std::sin(Lat), 2) - 6) / Radius;
+      return Kokkos::sin(Lon) * Kokkos::cos(Lon) *
+             Kokkos::pow(Kokkos::cos(Lat), 2) *
+             (20 * Kokkos::pow(Kokkos::sin(Lat), 2) - 6) / Radius;
    }
 
    KOKKOS_FUNCTION Real velocityDel2X(Real Lon, Real Lat) const {
       return 1 / (Radius * Radius) *
-                 (std::pow(std::cos(Lon), 2) - std::pow(std::sin(Lon), 2)) *
-                 std::cos(Lat) * (20 * std::pow(std::sin(Lat), 2) - 6) +
-             4 / (Radius * Radius) * std::pow(cos(Lon), 2) *
-                 (std::pow(cos(Lat), 3) -
-                  2 * std::cos(Lat) * std::pow(sin(Lat), 2));
+                 (Kokkos::pow(Kokkos::cos(Lon), 2) -
+                  Kokkos::pow(Kokkos::sin(Lon), 2)) *
+                 Kokkos::cos(Lat) *
+                 (20 * Kokkos::pow(Kokkos::sin(Lat), 2) - 6) +
+             4 / (Radius * Radius) * Kokkos::pow(cos(Lon), 2) *
+                 (Kokkos::pow(cos(Lat), 3) -
+                  2 * Kokkos::cos(Lat) * Kokkos::pow(sin(Lat), 2));
    }
 
    KOKKOS_FUNCTION Real velocityDel2Y(Real Lon, Real Lat) const {
-      return 1 / (Radius * Radius) * std::sin(Lon) * std::cos(Lon) *
-                 std::sin(Lat) * std::cos(Lat) *
-                 (80 * std::pow(std::cos(Lat), 2) - 28) +
-             8 / (Radius * Radius) * std::sin(Lon) * std::cos(Lon) *
-                 std::sin(Lat) * std::cos(Lat);
+      return 1 / (Radius * Radius) * Kokkos::sin(Lon) * Kokkos::cos(Lon) *
+                 Kokkos::sin(Lat) * Kokkos::cos(Lat) *
+                 (80 * Kokkos::pow(Kokkos::cos(Lat), 2) - 28) +
+             8 / (Radius * Radius) * Kokkos::sin(Lon) * Kokkos::cos(Lon) *
+                 Kokkos::sin(Lat) * Kokkos::cos(Lat);
    }
 
    KOKKOS_FUNCTION Real velocityDel2Div(Real Lon, Real Lat) const {
       return 1 / (Radius * Radius * Radius) *
-             (-2 * std::sin(Lon) * std::cos(Lon) *
-                  (28 * std::pow(sin(Lat), 2) - 8) +
-              std::sin(Lon) * std::cos(Lon) *
-                  ((std::pow(cos(Lat), 2) - 2 * std::pow(sin(Lat), 2)) *
-                       (80 * std::pow(cos(Lat), 2) - 20) -
-                   160 * std::pow(sin(Lat) * cos(Lat), 2)));
+             (-2 * Kokkos::sin(Lon) * Kokkos::cos(Lon) *
+                  (28 * Kokkos::pow(sin(Lat), 2) - 8) +
+              Kokkos::sin(Lon) * Kokkos::cos(Lon) *
+                  ((Kokkos::pow(cos(Lat), 2) - 2 * Kokkos::pow(sin(Lat), 2)) *
+                       (80 * Kokkos::pow(cos(Lat), 2) - 20) -
+                   160 * Kokkos::pow(sin(Lat) * cos(Lat), 2)));
    }
 
    KOKKOS_FUNCTION Real velocityDel2Curl(Real Lon, Real Lat) const {
       return 1 / (Radius * Radius * Radius) *
-             (-std::sin(Lat) * (std::pow(std::cos(Lat), 2) *
-                                    (56 * std::pow(cos(Lon), 2) - 40) -
-                                2 * (std::pow(cos(Lon), 2) *
-                                         (28 * std::pow(sin(Lat), 2) - 8) -
-                                     20 * std::pow(sin(Lat), 2) + 6)) +
-              std::sin(Lat) * (80 * std::pow(cos(Lat), 2) - 20) *
-                  (std::pow(cos(Lon), 2) - std::pow(sin(Lon), 2)));
+             (-Kokkos::sin(Lat) *
+                  (Kokkos::pow(Kokkos::cos(Lat), 2) *
+                       (56 * Kokkos::pow(cos(Lon), 2) - 40) -
+                   2 * (Kokkos::pow(cos(Lon), 2) *
+                            (28 * Kokkos::pow(sin(Lat), 2) - 8) -
+                        20 * Kokkos::pow(sin(Lat), 2) + 6)) +
+              Kokkos::sin(Lat) * (80 * Kokkos::pow(cos(Lat), 2) - 20) *
+                  (Kokkos::pow(cos(Lon), 2) - Kokkos::pow(sin(Lon), 2)));
    }
 
    KOKKOS_FUNCTION Real planetaryVorticity(Real Lon, Real Lat) const {
-      return std::sin(Lat);
+      return Kokkos::sin(Lat);
    }
 
    KOKKOS_FUNCTION Real normalizedRelativeVorticity(Real Lon, Real Lat) const {
@@ -282,20 +288,23 @@ struct TestSetupSphere {
    }
 
    KOKKOS_FUNCTION Real tracer(Real Lon, Real Lat) const {
-      return (2 - std::cos(Lon) * std::pow(std::cos(Lat), 4));
+      return (2 - Kokkos::cos(Lon) * Kokkos::pow(Kokkos::cos(Lat), 4));
    }
 
    KOKKOS_FUNCTION Real thickTracer(Real Lon, Real Lat) const {
-      return (4 - std::pow(std::cos(Lon), 2) * std::pow(std::cos(Lat), 8));
+      return (4 - Kokkos::pow(Kokkos::cos(Lon), 2) *
+                      Kokkos::pow(Kokkos::cos(Lat), 8));
    }
 
    KOKKOS_FUNCTION Real del2Tracer(Real Lon, Real Lat) const {
       return 1 / (Radius * Radius) *
-             (10 * std::cos(Lon) * std::pow(std::cos(Lat), 2) *
-                  (-1 + 2 * std::cos(2 * Lat)) +
-              std::pow(std::cos(Lon), 2) * std::pow(std::cos(Lat), 6) *
-                  (-13 + 18 * std::cos(2 * Lat)) -
-              std::pow(std::cos(Lat), 6) * std::pow(std::sin(Lon), 2));
+             (10 * Kokkos::cos(Lon) * Kokkos::pow(Kokkos::cos(Lat), 2) *
+                  (-1 + 2 * Kokkos::cos(2 * Lat)) +
+              Kokkos::pow(Kokkos::cos(Lon), 2) *
+                  Kokkos::pow(Kokkos::cos(Lat), 6) *
+                  (-13 + 18 * Kokkos::cos(2 * Lat)) -
+              Kokkos::pow(Kokkos::cos(Lat), 6) *
+                  Kokkos::pow(Kokkos::sin(Lon), 2));
    }
 };
 

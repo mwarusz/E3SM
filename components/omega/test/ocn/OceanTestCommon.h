@@ -26,8 +26,8 @@ bool isApprox(Real X, Real Y, Real RTol, Real ATol = 0) {
 KOKKOS_INLINE_FUNCTION void sphereToCartVec(Real (&CartVec)[3],
                                             const Real (&SphereVec)[2],
                                             Real Lon, Real Lat) {
-   using std::cos;
-   using std::sin;
+   using Kokkos::cos;
+   using Kokkos::sin;
    CartVec[0] = -sin(Lon) * SphereVec[0] - sin(Lat) * cos(Lon) * SphereVec[1];
    CartVec[1] = cos(Lon) * SphereVec[0] - sin(Lat) * sin(Lon) * SphereVec[1];
    CartVec[2] = cos(Lat) * SphereVec[1];
@@ -208,15 +208,15 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
          Fun(VecField, XE, YE);
 
          if (EdgeComp == EdgeComponent::Normal) {
-            const Real EdgeNormalX = std::cos(AngleEdge(IEdge));
-            const Real EdgeNormalY = std::sin(AngleEdge(IEdge));
+            const Real EdgeNormalX = Kokkos::cos(AngleEdge(IEdge));
+            const Real EdgeNormalY = Kokkos::sin(AngleEdge(IEdge));
             VecFieldEdge =
                 EdgeNormalX * VecField[0] + EdgeNormalY * VecField[1];
          }
 
          if (EdgeComp == EdgeComponent::Tangential) {
-            const Real EdgeTangentX = -std::sin(AngleEdge(IEdge));
-            const Real EdgeTangentY = std::cos(AngleEdge(IEdge));
+            const Real EdgeTangentX = -Kokkos::sin(AngleEdge(IEdge));
+            const Real EdgeTangentY = Kokkos::cos(AngleEdge(IEdge));
             VecFieldEdge =
                 EdgeTangentX * VecField[0] + EdgeTangentY * VecField[1];
          }
@@ -259,15 +259,15 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
             }
          } else {
             if (EdgeComp == EdgeComponent::Normal) {
-               const Real EdgeNormalX = std::cos(AngleEdge(IEdge));
-               const Real EdgeNormalY = std::sin(AngleEdge(IEdge));
+               const Real EdgeNormalX = Kokkos::cos(AngleEdge(IEdge));
+               const Real EdgeNormalY = Kokkos::sin(AngleEdge(IEdge));
                VecFieldEdge =
                    EdgeNormalX * VecField[0] + EdgeNormalY * VecField[1];
             }
 
             if (EdgeComp == EdgeComponent::Tangential) {
-               const Real EdgeTangentX = -std::sin(AngleEdge(IEdge));
-               const Real EdgeTangentY = std::cos(AngleEdge(IEdge));
+               const Real EdgeTangentX = -Kokkos::sin(AngleEdge(IEdge));
+               const Real EdgeTangentY = Kokkos::cos(AngleEdge(IEdge));
                VecFieldEdge =
                    EdgeTangentX * VecField[0] + EdgeTangentY * VecField[1];
             }
@@ -458,8 +458,9 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
              const Real ExactValElement = ExactFieldElement(IElement);
 
              // Errors
-             LInfElement(IElement) = std::abs(NumValElement - ExactValElement);
-             LInfScaleElement(IElement) = std::abs(ExactValElement);
+             LInfElement(IElement) =
+                 Kokkos::abs(NumValElement - ExactValElement);
+             LInfScaleElement(IElement) = Kokkos::abs(ExactValElement);
              L2Element(IElement)        = AreaElement(IElement) *
                                    LInfElement(IElement) *
                                    LInfElement(IElement);
@@ -484,8 +485,8 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
 
              // Errors
              LInfElement(IElement, K) =
-                 std::abs(NumValElement - ExactValElement);
-             LInfScaleElement(IElement, K) = std::abs(ExactValElement);
+                 Kokkos::abs(NumValElement - ExactValElement);
+             LInfScaleElement(IElement, K) = Kokkos::abs(ExactValElement);
              L2Element(IElement, K)        = AreaElement(IElement) *
                                       LInfElement(IElement, K) *
                                       LInfElement(IElement, K);
@@ -515,8 +516,8 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
 
              // Errors
              LInfElement(L, IElement, K) =
-                 std::abs(NumValElement - ExactValElement);
-             LInfScaleElement(L, IElement, K) = std::abs(ExactValElement);
+                 Kokkos::abs(NumValElement - ExactValElement);
+             LInfScaleElement(L, IElement, K) = Kokkos::abs(ExactValElement);
              L2Element(L, IElement, K)        = AreaElement(IElement) *
                                          LInfElement(L, IElement, K) *
                                          LInfElement(L, IElement, K);
@@ -550,9 +551,9 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
       LOG_ERROR("computeErrors: MPI Allreduce error");
 
    if (L2Scale > 0) {
-      L2Error = std::sqrt(L2Error / L2Scale);
+      L2Error = Kokkos::sqrt(L2Error / L2Scale);
    } else {
-      L2Error = std::sqrt(L2Error);
+      L2Error = Kokkos::sqrt(L2Error);
    }
 
    ErrorMeasures.L2   = L2Error;

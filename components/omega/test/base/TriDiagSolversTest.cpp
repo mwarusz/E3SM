@@ -142,7 +142,7 @@ Real runDiffManufactured(int NCells) {
    const Real TimeEnd  = 1;
    const Real TimeStep = 0.001 / (NCells / 100);
 
-   const int NSteps = std::ceil(TimeEnd / TimeStep);
+   const int NSteps = Kokkos::ceil(TimeEnd / TimeStep);
 
    Array1DReal XVertex("XVertex", NVertices);
    Array1DReal Diffusivity("Diffusivity", NVertices);
@@ -246,10 +246,10 @@ int testDiffusionManufactured() {
    NCells *= 2;
    const Real L2Err200 = runDiffManufactured(NCells);
 
-   const Real L2Rate = std::log2(L2Err100 / L2Err200);
+   const Real L2Rate = Kokkos::log2(L2Err100 / L2Err200);
 
    // Check convergence rate
-   if (std::abs(L2Rate - 2) > 0.1) {
+   if (Kokkos::abs(L2Rate - 2) > 0.1) {
       Err += 1;
       LOG_ERROR("TridiagonalSolver: Wrong conv rate for manufactured solution, "
                 "rate = {}",
@@ -277,7 +277,7 @@ Real runDiffusionStability(bool UseGeneralSolver, Real DiffValue) {
    const Real TimeEnd  = 100;
    const Real TimeStep = 1;
 
-   const int NSteps = std::ceil(TimeEnd / TimeStep);
+   const int NSteps = Kokkos::ceil(TimeEnd / TimeStep);
 
    // Problem domain is [0, 1]
    const Real DX = 1.0 / NCells;
@@ -313,7 +313,7 @@ Real runDiffusionStability(bool UseGeneralSolver, Real DiffValue) {
           Accum += LayerThick(ICell) * U(ICell) * U(ICell);
        },
        NormInit);
-   NormInit = std::sqrt(NormInit);
+   NormInit = Kokkos::sqrt(NormInit);
 
    // Time integration using backward Euler
    for (int Step = 0; Step < NSteps; ++Step) {
@@ -419,7 +419,7 @@ Real runDiffusionStability(bool UseGeneralSolver, Real DiffValue) {
           Accum += LayerThick(ICell) * U(ICell) * U(ICell);
        },
        Norm);
-   Norm = std::sqrt(Norm);
+   Norm = Kokkos::sqrt(Norm);
 
    // Return normalized change in the norm
    return (Norm - NormInit) / NormInit;
@@ -457,7 +457,7 @@ int testDiffusionStability() {
    const Real NormGeneralLargeDiff =
        runDiffusionStability(UseGeneralSolver, LargeDiffValue);
 
-   if (!std::isnan(NormGeneralLargeDiff)) {
+   if (!Kokkos::isnan(NormGeneralLargeDiff)) {
       Err += 1;
       LOG_ERROR("TridiagonalSolver: Expected general solver to fail");
    }
@@ -466,7 +466,7 @@ int testDiffusionStability() {
    const Real NormCustomLargeDiff =
        runDiffusionStability(UseGeneralSolver, LargeDiffValue);
 
-   if (std::isnan(NormCustomLargeDiff)) {
+   if (Kokkos::isnan(NormCustomLargeDiff)) {
       Err += 1;
       LOG_ERROR("TridiagonalSolver: Expected custom solver to pass");
    }

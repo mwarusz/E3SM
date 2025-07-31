@@ -260,7 +260,7 @@ int adjustTimeStep(TimeStepper *Stepper, Real TimeEnd) {
    R8 TimeStepSeconds;
    TimeStep.get(TimeStepSeconds, TimeUnits::Seconds);
 
-   const int NSteps = std::ceil(TimeEnd / TimeStepSeconds);
+   const int NSteps = Kokkos::ceil(TimeEnd / TimeStepSeconds);
 
    TimeStepSeconds = TimeEnd / NSteps;
    TimeStep.set(TimeStepSeconds, TimeUnits::Seconds);
@@ -354,10 +354,10 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
    std::vector<Real> ConvRates(NRefinements - 1);
    for (int RefLevel = 0; RefLevel < NRefinements - 1; ++RefLevel) {
       ConvRates[RefLevel] =
-          std::log2(Errors[RefLevel].LInf / Errors[RefLevel + 1].LInf);
+          Kokkos::log2(Errors[RefLevel].LInf / Errors[RefLevel + 1].LInf);
    }
 
-   if (std::abs(ConvRates.back() - ExpectedOrder) > ATol) {
+   if (Kokkos::abs(ConvRates.back() - ExpectedOrder) > ATol) {
       Err++;
       LOG_ERROR(
           "Wrong convergence rate for time stepper {}, got {:.3f}, expected {}",
