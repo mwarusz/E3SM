@@ -200,8 +200,9 @@ int initTimeStepperTest(const std::string &mesh) {
    // Creating non-default state and auxiliary state to use only one vertical
    // layer
 
-   auto *DefMesh = HorzMesh::getDefault();
-   auto *DefHalo = Halo::getDefault();
+   auto *DefMesh   = HorzMesh::getDefault();
+   auto *DefVCoord = VertCoord::getDefault();
+   auto *DefHalo   = Halo::getDefault();
 
    int NTracers          = Tracers::getNumTracers();
    const int NTimeLevels = 2;
@@ -212,8 +213,8 @@ int initTimeStepperTest(const std::string &mesh) {
       LOG_ERROR("TimeStepperTest: error creating test state");
    }
 
-   auto *TestAuxState = AuxiliaryState::create("TestAuxState", DefMesh, DefHalo,
-                                               NVertLayers, NTracers);
+   auto *TestAuxState = AuxiliaryState::create(
+       "TestAuxState", DefMesh, DefVCoord, DefHalo, NVertLayers, NTracers);
 
    Config *OmegaConfig = Config::getOmegaConfig();
    TestAuxState->readConfigOptions(OmegaConfig);

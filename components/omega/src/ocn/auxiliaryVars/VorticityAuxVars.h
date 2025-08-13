@@ -4,6 +4,7 @@
 #include "DataTypes.h"
 #include "HorzMesh.h"
 #include "OmegaKokkos.h"
+#include "VertCoord.h"
 
 #include <string>
 
@@ -19,7 +20,7 @@ class VorticityAuxVars {
    Array2DReal NormPlanetVortEdge;
 
    VorticityAuxVars(const std::string &AuxStateSuffix, const HorzMesh *Mesh,
-                    int NVertLayers);
+                    const VertCoord *VCoord, int NVertLayers);
 
    KOKKOS_FUNCTION void
    computeVarsOnVertex(int IVertex, int KChunk,
@@ -81,6 +82,10 @@ class VorticityAuxVars {
 
  private:
    I4 VertexDegree;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
+   Array1DI4 MinLayerVertexBot;
+   Array1DI4 MaxLayerVertexTop;
    Array2DI4 CellsOnVertex;
    Array2DI4 EdgesOnVertex;
    Array2DReal EdgeSignOnVertex;

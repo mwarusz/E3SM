@@ -7,12 +7,19 @@
 namespace OMEGA {
 
 VelocityDel2AuxVars::VelocityDel2AuxVars(const std::string &AuxStateSuffix,
-                                         const HorzMesh *Mesh, int NVertLayers)
+                                         const HorzMesh *Mesh,
+                                         const VertCoord *VCoord,
+                                         int NVertLayers)
     : Del2Edge("VelDel2Edge" + AuxStateSuffix, Mesh->NEdgesSize, NVertLayers),
       Del2DivCell("VelDel2DivCell" + AuxStateSuffix, Mesh->NCellsSize,
                   NVertLayers),
       Del2RelVortVertex("VelDel2RelVortVertex" + AuxStateSuffix,
                         Mesh->NVerticesSize, NVertLayers),
+      MinLayerCell(VCoord->MinLayerCell), MaxLayerCell(VCoord->MaxLayerCell),
+      MinLayerEdgeBot(VCoord->MinLayerEdgeBot),
+      MaxLayerEdgeTop(VCoord->MaxLayerEdgeTop),
+      MinLayerVertexBot(VCoord->MinLayerVertexBot),
+      MaxLayerVertexTop(VCoord->MaxLayerVertexTop),
       NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       EdgeSignOnCell(Mesh->EdgeSignOnCell), DcEdge(Mesh->DcEdge),
       DvEdge(Mesh->DvEdge), AreaCell(Mesh->AreaCell),

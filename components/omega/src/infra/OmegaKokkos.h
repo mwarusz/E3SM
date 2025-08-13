@@ -10,6 +10,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "DataTypes.h"
+#include "MachEnv.h"
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -264,6 +265,30 @@ template <int N, class F, class... R>
 inline void parallelReduce(const int (&UpperBounds)[N], const F &Functor,
                            R &&...Reducers) {
    parallelReduce("", UpperBounds, Functor, std::forward<R>(Reducers)...);
+}
+
+KOKKOS_INLINE_FUNCTION
+int computeNChunks(const Array1DI4 &MinLayer, const Array1DI4 &MaxLayer,
+                   const I4 I) {
+   const I4 KMin = MinLayer(I);
+   const I4 KMax = MaxLayer(I);
+   // Range length with inclusive bounds
+   const I4 KLen = KMax - KMin + 1;
+
+   // Ceiling division for number of full chunks plus possible partial chunk
+   return (KLen + VecLength - 1) / VecLength;
+}
+
+KOKKOS_INLINE_FUNCTION
+void computeKRange(const Array1DI4 &MinLayer, const Array1DI4 &MaxLayer,
+                   const I4 I, const I4 KChunk, I4 &KStart, I4 &KLen) {
+
+   const I4 KMin = MinLayer(I);
+   const I4 KMax = MaxLayer(I);
+   KStart        = KMin + KChunk * VecLength;
+   const I4 KEnd = KStart + VecLength;
+
+   KLen = (KEnd > KMax + 1) ? (KMax - KStart + 1) : VecLength;
 }
 
 } // end namespace OMEGA

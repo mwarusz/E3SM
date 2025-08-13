@@ -169,6 +169,8 @@ class Tendencies {
    Tendencies(const Tendencies &) = delete;
    Tendencies(Tendencies &&)      = delete;
 
+   const VertCoord *VCoord;
+
    // Mesh sizes
    I4 NCellsAll; ///< Number of cells including full halo
    I4 NEdgesAll; ///< Number of edges including full halo

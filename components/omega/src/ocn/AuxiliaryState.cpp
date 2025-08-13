@@ -17,14 +17,15 @@ static std::string stripDefault(const std::string &Name) {
 // Constructor. Constructs the member auxiliary variables and registers their
 // fields with IOStreams
 AuxiliaryState::AuxiliaryState(const std::string &Name, const HorzMesh *Mesh,
-                               Halo *MeshHalo, int NVertLayers, int NTracers)
-    : Mesh(Mesh), MeshHalo(MeshHalo), Name(stripDefault(Name)),
-      KineticAux(stripDefault(Name), Mesh, NVertLayers),
-      LayerThicknessAux(stripDefault(Name), Mesh, NVertLayers),
-      VorticityAux(stripDefault(Name), Mesh, NVertLayers),
-      VelocityDel2Aux(stripDefault(Name), Mesh, NVertLayers),
+                               const VertCoord *VCoord, Halo *MeshHalo,
+                               int NVertLayers, int NTracers)
+    : Mesh(Mesh), VCoord(VCoord), MeshHalo(MeshHalo), Name(stripDefault(Name)),
+      KineticAux(stripDefault(Name), Mesh, VCoord, NVertLayers),
+      LayerThicknessAux(stripDefault(Name), Mesh, VCoord, NVertLayers),
+      VorticityAux(stripDefault(Name), Mesh, VCoord, NVertLayers),
+      VelocityDel2Aux(stripDefault(Name), Mesh, VCoord, NVertLayers),
       WindForcingAux(stripDefault(Name), Mesh),
-      TracerAux(stripDefault(Name), Mesh, NVertLayers, NTracers) {
+      TracerAux(stripDefault(Name), Mesh, VCoord, NVertLayers, NTracers) {
 
    GroupName = "AuxiliaryState";
    if (Name != "Default") {
@@ -167,7 +168,8 @@ void AuxiliaryState::computeAll(const OceanState *State,
 
 // Create a non-default auxiliary state
 AuxiliaryState *AuxiliaryState::create(const std::string &Name,
-                                       const HorzMesh *Mesh, Halo *MeshHalo,
+                                       const HorzMesh *Mesh,
+                                       const VertCoord *VCoord, Halo *MeshHalo,
                                        int NVertLayers, const int NTracers) {
    if (AllAuxStates.find(Name) != AllAuxStates.end()) {
       LOG_ERROR("Attempted to create a new AuxiliaryState with name {} but it "
@@ -177,7 +179,7 @@ AuxiliaryState *AuxiliaryState::create(const std::string &Name,
    }
 
    auto *NewAuxState =
-       new AuxiliaryState(Name, Mesh, MeshHalo, NVertLayers, NTracers);
+       new AuxiliaryState(Name, Mesh, VCoord, MeshHalo, NVertLayers, NTracers);
    AllAuxStates.emplace(Name, NewAuxState);
 
    return NewAuxState;
@@ -186,14 +188,15 @@ AuxiliaryState *AuxiliaryState::create(const std::string &Name,
 // Create the default auxiliary state. Assumes that HorzMesh, VertCoord and
 // Halo have been initialized.
 void AuxiliaryState::init() {
-   const HorzMesh *DefMesh = HorzMesh::getDefault();
-   Halo *DefHalo           = Halo::getDefault();
+   const HorzMesh *DefMesh       = HorzMesh::getDefault();
+   const VertCoord *DefVertCoord = VertCoord::getDefault();
+   Halo *DefHalo                 = Halo::getDefault();
 
    int NVertLayers = VertCoord::getDefault()->NVertLayers;
    int NTracers    = Tracers::getNumTracers();
 
    AuxiliaryState::DefaultAuxState = AuxiliaryState::create(
-       "Default", DefMesh, DefHalo, NVertLayers, NTracers);
+       "Default", DefMesh, DefVertCoord, DefHalo, NVertLayers, NTracers);
 
    Config *OmegaConfig = Config::getOmegaConfig();
    DefaultAuxState->readConfigOptions(OmegaConfig);

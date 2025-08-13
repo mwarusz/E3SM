@@ -28,7 +28,7 @@ class ThicknessFluxDivOnCell {
    bool Enabled;
 
    /// constructor declaration
-   ThicknessFluxDivOnCell(const HorzMesh *Mesh);
+   ThicknessFluxDivOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    /// The functor takes cell index, vertical chunk index, and thickness flux
    /// array as inputs, outputs the tendency array
@@ -58,6 +58,10 @@ class ThicknessFluxDivOnCell {
    }
 
  private:
+   Array1DI4 MinLayerCell;
+   Array1DI4 MaxLayerCell;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array1DReal DvEdge;
@@ -72,7 +76,7 @@ class PotentialVortHAdvOnEdge {
    bool Enabled;
 
    /// constructor declaration
-   PotentialVortHAdvOnEdge(const HorzMesh *Mesh);
+   PotentialVortHAdvOnEdge(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    /// The functor takes edge index, vertical chunk index, and arrays for
    /// normalized relative vorticity, normalized planetary vorticity, layer
@@ -108,6 +112,8 @@ class PotentialVortHAdvOnEdge {
    }
 
  private:
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
    Array1DI4 NEdgesOnEdge;
    Array2DI4 EdgesOnEdge;
    Array2DReal WeightsOnEdge;
@@ -120,7 +126,7 @@ class KEGradOnEdge {
    bool Enabled;
 
    /// constructor declaration
-   KEGradOnEdge(const HorzMesh *Mesh);
+   KEGradOnEdge(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    /// The functor takes edge index, vertical chunk index, and kinetic energy
    /// array as inputs, outputs the tendency array
@@ -140,6 +146,8 @@ class KEGradOnEdge {
    }
 
  private:
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
    Array2DI4 CellsOnEdge;
    Array1DReal DcEdge;
    Array2DReal EdgeMask;
@@ -152,7 +160,7 @@ class SSHGradOnEdge {
    bool Enabled;
 
    /// constructor declaration
-   SSHGradOnEdge(const HorzMesh *Mesh);
+   SSHGradOnEdge(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    /// The functor takes edge index, vertical chunk index, and array of
    /// layer thickness/SSH, outputs tendency array
@@ -174,6 +182,8 @@ class SSHGradOnEdge {
 
  private:
    Real Grav = 9.80665_Real;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
    Array2DI4 CellsOnEdge;
    Array1DReal DcEdge;
    Array2DReal EdgeMask;
@@ -187,7 +197,7 @@ class VelocityDiffusionOnEdge {
    Real ViscDel2;
 
    /// constructor declaration
-   VelocityDiffusionOnEdge(const HorzMesh *Mesh);
+   VelocityDiffusionOnEdge(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    /// The functor takes edge index, vertical chunk index, and arrays for
    /// divergence of horizontal velocity (defined at cell centers) and relative
@@ -219,6 +229,8 @@ class VelocityDiffusionOnEdge {
    }
 
  private:
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
    Array2DI4 CellsOnEdge;
    Array2DI4 VerticesOnEdge;
    Array1DReal DcEdge;
@@ -236,7 +248,7 @@ class VelocityHyperDiffOnEdge {
    Real DivFactor;
 
    /// Constructor declaration
-   VelocityHyperDiffOnEdge(const HorzMesh *Mesh);
+   VelocityHyperDiffOnEdge(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    /// The functor takes the edge index, vertical chunk index, and arrays for
    /// the laplacian of divergence of horizontal velocity and the laplacian of
@@ -269,6 +281,8 @@ class VelocityHyperDiffOnEdge {
    }
 
  private:
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
    Array2DI4 CellsOnEdge;
    Array2DI4 VerticesOnEdge;
    Array1DReal DcEdge;
@@ -335,6 +349,7 @@ class BottomDragOnEdge {
 
  private:
    I4 NVertLayers;
+   Array1DI4 MaxLayerEdgeTop;
    Array2DI4 CellsOnEdge;
    Array2DReal EdgeMask;
 };
@@ -344,7 +359,7 @@ class TracerHorzAdvOnCell {
  public:
    bool Enabled;
 
-   TracerHorzAdvOnCell(const HorzMesh *Mesh);
+   TracerHorzAdvOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
                                    I4 KChunk, const Array2DReal &NormVelEdge,
@@ -373,6 +388,10 @@ class TracerHorzAdvOnCell {
    }
 
  private:
+   Array1DI4 MinLayerCell;
+   Array1DI4 MaxLayerCell;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DI4 CellsOnEdge;
@@ -389,7 +408,7 @@ class TracerDiffOnCell {
 
    Real EddyDiff2;
 
-   TracerDiffOnCell(const HorzMesh *Mesh);
+   TracerDiffOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    KOKKOS_FUNCTION void
    operator()(const Array3DReal &Tend, I4 L, I4 ICell, I4 KChunk,
@@ -426,6 +445,10 @@ class TracerDiffOnCell {
    }
 
  private:
+   Array1DI4 MinLayerCell;
+   Array1DI4 MaxLayerCell;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DI4 CellsOnEdge;
@@ -444,7 +467,7 @@ class TracerHyperDiffOnCell {
 
    Real EddyDiff4;
 
-   TracerHyperDiffOnCell(const HorzMesh *Mesh);
+   TracerHyperDiffOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
                                    I4 KChunk,
@@ -480,6 +503,10 @@ class TracerHyperDiffOnCell {
    }
 
  private:
+   Array1DI4 MinLayerCell;
+   Array1DI4 MaxLayerCell;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DI4 CellsOnEdge;
