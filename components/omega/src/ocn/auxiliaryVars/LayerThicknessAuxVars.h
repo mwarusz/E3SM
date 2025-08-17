@@ -27,11 +27,15 @@ class LayerThicknessAuxVars {
    KOKKOS_FUNCTION void
    computeVarsOnEdge(int IEdge, int KChunk, const Array2DReal &LayerThickCell,
                      const Array2DReal &NormalVelEdge) const {
-      const int KStart = KChunk * VecLength;
+      //      const int KStart = KChunk * VecLength;
+      I4 KStart, KLen;
+      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
+                    KLen);
+
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K = KStart + KVec;
          MeanLayerThickEdge(IEdge, K) =
              0.5_Real * (LayerThickCell(JCell0, K) + LayerThickCell(JCell1, K));
@@ -39,7 +43,7 @@ class LayerThicknessAuxVars {
 
       switch (FluxThickEdgeChoice) {
       case FluxThickEdgeOption::Center:
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
             const int K = KStart + KVec;
             FluxLayerThickEdge(IEdge, K) =
                 0.5_Real *
@@ -47,7 +51,7 @@ class LayerThicknessAuxVars {
          }
          break;
       case FluxThickEdgeOption::Upwind:
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
             const int K = KStart + KVec;
             if (NormalVelEdge(IEdge, K) > 0) {
                FluxLayerThickEdge(IEdge, K) = LayerThickCell(JCell0, K);
@@ -67,8 +71,11 @@ class LayerThicknessAuxVars {
                       const Array2DReal &LayerThickCell) const {
 
       // Temporary for stacked shallow water
-      const int KStart = KChunk * VecLength;
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      //      const int KStart = KChunk * VecLength;
+      //      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      I4 KStart, KLen;
+      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K       = KStart + KVec;
          SshCell(ICell, K) = LayerThickCell(ICell, K) - BottomDepth(ICell);
       }

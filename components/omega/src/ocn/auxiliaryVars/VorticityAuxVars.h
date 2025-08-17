@@ -26,8 +26,12 @@ class VorticityAuxVars {
    computeVarsOnVertex(int IVertex, int KChunk,
                        const Array2DReal &LayerThickCell,
                        const Array2DReal &NormalVelEdge) const {
-      const int KStart           = KChunk * VecLength;
+      //      const int KStart           = KChunk * VecLength;
       const Real InvAreaTriangle = 1._Real / AreaTriangle(IVertex);
+
+      I4 KStart, KLen;
+      computeKRange(MinLayerVertexBot, MaxLayerVertexTop, IVertex, KChunk,
+                    KStart, KLen);
 
       Real LayerThickVertex[VecLength] = {0};
       Real RelVortVertexTmp[VecLength] = {0};
@@ -36,7 +40,7 @@ class VorticityAuxVars {
          const int JCell = CellsOnVertex(IVertex, J);
          const int JEdge = EdgesOnVertex(IVertex, J);
 
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
             const int K = KStart + KVec;
             LayerThickVertex[KVec] += InvAreaTriangle *
                                       KiteAreasOnVertex(IVertex, J) *
@@ -60,11 +64,15 @@ class VorticityAuxVars {
    }
 
    KOKKOS_FUNCTION void computeVarsOnEdge(int IEdge, int KChunk) const {
-      const int KStart   = KChunk * VecLength;
+      //      const int KStart   = KChunk * VecLength;
       const int JVertex0 = VerticesOnEdge(IEdge, 0);
       const int JVertex1 = VerticesOnEdge(IEdge, 1);
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      I4 KStart, KLen;
+      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
+                    KLen);
+
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K = KStart + KVec;
          NormRelVortEdge(IEdge, K) =
              0.5_Real *

@@ -114,6 +114,8 @@ VertCoord::VertCoord(const std::string &Name_, //< [in] Name for new VertCoord
 
    initMovementWeights(Options);
 
+   defineFields();
+
 } // end constructor
 
 //------------------------------------------------------------------------------

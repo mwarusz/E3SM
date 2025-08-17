@@ -243,7 +243,7 @@ Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
    NCellsAll = Mesh->NCellsAll;
    NEdgesAll = Mesh->NEdgesAll;
    NTracers  = NTracersIn;
-   NChunks   = NVertLayers / VecLength;
+   NChunk    = NVertLayers / VecLength;
 
 } // end constructor
 
@@ -276,13 +276,26 @@ void Tendencies::computeThicknessTendenciesOnly(
    // Compute thickness flux divergence
    const Array2DReal &ThickFluxEdge =
        AuxState->LayerThicknessAux.FluxLayerThickEdge;
+   const Array1DI4 &MinLyrCell = VCoord->MinLayerCell;
+   const Array1DI4 &MaxLyrCell = VCoord->MaxLayerCell;
 
    if (LocThicknessFluxDiv.Enabled) {
-      parallelFor(
-          {NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
-             LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KChunk,
-                                 ThickFluxEdge, NormalVelEdge);
+      Kokkos::parallel_for(
+          TeamPolicy(NCellsAll, OMEGA_TEAMSIZE),
+          KOKKOS_LAMBDA(const TeamMember &Team) {
+             const I4 ICell   = Team.league_rank();
+             const I4 NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                    LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KChunk,
+                                        ThickFluxEdge, NormalVelEdge);
+                 });
           });
+      //      parallelFor(
+      //          {NCellsAll, NChunk}, KOKKOS_LAMBDA(int ICell, int KChunk) {
+      //             LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KChunk,
+      //                                 ThickFluxEdge, NormalVelEdge);
+      //          });
    }
 
    if (CustomThicknessTend) {
@@ -320,44 +333,94 @@ void Tendencies::computeVelocityTendenciesOnly(
        AuxState->LayerThicknessAux.FluxLayerThickEdge;
    const Array2DReal &NormRVortEdge = AuxState->VorticityAux.NormRelVortEdge;
    const Array2DReal &NormFEdge     = AuxState->VorticityAux.NormPlanetVortEdge;
+   const Array1DI4 &MinLyrEdgeBot   = VCoord->MinLayerEdgeBot;
+   const Array1DI4 &MaxLyrEdgeTop   = VCoord->MaxLayerEdgeTop;
    Array2DReal NormVelEdge;
    State->getNormalVelocity(NormVelEdge, VelTimeLevel);
    if (LocPotientialVortHAdv.Enabled) {
-      parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
-                                   NormRVortEdge, NormFEdge, FluxLayerThickEdge,
-                                   NormVelEdge);
+      Kokkos::parallel_for(
+          TeamPolicy(NEdgesAll, OMEGA_TEAMSIZE),
+          KOKKOS_LAMBDA(const TeamMember &Team) {
+             const I4 IEdge = Team.league_rank();
+             const I4 NChunks =
+                 computeNChunks(MinLyrEdgeBot, MaxLyrEdgeTop, IEdge);
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                    LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
+                                          NormRVortEdge, NormFEdge,
+                                          FluxLayerThickEdge, NormVelEdge);
+                 });
           });
+      //      parallelFor(
+      //          {NEdgesAll, NChunk}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+      //             LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
+      //                                   NormRVortEdge, NormFEdge,
+      //                                   FluxLayerThickEdge, NormVelEdge);
+      //          });
    }
 
    // Compute kinetic energy gradient
    const Array2DReal &KECell = AuxState->KineticAux.KineticEnergyCell;
    if (LocKEGrad.Enabled) {
-      parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocKEGrad(LocNormalVelocityTend, IEdge, KChunk, KECell);
+      Kokkos::parallel_for(
+          TeamPolicy(NEdgesAll, OMEGA_TEAMSIZE),
+          KOKKOS_LAMBDA(const TeamMember &Team) {
+             const I4 IEdge = Team.league_rank();
+             const I4 NChunks =
+                 computeNChunks(MinLyrEdgeBot, MaxLyrEdgeTop, IEdge);
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                    LocKEGrad(LocNormalVelocityTend, IEdge, KChunk, KECell);
+                 });
           });
+      //      parallelFor(
+      //          {NEdgesAll, NChunk}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+      //             LocKEGrad(LocNormalVelocityTend, IEdge, KChunk, KECell);
+      //          });
    }
 
    // Compute sea surface height gradient
    const Array2DReal &SSHCell = AuxState->LayerThicknessAux.SshCell;
    if (LocSSHGrad.Enabled) {
-      parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocSSHGrad(LocNormalVelocityTend, IEdge, KChunk, SSHCell);
+      Kokkos::parallel_for(
+          TeamPolicy(NEdgesAll, OMEGA_TEAMSIZE),
+          KOKKOS_LAMBDA(const TeamMember &Team) {
+             const int IEdge = Team.league_rank();
+             const int NChunks =
+                 computeNChunks(MinLyrEdgeBot, MaxLyrEdgeTop, IEdge);
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                    LocSSHGrad(LocNormalVelocityTend, IEdge, KChunk, SSHCell);
+                 });
           });
+      //      parallelFor(
+      //          {NEdgesAll, NChunk}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+      //             LocSSHGrad(LocNormalVelocityTend, IEdge, KChunk, SSHCell);
+      //          });
    }
 
    // Compute del2 horizontal diffusion
    const Array2DReal &DivCell     = AuxState->KineticAux.VelocityDivCell;
    const Array2DReal &RVortVertex = AuxState->VorticityAux.RelVortVertex;
    if (LocVelocityDiffusion.Enabled) {
-      parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk, DivCell,
-                                  RVortVertex);
+      Kokkos::parallel_for(
+          TeamPolicy(NEdgesAll, OMEGA_TEAMSIZE),
+          KOKKOS_LAMBDA(const TeamMember &Team) {
+             const int IEdge = Team.league_rank();
+             const int NChunks =
+                 computeNChunks(MinLyrEdgeBot, MaxLyrEdgeTop, IEdge);
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                    LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk,
+                                         DivCell, RVortVertex);
+                 });
           });
+      //      parallelFor(
+      //          {NEdgesAll, NChunk}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+      //             LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk,
+      //             DivCell,
+      //                                  RVortVertex);
+      //          });
    }
 
    // Compute del4 horizontal diffusion
@@ -365,11 +428,23 @@ void Tendencies::computeVelocityTendenciesOnly(
    const Array2DReal &Del2RVortVertex =
        AuxState->VelocityDel2Aux.Del2RelVortVertex;
    if (LocVelocityHyperDiff.Enabled) {
-      parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
-                                  Del2DivCell, Del2RVortVertex);
+      Kokkos::parallel_for(
+          TeamPolicy(NEdgesAll, OMEGA_TEAMSIZE),
+          KOKKOS_LAMBDA(const TeamMember &Team) {
+             const int IEdge = Team.league_rank();
+             const int NChunks =
+                 computeNChunks(MinLyrEdgeBot, MaxLyrEdgeTop, IEdge);
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                    LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
+                                         Del2DivCell, Del2RVortVertex);
+                 });
           });
+      //      parallelFor(
+      //          {NEdgesAll, NChunk}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+      //             LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
+      //                                  Del2DivCell, Del2RVortVertex);
+      //          });
    }
 
    // Compute wind forcing
@@ -377,11 +452,23 @@ void Tendencies::computeVelocityTendenciesOnly(
    const auto &MeanLayerThickEdge =
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
    if (LocWindForcing.Enabled) {
-      parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocWindForcing(LocNormalVelocityTend, IEdge, KChunk,
-                            NormalStressEdge, MeanLayerThickEdge);
+      Kokkos::parallel_for(
+          TeamPolicy(NEdgesAll, OMEGA_TEAMSIZE),
+          KOKKOS_LAMBDA(const TeamMember &Team) {
+             const int IEdge = Team.league_rank();
+             const int NChunks =
+                 computeNChunks(MinLyrEdgeBot, MaxLyrEdgeTop, IEdge);
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                    LocWindForcing(LocNormalVelocityTend, IEdge, KChunk,
+                                   NormalStressEdge, MeanLayerThickEdge);
+                 });
           });
+      //      parallelFor(
+      //          {NEdgesAll, NChunk}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+      //             LocWindForcing(LocNormalVelocityTend, IEdge, KChunk,
+      //                            NormalStressEdge, MeanLayerThickEdge);
+      //          });
    }
 
    // Compute bottom drag
@@ -413,41 +500,89 @@ void Tendencies::computeTracerTendenciesOnly(
    OMEGA_SCOPE(LocTracerDiffusion, TracerDiffusion);
    OMEGA_SCOPE(LocTracerHyperDiff, TracerHyperDiff);
 
+   OMEGA_SCOPE(LocNCellsAll, NCellsAll);
+
    deepCopy(LocTracerTend, 0);
 
    // compute tracer horizotal advection
    const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
    const Array3DReal &HTracersEdge  = AuxState->TracerAux.HTracersEdge;
+   const Array1DI4 &MinLyrCell      = VCoord->MinLayerCell;
+   const Array1DI4 &MaxLyrCell      = VCoord->MaxLayerCell;
    if (LocTracerHorzAdv.Enabled) {
-      parallelFor(
-          {NTracers, NCellsAll, NChunks},
-          KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
-             LocTracerHorzAdv(LocTracerTend, L, ICell, KChunk, NormalVelEdge,
-                              HTracersEdge);
+      Kokkos::parallel_for(
+          TeamPolicy(NTracers * NCellsAll, OMEGA_TEAMSIZE),
+          KOKKOS_LAMBDA(const TeamMember &Team) {
+             const int Iter    = Team.league_rank();
+             const int LTracer = Iter / LocNCellsAll;
+             const int ICell   = Iter % LocNCellsAll;
+
+             const int NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                    LocTracerHorzAdv(LocTracerTend, LTracer, ICell, KChunk,
+                                     NormalVelEdge, HTracersEdge);
+                 });
           });
+      //      parallelFor(
+      //          {NTracers, NCellsAll, NChunk},
+      //          KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
+      //             LocTracerHorzAdv(LocTracerTend, L, ICell, KChunk,
+      //             NormalVelEdge,
+      //                              HTracersEdge);
+      //          });
    }
 
    // compute tracer diffusion
    const Array2DReal &MeanLayerThickEdge =
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
    if (LocTracerDiffusion.Enabled) {
-      parallelFor(
-          {NTracers, NCellsAll, NChunks},
-          KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
-             LocTracerDiffusion(LocTracerTend, L, ICell, KChunk, TracerArray,
-                                MeanLayerThickEdge);
+      Kokkos::parallel_for(
+          TeamPolicy(NTracers * NCellsAll, OMEGA_TEAMSIZE),
+          KOKKOS_LAMBDA(const TeamMember &Team) {
+             const int Iter    = Team.league_rank();
+             const int LTracer = Iter / LocNCellsAll;
+             const int ICell   = Iter % LocNCellsAll;
+
+             const int NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                    LocTracerDiffusion(LocTracerTend, LTracer, ICell, KChunk,
+                                       TracerArray, MeanLayerThickEdge);
+                 });
           });
+      //      parallelFor(
+      //          {NTracers, NCellsAll, NChunk},
+      //          KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
+      //             LocTracerDiffusion(LocTracerTend, L, ICell, KChunk,
+      //             TracerArray,
+      //                                MeanLayerThickEdge);
+      //          });
    }
 
    // compute tracer hyperdiffusion
    const Array3DReal &Del2TracersCell = AuxState->TracerAux.Del2TracersCell;
    if (LocTracerHyperDiff.Enabled) {
-      parallelFor(
-          {NTracers, NCellsAll, NChunks},
-          KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
-             LocTracerHyperDiff(LocTracerTend, L, ICell, KChunk,
-                                Del2TracersCell);
+      Kokkos::parallel_for(
+          TeamPolicy(NTracers * NCellsAll, OMEGA_TEAMSIZE),
+          KOKKOS_LAMBDA(const TeamMember &Team) {
+             const int Iter    = Team.league_rank();
+             const int LTracer = Iter / LocNCellsAll;
+             const int ICell   = Iter % LocNCellsAll;
+
+             const int NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                    LocTracerHyperDiff(LocTracerTend, LTracer, ICell, KChunk,
+                                       Del2TracersCell);
+                 });
           });
+      //      parallelFor(
+      //          {NTracers, NCellsAll, NChunk},
+      //          KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
+      //             LocTracerHyperDiff(LocTracerTend, L, ICell, KChunk,
+      //                                Del2TracersCell);
+      //          });
    }
 
 } // end tracer tendency compute
@@ -467,13 +602,28 @@ void Tendencies::computeThicknessTendencies(
    OMEGA_SCOPE(LayerThicknessAux, AuxState->LayerThicknessAux);
    OMEGA_SCOPE(LayerThickCell, LayerThick);
    OMEGA_SCOPE(NormalVelEdge, NormVel);
+   const Array1DI4 &MinLyrEdgeBot = VCoord->MinLayerEdgeBot;
+   const Array1DI4 &MaxLyrEdgeTop = VCoord->MaxLayerEdgeTop;
 
-   parallelFor(
-       "computeLayerThickAux", {NEdgesAll, NChunks},
-       KOKKOS_LAMBDA(int IEdge, int KChunk) {
-          LayerThicknessAux.computeVarsOnEdge(IEdge, KChunk, LayerThickCell,
-                                              NormalVelEdge);
+   Kokkos::parallel_for(
+       TeamPolicy(NEdgesAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const int IEdge = Team.league_rank();
+          const int NChunks =
+              computeNChunks(MinLyrEdgeBot, MaxLyrEdgeTop, IEdge);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                 LayerThicknessAux.computeVarsOnEdge(
+                     IEdge, KChunk, LayerThickCell, NormalVelEdge);
+              });
        });
+   //   parallelFor(
+   //       "computeLayerThickAux", {NEdgesAll, NChunk},
+   //       KOKKOS_LAMBDA(int IEdge, int KChunk) {
+   //          LayerThicknessAux.computeVarsOnEdge(IEdge, KChunk,
+   //          LayerThickCell,
+   //                                              NormalVelEdge);
+   //       });
 
    computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
                                   Time);
@@ -502,22 +652,60 @@ void Tendencies::computeTracerTendencies(
    OMEGA_SCOPE(TracerAux, AuxState->TracerAux);
    OMEGA_SCOPE(LayerThickCell, State->LayerThickness[ThickTimeLevel]);
    OMEGA_SCOPE(NormalVelEdge, State->NormalVelocity[VelTimeLevel]);
+   OMEGA_SCOPE(LocNEdgesAll, NEdgesAll);
+   OMEGA_SCOPE(LocNCellsAll, NCellsAll);
 
-   parallelFor(
-       "computeTracerAuxEdge", {NTracers, NEdgesAll, NChunks},
-       KOKKOS_LAMBDA(int LTracer, int IEdge, int KChunk) {
-          TracerAux.computeVarsOnEdge(LTracer, IEdge, KChunk, NormalVelEdge,
-                                      LayerThickCell, TracerArray);
+   const Array1DI4 &MinLyrEdgeBot = VCoord->MinLayerEdgeBot;
+   const Array1DI4 &MaxLyrEdgeTop = VCoord->MaxLayerEdgeTop;
+   const Array1DI4 &MinLyrCell    = VCoord->MinLayerCell;
+   const Array1DI4 &MaxLyrCell    = VCoord->MaxLayerCell;
+
+   Kokkos::parallel_for(
+       TeamPolicy(NTracers * NEdgesAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const int Iter    = Team.league_rank();
+          const int LTracer = Iter / LocNEdgesAll;
+          const int IEdge   = Iter % LocNEdgesAll;
+
+          const int NChunks =
+              computeNChunks(MinLyrEdgeBot, MaxLyrEdgeTop, IEdge);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                 TracerAux.computeVarsOnEdge(LTracer, IEdge, KChunk,
+                                             NormalVelEdge, LayerThickCell,
+                                             TracerArray);
+              });
        });
+   //   parallelFor(
+   //       "computeTracerAuxEdge", {NTracers, NEdgesAll, NChunk},
+   //       KOKKOS_LAMBDA(int LTracer, int IEdge, int KChunk) {
+   //          TracerAux.computeVarsOnEdge(LTracer, IEdge, KChunk,
+   //          NormalVelEdge,
+   //                                      LayerThickCell, TracerArray);
+   //       });
 
    const auto &MeanLayerThickEdge =
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
-   parallelFor(
-       "computeTracerAuxCell", {NTracers, NCellsAll, NChunks},
-       KOKKOS_LAMBDA(int LTracer, int ICell, int KChunk) {
-          TracerAux.computeVarsOnCells(LTracer, ICell, KChunk,
-                                       MeanLayerThickEdge, TracerArray);
+   Kokkos::parallel_for(
+       TeamPolicy(NTracers * NCellsAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const int Iter    = Team.league_rank();
+          const int LTracer = Iter / LocNCellsAll;
+          const int ICell   = Iter % LocNCellsAll;
+
+          const int NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                 TracerAux.computeVarsOnCells(LTracer, ICell, KChunk,
+                                              MeanLayerThickEdge, TracerArray);
+              });
        });
+   //   parallelFor(
+   //       "computeTracerAuxCell", {NTracers, NCellsAll, NChunk},
+   //       KOKKOS_LAMBDA(int LTracer, int ICell, int KChunk) {
+   //          TracerAux.computeVarsOnCells(LTracer, ICell, KChunk,
+   //                                       MeanLayerThickEdge, TracerArray);
+   //       });
 
    computeTracerTendenciesOnly(State, AuxState, TracerArray, ThickTimeLevel,
                                VelTimeLevel, Time);

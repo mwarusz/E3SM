@@ -22,16 +22,25 @@ class KineticAuxVars {
    computeVarsOnCell(int ICell, int KChunk,
                      const Array2DReal &NormalVelEdge) const {
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
-      const int KStart       = KChunk * VecLength;
+      //      const int KStart       = KChunk * VecLength;
 
       Real KineticEnergyCellTmp[VecLength] = {0};
       Real VelocityDivCellTmp[VecLength]   = {0};
+      I4 KStart, KLen;
+      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const int JEdge     = EdgesOnCell(ICell, J);
          const Real AreaEdge = 0.5_Real * DvEdge(JEdge) * DcEdge(JEdge);
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
+         //         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         //            const int K = KStart + KVec;
+
+         const I4 KMinEdge = Kokkos::min(KStart, MinLayerEdgeBot(JEdge));
+         const I4 KMaxEdge =
+             Kokkos::max(KStart + KLen, MaxLayerEdgeTop(JEdge) + 1);
+
+         for (int K = KMinEdge; K < KMaxEdge; ++K) {
+            const int KVec = K - KStart;
             KineticEnergyCellTmp[KVec] += AreaEdge * 0.5_Real * InvAreaCell *
                                           NormalVelEdge(JEdge, K) *
                                           NormalVelEdge(JEdge, K);
@@ -40,7 +49,7 @@ class KineticAuxVars {
                                         NormalVelEdge(JEdge, K);
          }
       }
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K                 = KStart + KVec;
          KineticEnergyCell(ICell, K) = KineticEnergyCellTmp[KVec];
          VelocityDivCell(ICell, K)   = VelocityDivCellTmp[KVec];
