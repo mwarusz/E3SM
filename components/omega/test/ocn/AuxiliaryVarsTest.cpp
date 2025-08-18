@@ -835,6 +835,17 @@ int initAuxVarsTest(const std::string &mesh) {
 
    VertCoord::init();
 
+   // Reset NVertLayers to the test value
+   auto *DefVertCoord        = VertCoord::getDefault();
+   DefVertCoord->NVertLayers = NVertLayers;
+   Dimension::destroy("NVertLayers");
+   std::shared_ptr<Dimension> VertDim =
+       Dimension::create("NVertLayers", NVertLayers);
+
+   deepCopy(DefVertCoord->MaxLayerCell, NVertLayers - 1);
+   DefVertCoord->minMaxLayerEdge();
+   DefVertCoord->minMaxLayerVertex();
+
    HorzMesh::init();
 
    return Err;

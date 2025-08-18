@@ -1039,6 +1039,10 @@ void initTendTest(const std::string &MeshFile, int NVertLayers) {
    std::shared_ptr<Dimension> VertDim =
        Dimension::create("NVertLayers", NVertLayers);
 
+   deepCopy(DefVertCoord->MaxLayerCell, NVertLayers - 1);
+   DefVertCoord->minMaxLayerEdge();
+   DefVertCoord->minMaxLayerVertex();
+
    HorzMesh::init();
 
 } // end initTendTest
