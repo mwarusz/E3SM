@@ -46,16 +46,13 @@ class ThicknessFluxDivOnCell {
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
-         //         for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const I4 KMinEdge = MinLayerEdgeBot(JEdge);
-         const I4 KMaxEdge = MaxLayerEdgeTop(JEdge);
 
-         for (int KVec = 0; KVec < KLen; ++KVec) {
-            const I4 K = KStart + KVec;
+         const I4 KMinEdge = Kokkos::max(KStart, MinLayerEdgeBot(JEdge));
+         const I4 KMaxEdge =
+             Kokkos::min(KStart + KLen, MaxLayerEdgeTop(JEdge) + 1);
 
-            // Check if K is within valid range for this edge
-            if (K < KMinEdge || K > KMaxEdge)
-               continue;
+         for (int K = KMinEdge; K < KMaxEdge; ++K) {
+            const int KVec = K - KStart;
 
             DivTmp[KVec] -= DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
                             ThicknessFlux(JEdge, K) * NormalVelEdge(JEdge, K) *
@@ -410,15 +407,12 @@ class TracerHorzAdvOnCell {
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
 
-         const I4 KMinEdge = MinLayerEdgeBot(JEdge);
-         const I4 KMaxEdge = MaxLayerEdgeTop(JEdge);
+         const I4 KMinEdge = Kokkos::max(KStart, MinLayerEdgeBot(JEdge));
+         const I4 KMaxEdge =
+             Kokkos::min(KStart + KLen, MaxLayerEdgeTop(JEdge) + 1);
 
-         for (int KVec = 0; KVec < KLen; ++KVec) {
-            const I4 K = KStart + KVec;
-
-            // Check if K is within valid range for this edge
-            if (K < KMinEdge || K > KMaxEdge)
-               continue;
+         for (int K = KMinEdge; K < KMaxEdge; ++K) {
+            const int KVec = K - KStart;
 
             HAdvTmp[KVec] -= EdgeMask(JEdge, K) * DvEdge(JEdge) *
                              EdgeSignOnCell(ICell, J) *
@@ -470,8 +464,9 @@ class TracerDiffOnCell {
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
 
-         const I4 KMinEdge = MinLayerEdgeBot(JEdge);
-         const I4 KMaxEdge = MaxLayerEdgeTop(JEdge);
+         const I4 KMinEdge = Kokkos::max(KStart, MinLayerEdgeBot(JEdge));
+         const I4 KMaxEdge =
+             Kokkos::min(KStart + KLen, MaxLayerEdgeTop(JEdge) + 1);
 
          const I4 JCell0 = CellsOnEdge(JEdge, 0);
          const I4 JCell1 = CellsOnEdge(JEdge, 1);
@@ -479,12 +474,8 @@ class TracerDiffOnCell {
          const Real RTemp =
              MeshScalingDel2(JEdge) * DvEdge(JEdge) / DcEdge(JEdge);
 
-         for (int KVec = 0; KVec < KLen; ++KVec) {
-            const I4 K = KStart + KVec;
-
-            // Check if K is within valid range for this edge
-            if (K < KMinEdge || K > KMaxEdge)
-               continue;
+         for (int K = KMinEdge; K < KMaxEdge; ++K) {
+            const int KVec = K - KStart;
 
             const Real TracerGrad =
                 (TracerCell(L, JCell1, K) - TracerCell(L, JCell0, K));
@@ -538,8 +529,9 @@ class TracerHyperDiffOnCell {
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
 
-         const I4 KMinEdge = MinLayerEdgeBot(JEdge);
-         const I4 KMaxEdge = MaxLayerEdgeTop(JEdge);
+         const I4 KMinEdge = Kokkos::max(KStart, MinLayerEdgeBot(JEdge));
+         const I4 KMaxEdge =
+             Kokkos::min(KStart + KLen, MaxLayerEdgeTop(JEdge) + 1);
 
          const I4 JCell0 = CellsOnEdge(JEdge, 0);
          const I4 JCell1 = CellsOnEdge(JEdge, 1);
@@ -547,12 +539,8 @@ class TracerHyperDiffOnCell {
          const Real RTemp =
              MeshScalingDel4(JEdge) * DvEdge(JEdge) / DcEdge(JEdge);
 
-         for (int KVec = 0; KVec < KLen; ++KVec) {
-            const I4 K = KStart + KVec;
-
-            // Check if K is within valid range for this edge
-            if (K < KMinEdge || K > KMaxEdge)
-               continue;
+         for (int K = KMinEdge; K < KMaxEdge; ++K) {
+            const int KVec = K - KStart;
 
             const Real Del2TrGrad =
                 (TrDel2Cell(L, JCell1, K) - TrDel2Cell(L, JCell0, K));

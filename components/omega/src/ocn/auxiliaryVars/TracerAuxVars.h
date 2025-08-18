@@ -85,9 +85,9 @@ class TracerAuxVars {
 
          //         for (int KVec = 0; KVec < VecLength; ++KVec) {
          //            const int K           = KStart + KVec;
-         const I4 KMinEdge = Kokkos::min(KStart, MinLayerEdgeBot(JEdge));
+         const I4 KMinEdge = Kokkos::max(KStart, MinLayerEdgeBot(JEdge));
          const I4 KMaxEdge =
-             Kokkos::max(KStart + KLen, MaxLayerEdgeTop(JEdge) + 1);
+             Kokkos::min(KStart + KLen, MaxLayerEdgeTop(JEdge) + 1);
 
          for (int K = KMinEdge; K < KMaxEdge; ++K) {
             const int KVec        = K - KStart;
