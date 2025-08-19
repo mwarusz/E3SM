@@ -92,9 +92,12 @@ template <class F, int Rank> struct LinearIdxWrapper : F {
 
    LinearIdxWrapper(F &&Functor, const int (&Bounds)[Rank])
        : F(std::move(Functor)) {
-      Strides[Rank - 2] = Bounds[Rank - 1];
-      for (int I = Rank - 3; I >= 0; --I) {
-         Strides[I] = Bounds[I + 1] * Strides[I + 1];
+
+      if constexpr (Rank > 1) {
+         Strides[Rank - 2] = Bounds[Rank - 1];
+         for (int I = Rank - 3; I >= 0; --I) {
+            Strides[I] = Bounds[I + 1] * Strides[I + 1];
+         }
       }
    }
 
