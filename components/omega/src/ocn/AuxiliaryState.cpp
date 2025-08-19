@@ -17,14 +17,15 @@ static std::string stripDefault(const std::string &Name) {
 // Constructor. Constructs the member auxiliary variables and registers their
 // fields with IOStreams
 AuxiliaryState::AuxiliaryState(const std::string &Name, const HorzMesh *Mesh,
-                               Halo *MeshHalo, int NVertLevels, int NTracers)
-    : Mesh(Mesh), MeshHalo(MeshHalo), Name(stripDefault(Name)),
-      KineticAux(stripDefault(Name), Mesh, NVertLevels),
-      LayerThicknessAux(stripDefault(Name), Mesh, NVertLevels),
-      VorticityAux(stripDefault(Name), Mesh, NVertLevels),
-      VelocityDel2Aux(stripDefault(Name), Mesh, NVertLevels),
+                               const VertCoord *VCoord, Halo *MeshHalo,
+                               int NVertLayers, int NTracers)
+    : Mesh(Mesh), VCoord(VCoord), MeshHalo(MeshHalo), Name(stripDefault(Name)),
+      KineticAux(stripDefault(Name), Mesh, VCoord, NVertLayers),
+      LayerThicknessAux(stripDefault(Name), Mesh, VCoord, NVertLayers),
+      VorticityAux(stripDefault(Name), Mesh, VCoord, NVertLayers),
+      VelocityDel2Aux(stripDefault(Name), Mesh, VCoord, NVertLayers),
       WindForcingAux(stripDefault(Name), Mesh),
-      TracerAux(stripDefault(Name), Mesh, NVertLevels, NTracers) {
+      TracerAux(stripDefault(Name), Mesh, VCoord, NVertLayers, NTracers) {
 
    GroupName = "AuxiliaryState";
    if (Name != "Default") {
@@ -65,8 +66,8 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    State->getLayerThickness(LayerThickCell, ThickTimeLevel);
    State->getNormalVelocity(NormalVelEdge, VelTimeLevel);
 
-   const int NVertLevels = LayerThickCell.extent_int(1);
-   const int NChunks     = NVertLevels / VecLength;
+   const int NVertLayers = LayerThickCell.extent_int(1);
+   //   const int NChunks     = NVertLayers / VecLength;
 
    OMEGA_SCOPE(LocKineticAux, KineticAux);
    OMEGA_SCOPE(LocLayerThicknessAux, LayerThicknessAux);
@@ -74,18 +75,49 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    OMEGA_SCOPE(LocVelocityDel2Aux, VelocityDel2Aux);
    OMEGA_SCOPE(LocWindForcingAux, WindForcingAux);
 
-   parallelFor(
-       "vertexAuxState1", {Mesh->NVerticesAll, NChunks},
-       KOKKOS_LAMBDA(int IVertex, int KChunk) {
-          LocVorticityAux.computeVarsOnVertex(IVertex, KChunk, LayerThickCell,
-                                              NormalVelEdge);
+   const Array1DI4 &MinLyrCell      = VCoord->MinLayerCell;
+   const Array1DI4 &MaxLyrCell      = VCoord->MaxLayerCell;
+   const Array1DI4 &MinLyrEdgeBot   = VCoord->MinLayerEdgeBot;
+   const Array1DI4 &MaxLyrEdgeTop   = VCoord->MaxLayerEdgeTop;
+   const Array1DI4 &MinLyrVertexBot = VCoord->MinLayerVertexBot;
+   const Array1DI4 &MaxLyrVertexTop = VCoord->MaxLayerVertexTop;
+
+   Kokkos::parallel_for(
+       TeamPolicy(Mesh->NVerticesAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const int IVertex = Team.league_rank();
+          const int NChunks =
+              computeNChunks(MinLyrVertexBot, MaxLyrVertexTop, IVertex);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                 LocVorticityAux.computeVarsOnVertex(
+                     IVertex, KChunk, LayerThickCell, NormalVelEdge);
+              });
+       });
+   //   parallelFor(
+   //       "vertexAuxState1", {Mesh->NVerticesAll, NChunks},
+   //       KOKKOS_LAMBDA(int IVertex, int KChunk) {
+   //          LocVorticityAux.computeVarsOnVertex(IVertex, KChunk,
+   //          LayerThickCell,
+   //                                              NormalVelEdge);
+   //       });
+
+   Kokkos::parallel_for(
+       TeamPolicy(Mesh->NCellsAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const I4 ICell   = Team.league_rank();
+          const I4 NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                 LocKineticAux.computeVarsOnCell(ICell, KChunk, NormalVelEdge);
+              });
        });
 
-   parallelFor(
-       "cellAuxState1", {Mesh->NCellsAll, NChunks},
-       KOKKOS_LAMBDA(int ICell, int KChunk) {
-          LocKineticAux.computeVarsOnCell(ICell, KChunk, NormalVelEdge);
-       });
+   //   parallelFor(
+   //       "cellAuxState1", {Mesh->NCellsAll, NChunks},
+   //       KOKKOS_LAMBDA(int ICell, int KChunk) {
+   //          LocKineticAux.computeVarsOnCell(ICell, KChunk, NormalVelEdge);
+   //       });
 
    const auto &VelocityDivCell = KineticAux.VelocityDivCell;
    const auto &RelVortVertex   = VorticityAux.RelVortVertex;
@@ -95,34 +127,87 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
           LocWindForcingAux.computeVarsOnEdge(IEdge);
        });
 
-   parallelFor(
-       "edgeAuxState2", {Mesh->NEdgesAll, NChunks},
-       KOKKOS_LAMBDA(int IEdge, int KChunk) {
-          LocVorticityAux.computeVarsOnEdge(IEdge, KChunk);
-          LocLayerThicknessAux.computeVarsOnEdge(IEdge, KChunk, LayerThickCell,
-                                                 NormalVelEdge);
-          LocVelocityDel2Aux.computeVarsOnEdge(IEdge, KChunk, VelocityDivCell,
-                                               RelVortVertex);
+   Kokkos::parallel_for(
+       TeamPolicy(Mesh->NEdgesAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const I4 IEdge = Team.league_rank();
+          const I4 NChunks =
+              computeNChunks(MinLyrEdgeBot, MaxLyrEdgeTop, IEdge);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                 LocVorticityAux.computeVarsOnEdge(IEdge, KChunk);
+                 LocLayerThicknessAux.computeVarsOnEdge(
+                     IEdge, KChunk, LayerThickCell, NormalVelEdge);
+                 LocVelocityDel2Aux.computeVarsOnEdge(
+                     IEdge, KChunk, VelocityDivCell, RelVortVertex);
+              });
        });
 
-   parallelFor(
-       "vertexAuxState2", {Mesh->NVerticesAll, NChunks},
-       KOKKOS_LAMBDA(int IVertex, int KChunk) {
-          LocVelocityDel2Aux.computeVarsOnVertex(IVertex, KChunk);
+   //   parallelFor(
+   //       "edgeAuxState2", {Mesh->NEdgesAll, NChunks},
+   //       KOKKOS_LAMBDA(int IEdge, int KChunk) {
+   //          LocVorticityAux.computeVarsOnEdge(IEdge, KChunk);
+   //          LocLayerThicknessAux.computeVarsOnEdge(IEdge, KChunk,
+   //          LayerThickCell,
+   //                                                 NormalVelEdge);
+   //          LocVelocityDel2Aux.computeVarsOnEdge(IEdge, KChunk,
+   //          VelocityDivCell,
+   //                                               RelVortVertex);
+   //       });
+
+   Kokkos::parallel_for(
+       TeamPolicy(Mesh->NVerticesAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const int IVertex = Team.league_rank();
+          const int NChunks =
+              computeNChunks(MinLyrVertexBot, MaxLyrVertexTop, IVertex);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                 LocVelocityDel2Aux.computeVarsOnVertex(IVertex, KChunk);
+              });
        });
 
-   parallelFor(
-       "cellAuxState2", {Mesh->NCellsAll, NChunks},
-       KOKKOS_LAMBDA(int ICell, int KChunk) {
-          LocVelocityDel2Aux.computeVarsOnCell(ICell, KChunk);
+   //   parallelFor(
+   //       "vertexAuxState2", {Mesh->NVerticesAll, NChunks},
+   //       KOKKOS_LAMBDA(int IVertex, int KChunk) {
+   //          LocVelocityDel2Aux.computeVarsOnVertex(IVertex, KChunk);
+   //       });
+
+   Kokkos::parallel_for(
+       TeamPolicy(Mesh->NCellsAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const I4 ICell   = Team.league_rank();
+          const I4 NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                 LocVelocityDel2Aux.computeVarsOnCell(ICell, KChunk);
+              });
        });
 
-   parallelFor(
-       "cellAuxState3", {Mesh->NCellsAll, NChunks},
-       KOKKOS_LAMBDA(int ICell, int KChunk) {
-          LocLayerThicknessAux.computeVarsOnCells(ICell, KChunk,
-                                                  LayerThickCell);
+   //   parallelFor(
+   //       "cellAuxState2", {Mesh->NCellsAll, NChunks},
+   //       KOKKOS_LAMBDA(int ICell, int KChunk) {
+   //          LocVelocityDel2Aux.computeVarsOnCell(ICell, KChunk);
+   //       });
+
+   Kokkos::parallel_for(
+       TeamPolicy(Mesh->NCellsAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const I4 ICell   = Team.league_rank();
+          const I4 NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
+          Kokkos::parallel_for(Kokkos::TeamThreadRange(Team, NChunks),
+                               [=](const int KChunk) {
+                                  LocLayerThicknessAux.computeVarsOnCells(
+                                      ICell, KChunk, LayerThickCell);
+                               });
        });
+
+   //   parallelFor(
+   //       "cellAuxState3", {Mesh->NCellsAll, NChunks},
+   //       KOKKOS_LAMBDA(int ICell, int KChunk) {
+   //          LocLayerThicknessAux.computeVarsOnCells(ICell, KChunk,
+   //                                                  LayerThickCell);
+   //       });
 }
 
 // Compute the auxiliary variables
@@ -134,29 +219,69 @@ void AuxiliaryState::computeAll(const OceanState *State,
    State->getLayerThickness(LayerThickCell, ThickTimeLevel);
    State->getNormalVelocity(NormalVelEdge, VelTimeLevel);
 
-   const int NVertLevels = LayerThickCell.extent_int(1);
-   const int NChunks     = NVertLevels / VecLength;
-   const int NTracers    = TracerArray.extent_int(0);
+   const int NVertLayers = LayerThickCell.extent_int(1);
+   //   const int NChunks     = NVertLayers / VecLength;
+   const int NTracers = TracerArray.extent_int(0);
+
+   const Array1DI4 &MinLyrCell    = VCoord->MinLayerCell;
+   const Array1DI4 &MaxLyrCell    = VCoord->MaxLayerCell;
+   const Array1DI4 &MinLyrEdgeBot = VCoord->MinLayerEdgeBot;
+   const Array1DI4 &MaxLyrEdgeTop = VCoord->MaxLayerEdgeTop;
+   OMEGA_SCOPE(LocNEdgesAll, Mesh->NEdgesAll);
+   OMEGA_SCOPE(LocNCellsAll, Mesh->NCellsAll);
 
    OMEGA_SCOPE(LocTracerAux, TracerAux);
 
    computeMomAux(State, ThickTimeLevel, VelTimeLevel);
 
-   parallelFor(
-       "edgeAuxState4", {NTracers, Mesh->NEdgesAll, NChunks},
-       KOKKOS_LAMBDA(int LTracer, int IEdge, int KChunk) {
-          LocTracerAux.computeVarsOnEdge(LTracer, IEdge, KChunk, NormalVelEdge,
-                                         LayerThickCell, TracerArray);
+   Kokkos::parallel_for(
+       TeamPolicy(NTracers * LocNEdgesAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const int Iter    = Team.league_rank();
+          const int LTracer = Iter / LocNEdgesAll;
+          const int IEdge   = Iter % LocNEdgesAll;
+
+          const int NChunks =
+              computeNChunks(MinLyrEdgeBot, MaxLyrEdgeTop, IEdge);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                 LocTracerAux.computeVarsOnEdge(LTracer, IEdge, KChunk,
+                                                NormalVelEdge, LayerThickCell,
+                                                TracerArray);
+              });
        });
+
+   //   parallelFor(
+   //       "edgeAuxState4", {NTracers, Mesh->NEdgesAll, NChunks},
+   //       KOKKOS_LAMBDA(int LTracer, int IEdge, int KChunk) {
+   //          LocTracerAux.computeVarsOnEdge(LTracer, IEdge, KChunk,
+   //          NormalVelEdge,
+   //                                         LayerThickCell, TracerArray);
+   //       });
 
    const auto &MeanLayerThickEdge = LayerThicknessAux.MeanLayerThickEdge;
 
-   parallelFor(
-       "cellAuxState4", {NTracers, Mesh->NCellsAll, NChunks},
-       KOKKOS_LAMBDA(int LTracer, int ICell, int KChunk) {
-          LocTracerAux.computeVarsOnCells(LTracer, ICell, KChunk,
-                                          MeanLayerThickEdge, TracerArray);
+   Kokkos::parallel_for(
+       TeamPolicy(NTracers * LocNCellsAll, OMEGA_TEAMSIZE),
+       KOKKOS_LAMBDA(const TeamMember &Team) {
+          const int Iter    = Team.league_rank();
+          const int LTracer = Iter / LocNCellsAll;
+          const int ICell   = Iter % LocNCellsAll;
+
+          const int NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
+                 LocTracerAux.computeVarsOnCells(
+                     LTracer, ICell, KChunk, MeanLayerThickEdge, TracerArray);
+              });
        });
+
+   //   parallelFor(
+   //       "cellAuxState4", {NTracers, Mesh->NCellsAll, NChunks},
+   //       KOKKOS_LAMBDA(int LTracer, int ICell, int KChunk) {
+   //          LocTracerAux.computeVarsOnCells(LTracer, ICell, KChunk,
+   //                                          MeanLayerThickEdge, TracerArray);
+   //       });
 }
 
 void AuxiliaryState::computeAll(const OceanState *State,
@@ -167,8 +292,9 @@ void AuxiliaryState::computeAll(const OceanState *State,
 
 // Create a non-default auxiliary state
 AuxiliaryState *AuxiliaryState::create(const std::string &Name,
-                                       const HorzMesh *Mesh, Halo *MeshHalo,
-                                       int NVertLevels, const int NTracers) {
+                                       const HorzMesh *Mesh,
+                                       const VertCoord *VCoord, Halo *MeshHalo,
+                                       int NVertLayers, const int NTracers) {
    if (AllAuxStates.find(Name) != AllAuxStates.end()) {
       LOG_ERROR("Attempted to create a new AuxiliaryState with name {} but it "
                 "already exists",
@@ -177,23 +303,24 @@ AuxiliaryState *AuxiliaryState::create(const std::string &Name,
    }
 
    auto *NewAuxState =
-       new AuxiliaryState(Name, Mesh, MeshHalo, NVertLevels, NTracers);
+       new AuxiliaryState(Name, Mesh, VCoord, MeshHalo, NVertLayers, NTracers);
    AllAuxStates.emplace(Name, NewAuxState);
 
    return NewAuxState;
 }
 
-// Create the default auxiliary state. Assumes that HorzMesh has been
-// initialized.
+// Create the default auxiliary state. Assumes that HorzMesh, VertCoord and
+// Halo have been initialized.
 void AuxiliaryState::init() {
-   const HorzMesh *DefMesh = HorzMesh::getDefault();
-   Halo *DefHalo           = Halo::getDefault();
+   const HorzMesh *DefMesh       = HorzMesh::getDefault();
+   const VertCoord *DefVertCoord = VertCoord::getDefault();
+   Halo *DefHalo                 = Halo::getDefault();
 
-   int NVertLevels = DefMesh->NVertLevels;
+   int NVertLayers = VertCoord::getDefault()->NVertLayers;
    int NTracers    = Tracers::getNumTracers();
 
    AuxiliaryState::DefaultAuxState = AuxiliaryState::create(
-       "Default", DefMesh, DefHalo, NVertLevels, NTracers);
+       "Default", DefMesh, DefVertCoord, DefHalo, NVertLayers, NTracers);
 
    Config *OmegaConfig = Config::getOmegaConfig();
    DefaultAuxState->readConfigOptions(OmegaConfig);

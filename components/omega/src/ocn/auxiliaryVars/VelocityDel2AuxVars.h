@@ -4,6 +4,7 @@
 #include "DataTypes.h"
 #include "HorzMesh.h"
 #include "OmegaKokkos.h"
+#include "VertCoord.h"
 
 #include <string>
 
@@ -16,12 +17,15 @@ class VelocityDel2AuxVars {
    Array2DReal Del2RelVortVertex;
 
    VelocityDel2AuxVars(const std::string &AuxStateSuffix, const HorzMesh *Mesh,
-                       int NVertLevels);
+                       const VertCoord *VCoord, int NVertLayers);
 
    KOKKOS_FUNCTION void
    computeVarsOnEdge(int IEdge, int KChunk, const Array2DReal &VelocityDivCell,
                      const Array2DReal &RelVortVertex) const {
-      const int KStart = KChunk * VecLength;
+      //      const int KStart = KChunk * VecLength;
+      I4 KStart, KLen;
+      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
+                    KLen);
 
       const int JCell0   = CellsOnEdge(IEdge, 0);
       const int JCell1   = CellsOnEdge(IEdge, 1);
@@ -32,7 +36,7 @@ class VelocityDel2AuxVars {
       const Real InvDvEdge =
           1._Real / Kokkos::max(DvEdge(IEdge), 0.25_Real * DcEdge(IEdge));
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K = KStart + KVec;
          const Real GradDiv =
              (VelocityDivCell(JCell1, K) - VelocityDivCell(JCell0, K)) *
@@ -46,35 +50,47 @@ class VelocityDel2AuxVars {
 
    KOKKOS_FUNCTION void computeVarsOnCell(int ICell, int KChunk) const {
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
-      const int KStart       = KChunk * VecLength;
+      //      const int KStart       = KChunk * VecLength;
+      I4 KStart, KLen;
+      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
 
       Real Del2DivCellTmp[VecLength] = {0};
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const int JEdge     = EdgesOnCell(ICell, J);
          const Real AreaEdge = 0.5_Real * DvEdge(JEdge) * DcEdge(JEdge);
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
+         //         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         //            const int K = KStart + KVec;
+
+         const I4 KMinEdge = Kokkos::max(KStart, MinLayerEdgeBot(JEdge));
+         const I4 KMaxEdge =
+             Kokkos::min(KStart + KLen, MaxLayerEdgeTop(JEdge) + 1);
+
+         for (int K = KMinEdge; K < KMaxEdge; ++K) {
+            const int KVec = K - KStart;
             Del2DivCellTmp[KVec] -= DvEdge(JEdge) * InvAreaCell *
                                     EdgeSignOnCell(ICell, J) *
                                     Del2Edge(JEdge, K);
          }
       }
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K           = KStart + KVec;
          Del2DivCell(ICell, K) = Del2DivCellTmp[KVec];
       }
    }
 
    KOKKOS_FUNCTION void computeVarsOnVertex(int IVertex, int KChunk) const {
-      const int KStart           = KChunk * VecLength;
+      //      const int KStart           = KChunk * VecLength;
       const Real InvAreaTriangle = 1._Real / AreaTriangle(IVertex);
 
       Real Del2RelVortVertexTmp[VecLength] = {0};
+      I4 KStart, KLen;
+      computeKRange(MinLayerVertexBot, MaxLayerVertexTop, IVertex, KChunk,
+                    KStart, KLen);
 
       for (int J = 0; J < VertexDegree; ++J) {
          const int JEdge = EdgesOnVertex(IVertex, J);
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
             const int K = KStart + KVec;
             Del2RelVortVertexTmp[KVec] += InvAreaTriangle * DcEdge(JEdge) *
                                           EdgeSignOnVertex(IVertex, J) *
@@ -82,7 +98,7 @@ class VelocityDel2AuxVars {
          }
       }
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K                   = KStart + KVec;
          Del2RelVortVertex(IVertex, K) = Del2RelVortVertexTmp[KVec];
       }
@@ -93,6 +109,12 @@ class VelocityDel2AuxVars {
    void unregisterFields() const;
 
  private:
+   Array1DI4 MinLayerCell;
+   Array1DI4 MaxLayerCell;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
+   Array1DI4 MinLayerVertexBot;
+   Array1DI4 MaxLayerVertexTop;
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DReal EdgeSignOnCell;

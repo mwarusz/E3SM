@@ -26,6 +26,7 @@
 #include "OceanTestCommon.h"
 #include "OmegaKokkos.h"
 #include "Pacer.h"
+#include "VertCoord.h"
 #include "mpi.h"
 
 #include <cmath>
@@ -332,26 +333,26 @@ constexpr char DefaultMeshFile[] = "OmegaSphereMesh.nc";
 using TestSetup                  = TestSetupSphere;
 #endif
 
-int testThickFluxDiv(int NVertLevels, Real RTol) {
+int testThickFluxDiv(int NVertLayers, Real RTol) {
 
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
-
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
    // Compute exact result
    Array2DReal ExactThickFluxDiv("ExactThickFluxDiv", Mesh->NCellsOwned,
-                                 NVertLevels);
+                                 NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return -Setup.divergence(X, Y); },
        ExactThickFluxDiv, Geom, Mesh, OnCell, ExchangeHalos::No);
 
    // Set input array
-   Array2DReal ThickFluxEdge("ThickFluxEdge", Mesh->NEdgesSize, NVertLevels);
+   Array2DReal ThickFluxEdge("ThickFluxEdge", Mesh->NEdgesSize, NVertLayers);
 
    // TODO(mwarusz) temporary fix for this test
-   Array2DReal OnesEdge("OnesEdge", Mesh->NEdgesSize, NVertLevels);
+   Array2DReal OnesEdge("OnesEdge", Mesh->NEdgesSize, NVertLayers);
    deepCopy(OnesEdge, 1);
 
    Err += setVectorEdge(
@@ -363,11 +364,11 @@ int testThickFluxDiv(int NVertLevels, Real RTol) {
 
    // Compute numerical result
    Array2DReal NumThickFluxDiv("NumThickFluxDiv", Mesh->NCellsOwned,
-                               NVertLevels);
-   ThicknessFluxDivOnCell ThickFluxDivOnC(Mesh);
+                               NVertLayers);
+   ThicknessFluxDivOnCell ThickFluxDivOnC(Mesh, VCoord);
    parallelFor(
-       {Mesh->NCellsOwned, NVertLevels}, KOKKOS_LAMBDA(int ICell, int KLevel) {
-          ThickFluxDivOnC(NumThickFluxDiv, ICell, KLevel, OnesEdge,
+       {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int KLayer) {
+          ThickFluxDivOnC(NumThickFluxDiv, ICell, KLayer, OnesEdge,
                           ThickFluxEdge);
        });
 
@@ -387,16 +388,17 @@ int testThickFluxDiv(int NVertLevels, Real RTol) {
    return Err;
 } // end testThickFluxDiv
 
-int testPotVortHAdv(int NVertLevels, Real RTol) {
+int testPotVortHAdv(int NVertLayers, Real RTol) {
 
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array2DReal ExactPotVortHAdv("ExactPotVortHAdv", Mesh->NEdgesOwned,
-                                NVertLevels);
+                                NVertLayers);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -410,25 +412,25 @@ int testPotVortHAdv(int NVertLevels, Real RTol) {
 
    // Set input arrays
    Array2DReal NormRelVortEdge("NormRelVortEdge", Mesh->NEdgesSize,
-                               NVertLevels);
+                               NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.normRelVort(X, Y); },
        NormRelVortEdge, Geom, Mesh, OnEdge);
 
    Array2DReal NormPlanetVortEdge("NormPlanetVortEdge", Mesh->NEdgesSize,
-                                  NVertLevels);
+                                  NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.normPlanetVort(X, Y); },
        NormPlanetVortEdge, Geom, Mesh, OnEdge);
 
-   Array2DReal LayerThickEdge("LayerThickEdge", Mesh->NEdgesSize, NVertLevels);
+   Array2DReal LayerThickEdge("LayerThickEdge", Mesh->NEdgesSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.layerThick(X, Y); },
        LayerThickEdge, Geom, Mesh, OnEdge);
 
-   Array2DReal NormVelEdge("NormVelEdge", Mesh->NEdgesSize, NVertLevels);
+   Array2DReal NormVelEdge("NormVelEdge", Mesh->NEdgesSize, NVertLayers);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -438,12 +440,12 @@ int testPotVortHAdv(int NVertLevels, Real RTol) {
        NormVelEdge, EdgeComponent::Normal, Geom, Mesh);
 
    // Compute numerical result
-   Array2DReal NumPotVortHAdv("NumPotVortHAdv", Mesh->NEdgesOwned, NVertLevels);
+   Array2DReal NumPotVortHAdv("NumPotVortHAdv", Mesh->NEdgesOwned, NVertLayers);
 
-   PotentialVortHAdvOnEdge PotVortHAdvOnE(Mesh);
+   PotentialVortHAdvOnEdge PotVortHAdvOnE(Mesh, VCoord);
    parallelFor(
-       {Mesh->NEdgesOwned, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int KLevel) {
-          PotVortHAdvOnE(NumPotVortHAdv, IEdge, KLevel, NormRelVortEdge,
+       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
+          PotVortHAdvOnE(NumPotVortHAdv, IEdge, KLayer, NormRelVortEdge,
                          NormPlanetVortEdge, LayerThickEdge, NormVelEdge);
        });
 
@@ -463,15 +465,16 @@ int testPotVortHAdv(int NVertLevels, Real RTol) {
    return Err;
 } // end testPotVortHAdv
 
-int testKEGrad(int NVertLevels, Real RTol) {
+int testKEGrad(int NVertLayers, Real RTol) {
 
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
-   Array2DReal ExactKEGrad("ExactKEGrad", Mesh->NEdgesOwned, NVertLevels);
+   Array2DReal ExactKEGrad("ExactKEGrad", Mesh->NEdgesOwned, NVertLayers);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -481,19 +484,19 @@ int testKEGrad(int NVertLevels, Real RTol) {
        ExactKEGrad, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::No);
 
    // Set input array
-   Array2DReal KECell("KECell", Mesh->NCellsSize, NVertLevels);
+   Array2DReal KECell("KECell", Mesh->NCellsSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.scalar(X, Y); }, KECell,
        Geom, Mesh, OnCell);
 
    // Compute numerical result
-   Array2DReal NumKEGrad("NumKEGrad", Mesh->NEdgesOwned, NVertLevels);
+   Array2DReal NumKEGrad("NumKEGrad", Mesh->NEdgesOwned, NVertLayers);
 
-   KEGradOnEdge KEGradOnE(Mesh);
+   KEGradOnEdge KEGradOnE(Mesh, VCoord);
    parallelFor(
-       {Mesh->NEdgesOwned, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int KLevel) {
-          KEGradOnE(NumKEGrad, IEdge, KLevel, KECell);
+       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
+          KEGradOnE(NumKEGrad, IEdge, KLayer, KECell);
        });
 
    // Compute errors
@@ -511,15 +514,16 @@ int testKEGrad(int NVertLevels, Real RTol) {
    return Err;
 } // end testKEGrad
 
-int testSSHGrad(int NVertLevels, Real RTol) {
+int testSSHGrad(int NVertLayers, Real RTol) {
 
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
-   Array2DReal ExactSSHGrad("ExactSSHGrad", Mesh->NEdgesOwned, NVertLevels);
+   Array2DReal ExactSSHGrad("ExactSSHGrad", Mesh->NEdgesOwned, NVertLayers);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -529,19 +533,19 @@ int testSSHGrad(int NVertLevels, Real RTol) {
        ExactSSHGrad, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::No);
 
    // Set input array
-   Array2DReal SSHCell("SSHCell", Mesh->NCellsSize, NVertLevels);
+   Array2DReal SSHCell("SSHCell", Mesh->NCellsSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.scalar(X, Y); }, SSHCell,
        Geom, Mesh, OnCell);
 
    // Compute numerical result
-   Array2DReal NumSSHGrad("NumSSHGrad", Mesh->NEdgesOwned, NVertLevels);
+   Array2DReal NumSSHGrad("NumSSHGrad", Mesh->NEdgesOwned, NVertLayers);
 
-   SSHGradOnEdge SSHGradOnE(Mesh);
+   SSHGradOnEdge SSHGradOnE(Mesh, VCoord);
    parallelFor(
-       {Mesh->NEdgesOwned, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int KLevel) {
-          SSHGradOnE(NumSSHGrad, IEdge, KLevel, SSHCell);
+       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
+          SSHGradOnE(NumSSHGrad, IEdge, KLayer, SSHCell);
        });
 
    // Compute errors
@@ -555,27 +559,28 @@ int testSSHGrad(int NVertLevels, Real RTol) {
    return Err;
 } // end testSSHGrad
 
-int testVelDiff(int NVertLevels, Real RTol) {
+int testVelDiff(int NVertLayers, Real RTol) {
 
    int Err = 0;
    Error Err1;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    Config *OmegaConfig = Config::getOmegaConfig();
    Config TendConfig("Tendencies");
    Err1 += OmegaConfig->get(TendConfig);
    CHECK_ERROR_ABORT(Err1, "Tendencies: Tendencies group not found in Config");
 
-   VelocityDiffusionOnEdge VelDiffOnE(Mesh);
+   VelocityDiffusionOnEdge VelDiffOnE(Mesh, VCoord);
    Err1 += TendConfig.get("ViscDel2", VelDiffOnE.ViscDel2);
    CHECK_ERROR_ABORT(Err1, "Tendencies: ViscDel2 not found in TendConfig");
 
    const Real ViscDel2 = VelDiffOnE.ViscDel2;
 
    // Compute exact result
-   Array2DReal ExactVelDiff("ExactVelDiff", Mesh->NEdgesOwned, NVertLevels);
+   Array2DReal ExactVelDiff("ExactVelDiff", Mesh->NEdgesOwned, NVertLayers);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -585,24 +590,24 @@ int testVelDiff(int NVertLevels, Real RTol) {
        ExactVelDiff, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::No);
 
    // Set input arrays
-   Array2DReal DivCell("DivCell", Mesh->NCellsSize, NVertLevels);
+   Array2DReal DivCell("DivCell", Mesh->NCellsSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.divergence(X, Y); },
        DivCell, Geom, Mesh, OnCell);
 
-   Array2DReal RVortVertex("RVortVertex", Mesh->NVerticesSize, NVertLevels);
+   Array2DReal RVortVertex("RVortVertex", Mesh->NVerticesSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.curl(X, Y); }, RVortVertex,
        Geom, Mesh, OnVertex);
 
    // Compute numerical result
-   Array2DReal NumVelDiff("NumVelDiff", Mesh->NEdgesOwned, NVertLevels);
+   Array2DReal NumVelDiff("NumVelDiff", Mesh->NEdgesOwned, NVertLayers);
 
    parallelFor(
-       {Mesh->NEdgesOwned, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int KLevel) {
-          VelDiffOnE(NumVelDiff, IEdge, KLevel, DivCell, RVortVertex);
+       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
+          VelDiffOnE(NumVelDiff, IEdge, KLayer, DivCell, RVortVertex);
        });
 
    // Compute errors
@@ -620,20 +625,21 @@ int testVelDiff(int NVertLevels, Real RTol) {
    return Err;
 } // end testVelDiff
 
-int testVelHyperDiff(int NVertLevels, Real RTol) {
+int testVelHyperDiff(int NVertLayers, Real RTol) {
 
    int Err = 0;
    Error Err1;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    Config *OmegaConfig = Config::getOmegaConfig();
    Config TendConfig("Tendencies");
    Err1 += OmegaConfig->get(TendConfig);
    CHECK_ERROR_ABORT(Err1, "Tendencies: Tendencies group not found in Config");
 
-   VelocityHyperDiffOnEdge VelHyperDiffOnE(Mesh);
+   VelocityHyperDiffOnEdge VelHyperDiffOnE(Mesh, VCoord);
    Err1 += TendConfig.get("ViscDel4", VelHyperDiffOnE.ViscDel4);
    CHECK_ERROR_ABORT(Err1, "Tendencies: ViscDel4 not found in TendConfig");
 
@@ -644,7 +650,7 @@ int testVelHyperDiff(int NVertLevels, Real RTol) {
 
    // Compute exact result
    Array2DReal ExactVelHyperDiff("ExactVelHyperDiff", Mesh->NEdgesOwned,
-                                 NVertLevels);
+                                 NVertLayers);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -654,13 +660,13 @@ int testVelHyperDiff(int NVertLevels, Real RTol) {
        ExactVelHyperDiff, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::No);
 
    // Set input arrays
-   Array2DReal DivCell("DivCell", Mesh->NCellsSize, NVertLevels);
+   Array2DReal DivCell("DivCell", Mesh->NCellsSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.divergence(X, Y); },
        DivCell, Geom, Mesh, OnCell);
 
-   Array2DReal RVortVertex("RVortVertex", Mesh->NVerticesSize, NVertLevels);
+   Array2DReal RVortVertex("RVortVertex", Mesh->NVerticesSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.curl(X, Y); }, RVortVertex,
@@ -668,11 +674,11 @@ int testVelHyperDiff(int NVertLevels, Real RTol) {
 
    // Compute numerical result
    Array2DReal NumVelHyperDiff("NumVelHyperDiff", Mesh->NEdgesOwned,
-                               NVertLevels);
+                               NVertLayers);
 
    parallelFor(
-       {Mesh->NEdgesOwned, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int KLevel) {
-          VelHyperDiffOnE(NumVelHyperDiff, IEdge, KLevel, DivCell, RVortVertex);
+       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
+          VelHyperDiffOnE(NumVelHyperDiff, IEdge, KLayer, DivCell, RVortVertex);
        });
 
    // Compute errors
@@ -691,7 +697,7 @@ int testVelHyperDiff(int NVertLevels, Real RTol) {
    return Err;
 } // end testVelHyperDiff
 
-int testWindForcing(int NVertLevels) {
+int testWindForcing(int NVertLayers) {
 
    int Err = 0;
    TestSetup Setup;
@@ -702,9 +708,9 @@ int testWindForcing(int NVertLevels) {
 
    // Compute exact result
    Array2DReal ExactWindForcing("ExactWindForcing", Mesh->NEdgesOwned,
-                                NVertLevels);
+                                NVertLayers);
 
-   // Note: this computes wind forcing at every level
+   // Note: this computes wind forcing at every layer
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
           VecField[0] = Setup.windForcingX(X, Y, SaltWaterDensity);
@@ -714,7 +720,7 @@ int testWindForcing(int NVertLevels) {
 
    // Reset wind forcing to zero below the surface
    deepCopy(Kokkos::subview(ExactWindForcing, Kokkos::ALL,
-                            Kokkos::make_pair(1, NVertLevels)),
+                            Kokkos::make_pair(1, NVertLayers)),
             0);
 
    // Set input arrays
@@ -727,21 +733,21 @@ int testWindForcing(int NVertLevels) {
        },
        NormalStressEdge, EdgeComponent::Normal, Geom, Mesh);
 
-   Array2DReal LayerThickEdge("LayerThickEdge", Mesh->NEdgesSize, NVertLevels);
+   Array2DReal LayerThickEdge("LayerThickEdge", Mesh->NEdgesSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.scalarB(X, Y); },
        LayerThickEdge, Geom, Mesh, OnEdge);
 
    // Compute numerical result
-   Array2DReal NumWindForcing("NumWindForcing", Mesh->NEdgesOwned, NVertLevels);
+   Array2DReal NumWindForcing("NumWindForcing", Mesh->NEdgesOwned, NVertLayers);
 
    WindForcingOnEdge WindForcingOnE(Mesh);
    WindForcingOnE.SaltWaterDensity = SaltWaterDensity;
 
    parallelFor(
-       {Mesh->NEdgesOwned, NVertLevels}, KOKKOS_LAMBDA(int IEdge, int KLevel) {
-          WindForcingOnE(NumWindForcing, IEdge, KLevel, NormalStressEdge,
+       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
+          WindForcingOnE(NumWindForcing, IEdge, KLayer, NormalStressEdge,
                          LayerThickEdge);
        });
 
@@ -759,20 +765,21 @@ int testWindForcing(int NVertLevels) {
    return Err;
 } // end testWindForcing
 
-int testBottomDrag(int NVertLevels, Real RTol) {
+int testBottomDrag(int NVertLayers, Real RTol) {
 
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    const Real Coeff = 1.123456789;
 
    // Compute exact result
    Array2DReal ExactBottomDrag("ExactBottomDrag", Mesh->NEdgesOwned,
-                               NVertLevels);
+                               NVertLayers);
 
-   // Note: this computes bottom drag at every level
+   // Note: this computes bottom drag at every layer
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
           VecField[0] = Setup.bottomDragX(X, Y, Coeff);
@@ -780,13 +787,13 @@ int testBottomDrag(int NVertLevels, Real RTol) {
        },
        ExactBottomDrag, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::No);
 
-   // Reset bottom drag to zero above the lowest level
+   // Reset bottom drag to zero above the lowest layer
    deepCopy(Kokkos::subview(ExactBottomDrag, Kokkos::ALL,
-                            Kokkos::make_pair(0, NVertLevels - 1)),
+                            Kokkos::make_pair(0, NVertLayers - 1)),
             0);
 
    // Set input arrays
-   Array2DReal NormalVelEdge("NormalVelEdge", Mesh->NEdgesSize, NVertLevels);
+   Array2DReal NormalVelEdge("NormalVelEdge", Mesh->NEdgesSize, NVertLayers);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -795,7 +802,7 @@ int testBottomDrag(int NVertLevels, Real RTol) {
        },
        NormalVelEdge, EdgeComponent::Normal, Geom, Mesh);
 
-   Array2DReal KECell("KECell", Mesh->NCellsSize, NVertLevels);
+   Array2DReal KECell("KECell", Mesh->NCellsSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) {
@@ -803,16 +810,16 @@ int testBottomDrag(int NVertLevels, Real RTol) {
        },
        KECell, Geom, Mesh, OnCell);
 
-   Array2DReal LayerThickEdge("LayerThickEdge", Mesh->NEdgesSize, NVertLevels);
+   Array2DReal LayerThickEdge("LayerThickEdge", Mesh->NEdgesSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.scalarB(X, Y); },
        LayerThickEdge, Geom, Mesh, OnEdge);
 
    // Compute numerical result
-   Array2DReal NumBottomDrag("NumBottomDrag", Mesh->NEdgesOwned, NVertLevels);
+   Array2DReal NumBottomDrag("NumBottomDrag", Mesh->NEdgesOwned, NVertLayers);
 
-   BottomDragOnEdge BottomDragOnE(Mesh);
+   BottomDragOnEdge BottomDragOnE(Mesh, VCoord);
    BottomDragOnE.Coeff = Coeff;
 
    parallelFor(
@@ -833,23 +840,24 @@ int testBottomDrag(int NVertLevels, Real RTol) {
    return Err;
 } // end testBottomDrag
 
-int testTracerHorzAdvOnCell(int NVertLevels, int NTracers, Real RTol) {
+int testTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
 
    I4 Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array3DReal ExactTrFluxDiv("ExactTrFluxDiv", NTracers, Mesh->NCellsOwned,
-                              NVertLevels);
+                              NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.tracerFluxDiv(X, Y); },
        ExactTrFluxDiv, Geom, Mesh, OnCell, ExchangeHalos::No);
 
    // Set input arrays
-   Array2DReal NormalVelocity("NormalVelocity", Mesh->NEdgesSize, NVertLevels);
+   Array2DReal NormalVelocity("NormalVelocity", Mesh->NEdgesSize, NVertLayers);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -858,7 +866,7 @@ int testTracerHorzAdvOnCell(int NVertLevels, int NTracers, Real RTol) {
        },
        NormalVelocity, EdgeComponent::Normal, Geom, Mesh);
 
-   Array3DReal HTrOnEdge("HTrOnEdge", NTracers, Mesh->NEdgesSize, NVertLevels);
+   Array3DReal HTrOnEdge("HTrOnEdge", NTracers, Mesh->NEdgesSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return -Setup.layerThick(X, Y); },
@@ -866,12 +874,12 @@ int testTracerHorzAdvOnCell(int NVertLevels, int NTracers, Real RTol) {
 
    // Compute numerical result
    Array3DReal NumTrFluxDiv("NumTrFluxDiv", NTracers, Mesh->NCellsOwned,
-                            NVertLevels);
-   TracerHorzAdvOnCell TrHorzAdvOnC(Mesh);
+                            NVertLayers);
+   TracerHorzAdvOnCell TrHorzAdvOnC(Mesh, VCoord);
    parallelFor(
-       {NTracers, Mesh->NCellsOwned, NVertLevels},
-       KOKKOS_LAMBDA(int L, int ICell, int KLevel) {
-          TrHorzAdvOnC(NumTrFluxDiv, L, ICell, KLevel, NormalVelocity,
+       {NTracers, Mesh->NCellsOwned, NVertLayers},
+       KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
+          TrHorzAdvOnC(NumTrFluxDiv, L, ICell, KLayer, NormalVelocity,
                        HTrOnEdge);
        });
 
@@ -889,16 +897,17 @@ int testTracerHorzAdvOnCell(int NVertLevels, int NTracers, Real RTol) {
    return Err;
 } // end testTracerHorzAdvOnCell
 
-int testTracerDiffOnCell(int NVertLevels, int NTracers, Real RTol) {
+int testTracerDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
 
    I4 Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array3DReal ExactTracerDiff("ExactTracerDiff", NTracers, Mesh->NCellsOwned,
-                               NVertLevels);
+                               NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.tracerDiff(X, Y); },
@@ -906,13 +915,13 @@ int testTracerDiffOnCell(int NVertLevels, int NTracers, Real RTol) {
 
    // Set input arrays
    Array3DReal TracerCell("TracerCell", NTracers, Mesh->NCellsSize,
-                          NVertLevels);
+                          NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.scalarA(X, Y); },
        TracerCell, Geom, Mesh, OnCell);
 
-   Array2DReal LayerThickEdge("LayerThickEdge", Mesh->NEdgesSize, NVertLevels);
+   Array2DReal LayerThickEdge("LayerThickEdge", Mesh->NEdgesSize, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.scalarB(X, Y); },
@@ -920,14 +929,14 @@ int testTracerDiffOnCell(int NVertLevels, int NTracers, Real RTol) {
 
    // Compute numerical result
    Array3DReal NumTracerDiff("NumTracerDiff", NTracers, Mesh->NCellsOwned,
-                             NVertLevels);
-   TracerDiffOnCell TrDiffOnC(Mesh);
+                             NVertLayers);
+   TracerDiffOnCell TrDiffOnC(Mesh, VCoord);
    TrDiffOnC.EddyDiff2 = 1._Real;
 
    parallelFor(
-       {NTracers, Mesh->NCellsOwned, NVertLevels},
-       KOKKOS_LAMBDA(int L, int ICell, int KLevel) {
-          TrDiffOnC(NumTracerDiff, L, ICell, KLevel, TracerCell,
+       {NTracers, Mesh->NCellsOwned, NVertLayers},
+       KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
+          TrDiffOnC(NumTracerDiff, L, ICell, KLayer, TracerCell,
                     LayerThickEdge);
        });
 
@@ -945,16 +954,17 @@ int testTracerDiffOnCell(int NVertLevels, int NTracers, Real RTol) {
    return Err;
 } // end testTracerDiffOnCell
 
-int testTracerHyperDiffOnCell(int NVertLevels, int NTracers, Real RTol) {
+int testTracerHyperDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
 
    I4 Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array3DReal ExactTracerHyperDiff("ExactTracerHyperDiff", NTracers,
-                                    Mesh->NCellsOwned, NVertLevels);
+                                    Mesh->NCellsOwned, NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return -Setup.tracerHyperDiff(X, Y); },
@@ -962,7 +972,7 @@ int testTracerHyperDiffOnCell(int NVertLevels, int NTracers, Real RTol) {
 
    // Set input arrays
    Array3DReal TrDel2Cell("TracerCell", NTracers, Mesh->NCellsSize,
-                          NVertLevels);
+                          NVertLayers);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.scalarC(X, Y); },
@@ -970,13 +980,13 @@ int testTracerHyperDiffOnCell(int NVertLevels, int NTracers, Real RTol) {
 
    // Compute numerical result
    Array3DReal NumTracerHyperDiff("NumTracerHyperDiff", NTracers,
-                                  Mesh->NCellsOwned, NVertLevels);
-   TracerHyperDiffOnCell TrHypDiffOnC(Mesh);
+                                  Mesh->NCellsOwned, NVertLayers);
+   TracerHyperDiffOnCell TrHypDiffOnC(Mesh, VCoord);
    TrHypDiffOnC.EddyDiff4 = 1._Real;
    parallelFor(
-       {NTracers, Mesh->NCellsOwned, NVertLevels},
-       KOKKOS_LAMBDA(int L, int ICell, int KLevel) {
-          TrHypDiffOnC(NumTracerHyperDiff, L, ICell, KLevel, TrDel2Cell);
+       {NTracers, Mesh->NCellsOwned, NVertLayers},
+       KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
+          TrHypDiffOnC(NumTracerHyperDiff, L, ICell, KLayer, TrDel2Cell);
        });
 
    ErrorMeasures TrHyperDiffErrors;
@@ -993,7 +1003,7 @@ int testTracerHyperDiffOnCell(int NVertLevels, int NTracers, Real RTol) {
    return Err;
 } // end testTracerHyperDiffOnCell
 
-void initTendTest(const std::string &MeshFile, int NVertLevels) {
+void initTendTest(const std::string &MeshFile, int NVertLayers) {
 
    Error Err;
 
@@ -1008,15 +1018,6 @@ void initTendTest(const std::string &MeshFile, int NVertLevels) {
    Config("Omega");
    Config::readAll("omega.yml");
 
-   // Reset NVertLevels to the test value
-   Config *OmegaConfig = Config::getOmegaConfig();
-   Config DimConfig("Dimension");
-   Err += OmegaConfig->get(DimConfig);
-   CHECK_ERROR_ABORT(Err,
-                     "TendencyTermsTest: Dimension group not found in Config");
-
-   DimConfig.set("NVertLevels", NVertLevels);
-
    I4 IOErr = IO::init(DefComm);
    if (IOErr != 0) {
       ABORT_ERROR("TendencyTermsTest: error initializing parallel IO");
@@ -1029,6 +1030,19 @@ void initTendTest(const std::string &MeshFile, int NVertLevels) {
       ABORT_ERROR("TendencyTermsTest: error initializing default halo");
    }
 
+   VertCoord::init();
+
+   // Reset NVertLayers to the test value
+   auto *DefVertCoord        = VertCoord::getDefault();
+   DefVertCoord->NVertLayers = NVertLayers;
+   Dimension::destroy("NVertLayers");
+   std::shared_ptr<Dimension> VertDim =
+       Dimension::create("NVertLayers", NVertLayers);
+
+   deepCopy(DefVertCoord->MaxLayerCell, NVertLayers - 1);
+   DefVertCoord->minMaxLayerEdge();
+   DefVertCoord->minMaxLayerVertex();
+
    HorzMesh::init();
 
 } // end initTendTest
@@ -1036,6 +1050,7 @@ void initTendTest(const std::string &MeshFile, int NVertLevels) {
 void finalizeTendTest() {
 
    HorzMesh::clear();
+   VertCoord::clear();
    Dimension::clear();
    Halo::clear();
    Decomp::clear();
@@ -1045,36 +1060,36 @@ void finalizeTendTest() {
 
 int tendencyTermsTest(const std::string &MeshFile = DefaultMeshFile) {
    int Err         = 0;
-   int NVertLevels = 16;
+   int NVertLayers = 16;
 
-   initTendTest(MeshFile, NVertLevels);
+   initTendTest(MeshFile, NVertLayers);
 
    const auto &Mesh = HorzMesh::getDefault();
    int NTracers     = 3;
 
    const Real RTol = sizeof(Real) == 4 ? 2e-2 : 1e-5;
 
-   Err += testThickFluxDiv(NVertLevels, RTol);
+   Err += testThickFluxDiv(NVertLayers, RTol);
 
-   Err += testPotVortHAdv(NVertLevels, RTol);
+   Err += testPotVortHAdv(NVertLayers, RTol);
 
-   Err += testKEGrad(NVertLevels, RTol);
+   Err += testKEGrad(NVertLayers, RTol);
 
-   Err += testSSHGrad(NVertLevels, RTol);
+   Err += testSSHGrad(NVertLayers, RTol);
 
-   Err += testVelDiff(NVertLevels, RTol);
+   Err += testVelDiff(NVertLayers, RTol);
 
-   Err += testVelHyperDiff(NVertLevels, RTol);
+   Err += testVelHyperDiff(NVertLayers, RTol);
 
-   Err += testWindForcing(NVertLevels);
+   Err += testWindForcing(NVertLayers);
 
-   Err += testBottomDrag(NVertLevels, RTol);
+   Err += testBottomDrag(NVertLayers, RTol);
 
-   Err += testTracerHorzAdvOnCell(NVertLevels, NTracers, RTol);
+   Err += testTracerHorzAdvOnCell(NVertLayers, NTracers, RTol);
 
-   Err += testTracerDiffOnCell(NVertLevels, NTracers, RTol);
+   Err += testTracerDiffOnCell(NVertLayers, NTracers, RTol);
 
-   Err += testTracerHyperDiffOnCell(NVertLevels, NTracers, RTol);
+   Err += testTracerHyperDiffOnCell(NVertLayers, NTracers, RTol);
 
    if (Err == 0) {
       LOG_INFO("TendencyTermsTest: Successful completion");

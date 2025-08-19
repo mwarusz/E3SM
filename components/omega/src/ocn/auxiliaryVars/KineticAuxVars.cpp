@@ -7,11 +7,15 @@
 namespace OMEGA {
 
 KineticAuxVars::KineticAuxVars(const std::string &AuxStateSuffix,
-                               const HorzMesh *Mesh, int NVertLevels)
+                               const HorzMesh *Mesh, const VertCoord *VCoord,
+                               int NVertLayers)
     : KineticEnergyCell("KineticEnergyCell" + AuxStateSuffix, Mesh->NCellsSize,
-                        NVertLevels),
+                        NVertLayers),
       VelocityDivCell("VelocityDivCell" + AuxStateSuffix, Mesh->NCellsSize,
-                      NVertLevels),
+                      NVertLayers),
+      MinLayerCell(VCoord->MinLayerCell), MaxLayerCell(VCoord->MaxLayerCell),
+      MinLayerEdgeBot(VCoord->MinLayerEdgeBot),
+      MaxLayerEdgeTop(VCoord->MaxLayerEdgeTop),
       NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       EdgeSignOnCell(Mesh->EdgeSignOnCell), DcEdge(Mesh->DcEdge),
       DvEdge(Mesh->DvEdge), AreaCell(Mesh->AreaCell) {}
@@ -36,7 +40,7 @@ void KineticAuxVars::registerFields(
 
    // Kinetic energy on cells
    DimNames[0]                 = "NCells" + DimSuffix;
-   DimNames[1]                 = "NVertLevels";
+   DimNames[1]                 = "NVertLayers";
    auto KineticEnergyCellField = Field::create(
        KineticEnergyCell.label(),                        // field name
        "kinetic energy of horizontal velocity on cells", // long name/describe

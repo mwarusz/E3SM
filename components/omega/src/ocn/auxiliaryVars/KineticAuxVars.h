@@ -4,6 +4,7 @@
 #include "DataTypes.h"
 #include "HorzMesh.h"
 #include "OmegaKokkos.h"
+#include "VertCoord.h"
 
 #include <string>
 
@@ -15,22 +16,31 @@ class KineticAuxVars {
    Array2DReal VelocityDivCell;
 
    KineticAuxVars(const std::string &AuxStateSuffix, const HorzMesh *Mesh,
-                  int NVertLevels);
+                  const VertCoord *VCoord, int NVertLayers);
 
    KOKKOS_FUNCTION void
    computeVarsOnCell(int ICell, int KChunk,
                      const Array2DReal &NormalVelEdge) const {
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
-      const int KStart       = KChunk * VecLength;
+      //      const int KStart       = KChunk * VecLength;
 
       Real KineticEnergyCellTmp[VecLength] = {0};
       Real VelocityDivCellTmp[VecLength]   = {0};
+      I4 KStart, KLen;
+      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const int JEdge     = EdgesOnCell(ICell, J);
          const Real AreaEdge = 0.5_Real * DvEdge(JEdge) * DcEdge(JEdge);
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
+         //         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         //            const int K = KStart + KVec;
+
+         const I4 KMinEdge = Kokkos::max(KStart, MinLayerEdgeBot(JEdge));
+         const I4 KMaxEdge =
+             Kokkos::min(KStart + KLen, MaxLayerEdgeTop(JEdge) + 1);
+
+         for (int K = KMinEdge; K < KMaxEdge; ++K) {
+            const int KVec = K - KStart;
             KineticEnergyCellTmp[KVec] += AreaEdge * 0.5_Real * InvAreaCell *
                                           NormalVelEdge(JEdge, K) *
                                           NormalVelEdge(JEdge, K);
@@ -39,7 +49,7 @@ class KineticAuxVars {
                                         NormalVelEdge(JEdge, K);
          }
       }
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K                 = KStart + KVec;
          KineticEnergyCell(ICell, K) = KineticEnergyCellTmp[KVec];
          VelocityDivCell(ICell, K)   = VelocityDivCellTmp[KVec];
@@ -51,6 +61,10 @@ class KineticAuxVars {
    void unregisterFields() const;
 
  private:
+   Array1DI4 MinLayerCell;
+   Array1DI4 MaxLayerCell;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DReal EdgeSignOnCell;

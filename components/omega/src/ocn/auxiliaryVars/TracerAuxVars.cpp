@@ -6,12 +6,15 @@
 namespace OMEGA {
 
 TracerAuxVars::TracerAuxVars(const std::string &AuxStateSuffix,
-                             const HorzMesh *Mesh, const I4 NVertLevels,
-                             const I4 NTracers)
+                             const HorzMesh *Mesh, const VertCoord *VCoord,
+                             const I4 NVertLayers, const I4 NTracers)
     : HTracersEdge("ThickTracersEdge" + AuxStateSuffix, NTracers,
-                   Mesh->NEdgesSize, NVertLevels),
+                   Mesh->NEdgesSize, NVertLayers),
       Del2TracersCell("Del2TracerCell" + AuxStateSuffix, NTracers,
-                      Mesh->NCellsSize, NVertLevels),
+                      Mesh->NCellsSize, NVertLayers),
+      MinLayerCell(VCoord->MinLayerCell), MaxLayerCell(VCoord->MaxLayerCell),
+      MinLayerEdgeBot(VCoord->MinLayerEdgeBot),
+      MaxLayerEdgeTop(VCoord->MaxLayerEdgeTop),
       NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       CellsOnEdge(Mesh->CellsOnEdge), EdgeSignOnCell(Mesh->EdgeSignOnCell),
       DcEdge(Mesh->DcEdge), DvEdge(Mesh->DvEdge), AreaCell(Mesh->AreaCell),
@@ -36,7 +39,7 @@ void TracerAuxVars::registerFields(const std::string &AuxGroupName,
    // Thickness-weighted tracers on Edge
    DimNames[0]            = "NTracers";
    DimNames[1]            = "NEdges" + DimSuffix;
-   DimNames[2]            = "NVertLevels";
+   DimNames[2]            = "NVertLayers";
    auto HTracersEdgeField = Field::create(
        HTracersEdge.label(), // field name
        "thickness-weighted tracers at edges. May be centered, upwinded, or a "
