@@ -291,6 +291,39 @@ void computeKRange(const Array1DI4 &MinLayer, const Array1DI4 &MaxLayer,
    KLen = (KEnd > KMax + 1) ? (KMax - KStart + 1) : VecLength;
 }
 
+// parallelForOuter: with label
+template <int N, class F>
+inline void parallelForOuter(const std::string &Label,
+                             const int (&UpperBounds)[N], const F &Functor) {
+
+   const auto LinFunctor = LinearIdxWrapper{std::move(Functor), UpperBounds};
+   int LinBound          = 1;
+   for (int Rank = 0; Rank < N; ++Rank) {
+      LinBound *= UpperBounds[Rank];
+   }
+
+   auto Policy = TeamPolicy(LinBound, OMEGA_TEAMSIZE);
+   Kokkos::parallel_for(
+       Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
+          const int TeamId = Team.league_rank();
+          LinFunctor(TeamId, Team);
+       });
+}
+
+// parallelForOuter: without label
+template <int N, class F>
+inline void parallelForOuter(const int (&UpperBounds)[N], const F &Functor) {
+   parallelForOuter("", UpperBounds, Functor);
+}
+
+// parallelForInner
+template <class F>
+KOKKOS_FUNCTION void parallelForInner(const TeamMember &Team, int UpperBound,
+                                      const F &Functor) {
+   const auto Policy = TeamThreadRange(Team, UpperBound);
+   Kokkos::parallel_for(Policy, Functor);
+}
+
 } // end namespace OMEGA
 
 //===----------------------------------------------------------------------===//
