@@ -294,6 +294,20 @@ void computeKRange(const Array1DI4 &MinLayer, const Array1DI4 &MaxLayer,
    KLen = (KEnd > KMax + 1) ? (KMax - KStart + 1) : VecLength;
 }
 
+#ifdef OMEGA_TARGET_DEVICE
+constexpr int NElemPerTeam = 8;
+
+#ifdef KOKKOS_ENABLE_HIP
+constexpr int VectorSize = 32;
+#else
+constexpr int VectorSize = 16;
+#endif
+
+#else
+constexpr int NElemPerTeam = 1;
+constexpr int VectorSize   = 1;
+#endif
+
 // parallelForOuter: with label
 template <int N, class F>
 inline void parallelForOuter(const std::string &Label,
@@ -305,12 +319,28 @@ inline void parallelForOuter(const std::string &Label,
       LinBound *= UpperBounds[Rank];
    }
 
-   auto Policy = TeamPolicy(LinBound, OMEGA_TEAMSIZE);
-   Kokkos::parallel_for(
-       Label, Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
-          const int TeamId = Team.league_rank();
-          LinFunctor(TeamId, Team);
-       });
+   if constexpr (NElemPerTeam == 1) {
+
+      auto Policy = TeamPolicy(LinBound, OMEGA_TEAMSIZE);
+      Kokkos::parallel_for(
+          Label, Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
+             const int TeamId = Team.league_rank();
+             LinFunctor(TeamId, Team);
+          });
+
+   } else {
+
+      auto Policy = TeamPolicy(LinBound, NElemPerTeam, VectorSize);
+      Kokkos::parallel_for(
+          Label, Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
+             const int TeamId   = Team.league_rank();
+             const int ThreadId = Team.team_rank();
+             const int Idx      = TeamId * NElemPerTeam + ThreadId;
+             if (Idx < LinBound) {
+                LinFunctor(Idx, Team);
+             }
+          });
+   }
 }
 
 // parallelForOuter: without label
@@ -323,8 +353,13 @@ inline void parallelForOuter(const int (&UpperBounds)[N], const F &Functor) {
 template <class F>
 KOKKOS_FUNCTION void parallelForInner(const TeamMember &Team, int UpperBound,
                                       const F &Functor) {
-   const auto Policy = TeamThreadRange(Team, UpperBound);
-   Kokkos::parallel_for(Policy, Functor);
+   if constexpr (NElemPerTeam == 1) {
+      const auto Policy = TeamThreadRange(Team, UpperBound);
+      Kokkos::parallel_for(Policy, Functor);
+   } else {
+      const auto Policy = ThreadVectorRange(Team, UpperBound);
+      Kokkos::parallel_for(Policy, Functor);
+   }
 }
 
 } // end namespace OMEGA
