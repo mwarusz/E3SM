@@ -307,7 +307,7 @@ inline void parallelForOuter(const std::string &Label,
 
    auto Policy = TeamPolicy(LinBound, OMEGA_TEAMSIZE);
    Kokkos::parallel_for(
-       Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
+       Label, Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
           const int TeamId = Team.league_rank();
           LinFunctor(TeamId, Team);
        });
