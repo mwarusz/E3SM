@@ -31,6 +31,7 @@
 
 namespace OMEGA {
 
+// Read timing configuration and set Pacer options
 static void readTimingConfig() {
    Error Err;
 
