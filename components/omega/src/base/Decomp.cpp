@@ -423,7 +423,7 @@ int readMesh(const int MeshFileID, // file ID for open mesh file
 
 void Decomp::init(const std::string &MeshFileName) {
 
-   bool TimerFlag = Pacer::start("Decomp init");
+   bool TimerFlag = Pacer::start("Decomp init", 0);
    Error Err; // default successful return code
 
    I4 InHaloWidth;
@@ -454,7 +454,7 @@ void Decomp::init(const std::string &MeshFileName) {
    Decomp::DefaultDecomp = Decomp::create("Default", DefEnv, NParts, Method,
                                           InHaloWidth, MeshFileName);
 
-   TimerFlag = Pacer::stop("Decomp init") && TimerFlag;
+   TimerFlag = Pacer::stop("Decomp init", 0) && TimerFlag;
    if (!TimerFlag)
       LOG_WARN("Decomp::init: Error in timers");
 
@@ -473,7 +473,7 @@ Decomp::Decomp(
     const std::string &MeshFileName_ //< [in] name of file with mesh info
 ) {
 
-   bool TimerFlag = Pacer::start("Decomp construct");
+   bool TimerFlag = Pacer::start("Decomp construct", 1);
    int Err        = 0; // internal error code
 
    // Retrieve some info on the MPI layout
@@ -484,7 +484,7 @@ Decomp::Decomp(
    bool IsMaster = InEnv->isMasterTask();
 
    // Open the mesh file for reading (assume IO has already been initialized)
-   TimerFlag = Pacer::start("Decomp read mesh") && TimerFlag;
+   TimerFlag = Pacer::start("Decomp read mesh", 2) && TimerFlag;
    int FileID;
    MeshFileName = MeshFileName_;
    Err          = IO::openFile(FileID, MeshFileName, IO::ModeRead);
@@ -512,13 +512,13 @@ Decomp::Decomp(
 
    // Close file
    Err       = IO::closeFile(FileID);
-   TimerFlag = Pacer::stop("Decomp read mesh") && TimerFlag;
+   TimerFlag = Pacer::stop("Decomp read mesh", 2) && TimerFlag;
 
    // In the case of single task avoid calling a full partitioning routine and
    // just set the needed variables directly. This is done because some METIS
    // functions can raise SIGFPE when numparts == 1 due to division by zero
    // See: https://github.com/KarypisLab/METIS/issues/67
-   TimerFlag = Pacer::start("Decomp part cells") && TimerFlag;
+   TimerFlag = Pacer::start("Decomp part cells", 2) && TimerFlag;
    if (NumTasks == 1) {
       partCellsSingleTask();
    } else {
@@ -546,58 +546,58 @@ Decomp::Decomp(
 
       } // End switch on Method
    }
-   TimerFlag = Pacer::stop("Decomp part cells") && TimerFlag;
+   TimerFlag = Pacer::stop("Decomp part cells", 2) && TimerFlag;
 
    //---------------------------------------------------------------------------
    // Cell partitioning complete. Redistribute the initial XXOnCell arrays
    // to their final locations.
-   TimerFlag = Pacer::start("Decomp rearrange cells") && TimerFlag;
+   TimerFlag = Pacer::start("Decomp rearrange cells", 2) && TimerFlag;
    Err       = rearrangeCellArrays(InEnv, CellsOnCellInit, EdgesOnCellInit,
                                    VerticesOnCellInit);
    if (Err != 0) {
       LOG_CRITICAL("Decomp: Error rearranging XxOnCell arrays");
       return;
    }
-   TimerFlag = Pacer::stop("Decomp rearrange cells") && TimerFlag;
+   TimerFlag = Pacer::stop("Decomp rearrange cells", 2) && TimerFlag;
 
    // Partition the edges
-   TimerFlag = Pacer::start("Decomp part edges") && TimerFlag;
+   TimerFlag = Pacer::start("Decomp part edges", 2) && TimerFlag;
    Err       = partEdges(InEnv, CellsOnEdgeInit);
    if (Err != 0) {
       LOG_CRITICAL("Decomp: Error partitioning edges");
       return;
    }
-   TimerFlag = Pacer::stop("Decomp part edges") && TimerFlag;
+   TimerFlag = Pacer::stop("Decomp part edges", 2) && TimerFlag;
 
    // Edge partitioning complete. Redistribute the initial XXOnEdge arrays
    // to their final locations.
-   TimerFlag = Pacer::start("Decomp rearrange edges") && TimerFlag;
+   TimerFlag = Pacer::start("Decomp rearrange edges", 2) && TimerFlag;
    Err       = rearrangeEdgeArrays(InEnv, CellsOnEdgeInit, EdgesOnEdgeInit,
                                    VerticesOnEdgeInit);
    if (Err != 0) {
       LOG_CRITICAL("Decomp: Error rearranging XxOnEdge arrays");
       return;
    }
-   TimerFlag = Pacer::stop("Decomp rearrange edges") && TimerFlag;
+   TimerFlag = Pacer::stop("Decomp rearrange edges", 2) && TimerFlag;
 
    // Partition the vertices
-   TimerFlag = Pacer::start("Decomp part vertices") && TimerFlag;
+   TimerFlag = Pacer::start("Decomp part vertices", 2) && TimerFlag;
    Err       = partVertices(InEnv, CellsOnVertexInit);
    if (Err != 0) {
       LOG_CRITICAL("Decomp: Error partitioning vertices");
       return;
    }
-   TimerFlag = Pacer::stop("Decomp part vertices") && TimerFlag;
+   TimerFlag = Pacer::stop("Decomp part vertices", 2) && TimerFlag;
 
    // Vertex partitioning complete. Redistribute the initial XXOnVertex arrays
    // to their final locations.
-   TimerFlag = Pacer::start("Decomp rearrange vertices") && TimerFlag;
+   TimerFlag = Pacer::start("Decomp rearrange vertices", 2) && TimerFlag;
    Err = rearrangeVertexArrays(InEnv, CellsOnVertexInit, EdgesOnVertexInit);
    if (Err != 0) {
       LOG_CRITICAL("Decomp: Error rearranging XxOnVertex arrays");
       return;
    }
-   TimerFlag = Pacer::stop("Decomp rearrange vertices") && TimerFlag;
+   TimerFlag = Pacer::stop("Decomp rearrange vertices", 2) && TimerFlag;
 
    // Convert global addresses to local addresses. Create the global to
    // local address ordered maps to simplify and optimize searches.
@@ -605,7 +605,7 @@ Decomp::Decomp(
    // to map that to the local NXxAll+1 (NXxSize). We insert that value
    // first in the map so that later attempts to change will be ignored.
 
-   TimerFlag = Pacer::start("Decomp construct global to local") && TimerFlag;
+   TimerFlag = Pacer::start("Decomp construct global to local", 2) && TimerFlag;
    std::map<I4, I4> GlobToLocCell;
    GlobToLocCell[NCellsGlobal + 1] = NCellsAll;
    for (int Cell = 0; Cell < NCellsAll; ++Cell) {
@@ -760,11 +760,11 @@ Decomp::Decomp(
          EdgesOnVertexH(Vrtx, Edge) = LocalAdd;
       }
    }
-   TimerFlag = Pacer::stop("Decomp construct global to local") && TimerFlag;
+   TimerFlag = Pacer::stop("Decomp construct global to local", 2) && TimerFlag;
 
    // Create device copies of all arrays
 
-   TimerFlag  = Pacer::start("Decomp construct device copy") && TimerFlag;
+   TimerFlag  = Pacer::start("Decomp construct device copy", 2) && TimerFlag;
    NCellsHalo = createDeviceMirrorCopy(NCellsHaloH);
    CellID     = createDeviceMirrorCopy(CellIDH);
    CellLoc    = createDeviceMirrorCopy(CellLocH);
@@ -789,8 +789,8 @@ Decomp::Decomp(
 
    CellsOnVertex = createDeviceMirrorCopy(CellsOnVertexH);
    EdgesOnVertex = createDeviceMirrorCopy(EdgesOnVertexH);
-   TimerFlag     = Pacer::stop("Decomp construct device copy") && TimerFlag;
-   TimerFlag     = Pacer::stop("Decomp construct") && TimerFlag;
+   TimerFlag     = Pacer::stop("Decomp construct device copy", 2) && TimerFlag;
+   TimerFlag     = Pacer::stop("Decomp construct", 1) && TimerFlag;
    if (!TimerFlag)
       LOG_WARN("Decomp constructor: Error encounterd in timers");
 } // end decomposition constructor
@@ -807,7 +807,7 @@ Decomp *Decomp::create(
     const std::string &MeshFileName //< [in] name of file with mesh info
 ) {
 
-   bool TimerFlag = Pacer::start("Decomp create");
+   bool TimerFlag = Pacer::start("Decomp create", 1);
    // Check to see if a decomposition of the same name already exists and
    // if so, exit with an error
    if (AllDecomps.find(Name) != AllDecomps.end()) {
@@ -823,7 +823,7 @@ Decomp *Decomp::create(
        new Decomp(Name, Env, NParts, Method, HaloWidth, MeshFileName);
    AllDecomps.emplace(Name, NewDecomp);
 
-   TimerFlag = Pacer::stop("Decomp create") && TimerFlag;
+   TimerFlag = Pacer::stop("Decomp create", 1) && TimerFlag;
    if (!TimerFlag)
       LOG_WARN("Decomp::create: Error encountered in timers");
    return NewDecomp;
@@ -953,7 +953,7 @@ int Decomp::partCellsKWay(
    // One at a time, each task broadcasts its portion of the CellsOnCell data
    // and then unpacks it into the adjacency array in the packed form needed
    // by METIS/ParMETIS
-   bool TimerFlag = Pacer::start("Gather adjacency");
+   bool TimerFlag = Pacer::start("Gather adjacency", 2);
    for (int Task = 0; Task < NumTasks; ++Task) {
 
       // If it is this task's turn, pack up the CellsOnCell data and broadcast
@@ -995,7 +995,7 @@ int Decomp::partCellsKWay(
    } // end task loop
 
    AdjAdd[NCellsGlobal] = Add; // Add the ending address
-   TimerFlag            = Pacer::stop("Gather adjacency") && TimerFlag;
+   TimerFlag            = Pacer::stop("Gather adjacency", 2) && TimerFlag;
 
    // Set up remaining partitioning variables
 
@@ -1032,7 +1032,7 @@ int Decomp::partCellsKWay(
    // Call METIS routine to partition the mesh
    // METIS routines are C code that expect pointers, so we use the
    // idiom &Var[0] to extract the pointer to the data in std::vector
-   TimerFlag    = Pacer::start("Metis partitioning") && TimerFlag;
+   TimerFlag    = Pacer::start("Metis partitioning", 2) && TimerFlag;
    int MetisErr = METIS_PartGraphKway(&NCellsMetis, &NConstraints, &AdjAdd[0],
                                       &Adjacency[0], VrtxWgtPtr, VrtxSize,
                                       EdgeWgtPtr, &NumTasksMetis, TpWgts, Ubvec,
@@ -1043,7 +1043,7 @@ int Decomp::partCellsKWay(
       Err = -1;
       return Err;
    }
-   TimerFlag = Pacer::stop("Metis partitioning") && TimerFlag;
+   TimerFlag = Pacer::stop("Metis partitioning", 2) && TimerFlag;
 
    // Determine the initial sizes needed by address arrays
 
@@ -1213,7 +1213,7 @@ int Decomp::partEdges(
    // and edges using the std::set container and related search/sort functions.
    // We create sets for local owned cells, all local edges,
    // local owned edges and local halo edges.
-   bool TimerFlag = Pacer::start("partEdgesOwned");
+   bool TimerFlag = Pacer::start("partEdgesOwned", 3);
    std::set<I4> CellsOwned;
    std::set<I4> CellsAll;
    std::set<I4> EdgesAll;
@@ -1259,7 +1259,7 @@ int Decomp::partEdges(
          }
       }
    }
-   TimerFlag = Pacer::stop("partEdgesOwned") && TimerFlag;
+   TimerFlag = Pacer::stop("partEdgesOwned", 3) && TimerFlag;
 
    // Broadcast the edge ownership to all tasks, one chunk at a time
    // and create a sorted list of all owned edges.
@@ -1267,7 +1267,7 @@ int Decomp::partEdges(
    std::vector<I4> EdgeBuf(NEdgesChunk);
    for (int Task = 0; Task < NumTasks; ++Task) {
 
-      TimerFlag = Pacer::start("partEdgesOwnerBcast") && TimerFlag;
+      TimerFlag = Pacer::start("partEdgesOwnerBcast", 3) && TimerFlag;
       // if it is this task's turn, fill the buffer with the owner info
       if (Task == MyTask) {
          for (int Edge = 0; Edge < NEdgesChunk; ++Edge) {
@@ -1276,11 +1276,11 @@ int Decomp::partEdges(
       }
       // Broadcast this buffer
       Err       = MPI_Bcast(&EdgeBuf[0], NEdgesChunk, MPI_INT32_T, Task, Comm);
-      TimerFlag = Pacer::stop("partEdgesOwnerBcast") && TimerFlag;
+      TimerFlag = Pacer::stop("partEdgesOwnerBcast", 3) && TimerFlag;
 
       // For each edge in the buffer, check to see if the task owns
       // the cell. If so, add the edge ID to the owned edges list.
-      TimerFlag = Pacer::start("partEdgesOwnerSearch") && TimerFlag;
+      TimerFlag = Pacer::start("partEdgesOwnerSearch", 3) && TimerFlag;
       for (int Edge = 0; Edge < NEdgesChunk; ++Edge) {
 
          I4 EdgeGlob =
@@ -1296,7 +1296,7 @@ int Decomp::partEdges(
             EdgesOwned.insert(EdgeGlob);
          }
       }
-      TimerFlag = Pacer::stop("partEdgesOwnerSearch") && TimerFlag;
+      TimerFlag = Pacer::stop("partEdgesOwnerSearch", 3) && TimerFlag;
 
    } // end task loop
 
@@ -1305,7 +1305,7 @@ int Decomp::partEdges(
    // level is actually stored in reverse order from the end inward. We sort
    // edge IDs, locations and CellsOnEdge with this ordering.
 
-   TimerFlag   = Pacer::start("partEdgesHalo") && TimerFlag;
+   TimerFlag   = Pacer::start("partEdgesHalo", 3) && TimerFlag;
    NEdgesOwned = EdgesOwned.size();
    HostArray1DI4 NEdgesHaloTmp("NEdgesHalo", HaloWidth);
    I4 HaloCount     = EdgesOwnedHalo1.size();
@@ -1366,7 +1366,7 @@ int Decomp::partEdges(
       if ((Halo + 1) < HaloWidth)
          NEdgesHaloTmp(Halo + 1) = HaloCount;
    } // end halo loop
-   TimerFlag = Pacer::stop("partEdgesHalo") && TimerFlag;
+   TimerFlag = Pacer::stop("partEdgesHalo", 3) && TimerFlag;
 
    // Now that we have the local lists, update the final location
    // (task, local edge address) of each of the local edges. This
@@ -1374,7 +1374,7 @@ int Decomp::partEdges(
    // Resize the buffer to make sure we have enough room - the distribution
    // may be less even than the original chunk size.
 
-   TimerFlag = Pacer::start("partEdgesFinalLoc") && TimerFlag;
+   TimerFlag = Pacer::start("partEdgesFinalLoc", 3) && TimerFlag;
    HostArray2DI4 EdgeLocTmp("EdgeLoc", NEdgesSize, 2);
    EdgeBuf.resize(2 * NEdgesChunk);
 
@@ -1397,7 +1397,7 @@ int Decomp::partEdges(
    // needs and stores the remote address
    for (int Task = 0; Task < NumTasks; ++Task) {
 
-      TimerFlag = Pacer::start("partEdgesFinalBcast") && TimerFlag;
+      TimerFlag = Pacer::start("partEdgesFinalBcast", 3) && TimerFlag;
       // fill broadcast buffer with the list of owned edges. The
       // first entry in the vector is the number of edges owned by
       // this task.
@@ -1409,10 +1409,10 @@ int Decomp::partEdges(
       }
       // Broadcast the list of edges owned by this task
       Err = MPI_Bcast(&EdgeBuf[0], 2 * NEdgesChunk, MPI_INT32_T, Task, Comm);
-      TimerFlag = Pacer::stop("partEdgesFinalBcast") && TimerFlag;
+      TimerFlag = Pacer::stop("partEdgesFinalBcast", 3) && TimerFlag;
 
       // Extract the buffer into a local search vector
-      TimerFlag   = Pacer::start("partEdgesFinalSearch") && TimerFlag;
+      TimerFlag   = Pacer::start("partEdgesFinalSearch", 3) && TimerFlag;
       I4 BufOwned = EdgeBuf[0];
       RemoteID.resize(BufOwned);
       for (int Edge = 0; Edge < BufOwned; ++Edge)
@@ -1431,9 +1431,9 @@ int Decomp::partEdges(
             }
          }
       }
-      TimerFlag = Pacer::stop("partEdgesFinalSearch") && TimerFlag;
+      TimerFlag = Pacer::stop("partEdgesFinalSearch", 3) && TimerFlag;
    }
-   TimerFlag = Pacer::stop("partEdgesFinalLoc") && TimerFlag;
+   TimerFlag = Pacer::stop("partEdgesFinalLoc", 3) && TimerFlag;
 
    // Copy ID and location arrays into permanent storage
    EdgeIDH     = EdgeIDTmp;
@@ -1483,7 +1483,7 @@ int Decomp::partVertices(
    // and vertices using the std::set container and related search/sort
    // functions. We create sets for local owned cells, all local vertices,
    // local owned vertices and local halo vertices.
-   bool TimerFlag = Pacer::start("partVerticesOwned");
+   bool TimerFlag = Pacer::start("partVerticesOwned", 3);
    std::set<I4> CellsOwned;
    std::set<I4> CellsAll;
    std::set<I4> VerticesAll;
@@ -1529,7 +1529,7 @@ int Decomp::partVertices(
          }
       }
    }
-   TimerFlag = Pacer::stop("partVerticesOwned") && TimerFlag;
+   TimerFlag = Pacer::stop("partVerticesOwned", 3) && TimerFlag;
 
    // Broadcast the vertex ownership to all tasks, one chunk at a time
    // and create a sorted list of all owned vertices.
@@ -1537,7 +1537,7 @@ int Decomp::partVertices(
    std::vector<I4> VrtxBuf(NVerticesChunk);
    for (int Task = 0; Task < NumTasks; ++Task) {
 
-      TimerFlag = Pacer::start("partVerticesOwnedBcast") && TimerFlag;
+      TimerFlag = Pacer::start("partVerticesOwnedBcast", 3) && TimerFlag;
       // if it is this task's turn, fill the buffer with the owner info
       if (Task == MyTask) {
          for (int Vrtx = 0; Vrtx < NVerticesChunk; ++Vrtx) {
@@ -1546,11 +1546,11 @@ int Decomp::partVertices(
       }
       // Broadcast this buffer
       Err = MPI_Bcast(&VrtxBuf[0], NVerticesChunk, MPI_INT32_T, Task, Comm);
-      TimerFlag = Pacer::stop("partVerticesOwnedBcast") && TimerFlag;
+      TimerFlag = Pacer::stop("partVerticesOwnedBcast", 3) && TimerFlag;
 
       // For each vertex in the buffer, check to see if the task owns
       // the cell. If so, add the vertex ID to the owned vertices list.
-      TimerFlag = Pacer::start("partVerticesOwnedSearch") && TimerFlag;
+      TimerFlag = Pacer::start("partVerticesOwnedSearch", 3) && TimerFlag;
       for (int Vrtx = 0; Vrtx < NVerticesChunk; ++Vrtx) {
 
          I4 VrtxGlob =
@@ -1566,7 +1566,7 @@ int Decomp::partVertices(
             VerticesOwned.insert(VrtxGlob);
          }
       }
-      TimerFlag = Pacer::stop("partVerticesOwnedSearch") && TimerFlag;
+      TimerFlag = Pacer::stop("partVerticesOwnedSearch", 3) && TimerFlag;
 
    } // end task loop
 
@@ -1575,7 +1575,7 @@ int Decomp::partVertices(
    // level is actually stored in reverse order from the end inward. We sort
    // vertex IDs, locations and CellsOnVertex with this ordering.
 
-   TimerFlag      = Pacer::start("partVerticesHalo") && TimerFlag;
+   TimerFlag      = Pacer::start("partVerticesHalo", 3) && TimerFlag;
    NVerticesOwned = VerticesOwned.size();
    HostArray1DI4 NVerticesHaloTmp("NVerticesHalo", HaloWidth);
    I4 HaloCount        = VerticesOwnedHalo1.size();
@@ -1637,7 +1637,7 @@ int Decomp::partVertices(
       if ((Halo + 1) < HaloWidth)
          NVerticesHaloTmp(Halo + 1) = HaloCount;
    } // end halo loop
-   TimerFlag = Pacer::stop("partVerticesHalo") && TimerFlag;
+   TimerFlag = Pacer::stop("partVerticesHalo", 3) && TimerFlag;
 
    // Now that we have the local lists, update the final location
    // (task, local edge address) of each of the local vertices. This
@@ -1645,7 +1645,7 @@ int Decomp::partVertices(
    // Resize the buffer to make sure we have enough room - the distribution
    // may be less even than the original chunk size.
 
-   TimerFlag = Pacer::start("partVerticesFinalLoc") && TimerFlag;
+   TimerFlag = Pacer::start("partVerticesFinalLoc", 3) && TimerFlag;
    HostArray2DI4 VertexLocTmp("VertexLoc", NVerticesSize, 2);
    VrtxBuf.resize(2 * NVerticesChunk);
 
@@ -1671,7 +1671,7 @@ int Decomp::partVertices(
       // fill broadcast buffer with the list of owned vertices. The
       // first entry in the vector is the number of vertices owned by
       // this task.
-      TimerFlag = Pacer::start("partVerticesFinalBcast") && TimerFlag;
+      TimerFlag = Pacer::start("partVerticesFinalBcast", 3) && TimerFlag;
       if (Task == MyTask) {
          VrtxBuf[0] = NVerticesOwned;
          for (int BufVrtx = 0; BufVrtx < NVerticesOwned; ++BufVrtx) {
@@ -1680,10 +1680,10 @@ int Decomp::partVertices(
       }
       // Broadcast the list of vertices owned by this task
       Err = MPI_Bcast(&VrtxBuf[0], 2 * NVerticesChunk, MPI_INT32_T, Task, Comm);
-      TimerFlag = Pacer::stop("partVerticesFinalBcast") && TimerFlag;
+      TimerFlag = Pacer::stop("partVerticesFinalBcast", 3) && TimerFlag;
 
       // Extract the buffer into a local search vector
-      TimerFlag   = Pacer::start("partVerticesFinalSearch") && TimerFlag;
+      TimerFlag   = Pacer::start("partVerticesFinalSearch", 3) && TimerFlag;
       I4 BufOwned = VrtxBuf[0];
       RemoteID.resize(BufOwned);
       for (int Vrtx = 0; Vrtx < BufOwned; ++Vrtx)
@@ -1702,9 +1702,9 @@ int Decomp::partVertices(
             }
          }
       }
-      TimerFlag = Pacer::stop("partVerticesFinalSearch") && TimerFlag;
+      TimerFlag = Pacer::stop("partVerticesFinalSearch", 3) && TimerFlag;
    }
-   TimerFlag = Pacer::stop("partVerticesFinalLoc") && TimerFlag;
+   TimerFlag = Pacer::stop("partVerticesFinalLoc", 3) && TimerFlag;
 
    // Copy ID and location arrays into permanent storage
    VertexIDH      = VertexIDTmp;
@@ -1731,7 +1731,7 @@ int Decomp::rearrangeCellArrays(
 ) {
 
    int Err        = 0; // default return code
-   bool TimerFlag = Pacer::start("rearrangeCellArrays");
+   bool TimerFlag = Pacer::start("rearrangeCellArrays", 3);
 
    // Extract some MPI information
    MPI_Comm Comm = InEnv->getComm();
@@ -1777,7 +1777,7 @@ int Decomp::rearrangeCellArrays(
    // entries it needs.
    for (int Task = 0; Task < NumTasks; ++Task) {
 
-      TimerFlag = Pacer::start("rearrangeCellsBcast") && TimerFlag;
+      TimerFlag = Pacer::start("rearrangeCellsBcast", 3) && TimerFlag;
       // If it is this task's turn to send, fill the buffer with the local
       // chunk of all three arrays.
       if (MyTask == Task) { // Fill buffer with local chunk
@@ -1796,13 +1796,13 @@ int Decomp::rearrangeCellArrays(
          LOG_CRITICAL("rearrangeCellArrays: Error broadcasting cell buffer");
          return Err;
       }
-      TimerFlag = Pacer::stop("rearrangeCellsBcast") && TimerFlag;
+      TimerFlag = Pacer::stop("rearrangeCellsBcast", 3) && TimerFlag;
 
       // For each cell needed locally, we can compute the task and address
       // of the cell in the linear distribution and extract from the buffer
       // if needed
 
-      TimerFlag = Pacer::start("rearrangeCellsSearch") && TimerFlag;
+      TimerFlag = Pacer::start("rearrangeCellsSearch", 3) && TimerFlag;
       for (int Cell = 0; Cell < NCellsAll; ++Cell) {
          if (TaskInit[Cell] == Task) {
             if (AddInit[Cell] < NCellsGlobal + 1) {
@@ -1835,7 +1835,7 @@ int Decomp::rearrangeCellArrays(
             }
          }
       }
-      TimerFlag = Pacer::stop("rearrangeCellsSearch") && TimerFlag;
+      TimerFlag = Pacer::stop("rearrangeCellsSearch", 3) && TimerFlag;
    } // end loop over MPI tasks
 
    // Copy to final location on host - wait to create device copies until
@@ -1846,7 +1846,7 @@ int Decomp::rearrangeCellArrays(
    NEdgesOnCellH   = NEdgesOnCellTmp;
 
    // All done
-   TimerFlag = Pacer::stop("rearrangeCellArrays") && TimerFlag;
+   TimerFlag = Pacer::stop("rearrangeCellArrays", 3) && TimerFlag;
    if (!TimerFlag)
       LOG_WARN("Decomp::rearrangeCellArrays: Error in timers");
    return Err;
@@ -1914,7 +1914,7 @@ int Decomp::rearrangeEdgeArrays(
    // entries it owns.
    for (int Task = 0; Task < NumTasks; ++Task) {
 
-      TimerFlag = Pacer::start("rearrangeEdgeArraysBcast") && TimerFlag;
+      TimerFlag = Pacer::start("rearrangeEdgeArraysBcast", 3) && TimerFlag;
       // If it is this task's turn to send, fill the buffer with the local
       // chunk of all three arrays.
       if (MyTask == Task) { // Fill buffer with local chunk
@@ -1942,11 +1942,11 @@ int Decomp::rearrangeEdgeArrays(
          LOG_CRITICAL("rearrangeEdgeArrays: Error broadcasting edge buffer");
          return Err;
       }
-      TimerFlag = Pacer::stop("rearrangeEdgeArraysBcast") && TimerFlag;
+      TimerFlag = Pacer::stop("rearrangeEdgeArraysBcast", 3) && TimerFlag;
 
       // If the local Edge array has points in this buffer, extract the
       // array information into the proper location
-      TimerFlag = Pacer::start("rearrangeEdgeArraysSearch") && TimerFlag;
+      TimerFlag = Pacer::start("rearrangeEdgeArraysSearch", 3) && TimerFlag;
       for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
          if (TaskInit[Edge] == Task) {
             if (AddInit[Edge] < NEdgesGlobal + 1) {
@@ -1980,7 +1980,7 @@ int Decomp::rearrangeEdgeArrays(
             } // end if address in buffer
          } // end if address on this task
       } // end loop over local edges
-      TimerFlag = Pacer::stop("rearrangeEdgeArraysSearch") && TimerFlag;
+      TimerFlag = Pacer::stop("rearrangeEdgeArraysSearch", 3) && TimerFlag;
    } // end loop over MPI tasks
 
    // Copy to final location on host - wait to create device copies until
@@ -2055,7 +2055,7 @@ int Decomp::rearrangeVertexArrays(
 
       // If it is this task's turn to send, fill the buffer with the local
       // chunk of both arrays.
-      TimerFlag = Pacer::start("rearrangeVertexArraysBcast") && TimerFlag;
+      TimerFlag = Pacer::start("rearrangeVertexArraysBcast", 3) && TimerFlag;
       if (MyTask == Task) { // Fill buffer with local chunk
          for (int Vrtx = 0; Vrtx < NVerticesChunk; ++Vrtx) {
             I4 BufAdd = Vrtx * SizePerVrtx;
@@ -2076,11 +2076,11 @@ int Decomp::rearrangeVertexArrays(
          LOG_CRITICAL("rearrangeVertexArrays: Error broadcasting buffer");
          return Err;
       }
-      TimerFlag = Pacer::stop("rearrangeVertexArraysBcast") && TimerFlag;
+      TimerFlag = Pacer::stop("rearrangeVertexArraysBcast", 3) && TimerFlag;
 
       // For each local vertex in the distribution, determine whether the
       // buffer contains the vertex and extract the arrays
-      TimerFlag = Pacer::start("rearrangeVertexArraysSearch") && TimerFlag;
+      TimerFlag = Pacer::start("rearrangeVertexArraysSearch", 3) && TimerFlag;
       for (int Vrtx = 0; Vrtx < NVerticesAll; ++Vrtx) {
          if (TaskInit[Vrtx] == Task) {
             if (AddInit[Vrtx] < NVerticesGlobal + 1) {
@@ -2099,7 +2099,7 @@ int Decomp::rearrangeVertexArrays(
             } // end if valid vertex
          } // end if task has the vertex
       } // end loop over local vertices
-      TimerFlag = Pacer::stop("rearrangeVertexArraysSearch") && TimerFlag;
+      TimerFlag = Pacer::stop("rearrangeVertexArraysSearch", 3) && TimerFlag;
    } // end loop over MPI tasks
 
    // Copy to final location on host - wait to create device copies until

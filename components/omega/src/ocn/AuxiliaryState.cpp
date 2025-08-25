@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "Field.h"
 #include "Logging.h"
+#include "Pacer.h"
 
 namespace OMEGA {
 
@@ -75,6 +76,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    OMEGA_SCOPE(LocVelocityDel2Aux, VelocityDel2Aux);
    OMEGA_SCOPE(LocWindForcingAux, WindForcingAux);
 
+   Pacer::start("AuxState:computeMomAux", 1);
    const Array1DI4 &MinLyrCell      = VCoord->MinLayerCell;
    const Array1DI4 &MaxLyrCell      = VCoord->MaxLayerCell;
    const Array1DI4 &MinLyrEdgeBot   = VCoord->MinLayerEdgeBot;
@@ -82,6 +84,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    const Array1DI4 &MinLyrVertexBot = VCoord->MinLayerVertexBot;
    const Array1DI4 &MaxLyrVertexTop = VCoord->MaxLayerVertexTop;
 
+   Pacer::start("AuxState:vertexAuxState1", 2);
    parallelForOuter(
        {Mesh->NVerticesAll},
        KOKKOS_LAMBDA(int IVertex, const TeamMember &Team) {
@@ -92,6 +95,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
                                                  LayerThickCell, NormalVelEdge);
           });
        });
+   Pacer::stop("AuxState:vertexAuxState1", 2);
 
    // Kokkos::parallel_for(
    //     TeamPolicy(Mesh->NVerticesAll, OMEGA_TEAMSIZE),
@@ -114,6 +118,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    //                                              NormalVelEdge);
    //       });
 
+   Pacer::start("AuxState:cellAuxState1", 2);
    parallelForOuter(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
           const I4 NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
@@ -121,6 +126,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
              LocKineticAux.computeVarsOnCell(ICell, KChunk, NormalVelEdge);
           });
        });
+   Pacer::stop("AuxState:cellAuxState1", 2);
 
    // Kokkos::parallel_for(
    //     TeamPolicy(Mesh->NCellsAll, OMEGA_TEAMSIZE),
@@ -143,11 +149,14 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    const auto &VelocityDivCell = KineticAux.VelocityDivCell;
    const auto &RelVortVertex   = VorticityAux.RelVortVertex;
 
+   Pacer::start("AuxState:edgeAuxState1", 2);
    parallelFor(
        "edgeAuxState1", {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
           LocWindForcingAux.computeVarsOnEdge(IEdge);
        });
+   Pacer::stop("AuxState:edgeAuxState1", 2);
 
+   Pacer::start("AuxState:edgeAuxState2", 2);
    parallelForOuter(
        {Mesh->NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
           const I4 NChunks =
@@ -160,6 +169,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
                  IEdge, KChunk, VelocityDivCell, RelVortVertex);
           });
        });
+   Pacer::stop("AuxState:edgeAuxState2", 2);
 
    // Kokkos::parallel_for(
    //     TeamPolicy(Mesh->NEdgesAll, OMEGA_TEAMSIZE),
@@ -189,6 +199,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    //                                               RelVortVertex);
    //       });
 
+   Pacer::start("AuxState:vertexAuxState2", 2);
    parallelForOuter(
        {Mesh->NVerticesAll},
        KOKKOS_LAMBDA(int IVertex, const TeamMember &Team) {
@@ -198,6 +209,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
              LocVelocityDel2Aux.computeVarsOnVertex(IVertex, KChunk);
           });
        });
+   Pacer::stop("AuxState:vertexAuxState2", 2);
 
    // Kokkos::parallel_for(
    //     TeamPolicy(Mesh->NVerticesAll, OMEGA_TEAMSIZE),
@@ -217,6 +229,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    //          LocVelocityDel2Aux.computeVarsOnVertex(IVertex, KChunk);
    //       });
 
+   Pacer::start("AuxState:cellAuxState2", 2);
    parallelForOuter(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
           const I4 NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
@@ -224,6 +237,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
              LocVelocityDel2Aux.computeVarsOnCell(ICell, KChunk);
           });
        });
+   Pacer::stop("AuxState:cellAuxState2", 2);
 
    // Kokkos::parallel_for(
    //     TeamPolicy(Mesh->NCellsAll, OMEGA_TEAMSIZE),
@@ -242,6 +256,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    //          LocVelocityDel2Aux.computeVarsOnCell(ICell, KChunk);
    //       });
 
+   Pacer::start("AuxState:cellAuxState3", 2);
    parallelForOuter(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
           const I4 NChunks = computeNChunks(MinLyrCell, MaxLyrCell, ICell);
@@ -250,6 +265,9 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
                                                      LayerThickCell);
           });
        });
+   Pacer::stop("AuxState:cellAuxState3", 2);
+
+   Pacer::stop("AuxState:computeMomAux", 1);
 
    // Kokkos::parallel_for(
    //     TeamPolicy(Mesh->NCellsAll, OMEGA_TEAMSIZE),
@@ -293,8 +311,11 @@ void AuxiliaryState::computeAll(const OceanState *State,
 
    OMEGA_SCOPE(LocTracerAux, TracerAux);
 
+   Pacer::start("AuxState:computeAll", 1);
+
    computeMomAux(State, ThickTimeLevel, VelTimeLevel);
 
+   Pacer::start("AuxState:edgeAuxState4", 2);
    parallelForOuter(
        {NTracers, LocNEdgesAll},
        KOKKOS_LAMBDA(int LTracer, int IEdge, const TeamMember &Team) {
@@ -306,6 +327,7 @@ void AuxiliaryState::computeAll(const OceanState *State,
                                             TracerArray);
           });
        });
+   Pacer::stop("AuxState:edgeAuxState4", 2);
 
    // Kokkos::parallel_for(
    //     TeamPolicy(NTracers * LocNEdgesAll, OMEGA_TEAMSIZE),
@@ -334,6 +356,7 @@ void AuxiliaryState::computeAll(const OceanState *State,
 
    const auto &MeanLayerThickEdge = LayerThicknessAux.MeanLayerThickEdge;
 
+   Pacer::start("AuxState:cellAuxState4", 2);
    parallelForOuter(
        {NTracers, LocNCellsAll},
        KOKKOS_LAMBDA(int LTracer, int ICell, const TeamMember &Team) {
@@ -343,6 +366,7 @@ void AuxiliaryState::computeAll(const OceanState *State,
                                              MeanLayerThickEdge, TracerArray);
           });
        });
+   Pacer::stop("AuxState:cellAuxState4", 2);
 
    // Kokkos::parallel_for(
    //     TeamPolicy(NTracers * LocNCellsAll, OMEGA_TEAMSIZE),
