@@ -77,6 +77,7 @@ using TeamMember      = TeamPolicy::member_type;
 using ScratchMemSpace = ExecSpace::scratch_memory_space;
 using Kokkos::MemoryUnmanaged;
 using Kokkos::TeamThreadRange;
+using Kokkos::ThreadVectorRange;
 
 /// team_size for hierarchical parallelism
 #ifdef OMEGA_TARGET_DEVICE
@@ -330,7 +331,8 @@ inline void parallelForOuter(const std::string &Label,
 
    } else {
 
-      auto Policy = TeamPolicy(LinBound, NElemPerTeam, VectorSize);
+      auto Policy = TeamPolicy((LinBound + NElemPerTeam - 1) / NElemPerTeam,
+                               NElemPerTeam, VectorSize);
       Kokkos::parallel_for(
           Label, Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
              const int TeamId   = Team.league_rank();
