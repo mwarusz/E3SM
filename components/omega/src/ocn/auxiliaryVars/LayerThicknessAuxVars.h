@@ -28,9 +28,9 @@ class LayerThicknessAuxVars {
    computeVarsOnEdge(int IEdge, int KChunk, const Array2DReal &LayerThickCell,
                      const Array2DReal &NormalVelEdge) const {
       //      const int KStart = KChunk * VecLength;
-      I4 KStart, KLen;
-      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
-                    KLen);
+      const I4 KStart = computeKStart(MinLayerEdgeBot, IEdge, KChunk);
+      const I4 KLen =
+          computeKLen(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk);
 
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
@@ -73,8 +73,8 @@ class LayerThicknessAuxVars {
       // Temporary for stacked shallow water
       //      const int KStart = KChunk * VecLength;
       //      for (int KVec = 0; KVec < VecLength; ++KVec) {
-      I4 KStart, KLen;
-      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
+      const I4 KStart = computeKStart(MinLayerCell, ICell, KChunk);
+      const I4 KLen   = computeKLen(MinLayerCell, MaxLayerCell, ICell, KChunk);
       for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K       = KStart + KVec;
          SshCell(ICell, K) = LayerThickCell(ICell, K) - BottomDepth(ICell);

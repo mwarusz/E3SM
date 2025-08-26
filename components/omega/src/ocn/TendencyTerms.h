@@ -41,8 +41,8 @@ class ThicknessFluxDivOnCell {
 
       Real DivTmp[VecLength] = {0};
 
-      I4 KStart, KLen;
-      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
+      const I4 KStart = computeKStart(MinLayerCell, ICell, KChunk);
+      const I4 KLen   = computeKLen(MinLayerCell, MaxLayerCell, ICell, KChunk);
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
@@ -100,9 +100,9 @@ class PotentialVortHAdvOnEdge {
       //      const I4 KStart         = KChunk * VecLength;
       Real VortTmp[VecLength] = {0};
 
-      I4 KStart, KLen;
-      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
-                    KLen);
+      const I4 KStart = computeKStart(MinLayerEdgeBot, IEdge, KChunk);
+      const I4 KLen =
+          computeKLen(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk);
 
       for (int J = 0; J < NEdgesOnEdge(IEdge); ++J) {
          I4 JEdge = EdgesOnEdge(IEdge, J);
@@ -152,9 +152,9 @@ class KEGradOnEdge {
       const Real InvDcEdge = 1._Real / DcEdge(IEdge);
 
       //      for (int KVec = 0; KVec < VecLength; ++KVec) {
-      I4 KStart, KLen;
-      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
-                    KLen);
+      const I4 KStart = computeKStart(MinLayerEdgeBot, IEdge, KChunk);
+      const I4 KLen =
+          computeKLen(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk);
 
       for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
@@ -186,9 +186,9 @@ class SSHGradOnEdge {
                                    const Array2DReal &SshCell) const {
 
       //      const I4 KStart      = KChunk * VecLength;
-      I4 KStart, KLen;
-      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
-                    KLen);
+      const I4 KStart = computeKStart(MinLayerEdgeBot, IEdge, KChunk);
+      const I4 KLen =
+          computeKLen(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk);
 
       const I4 ICell0      = CellsOnEdge(IEdge, 0);
       const I4 ICell1      = CellsOnEdge(IEdge, 1);
@@ -229,9 +229,9 @@ class VelocityDiffusionOnEdge {
                                    const Array2DReal &RVortVertex) const {
 
       //      const I4 KStart = KChunk * VecLength;
-      I4 KStart, KLen;
-      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
-                    KLen);
+      const I4 KStart = computeKStart(MinLayerEdgeBot, IEdge, KChunk);
+      const I4 KLen =
+          computeKLen(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk);
 
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
@@ -284,9 +284,9 @@ class VelocityHyperDiffOnEdge {
                                    const Array2DReal &Del2RVortVertex) const {
 
       //      const I4 KStart = KChunk * VecLength;
-      I4 KStart, KLen;
-      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
-                    KLen);
+      const I4 KStart = computeKStart(MinLayerEdgeBot, IEdge, KChunk);
+      const I4 KLen =
+          computeKLen(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk);
 
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
@@ -401,8 +401,8 @@ class TracerHorzAdvOnCell {
 
       Real HAdvTmp[VecLength] = {0};
 
-      I4 KStart, KLen;
-      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
+      const I4 KStart = computeKStart(MinLayerCell, ICell, KChunk);
+      const I4 KLen   = computeKLen(MinLayerCell, MaxLayerCell, ICell, KChunk);
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
@@ -458,8 +458,8 @@ class TracerDiffOnCell {
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real DiffTmp[VecLength] = {0};
-      I4 KStart, KLen;
-      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
+      const I4 KStart         = computeKStart(MinLayerCell, ICell, KChunk);
+      const I4 KLen = computeKLen(MinLayerCell, MaxLayerCell, ICell, KChunk);
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
@@ -523,8 +523,8 @@ class TracerHyperDiffOnCell {
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real HypTmp[VecLength] = {0};
-      I4 KStart, KLen;
-      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
+      const I4 KStart        = computeKStart(MinLayerCell, ICell, KChunk);
+      const I4 KLen = computeKLen(MinLayerCell, MaxLayerCell, ICell, KChunk);
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);

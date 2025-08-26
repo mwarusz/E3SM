@@ -26,8 +26,8 @@ class KineticAuxVars {
 
       Real KineticEnergyCellTmp[VecLength] = {0};
       Real VelocityDivCellTmp[VecLength]   = {0};
-      I4 KStart, KLen;
-      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
+      const I4 KStart = computeKStart(MinLayerCell, ICell, KChunk);
+      const I4 KLen   = computeKLen(MinLayerCell, MaxLayerCell, ICell, KChunk);
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const int JEdge     = EdgesOnCell(ICell, J);

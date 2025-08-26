@@ -284,15 +284,24 @@ int computeNChunks(const Array1DI4 &MinLayer, const Array1DI4 &MaxLayer,
 }
 
 KOKKOS_INLINE_FUNCTION
-void computeKRange(const Array1DI4 &MinLayer, const Array1DI4 &MaxLayer,
-                   const I4 I, const I4 KChunk, I4 &KStart, I4 &KLen) {
-
+int computeKStart(const Array1DI4 &MinLayer, const I4 I, const I4 KChunk) {
    const I4 KMin = MinLayer(I);
-   const I4 KMax = MaxLayer(I);
-   KStart        = KMin + KChunk * VecLength;
-   const I4 KEnd = KStart + VecLength;
+   return KMin + KChunk * VecLength;
+}
 
-   KLen = (KEnd > KMax + 1) ? (KMax - KStart + 1) : VecLength;
+KOKKOS_INLINE_FUNCTION
+constexpr int computeKLen(const Array1DI4 &MinLayer, const Array1DI4 &MaxLayer,
+                          const I4 I, const I4 KChunk) {
+
+   if constexpr (VecLength == 1) {
+      return 1;
+   } else {
+      const I4 KMin   = MinLayer(I);
+      const I4 KStart = KMin + KChunk * VecLength;
+      const I4 KMax   = MaxLayer(I);
+      const I4 KEnd   = KStart + VecLength;
+      return (KEnd > KMax + 1) ? (KMax - KStart + 1) : VecLength;
+   }
 }
 
 #ifdef OMEGA_TARGET_DEVICE

@@ -29,9 +29,9 @@ class TracerAuxVars {
                                           const Array2DReal &HCell,
                                           const Array3DReal &TrCell) const {
       //      const int KStart = KChunk * VecLength;
-      I4 KStart, KLen;
-      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
-                    KLen);
+      const I4 KStart = computeKStart(MinLayerEdgeBot, IEdge, KChunk);
+      const I4 KLen =
+          computeKLen(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk);
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
 
@@ -69,8 +69,8 @@ class TracerAuxVars {
                       const Array3DReal &TrCell) const {
 
       //      const int KStart       = KChunk * VecLength;
-      I4 KStart, KLen;
-      computeKRange(MinLayerCell, MaxLayerCell, ICell, KChunk, KStart, KLen);
+      const I4 KStart = computeKStart(MinLayerCell, ICell, KChunk);
+      const I4 KLen   = computeKLen(MinLayerCell, MaxLayerCell, ICell, KChunk);
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real Del2TrCellTmp[VecLength] = {0};

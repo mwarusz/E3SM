@@ -29,9 +29,9 @@ class VorticityAuxVars {
       //      const int KStart           = KChunk * VecLength;
       const Real InvAreaTriangle = 1._Real / AreaTriangle(IVertex);
 
-      I4 KStart, KLen;
-      computeKRange(MinLayerVertexBot, MaxLayerVertexTop, IVertex, KChunk,
-                    KStart, KLen);
+      const I4 KStart = computeKStart(MinLayerVertexBot, IVertex, KChunk);
+      const I4 KLen =
+          computeKLen(MinLayerVertexBot, MaxLayerVertexTop, IVertex, KChunk);
 
       Real LayerThickVertex[VecLength] = {0};
       Real RelVortVertexTmp[VecLength] = {0};
@@ -68,9 +68,9 @@ class VorticityAuxVars {
       const int JVertex0 = VerticesOnEdge(IEdge, 0);
       const int JVertex1 = VerticesOnEdge(IEdge, 1);
 
-      I4 KStart, KLen;
-      computeKRange(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk, KStart,
-                    KLen);
+      const I4 KStart = computeKStart(MinLayerEdgeBot, IEdge, KChunk);
+      const I4 KLen =
+          computeKLen(MinLayerEdgeBot, MaxLayerEdgeTop, IEdge, KChunk);
 
       for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K = KStart + KVec;
