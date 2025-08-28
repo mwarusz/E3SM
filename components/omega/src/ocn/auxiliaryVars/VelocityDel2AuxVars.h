@@ -36,6 +36,8 @@ class VelocityDel2AuxVars {
       const Real InvDvEdge =
           1._Real / Kokkos::max(DvEdge(IEdge), 0.25_Real * DcEdge(IEdge));
 
+      Real Del2Tmp[VecLength];
+
       for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K = KStart + KVec;
          const Real GradDiv =
@@ -44,7 +46,12 @@ class VelocityDel2AuxVars {
          const Real CurlVort =
              -(RelVortVertex(JVertex1, K) - RelVortVertex(JVertex0, K)) *
              InvDvEdge;
-         Del2Edge(IEdge, K) = EdgeMask(IEdge, K) * GradDiv + CurlVort;
+         Del2Tmp[KVec] = EdgeMask(IEdge, K) * GradDiv + CurlVort;
+      }
+
+      for (int KVec = 0; KVec < KLen; ++KVec) {
+         const int K        = KStart + KVec;
+         Del2Edge(IEdge, K) = Del2Tmp[KVec];
       }
    }
 

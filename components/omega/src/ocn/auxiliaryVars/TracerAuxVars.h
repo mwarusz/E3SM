@@ -35,31 +35,40 @@ class TracerAuxVars {
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
 
+      const auto LTrCell = subview(TrCell, L, Kokkos::ALL, Kokkos::ALL);
+      const auto LHTracersEdge =
+          subview(HTracersEdge, L, Kokkos::ALL, Kokkos::ALL);
+
+      Real HTracerTmp[VecLength];
+
       switch (TracersOnEdgeChoice) {
       case FluxTracerEdgeOption::Center:
          for (int KVec = 0; KVec < KLen; ++KVec) {
             const int K = KStart + KVec;
-            HTracersEdge(L, IEdge, K) =
-                0.5_Real * (HCell(JCell0, K) * TrCell(L, JCell0, K) +
-                            HCell(JCell1, K) * TrCell(L, JCell1, K));
+            HTracerTmp[KVec] =
+                0.5_Real * (HCell(JCell0, K) * LTrCell(JCell0, K) +
+                            HCell(JCell1, K) * LTrCell(JCell1, K));
          }
          break;
       case FluxTracerEdgeOption::Upwind:
          for (int KVec = 0; KVec < KLen; ++KVec) {
             const int K = KStart + KVec;
             if (NormalVelEdge(IEdge, K) > 0) {
-               HTracersEdge(L, IEdge, K) =
-                   HCell(JCell0, K) * TrCell(L, JCell0, K);
+               HTracerTmp[KVec] = HCell(JCell0, K) * LTrCell(JCell0, K);
             } else if (NormalVelEdge(IEdge, K) < 0) {
-               HTracersEdge(L, IEdge, K) =
-                   HCell(JCell1, K) * TrCell(L, JCell1, K);
+               HTracerTmp[KVec] = HCell(JCell1, K) * LTrCell(JCell1, K);
             } else {
-               HTracersEdge(L, IEdge, K) =
-                   Kokkos::max(HCell(JCell0, K) * TrCell(L, JCell0, K),
-                               HCell(JCell1, K) * TrCell(L, JCell1, K));
+               HTracerTmp[KVec] =
+                   Kokkos::max(HCell(JCell0, K) * LTrCell(JCell0, K),
+                               HCell(JCell1, K) * LTrCell(JCell1, K));
             }
          }
          break;
+      }
+
+      for (int KVec = 0; KVec < KLen; ++KVec) {
+         const int K             = KStart + KVec;
+         LHTracersEdge(IEdge, K) = HTracerTmp[KVec];
       }
    }
 
@@ -73,6 +82,10 @@ class TracerAuxVars {
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
+      const auto LDel2TracersCell =
+          subview(Del2TracersCell, L, Kokkos::ALL, Kokkos::ALL);
+      const auto LTrCell = subview(TrCell, L, Kokkos::ALL, Kokkos::ALL);
+
       Real Del2TrCellTmp[VecLength] = {0};
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
@@ -85,7 +98,7 @@ class TracerAuxVars {
 
          for (int KVec = 0; KVec < KLen; ++KVec) {
             const int K           = KStart + KVec;
-            const Real TracerGrad = TrCell(L, JCell1, K) - TrCell(L, JCell0, K);
+            const Real TracerGrad = LTrCell(JCell1, K) - LTrCell(JCell0, K);
             Del2TrCellTmp[KVec] -= EdgeMask(JEdge, K) *
                                    EdgeSignOnCell(ICell, J) * DvDcEdge *
                                    LayerThickEdgeMean(JEdge, K) * TracerGrad;

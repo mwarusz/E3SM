@@ -34,34 +34,46 @@ class LayerThicknessAuxVars {
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
 
+      Real MeanThickTmp[VecLength];
+      Real FluxThickTmp[VecLength];
+
       for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K = KStart + KVec;
-         MeanLayerThickEdge(IEdge, K) =
+         MeanThickTmp[KVec] =
              0.5_Real * (LayerThickCell(JCell0, K) + LayerThickCell(JCell1, K));
       }
 
       switch (FluxThickEdgeChoice) {
       case FluxThickEdgeOption::Center:
          for (int KVec = 0; KVec < KLen; ++KVec) {
-            const int K = KStart + KVec;
-            FluxLayerThickEdge(IEdge, K) =
-                0.5_Real *
-                (LayerThickCell(JCell0, K) + LayerThickCell(JCell1, K));
+            const int K        = KStart + KVec;
+            FluxThickTmp[KVec] = 0.5_Real * (LayerThickCell(JCell0, K) +
+                                             LayerThickCell(JCell1, K));
          }
          break;
       case FluxThickEdgeOption::Upwind:
          for (int KVec = 0; KVec < KLen; ++KVec) {
             const int K = KStart + KVec;
             if (NormalVelEdge(IEdge, K) > 0) {
-               FluxLayerThickEdge(IEdge, K) = LayerThickCell(JCell0, K);
+               FluxThickTmp[KVec] = LayerThickCell(JCell0, K);
             } else if (NormalVelEdge(IEdge, K) < 0) {
-               FluxLayerThickEdge(IEdge, K) = LayerThickCell(JCell1, K);
+               FluxThickTmp[KVec] = LayerThickCell(JCell1, K);
             } else {
-               FluxLayerThickEdge(IEdge, K) = Kokkos::max(
-                   LayerThickCell(JCell0, K), LayerThickCell(JCell1, K));
+               FluxThickTmp[KVec] = Kokkos::max(LayerThickCell(JCell0, K),
+                                                LayerThickCell(JCell1, K));
             }
          }
          break;
+      }
+
+      for (int KVec = 0; KVec < KLen; ++KVec) {
+         const int K                  = KStart + KVec;
+         MeanLayerThickEdge(IEdge, K) = MeanThickTmp[KVec];
+      }
+
+      for (int KVec = 0; KVec < KLen; ++KVec) {
+         const int K                  = KStart + KVec;
+         FluxLayerThickEdge(IEdge, K) = FluxThickTmp[KVec];
       }
    }
 
