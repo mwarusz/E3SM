@@ -132,10 +132,17 @@ class KEGradOnEdge {
       const I4 JCell1      = CellsOnEdge(IEdge, 1);
       const Real InvDcEdge = 1._Real / DcEdge(IEdge);
 
+      Real KETmp[VecLength] = {0};
+
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(IEdge, K) -= EdgeMask(IEdge, K) *
-                           (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
+         KETmp[KVec] -= EdgeMask(IEdge, K) *
+                        (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
+      }
+
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const I4 K = KStart + KVec;
+         Tend(IEdge, K) += KETmp[KVec];
       }
    }
 
@@ -164,11 +171,17 @@ class SSHGradOnEdge {
       const I4 ICell1      = CellsOnEdge(IEdge, 1);
       const Real InvDcEdge = 1._Real / DcEdge(IEdge);
 
+      Real SSHTmp[VecLength] = {0};
+
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(IEdge, K) -= EdgeMask(IEdge, K) * Grav *
-                           (SshCell(ICell1, K) - SshCell(ICell0, K)) *
-                           InvDcEdge;
+         SSHTmp[KVec] -= EdgeMask(IEdge, K) * Grav *
+                         (SshCell(ICell1, K) - SshCell(ICell0, K)) * InvDcEdge;
+      }
+
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const I4 K = KStart + KVec;
+         Tend(IEdge, K) += SSHTmp[KVec];
       }
    }
 
@@ -206,15 +219,19 @@ class VelocityDiffusionOnEdge {
       const Real DcEdgeInv = 1._Real / DcEdge(IEdge);
       const Real DvEdgeInv = 1._Real / DvEdge(IEdge);
 
+      Real Del2Tmp[VecLength] = {0};
+
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         const Real Del2U =
+         Del2Tmp[KVec] =
              ((DivCell(ICell1, K) - DivCell(ICell0, K)) * DcEdgeInv -
               (RVortVertex(IVertex1, K) - RVortVertex(IVertex0, K)) *
                   DvEdgeInv);
-
-         Tend(IEdge, K) +=
-             EdgeMask(IEdge, K) * ViscDel2 * MeshScalingDel2(IEdge) * Del2U;
+      }
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const I4 K = KStart + KVec;
+         Tend(IEdge, K) += EdgeMask(IEdge, K) * ViscDel2 *
+                           MeshScalingDel2(IEdge) * Del2Tmp[KVec];
       }
    }
 
@@ -255,16 +272,20 @@ class VelocityHyperDiffOnEdge {
       const Real DcEdgeInv = 1._Real / DcEdge(IEdge);
       const Real DvEdgeInv = 1._Real / DvEdge(IEdge);
 
+      Real Del2Tmp[VecLength] = {0};
+
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         const Real Del2U =
+         Del2Tmp[KVec] =
              (DivFactor * (Del2DivCell(ICell1, K) - Del2DivCell(ICell0, K)) *
                   DcEdgeInv -
               (Del2RVortVertex(IVertex1, K) - Del2RVortVertex(IVertex0, K)) *
                   DvEdgeInv);
-
-         Tend(IEdge, K) -=
-             EdgeMask(IEdge, K) * ViscDel4 * MeshScalingDel4(IEdge) * Del2U;
+      }
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const I4 K = KStart + KVec;
+         Tend(IEdge, K) -= EdgeMask(IEdge, K) * ViscDel4 *
+                           MeshScalingDel4(IEdge) * Del2Tmp[KVec];
       }
    }
 
@@ -353,6 +374,10 @@ class TracerHorzAdvOnCell {
       const I4 KStart        = KChunk * VecLength;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
+      const auto LHTracersOnEdge =
+          subview(HTracersOnEdge, L, Kokkos::ALL, Kokkos::ALL);
+      const auto LTend = subview(Tend, L, Kokkos::ALL, Kokkos::ALL);
+
       Real HAdvTmp[VecLength] = {0};
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
@@ -360,15 +385,14 @@ class TracerHorzAdvOnCell {
 
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const I4 K = KStart + KVec;
-            HAdvTmp[KVec] -= EdgeMask(JEdge, K) * DvEdge(JEdge) *
-                             EdgeSignOnCell(ICell, J) *
-                             HTracersOnEdge(L, JEdge, K) *
-                             NormVelEdge(JEdge, K) * InvAreaCell;
+            HAdvTmp[KVec] -=
+                EdgeMask(JEdge, K) * DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
+                LHTracersOnEdge(JEdge, K) * NormVelEdge(JEdge, K) * InvAreaCell;
          }
       }
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(L, ICell, K) -= HAdvTmp[KVec];
+         LTend(ICell, K) -= HAdvTmp[KVec];
       }
    }
 
@@ -399,6 +423,9 @@ class TracerDiffOnCell {
       const I4 KStart        = KChunk * VecLength;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
+      const auto LTracerCell = subview(TracerCell, L, Kokkos::ALL, Kokkos::ALL);
+      const auto LTend       = subview(Tend, L, Kokkos::ALL, Kokkos::ALL);
+
       Real DiffTmp[VecLength] = {0};
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
@@ -413,7 +440,7 @@ class TracerDiffOnCell {
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const I4 K = KStart + KVec;
             const Real TracerGrad =
-                (TracerCell(L, JCell1, K) - TracerCell(L, JCell0, K));
+                (LTracerCell(JCell1, K) - LTracerCell(JCell0, K));
 
             DiffTmp[KVec] -= EdgeMask(JEdge, K) * EdgeSignOnCell(ICell, J) *
                              RTemp * MeanLayerThickEdge(JEdge, K) * TracerGrad;
@@ -421,7 +448,7 @@ class TracerDiffOnCell {
       }
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(L, ICell, K) += EddyDiff2 * DiffTmp[KVec] * InvAreaCell;
+         LTend(ICell, K) += EddyDiff2 * DiffTmp[KVec] * InvAreaCell;
       }
    }
 
@@ -453,6 +480,9 @@ class TracerHyperDiffOnCell {
       const I4 KStart        = KChunk * VecLength;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
+      const auto LTrDel2Cell = subview(TrDel2Cell, L, Kokkos::ALL, Kokkos::ALL);
+      const auto LTend       = subview(Tend, L, Kokkos::ALL, Kokkos::ALL);
+
       Real HypTmp[VecLength] = {0};
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
@@ -467,7 +497,7 @@ class TracerHyperDiffOnCell {
          for (int KVec = 0; KVec < VecLength; ++KVec) {
             const I4 K = KStart + KVec;
             const Real Del2TrGrad =
-                (TrDel2Cell(L, JCell1, K) - TrDel2Cell(L, JCell0, K));
+                (LTrDel2Cell(JCell1, K) - LTrDel2Cell(JCell0, K));
 
             HypTmp[KVec] -= EdgeMask(JEdge, K) * EdgeSignOnCell(ICell, J) *
                             RTemp * Del2TrGrad;
@@ -475,7 +505,7 @@ class TracerHyperDiffOnCell {
       }
       for (int KVec = 0; KVec < VecLength; ++KVec) {
          const I4 K = KStart + KVec;
-         Tend(L, ICell, K) -= EddyDiff4 * HypTmp[KVec] * InvAreaCell;
+         LTend(ICell, K) -= EddyDiff4 * HypTmp[KVec] * InvAreaCell;
       }
    }
 

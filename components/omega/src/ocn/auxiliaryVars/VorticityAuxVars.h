@@ -63,15 +63,28 @@ class VorticityAuxVars {
       const int JVertex0 = VerticesOnEdge(IEdge, 0);
       const int JVertex1 = VerticesOnEdge(IEdge, 1);
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const int K = KStart + KVec;
-         NormRelVortEdge(IEdge, K) =
-             0.5_Real *
-             (NormRelVortVertex(JVertex0, K) + NormRelVortVertex(JVertex1, K));
+      Real NRelVortTmp[VecLength];
+      Real NPlanetVortTmp[VecLength];
 
-         NormPlanetVortEdge(IEdge, K) =
-             0.5_Real * (NormPlanetVortVertex(JVertex0, K) +
-                         NormPlanetVortVertex(JVertex1, K));
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const int K       = KStart + KVec;
+         NRelVortTmp[KVec] = 0.5_Real * (NormRelVortVertex(JVertex0, K) +
+                                         NormRelVortVertex(JVertex1, K));
+      }
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const int K          = KStart + KVec;
+         NPlanetVortTmp[KVec] = 0.5_Real * (NormPlanetVortVertex(JVertex0, K) +
+                                            NormPlanetVortVertex(JVertex1, K));
+      }
+
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const int K               = KStart + KVec;
+         NormRelVortEdge(IEdge, K) = NRelVortTmp[KVec];
+      }
+
+      for (int KVec = 0; KVec < VecLength; ++KVec) {
+         const int K                  = KStart + KVec;
+         NormPlanetVortEdge(IEdge, K) = NPlanetVortTmp[KVec];
       }
    }
 
