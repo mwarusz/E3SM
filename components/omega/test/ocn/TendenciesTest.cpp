@@ -199,21 +199,21 @@ int testTendencies() {
    int NTracers    = Tracers::getNumTracers();
 
    const Real LayerThickTendSum =
-       sum(DefTendencies->LayerThicknessTend, NCellsOwned);
+       sum(DefTendencies->LayerThicknessTend, Mesh, VCoord, OnCell);
    if (!Kokkos::isfinite(LayerThickTendSum) || LayerThickTendSum == 0) {
       Err++;
       LOG_ERROR("TendenciesTest: LayerThickTend FAIL");
    }
 
    const Real NormVelTendSum =
-       sum(DefTendencies->NormalVelocityTend, NEdgesOwned);
+       sum(DefTendencies->NormalVelocityTend, Mesh, VCoord, OnEdge);
    if (!Kokkos::isfinite(NormVelTendSum) || NormVelTendSum == 0) {
       Err++;
       LOG_ERROR("TendenciesTest: NormVelTendSum FAIL");
    }
 
    const Real TraceTendSum =
-       sum(DefTendencies->TracerTend, NTracers, NCellsOwned);
+       sum(DefTendencies->TracerTend, Mesh, VCoord, OnCell);
    if (!Kokkos::isfinite(TraceTendSum) || TraceTendSum == 0) {
       Err++;
       LOG_ERROR("TendenciesTest: TraceTendSum FAIL");

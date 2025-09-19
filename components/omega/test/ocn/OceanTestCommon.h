@@ -386,6 +386,53 @@ inline Real sum(const Array2DReal &Arr, int Extent0, int Extent1) {
    return Sum;
 }
 
+inline Real sum(const Array2DReal &Arr, const HorzMesh *Mesh,
+                const VertCoord *VCoord, MeshElement Element) {
+
+   int NElementsOwned;
+   Array1DI4 MinLayerElement, MaxLayerElement;
+
+   switch (Element) {
+   case OnCell:
+      NElementsOwned  = Mesh->NCellsOwned;
+      MinLayerElement = VCoord->MinLayerCell;
+      MaxLayerElement = VCoord->MaxLayerCell;
+      break;
+   case OnVertex:
+      NElementsOwned  = Mesh->NVerticesOwned;
+      MinLayerElement = VCoord->MinLayerVertexBot;
+      MaxLayerElement = VCoord->MaxLayerVertexTop;
+      break;
+   case OnEdge:
+      NElementsOwned  = Mesh->NEdgesOwned;
+      MinLayerElement = VCoord->MinLayerEdgeBot;
+      MaxLayerElement = VCoord->MaxLayerEdgeTop;
+      break;
+   default:
+      LOG_ERROR("setScalar: element needs to be one of (OnCell, OnVertex, "
+                "OnEdge)");
+      return 1;
+   }
+   Real Sum;
+
+   parallelReduceOuter(
+       {NElementsOwned},
+       KOKKOS_LAMBDA(int I, const TeamMember &Team, Real &Accum) {
+          const int KMin   = MinLayerElement(I);
+          const int KRange = MaxLayerElement(I) - KMin + 1;
+          parallelReduceInner(
+              Team, KRange,
+              [=](int KOff, Real &AccumInner) {
+                 const int K = KMin + KOff;
+                 AccumInner += Arr(I, K);
+              },
+              Accum);
+       },
+       Sum);
+
+   return Sum;
+}
+
 inline Real sum(const Array2DReal &Arr) {
    return sum(Arr, Arr.extent_int(0), Arr.extent_int(1));
 }
@@ -417,6 +464,53 @@ inline Real sum(const Array3DReal &Arr, int Extent0) {
 
 inline Real sum(const Array3DReal &Arr, int Extent0, int Extent1) {
    return sum(Arr, Extent0, Extent1, Arr.extent_int(2));
+}
+
+inline Real sum(const Array3DReal &Arr, const HorzMesh *Mesh,
+                const VertCoord *VCoord, MeshElement Element) {
+
+   int NElementsOwned;
+   Array1DI4 MinLayerElement, MaxLayerElement;
+
+   switch (Element) {
+   case OnCell:
+      NElementsOwned  = Mesh->NCellsOwned;
+      MinLayerElement = VCoord->MinLayerCell;
+      MaxLayerElement = VCoord->MaxLayerCell;
+      break;
+   case OnVertex:
+      NElementsOwned  = Mesh->NVerticesOwned;
+      MinLayerElement = VCoord->MinLayerVertexBot;
+      MaxLayerElement = VCoord->MaxLayerVertexTop;
+      break;
+   case OnEdge:
+      NElementsOwned  = Mesh->NEdgesOwned;
+      MinLayerElement = VCoord->MinLayerEdgeBot;
+      MaxLayerElement = VCoord->MaxLayerEdgeTop;
+      break;
+   default:
+      LOG_ERROR("setScalar: element needs to be one of (OnCell, OnVertex, "
+                "OnEdge)");
+      return 1;
+   }
+   Real Sum;
+
+   parallelReduceOuter(
+       {Arr.extent_int(0), NElementsOwned},
+       KOKKOS_LAMBDA(int L, int I, const TeamMember &Team, Real &Accum) {
+          const int KMin   = MinLayerElement(I);
+          const int KRange = MaxLayerElement(I) - KMin + 1;
+          parallelReduceInner(
+              Team, KRange,
+              [=](int KOff, Real &AccumInner) {
+                 const int K = KMin + KOff;
+                 AccumInner += Arr(L, I, K);
+              },
+              Accum);
+       },
+       Sum);
+
+   return Sum;
 }
 
 struct ErrorMeasures {

@@ -189,6 +189,8 @@ int testAuxState() {
    deepCopy(DefAuxState->TracerAux.HTracersEdge, NAN);
    deepCopy(DefAuxState->TracerAux.Del2TracersCell, NAN);
 
+   auto *VCoord = VertCoord::getDefault();
+
    // compute auxiliary variables
    const auto *State = OceanState::getDefault();
    Array3DReal TracerArray;
@@ -202,77 +204,77 @@ int testAuxState() {
    int NTracers       = Tracers::getNumTracers();
 
    const Real KineticEnergySum =
-       sum(DefAuxState->KineticAux.KineticEnergyCell, NCellsOwned);
+       sum(DefAuxState->KineticAux.KineticEnergyCell, Mesh, VCoord, OnCell);
    if (!Kokkos::isfinite(KineticEnergySum)) {
       Err++;
       LOG_ERROR("AuxStateTest: KineticEnergy FAIL");
    }
 
    const Real VelocityDivSum =
-       sum(DefAuxState->KineticAux.VelocityDivCell, NCellsOwned);
+       sum(DefAuxState->KineticAux.VelocityDivCell, Mesh, VCoord, OnCell);
    if (!Kokkos::isfinite(VelocityDivSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: VelocityDivCell FAIL");
    }
 
-   const Real FluxLayerThickSum =
-       sum(DefAuxState->LayerThicknessAux.FluxLayerThickEdge, NEdgesOwned);
+   const Real FluxLayerThickSum = sum(
+       DefAuxState->LayerThicknessAux.FluxLayerThickEdge, Mesh, VCoord, OnEdge);
    if (!Kokkos::isfinite(FluxLayerThickSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: FluxLayerThickEdge FAIL");
    }
 
-   const Real MeanLayerThickSum =
-       sum(DefAuxState->LayerThicknessAux.MeanLayerThickEdge, NEdgesOwned);
+   const Real MeanLayerThickSum = sum(
+       DefAuxState->LayerThicknessAux.MeanLayerThickEdge, Mesh, VCoord, OnEdge);
    if (!Kokkos::isfinite(MeanLayerThickSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: MeanLayerThickEdge FAIL");
    }
 
    const Real RelVortVSum =
-       sum(DefAuxState->VorticityAux.RelVortVertex, NVerticesOwned);
+       sum(DefAuxState->VorticityAux.RelVortVertex, Mesh, VCoord, OnVertex);
    if (!Kokkos::isfinite(RelVortVSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: RelVortVertex FAIL");
    }
 
    const Real NormRelVortVSum =
-       sum(DefAuxState->VorticityAux.NormRelVortVertex, NVerticesOwned);
+       sum(DefAuxState->VorticityAux.NormRelVortVertex, Mesh, VCoord, OnVertex);
    if (!Kokkos::isfinite(NormRelVortVSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: NormRelVortVertex FAIL");
    }
 
-   const Real NormPlanetVortVSum =
-       sum(DefAuxState->VorticityAux.NormPlanetVortVertex, NVerticesOwned);
+   const Real NormPlanetVortVSum = sum(
+       DefAuxState->VorticityAux.NormPlanetVortVertex, Mesh, VCoord, OnVertex);
    if (!Kokkos::isfinite(NormPlanetVortVSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: NormPlanetVortVertex FAIL");
    }
 
    const Real NormRelVortESum =
-       sum(DefAuxState->VorticityAux.NormRelVortEdge, NEdgesOwned);
+       sum(DefAuxState->VorticityAux.NormRelVortEdge, Mesh, VCoord, OnEdge);
    if (!Kokkos::isfinite(NormRelVortESum)) {
       Err++;
       LOG_ERROR("AuxStateTest: NormRelVortEdge FAIL");
    }
 
    const Real NormPlanetVortESum =
-       sum(DefAuxState->VorticityAux.NormPlanetVortEdge, NEdgesOwned);
+       sum(DefAuxState->VorticityAux.NormPlanetVortEdge, Mesh, VCoord, OnEdge);
    if (!Kokkos::isfinite(NormPlanetVortESum)) {
       Err++;
       LOG_ERROR("AuxStateTest: NormPlanetVortEdge FAIL");
    }
 
    const Real HTracersESum =
-       sum(DefAuxState->TracerAux.HTracersEdge, NTracers, NEdgesOwned);
+       sum(DefAuxState->TracerAux.HTracersEdge, Mesh, VCoord, OnEdge);
    if (!Kokkos::isfinite(HTracersESum)) {
       Err++;
       LOG_ERROR("AuxStateTest: HTracersOnEdge FAIL");
    }
 
    const Real Del2TracersCSum =
-       sum(DefAuxState->TracerAux.Del2TracersCell, NTracers, NCellsOwned);
+       sum(DefAuxState->TracerAux.Del2TracersCell, Mesh, VCoord, OnCell);
    if (!Kokkos::isfinite(Del2TracersCSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: Del2TracersOnCell FAIL");
