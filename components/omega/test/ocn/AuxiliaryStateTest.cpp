@@ -7,6 +7,7 @@
 #include "Halo.h"
 #include "HorzMesh.h"
 #include "IO.h"
+#include "IOStream.h"
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OceanTestCommon.h"
@@ -63,6 +64,10 @@ int initState() {
 
    int NTracers = Tracers::getNumTracers();
 
+   deepCopy(LayerThickCell, NAN);
+   deepCopy(NormalVelEdge, NAN);
+   deepCopy(TracerArray, NAN);
+
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.layerThickness(X, Y); },
        LayerThickCell, Geom, Mesh, VCoord, OnCell);
@@ -102,6 +107,7 @@ int initAuxStateTest(const std::string &mesh) {
 
    IO::init(DefComm);
    Decomp::init(mesh);
+   IOStream::init();
 
    int HaloErr = Halo::init();
    if (HaloErr != 0) {
@@ -111,6 +117,7 @@ int initAuxStateTest(const std::string &mesh) {
 
    VertCoord::init1();
    HorzMesh::init();
+   VertCoord::init2();
 
    Tracers::init();
    int StateErr = OceanState::init();
