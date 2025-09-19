@@ -188,6 +188,7 @@ int testDivergence(Real RTol) {
    TestSetup Setup;
 
    const auto &Mesh      = HorzMesh::getDefault();
+   auto *VCoord          = VertCoord::getDefault();
    const int NVertLayers = 16;
 
    // Prepare operator input
@@ -197,13 +198,13 @@ int testDivergence(Real RTol) {
           VecField[0] = Setup.exactVecX(X, Y);
           VecField[1] = Setup.exactVecY(X, Y);
        },
-       VecEdge, EdgeComponent::Normal, Geom, Mesh);
+       VecEdge, EdgeComponent::Normal, Geom, Mesh, VCoord);
 
    // Compute exact result
    Array2DReal ExactDivCell("ExactDivCell", Mesh->NCellsOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.exactDivVec(X, Y); },
-       ExactDivCell, Geom, Mesh, OnCell, ExchangeHalos::No);
+       ExactDivCell, Geom, Mesh, VCoord, OnCell, ExchangeHalos::No);
 
    // Compute numerical result
    Array2DReal NumDivCell("NumDivCell", Mesh->NCellsOwned, NVertLayers);
@@ -215,7 +216,8 @@ int testDivergence(Real RTol) {
 
    // Compute error measures
    ErrorMeasures DivErrors;
-   Err += computeErrors(DivErrors, NumDivCell, ExactDivCell, Mesh, OnCell);
+   Err +=
+       computeErrors(DivErrors, NumDivCell, ExactDivCell, Mesh, VCoord, OnCell);
    // Check error values
    Err += checkErrors("OperatorsTest", "Divergence", DivErrors,
                       Setup.ExpectedDivErrors, RTol);
@@ -232,6 +234,7 @@ int testGradient(Real RTol) {
    TestSetup Setup;
 
    const auto &Mesh      = HorzMesh::getDefault();
+   auto *VCoord          = VertCoord::getDefault();
    const int NVertLayers = 16;
 
    // Prepare operator input
@@ -240,7 +243,7 @@ int testGradient(Real RTol) {
        KOKKOS_LAMBDA(Real Coord1, Real Coord2) {
           return Setup.exactScalar(Coord1, Coord2);
        },
-       ScalarCell, Geom, Mesh, OnCell);
+       ScalarCell, Geom, Mesh, VCoord, OnCell);
 
    // Compute exact result
    Array2DReal ExactGradEdge("ExactGradEdge", Mesh->NEdgesOwned, NVertLayers);
@@ -249,7 +252,8 @@ int testGradient(Real RTol) {
           VecField[0] = Setup.exactGradScalarX(X, Y);
           VecField[1] = Setup.exactGradScalarY(X, Y);
        },
-       ExactGradEdge, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::No);
+       ExactGradEdge, EdgeComponent::Normal, Geom, Mesh, VCoord,
+       ExchangeHalos::No);
 
    // Compute numerical result
    GradientOnEdge GradientEdge(Mesh);
@@ -261,7 +265,8 @@ int testGradient(Real RTol) {
 
    // Compute error measures
    ErrorMeasures GradErrors;
-   Err += computeErrors(GradErrors, NumGradEdge, ExactGradEdge, Mesh, OnEdge);
+   Err += computeErrors(GradErrors, NumGradEdge, ExactGradEdge, Mesh, VCoord,
+                        OnEdge);
    // Check error values
    Err += checkErrors("OperatorsTest", "Gradient", GradErrors,
                       Setup.ExpectedGradErrors, RTol);
@@ -277,6 +282,7 @@ int testCurl(Real RTol) {
    int Err = 0;
    TestSetup Setup;
    const auto &Mesh      = HorzMesh::getDefault();
+   auto *VCoord          = VertCoord::getDefault();
    const int NVertLayers = 16;
 
    // Prepare operator input
@@ -286,14 +292,14 @@ int testCurl(Real RTol) {
           VecField[0] = Setup.exactVecX(X, Y);
           VecField[1] = Setup.exactVecY(X, Y);
        },
-       VecEdge, EdgeComponent::Normal, Geom, Mesh);
+       VecEdge, EdgeComponent::Normal, Geom, Mesh, VCoord);
 
    // Compute exact result
    Array2DReal ExactCurlVertex("ExactCurlVertex", Mesh->NVerticesOwned,
                                NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.exactCurlVec(X, Y); },
-       ExactCurlVertex, Geom, Mesh, OnVertex, ExchangeHalos::No);
+       ExactCurlVertex, Geom, Mesh, VCoord, OnVertex, ExchangeHalos::No);
 
    // Compute numerical result
    Array2DReal NumCurlVertex("NumCurlVertex", Mesh->NVerticesOwned,
@@ -307,7 +313,7 @@ int testCurl(Real RTol) {
    // Compute error measures
    ErrorMeasures CurlErrors;
    Err += computeErrors(CurlErrors, NumCurlVertex, ExactCurlVertex, Mesh,
-                        OnVertex);
+                        VCoord, OnVertex);
    // Check error values
    Err += checkErrors("OperatorsTest", "Curl", CurlErrors,
                       Setup.ExpectedCurlErrors, RTol);
@@ -324,6 +330,7 @@ int testRecon(Real RTol) {
    TestSetup Setup;
 
    const auto &Mesh      = HorzMesh::getDefault();
+   auto *VCoord          = VertCoord::getDefault();
    const int NVertLayers = 16;
 
    // Prepare operator input
@@ -333,7 +340,7 @@ int testRecon(Real RTol) {
           VecField[0] = Setup.exactVecX(X, Y);
           VecField[1] = Setup.exactVecY(X, Y);
        },
-       VecEdge, EdgeComponent::Normal, Geom, Mesh);
+       VecEdge, EdgeComponent::Normal, Geom, Mesh, VCoord);
 
    // Compute exact result
    Array2DReal ExactReconEdge("ExactReconEdge", Mesh->NEdgesOwned, NVertLayers);
@@ -343,7 +350,7 @@ int testRecon(Real RTol) {
           VecField[0] = Setup.exactVecX(X, Y);
           VecField[1] = Setup.exactVecY(X, Y);
        },
-       ExactReconEdge, EdgeComponent::Tangential, Geom, Mesh,
+       ExactReconEdge, EdgeComponent::Tangential, Geom, Mesh, VCoord,
        ExchangeHalos::No);
 
    // Compute numerical result
@@ -356,8 +363,8 @@ int testRecon(Real RTol) {
 
    // Compute error measures
    ErrorMeasures ReconErrors;
-   Err +=
-       computeErrors(ReconErrors, NumReconEdge, ExactReconEdge, Mesh, OnEdge);
+   Err += computeErrors(ReconErrors, NumReconEdge, ExactReconEdge, Mesh, VCoord,
+                        OnEdge);
    // Check error values
    Err += checkErrors("OperatorsTest", "Recon", ReconErrors,
                       Setup.ExpectedReconErrors, RTol);
@@ -373,6 +380,7 @@ int testInterpCellToEdge(Real RTol) {
    int Err = 0;
    TestSetup Setup;
    const auto &Mesh = HorzMesh::getDefault();
+   auto *VCoord     = VertCoord::getDefault();
 
    // Prepare operator input
    Array1DReal ScalarCell("ScalarCell", Mesh->NCellsSize);
@@ -380,7 +388,7 @@ int testInterpCellToEdge(Real RTol) {
        KOKKOS_LAMBDA(Real Coord1, Real Coord2) {
           return Setup.exactScalar(Coord1, Coord2);
        },
-       ScalarCell, Geom, Mesh, OnCell);
+       ScalarCell, Geom, Mesh, VCoord, OnCell);
 
    // Compute exact result
    Array1DReal ExactScalarEdge("ExactScalarEdge", Mesh->NEdgesOwned);
@@ -388,7 +396,7 @@ int testInterpCellToEdge(Real RTol) {
        KOKKOS_LAMBDA(Real Coord1, Real Coord2) {
           return Setup.exactScalar(Coord1, Coord2);
        },
-       ExactScalarEdge, Geom, Mesh, OnEdge, ExchangeHalos::No);
+       ExactScalarEdge, Geom, Mesh, VCoord, OnEdge, ExchangeHalos::No);
 
    // Compute numerical result
    Array1DReal IsoNumScalarEdge("IsoNumScalarEdge", Mesh->NEdgesOwned);
@@ -405,11 +413,11 @@ int testInterpCellToEdge(Real RTol) {
    // Compute error measures
    ErrorMeasures AnisoInterpErrors;
    Err += computeErrors(AnisoInterpErrors, AnisoNumScalarEdge, ExactScalarEdge,
-                        Mesh, OnEdge);
+                        Mesh, VCoord, OnEdge);
 
    ErrorMeasures IsoInterpErrors;
    Err += computeErrors(IsoInterpErrors, IsoNumScalarEdge, ExactScalarEdge,
-                        Mesh, OnEdge);
+                        Mesh, VCoord, OnEdge);
 
    // Check error values
    Err += checkErrors("OperatorsTest", "AnisoInterpCellToEdge",

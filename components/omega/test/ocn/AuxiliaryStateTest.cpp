@@ -50,8 +50,9 @@ int initState() {
    int Err = 0;
 
    TestSetup Setup;
-   auto *Mesh  = HorzMesh::getDefault();
-   auto *State = OceanState::getDefault();
+   auto *Mesh   = HorzMesh::getDefault();
+   auto *State  = OceanState::getDefault();
+   auto *VCoord = VertCoord::getDefault();
 
    Array2DReal LayerThickCell;
    Array2DReal NormalVelEdge;
@@ -64,19 +65,19 @@ int initState() {
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.layerThickness(X, Y); },
-       LayerThickCell, Geom, Mesh, OnCell);
+       LayerThickCell, Geom, Mesh, VCoord, OnCell);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.tracer(X, Y); },
-       TracerArray, Geom, Mesh, OnCell);
+       TracerArray, Geom, Mesh, VCoord, OnCell);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real Lon, Real Lat) {
           VecField[0] = Setup.velocityX(Lon, Lat);
           VecField[1] = Setup.velocityY(Lon, Lat);
        },
-       NormalVelEdge, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::Yes,
-       CartProjection::No);
+       NormalVelEdge, EdgeComponent::Normal, Geom, Mesh, VCoord,
+       ExchangeHalos::Yes, CartProjection::No);
 
    return Err;
 }

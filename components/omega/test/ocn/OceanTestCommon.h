@@ -7,6 +7,7 @@
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OmegaKokkos.h"
+#include "VertCoord.h"
 
 namespace OMEGA {
 
@@ -71,7 +72,8 @@ enum class ExchangeHalos { Yes, No };
 // analytical formula and optionally exchange halos
 template <class Functor, class Array>
 int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
-              const HorzMesh *Mesh, MeshElement Element,
+              const HorzMesh *Mesh, const VertCoord *VCoord,
+              MeshElement Element,
               ExchangeHalos ExchangeHalosOpt = ExchangeHalos::Yes) {
 
    int Err = 0;
@@ -79,28 +81,35 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
    int NElementsOwned;
    Array1DReal XElement, YElement;
    Array1DReal LonElement, LatElement;
+   Array1DI4 MinLayerElement, MaxLayerElement;
 
    switch (Element) {
    case OnCell:
-      NElementsOwned = Mesh->NCellsOwned;
-      XElement       = createDeviceMirrorCopy(Mesh->XCellH);
-      YElement       = createDeviceMirrorCopy(Mesh->YCellH);
-      LonElement     = createDeviceMirrorCopy(Mesh->LonCellH);
-      LatElement     = createDeviceMirrorCopy(Mesh->LatCellH);
+      NElementsOwned  = Mesh->NCellsOwned;
+      XElement        = createDeviceMirrorCopy(Mesh->XCellH);
+      YElement        = createDeviceMirrorCopy(Mesh->YCellH);
+      LonElement      = createDeviceMirrorCopy(Mesh->LonCellH);
+      LatElement      = createDeviceMirrorCopy(Mesh->LatCellH);
+      MinLayerElement = VCoord->MinLayerCell;
+      MaxLayerElement = VCoord->MaxLayerCell;
       break;
    case OnVertex:
-      NElementsOwned = Mesh->NVerticesOwned;
-      XElement       = createDeviceMirrorCopy(Mesh->XVertexH);
-      YElement       = createDeviceMirrorCopy(Mesh->YVertexH);
-      LonElement     = createDeviceMirrorCopy(Mesh->LonVertexH);
-      LatElement     = createDeviceMirrorCopy(Mesh->LatVertexH);
+      NElementsOwned  = Mesh->NVerticesOwned;
+      XElement        = createDeviceMirrorCopy(Mesh->XVertexH);
+      YElement        = createDeviceMirrorCopy(Mesh->YVertexH);
+      LonElement      = createDeviceMirrorCopy(Mesh->LonVertexH);
+      LatElement      = createDeviceMirrorCopy(Mesh->LatVertexH);
+      MinLayerElement = VCoord->MinLayerVertexBot;
+      MaxLayerElement = VCoord->MaxLayerVertexTop;
       break;
    case OnEdge:
-      NElementsOwned = Mesh->NEdgesOwned;
-      XElement       = createDeviceMirrorCopy(Mesh->XEdgeH);
-      YElement       = createDeviceMirrorCopy(Mesh->YEdgeH);
-      LonElement     = createDeviceMirrorCopy(Mesh->LonEdgeH);
-      LatElement     = createDeviceMirrorCopy(Mesh->LatEdgeH);
+      NElementsOwned  = Mesh->NEdgesOwned;
+      XElement        = createDeviceMirrorCopy(Mesh->XEdgeH);
+      YElement        = createDeviceMirrorCopy(Mesh->YEdgeH);
+      LonElement      = createDeviceMirrorCopy(Mesh->LonEdgeH);
+      LatElement      = createDeviceMirrorCopy(Mesh->LatEdgeH);
+      MinLayerElement = VCoord->MinLayerEdgeBot;
+      MaxLayerElement = VCoord->MaxLayerEdgeTop;
       break;
    default:
       LOG_ERROR("setScalar: element needs to be one of (OnCell, OnVertex, "
@@ -124,37 +133,45 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
    }
 
    if constexpr (Array::rank == 2) {
-      const int NVertLayers = ScalarElement.extent_int(1);
-
-      parallelFor(
-          {NElementsOwned, NVertLayers}, KOKKOS_LAMBDA(int IElement, int K) {
-             if (Geom == Geometry::Planar) {
-                const Real X               = XElement(IElement);
-                const Real Y               = YElement(IElement);
-                ScalarElement(IElement, K) = Fun(X, Y);
-             } else {
-                const Real Lon             = LonElement(IElement);
-                const Real Lat             = LatElement(IElement);
-                ScalarElement(IElement, K) = Fun(Lon, Lat);
-             }
+      parallelForOuter(
+          {NElementsOwned},
+          KOKKOS_LAMBDA(int IElement, const TeamMember &Team) {
+             const int KMin   = MinLayerElement(IElement);
+             const int KRange = MaxLayerElement(IElement) - KMin + 1;
+             parallelForInner(Team, KRange, [=](int KOff) {
+                const int K = KMin + KOff;
+                if (Geom == Geometry::Planar) {
+                   const Real X               = XElement(IElement);
+                   const Real Y               = YElement(IElement);
+                   ScalarElement(IElement, K) = Fun(X, Y);
+                } else {
+                   const Real Lon             = LonElement(IElement);
+                   const Real Lat             = LatElement(IElement);
+                   ScalarElement(IElement, K) = Fun(Lon, Lat);
+                }
+             });
           });
    }
 
    if constexpr (Array::rank == 3) {
-      const int NTracers    = ScalarElement.extent_int(0);
-      const int NVertLayers = ScalarElement.extent_int(2);
-      parallelFor(
-          {NTracers, NElementsOwned, NVertLayers},
-          KOKKOS_LAMBDA(int L, int IElement, int K) {
-             if (Geom == Geometry::Planar) {
-                const Real X                  = XElement(IElement);
-                const Real Y                  = YElement(IElement);
-                ScalarElement(L, IElement, K) = Fun(X, Y);
-             } else {
-                const Real Lon                = LonElement(IElement);
-                const Real Lat                = LatElement(IElement);
-                ScalarElement(L, IElement, K) = Fun(Lon, Lat);
-             }
+      const int NTracers = ScalarElement.extent_int(0);
+      parallelForOuter(
+          {NTracers, NElementsOwned},
+          KOKKOS_LAMBDA(int L, int IElement, const TeamMember &Team) {
+             const int KMin   = MinLayerElement(IElement);
+             const int KRange = MaxLayerElement(IElement) - KMin + 1;
+             parallelForInner(Team, KRange, [=](int KOff) {
+                const int K = KMin + KOff;
+                if (Geom == Geometry::Planar) {
+                   const Real X                  = XElement(IElement);
+                   const Real Y                  = YElement(IElement);
+                   ScalarElement(L, IElement, K) = Fun(X, Y);
+                } else {
+                   const Real Lon                = LonElement(IElement);
+                   const Real Lat                = LatElement(IElement);
+                   ScalarElement(L, IElement, K) = Fun(Lon, Lat);
+                }
+             });
           });
    }
 
@@ -174,6 +191,7 @@ enum class CartProjection { Yes, No };
 template <class Functor, class Array>
 int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
                   EdgeComponent EdgeComp, Geometry Geom, const HorzMesh *Mesh,
+                  const VertCoord *VCoord,
                   ExchangeHalos ExchangeHalosOpt   = ExchangeHalos::Yes,
                   CartProjection CartProjectionOpt = CartProjection::Yes) {
 
@@ -197,6 +215,9 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
    auto &AngleEdge      = Mesh->AngleEdge;
    auto &CellsOnEdge    = Mesh->CellsOnEdge;
    auto &VerticesOnEdge = Mesh->VerticesOnEdge;
+
+   auto &MinLayerEdgeBot = VCoord->MinLayerEdgeBot;
+   auto &MaxLayerEdgeTop = VCoord->MaxLayerEdgeTop;
 
    auto ProjectVector = KOKKOS_LAMBDA(int IEdge) {
       Real VecFieldEdge;
@@ -284,10 +305,15 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
    }
 
    if constexpr (Array::rank == 2) {
-      const int NVertLayers = VectorFieldEdge.extent_int(1);
-      parallelFor(
-          {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int K) {
-             VectorFieldEdge(IEdge, K) = ProjectVector(IEdge);
+      parallelForOuter(
+          {Mesh->NEdgesOwned},
+          KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+             const int KMin   = MinLayerEdgeBot(IEdge);
+             const int KRange = MaxLayerEdgeTop(IEdge) - KMin + 1;
+             parallelForInner(Team, KRange, [=](int KOff) {
+                const int K               = KMin + KOff;
+                VectorFieldEdge(IEdge, K) = ProjectVector(IEdge);
+             });
           });
    }
 
@@ -403,7 +429,7 @@ struct ErrorMeasures {
 template <class Array>
 int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
                   const Array &ExactFieldElement, const HorzMesh *Mesh,
-                  MeshElement Element) {
+                  const VertCoord *VCoord, MeshElement Element) {
 
    int Err = 0;
 

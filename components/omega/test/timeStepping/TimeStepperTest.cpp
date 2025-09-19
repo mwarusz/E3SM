@@ -124,6 +124,7 @@ ErrorMeasures computeErrors() {
 
    const auto *State      = OceanState::get("TestState");
    const auto *ExactState = OceanState::get("Exact");
+   auto *VCoord           = VertCoord::getDefault();
 
    Array2DReal NormalVelEdge;
    Array2DReal ExactNormalVelEdge;
@@ -132,7 +133,8 @@ ErrorMeasures computeErrors() {
 
    // Only velocity errors matters, because thickness remains constant
    ErrorMeasures VelErrors;
-   computeErrors(VelErrors, NormalVelEdge, ExactNormalVelEdge, DefMesh, OnEdge);
+   computeErrors(VelErrors, NormalVelEdge, ExactNormalVelEdge, DefMesh, VCoord,
+                 OnEdge);
 
    return VelErrors;
 }
