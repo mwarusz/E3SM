@@ -420,13 +420,16 @@ inline Real sum(const Array2DReal &Arr, const HorzMesh *Mesh,
        KOKKOS_LAMBDA(int I, const TeamMember &Team, Real &Accum) {
           const int KMin   = MinLayerElement(I);
           const int KRange = MaxLayerElement(I) - KMin + 1;
+          Real SumInner;
           parallelReduceInner(
               Team, KRange,
               [=](int KOff, Real &AccumInner) {
                  const int K = KMin + KOff;
                  AccumInner += Arr(I, K);
               },
-              Accum);
+              SumInner);
+
+          Accum += SumInner;
        },
        Sum);
 
@@ -500,13 +503,15 @@ inline Real sum(const Array3DReal &Arr, const HorzMesh *Mesh,
        KOKKOS_LAMBDA(int L, int I, const TeamMember &Team, Real &Accum) {
           const int KMin   = MinLayerElement(I);
           const int KRange = MaxLayerElement(I) - KMin + 1;
+          Real SumInner;
           parallelReduceInner(
               Team, KRange,
               [=](int KOff, Real &AccumInner) {
                  const int K = KMin + KOff;
                  AccumInner += Arr(L, I, K);
               },
-              Accum);
+              SumInner);
+          Accum += SumInner;
        },
        Sum);
 
