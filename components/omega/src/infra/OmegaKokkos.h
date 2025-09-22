@@ -349,7 +349,7 @@ inline void parallelReduceOuter(const std::string &Label,
        // Label, Policy, KOKKOS_LAMBDA<class... A>(const TeamMember &Team,
        // A&&... Accums) {
        Label, Policy,
-       KOKKOS_LAMBDA(const TeamMember &Team, auto... Accums) {
+       KOKKOS_LAMBDA(const TeamMember &Team, auto &...Accums) {
           // Label, Policy, KOKKOS_LAMBDA (const TeamMember &Team, typename
           // ReducerValueType<R>::value_type&... Accums) {
           const int TeamId = Team.league_rank();
