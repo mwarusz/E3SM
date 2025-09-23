@@ -216,8 +216,8 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
    auto &CellsOnEdge    = Mesh->CellsOnEdge;
    auto &VerticesOnEdge = Mesh->VerticesOnEdge;
 
-   auto &MinLayerEdgeBot = VCoord->MinLayerEdgeBot;
-   auto &MaxLayerEdgeTop = VCoord->MaxLayerEdgeTop;
+   auto &MinLayerEdgeBot = VCoord->MinLayerEdgeTop;
+   auto &MaxLayerEdgeTop = VCoord->MaxLayerEdgeBot;
 
    auto ProjectVector = KOKKOS_LAMBDA(int IEdge) {
       Real VecFieldEdge;
