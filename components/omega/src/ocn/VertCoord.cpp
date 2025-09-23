@@ -10,6 +10,7 @@
 #include "VertCoord.h"
 #include "Dimension.h"
 #include "Field.h"
+#include "Halo.h"
 #include "IO.h"
 #include "IOStream.h"
 #include "OmegaKokkos.h"
@@ -203,6 +204,10 @@ void VertCoord::completeSetup(Config *Options //< [in] configuration options
           LocMinLayerCell(ICell) -= 1;
           LocMaxLayerCell(ICell) -= 1;
        });
+
+   auto MeshHalo = Halo::getDefault();
+   MeshHalo->exchangeFullArrayHalo(LocMinLayerCell, OnCell);
+   MeshHalo->exchangeFullArrayHalo(LocMaxLayerCell, OnCell);
 
    // Compute Edge and Vertex vertical ranges
    minMaxLayerEdge();
