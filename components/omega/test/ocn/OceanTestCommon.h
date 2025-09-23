@@ -99,8 +99,8 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
       YElement        = createDeviceMirrorCopy(Mesh->YVertexH);
       LonElement      = createDeviceMirrorCopy(Mesh->LonVertexH);
       LatElement      = createDeviceMirrorCopy(Mesh->LatVertexH);
-      MinLayerElement = VCoord->MinLayerVertexBot;
-      MaxLayerElement = VCoord->MaxLayerVertexTop;
+      MinLayerElement = VCoord->MinLayerVertexTop;
+      MaxLayerElement = VCoord->MaxLayerVertexBot;
       break;
    case OnEdge:
       NElementsOwned  = Mesh->NEdgesOwned;
@@ -108,8 +108,8 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
       YElement        = createDeviceMirrorCopy(Mesh->YEdgeH);
       LonElement      = createDeviceMirrorCopy(Mesh->LonEdgeH);
       LatElement      = createDeviceMirrorCopy(Mesh->LatEdgeH);
-      MinLayerElement = VCoord->MinLayerEdgeBot;
-      MaxLayerElement = VCoord->MaxLayerEdgeTop;
+      MinLayerElement = VCoord->MinLayerEdgeTop;
+      MaxLayerElement = VCoord->MaxLayerEdgeBot;
       break;
    default:
       LOG_ERROR("setScalar: element needs to be one of (OnCell, OnVertex, "
