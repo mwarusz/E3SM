@@ -21,14 +21,15 @@ static std::string stripDefault(const std::string &Name) {
 // Constructor. Constructs the member auxiliary variables and registers their
 // fields with IOStreams
 AuxiliaryState::AuxiliaryState(const std::string &Name, const HorzMesh *Mesh,
-                               Halo *MeshHalo, int NVertLayers, int NTracers)
-    : Mesh(Mesh), MeshHalo(MeshHalo), Name(stripDefault(Name)),
-      KineticAux(stripDefault(Name), Mesh, NVertLayers),
-      LayerThicknessAux(stripDefault(Name), Mesh, NVertLayers),
-      VorticityAux(stripDefault(Name), Mesh, NVertLayers),
-      VelocityDel2Aux(stripDefault(Name), Mesh, NVertLayers),
+                               const VertCoord *VCoord, Halo *MeshHalo,
+                               int NTracers)
+    : Mesh(Mesh), MeshHalo(MeshHalo), VCoord(VCoord), Name(stripDefault(Name)),
+      KineticAux(stripDefault(Name), Mesh, VCoord),
+      LayerThicknessAux(stripDefault(Name), Mesh, VCoord->NVertLayers),
+      VorticityAux(stripDefault(Name), Mesh, VCoord->NVertLayers),
+      VelocityDel2Aux(stripDefault(Name), Mesh, VCoord->NVertLayers),
       WindForcingAux(stripDefault(Name), Mesh),
-      TracerAux(stripDefault(Name), Mesh, NVertLayers, NTracers) {
+      TracerAux(stripDefault(Name), Mesh, VCoord->NVertLayers, NTracers) {
 
    GroupName = "AuxiliaryState";
    if (Name != "Default") {
@@ -67,7 +68,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    State->getLayerThickness(LayerThickCell, ThickTimeLevel);
    State->getNormalVelocity(NormalVelEdge, VelTimeLevel);
 
-   const int NVertLayers = LayerThickCell.extent_int(1);
+   const int NVertLayers = VCoord->NVertLayers;
    const int NChunks     = NVertLayers / VecLength;
 
    OMEGA_SCOPE(LocKineticAux, KineticAux);
@@ -75,8 +76,6 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    OMEGA_SCOPE(LocVorticityAux, VorticityAux);
    OMEGA_SCOPE(LocVelocityDel2Aux, VelocityDel2Aux);
    OMEGA_SCOPE(LocWindForcingAux, WindForcingAux);
-
-   auto VCoord = VertCoord::getDefault();
 
    const Array1DI4 &MinLyrCell      = VCoord->MinLayerCell;
    const Array1DI4 &MaxLyrCell      = VCoord->MaxLayerCell;
@@ -260,7 +259,7 @@ void AuxiliaryState::computeAll(const OceanState *State,
    State->getLayerThickness(LayerThickCell, ThickTimeLevel);
    State->getNormalVelocity(NormalVelEdge, VelTimeLevel);
 
-   const int NVertLayers = LayerThickCell.extent_int(1);
+   const int NVertLayers = VCoord->NVertLayers;
    const int NChunks     = NVertLayers / VecLength;
    const int NTracers    = TracerArray.extent_int(0);
 
@@ -340,8 +339,9 @@ void AuxiliaryState::computeAll(const OceanState *State,
 
 // Create a non-default auxiliary state
 AuxiliaryState *AuxiliaryState::create(const std::string &Name,
-                                       const HorzMesh *Mesh, Halo *MeshHalo,
-                                       int NVertLayers, const int NTracers) {
+                                       const HorzMesh *Mesh,
+                                       const VertCoord *VCoord, Halo *MeshHalo,
+                                       const int NTracers) {
    if (AllAuxStates.find(Name) != AllAuxStates.end()) {
       LOG_ERROR("Attempted to create a new AuxiliaryState with name {} but it "
                 "already exists",
@@ -350,7 +350,7 @@ AuxiliaryState *AuxiliaryState::create(const std::string &Name,
    }
 
    auto *NewAuxState =
-       new AuxiliaryState(Name, Mesh, MeshHalo, NVertLayers, NTracers);
+       new AuxiliaryState(Name, Mesh, VCoord, MeshHalo, NTracers);
    AllAuxStates.emplace(Name, NewAuxState);
 
    return NewAuxState;
@@ -362,11 +362,11 @@ void AuxiliaryState::init() {
    const HorzMesh *DefMesh = HorzMesh::getDefault();
    Halo *DefHalo           = Halo::getDefault();
 
-   int NVertLayers = VertCoord::getDefault()->NVertLayers;
-   int NTracers    = Tracers::getNumTracers();
+   const auto *VCoord = VertCoord::getDefault();
+   int NTracers       = Tracers::getNumTracers();
 
-   AuxiliaryState::DefaultAuxState = AuxiliaryState::create(
-       "Default", DefMesh, DefHalo, NVertLayers, NTracers);
+   AuxiliaryState::DefaultAuxState =
+       AuxiliaryState::create("Default", DefMesh, VCoord, DefHalo, NTracers);
 
    Config *OmegaConfig = Config::getOmegaConfig();
    DefaultAuxState->readConfigOptions(OmegaConfig);

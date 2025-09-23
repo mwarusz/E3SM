@@ -347,8 +347,8 @@ int testKineticAuxVars(const Array2DReal &LayerThicknessCell,
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
-   auto *VCoord    = VertCoord::getDefault();
+   const auto Mesh    = HorzMesh::getDefault();
+   const auto *VCoord = VertCoord::getDefault();
 
    // Compute exact result
 
@@ -366,7 +366,7 @@ int testKineticAuxVars(const Array2DReal &LayerThicknessCell,
 
    // Compute numerical result
 
-   KineticAuxVars KineticAux("", Mesh, NVertLayers);
+   KineticAuxVars KineticAux("", Mesh, VCoord);
 
    parallelFor(
        {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int KLayer) {
