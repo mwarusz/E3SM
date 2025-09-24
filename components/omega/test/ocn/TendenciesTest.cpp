@@ -185,6 +185,24 @@ int testTendencies() {
    // compute tendencies
    const auto *State    = OceanState::getDefault();
    const auto *AuxState = AuxiliaryState::getDefault();
+
+   deepCopy(AuxState->KineticAux.KineticEnergyCell, NAN);
+   deepCopy(AuxState->KineticAux.VelocityDivCell, NAN);
+   deepCopy(AuxState->LayerThicknessAux.FluxLayerThickEdge, NAN);
+   deepCopy(AuxState->LayerThicknessAux.MeanLayerThickEdge, NAN);
+   deepCopy(AuxState->LayerThicknessAux.SshCell, NAN);
+   deepCopy(AuxState->TracerAux.HTracersEdge, NAN);
+   deepCopy(AuxState->TracerAux.Del2TracersCell, NAN);
+   deepCopy(AuxState->VelocityDel2Aux.Del2Edge, NAN);
+   deepCopy(AuxState->VelocityDel2Aux.Del2DivCell, NAN);
+   deepCopy(AuxState->VelocityDel2Aux.Del2RelVortVertex, NAN);
+
+   deepCopy(AuxState->VorticityAux.RelVortVertex, NAN);
+   deepCopy(AuxState->VorticityAux.NormRelVortVertex, NAN);
+   deepCopy(AuxState->VorticityAux.NormPlanetVortVertex, NAN);
+   deepCopy(AuxState->VorticityAux.NormRelVortEdge, NAN);
+   deepCopy(AuxState->VorticityAux.NormPlanetVortEdge, NAN);
+
    Array3DReal TracerArray;
    Err += Tracers::getAll(TracerArray, 0);
    int ThickTimeLevel = 0;
