@@ -25,11 +25,11 @@ AuxiliaryState::AuxiliaryState(const std::string &Name, const HorzMesh *Mesh,
                                int NTracers)
     : Mesh(Mesh), MeshHalo(MeshHalo), VCoord(VCoord), Name(stripDefault(Name)),
       KineticAux(stripDefault(Name), Mesh, VCoord),
-      LayerThicknessAux(stripDefault(Name), Mesh, VCoord->NVertLayers),
-      VorticityAux(stripDefault(Name), Mesh, VCoord->NVertLayers),
-      VelocityDel2Aux(stripDefault(Name), Mesh, VCoord->NVertLayers),
+      LayerThicknessAux(stripDefault(Name), Mesh, VCoord),
+      VorticityAux(stripDefault(Name), Mesh, VCoord),
+      VelocityDel2Aux(stripDefault(Name), Mesh, VCoord),
       WindForcingAux(stripDefault(Name), Mesh),
-      TracerAux(stripDefault(Name), Mesh, VCoord->NVertLayers, NTracers) {
+      TracerAux(stripDefault(Name), Mesh, VCoord, NTracers) {
 
    GroupName = "AuxiliaryState";
    if (Name != "Default") {

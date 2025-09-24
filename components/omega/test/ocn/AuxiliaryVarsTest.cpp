@@ -453,8 +453,8 @@ int testLayerThicknessAuxVars(const Array2DReal &LayerThickCell,
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
-   auto *VCoord    = VertCoord::getDefault();
+   const auto Mesh    = HorzMesh::getDefault();
+   const auto *VCoord = VertCoord::getDefault();
 
    // Compute exact result
 
@@ -465,7 +465,7 @@ int testLayerThicknessAuxVars(const Array2DReal &LayerThickCell,
 
    // Compute numerical result
 
-   LayerThicknessAuxVars LayerThicknessAux("", Mesh, NVertLayers);
+   LayerThicknessAuxVars LayerThicknessAux("", Mesh, VCoord);
    LayerThicknessAux.FluxThickEdgeChoice = FluxThickEdgeOption::Upwind;
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
@@ -502,10 +502,10 @@ int testVorticityAuxVars(const Array2DReal &LayerThickCell,
    TestSetup Setup;
    int Err = 0;
 
-   const auto Decomp = Decomp::getDefault();
-   const auto Mesh   = HorzMesh::getDefault();
-   auto *VCoord      = VertCoord::getDefault();
-   VorticityAuxVars VorticityAux("", Mesh, NVertLayers);
+   const auto Decomp  = Decomp::getDefault();
+   const auto Mesh    = HorzMesh::getDefault();
+   const auto *VCoord = VertCoord::getDefault();
+   VorticityAuxVars VorticityAux("", Mesh, VCoord);
 
    // Compute exact results for vertex variables
 
@@ -620,10 +620,10 @@ int testVelocityDel2AuxVars(Real RTol) {
    TestSetup Setup;
    int Err = 0;
 
-   const auto Decomp = Decomp::getDefault();
-   const auto Mesh   = HorzMesh::getDefault();
-   auto *VCoord      = VertCoord::getDefault();
-   VelocityDel2AuxVars VelocityDel2Aux("", Mesh, NVertLayers);
+   const auto Decomp  = Decomp::getDefault();
+   const auto Mesh    = HorzMesh::getDefault();
+   const auto *VCoord = VertCoord::getDefault();
+   VelocityDel2AuxVars VelocityDel2Aux("", Mesh, VCoord);
 
    // Use analytical expressions to compute inputs
 
@@ -731,10 +731,10 @@ int testTracerAuxVars(const Array2DReal &LayerThickCell,
    TestSetup Setup;
    int Err = 0;
 
-   const auto Mesh = HorzMesh::getDefault();
-   auto *VCoord    = VertCoord::getDefault();
+   const auto Mesh    = HorzMesh::getDefault();
+   const auto *VCoord = VertCoord::getDefault();
 
-   TracerAuxVars TracerAux("", Mesh, NVertLayers, NTracers);
+   TracerAuxVars TracerAux("", Mesh, VCoord, NTracers);
    TracerAux.TracersOnEdgeChoice = FluxTracerEdgeOption::Upwind;
 
    // Set input arrays
@@ -839,6 +839,11 @@ int initAuxVarsTest(const std::string &mesh) {
    // Reset NVertLayers to the test value
    auto *DefVertCoord        = VertCoord::getDefault();
    DefVertCoord->NVertLayers = NVertLayers;
+
+   deepCopy(DefVertCoord->MaxLayerCell, NVertLayers - 1);
+   DefVertCoord->minMaxLayerEdge();
+   DefVertCoord->minMaxLayerVertex();
+
    Dimension::destroy("NVertLayers");
    std::shared_ptr<Dimension> VertDim =
        Dimension::create("NVertLayers", NVertLayers);

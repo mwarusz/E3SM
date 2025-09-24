@@ -1043,6 +1043,11 @@ void initTendTest(const std::string &MeshFile, int NVertLayers) {
    // Reset NVertLayers to the test value
    auto *DefVertCoord        = VertCoord::getDefault();
    DefVertCoord->NVertLayers = NVertLayers;
+
+   deepCopy(DefVertCoord->MaxLayerCell, NVertLayers - 1);
+   DefVertCoord->minMaxLayerEdge();
+   DefVertCoord->minMaxLayerVertex();
+
    Dimension::destroy("NVertLayers");
    std::shared_ptr<Dimension> VertDim =
        Dimension::create("NVertLayers", NVertLayers);

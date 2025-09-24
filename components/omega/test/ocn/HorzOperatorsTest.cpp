@@ -183,13 +183,14 @@ using TestSetup = TestSetupSphere1;
 using TestSetup = TestSetupSphere2;
 #endif
 
+constexpr int NVertLayers = 16;
+
 int testDivergence(Real RTol) {
    int Err = 0;
    TestSetup Setup;
 
-   const auto &Mesh      = HorzMesh::getDefault();
-   auto *VCoord          = VertCoord::getDefault();
-   const int NVertLayers = 16;
+   const auto &Mesh = HorzMesh::getDefault();
+   auto *VCoord     = VertCoord::getDefault();
 
    // Prepare operator input
    Array2DReal VecEdge("VecEdge", Mesh->NEdgesSize, NVertLayers);
@@ -233,9 +234,8 @@ int testGradient(Real RTol) {
    int Err = 0;
    TestSetup Setup;
 
-   const auto &Mesh      = HorzMesh::getDefault();
-   auto *VCoord          = VertCoord::getDefault();
-   const int NVertLayers = 16;
+   const auto &Mesh = HorzMesh::getDefault();
+   auto *VCoord     = VertCoord::getDefault();
 
    // Prepare operator input
    Array2DReal ScalarCell("ScalarCell", Mesh->NCellsSize, NVertLayers);
@@ -281,9 +281,8 @@ int testGradient(Real RTol) {
 int testCurl(Real RTol) {
    int Err = 0;
    TestSetup Setup;
-   const auto &Mesh      = HorzMesh::getDefault();
-   auto *VCoord          = VertCoord::getDefault();
-   const int NVertLayers = 16;
+   const auto &Mesh = HorzMesh::getDefault();
+   auto *VCoord     = VertCoord::getDefault();
 
    // Prepare operator input
    Array2DReal VecEdge("VecEdge", Mesh->NEdgesSize, NVertLayers);
@@ -329,9 +328,8 @@ int testRecon(Real RTol) {
    int Err = 0;
    TestSetup Setup;
 
-   const auto &Mesh      = HorzMesh::getDefault();
-   auto *VCoord          = VertCoord::getDefault();
-   const int NVertLayers = 16;
+   const auto &Mesh = HorzMesh::getDefault();
+   auto *VCoord     = VertCoord::getDefault();
 
    // Prepare operator input
    Array2DReal VecEdge("VecEdge", Mesh->NEdgesSize, NVertLayers);
@@ -459,6 +457,18 @@ int initOperatorsTest(const std::string &MeshFile) {
    }
 
    VertCoord::init1();
+
+   // Reset NVertLayers to the test value
+   auto *DefVertCoord        = VertCoord::getDefault();
+   DefVertCoord->NVertLayers = NVertLayers;
+
+   deepCopy(DefVertCoord->MaxLayerCell, NVertLayers - 1);
+   DefVertCoord->minMaxLayerEdge();
+   DefVertCoord->minMaxLayerVertex();
+
+   Dimension::destroy("NVertLayers");
+   std::shared_ptr<Dimension> VertDim =
+       Dimension::create("NVertLayers", NVertLayers);
 
    HorzMesh::init();
 
