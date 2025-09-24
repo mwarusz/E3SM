@@ -387,26 +387,20 @@ inline Real sum(const Array2DReal &Arr, int Extent0, int Extent1) {
 }
 
 inline Real sum(const Array2DReal &Arr, const HorzMesh *Mesh,
-                const VertCoord *VCoord, MeshElement Element) {
+                const Array1DI4 &MinLayerElement,
+                const Array1DI4 &MaxLayerElement, MeshElement Element) {
 
    int NElementsOwned;
-   Array1DI4 MinLayerElement, MaxLayerElement;
 
    switch (Element) {
    case OnCell:
-      NElementsOwned  = Mesh->NCellsOwned;
-      MinLayerElement = VCoord->MinLayerCell;
-      MaxLayerElement = VCoord->MaxLayerCell;
+      NElementsOwned = Mesh->NCellsOwned;
       break;
    case OnVertex:
-      NElementsOwned  = Mesh->NVerticesOwned;
-      MinLayerElement = VCoord->MinLayerVertexBot;
-      MaxLayerElement = VCoord->MaxLayerVertexTop;
+      NElementsOwned = Mesh->NVerticesOwned;
       break;
    case OnEdge:
-      NElementsOwned  = Mesh->NEdgesOwned;
-      MinLayerElement = VCoord->MinLayerEdgeBot;
-      MaxLayerElement = VCoord->MaxLayerEdgeTop;
+      NElementsOwned = Mesh->NEdgesOwned;
       break;
    default:
       LOG_ERROR("setScalar: element needs to be one of (OnCell, OnVertex, "
@@ -470,26 +464,20 @@ inline Real sum(const Array3DReal &Arr, int Extent0, int Extent1) {
 }
 
 inline Real sum(const Array3DReal &Arr, const HorzMesh *Mesh,
-                const VertCoord *VCoord, MeshElement Element) {
+                const Array1DI4 &MinLayerElement,
+                const Array1DI4 &MaxLayerElement, MeshElement Element) {
 
    int NElementsOwned;
-   Array1DI4 MinLayerElement, MaxLayerElement;
 
    switch (Element) {
    case OnCell:
-      NElementsOwned  = Mesh->NCellsOwned;
-      MinLayerElement = VCoord->MinLayerCell;
-      MaxLayerElement = VCoord->MaxLayerCell;
+      NElementsOwned = Mesh->NCellsOwned;
       break;
    case OnVertex:
-      NElementsOwned  = Mesh->NVerticesOwned;
-      MinLayerElement = VCoord->MinLayerVertexBot;
-      MaxLayerElement = VCoord->MaxLayerVertexTop;
+      NElementsOwned = Mesh->NVerticesOwned;
       break;
    case OnEdge:
-      NElementsOwned  = Mesh->NEdgesOwned;
-      MinLayerElement = VCoord->MinLayerEdgeBot;
-      MaxLayerElement = VCoord->MaxLayerEdgeTop;
+      NElementsOwned = Mesh->NEdgesOwned;
       break;
    default:
       LOG_ERROR("setScalar: element needs to be one of (OnCell, OnVertex, "

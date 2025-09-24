@@ -204,77 +204,88 @@ int testAuxState() {
    int NTracers       = Tracers::getNumTracers();
 
    const Real KineticEnergySum =
-       sum(DefAuxState->KineticAux.KineticEnergyCell, Mesh, VCoord, OnCell);
+       sum(DefAuxState->KineticAux.KineticEnergyCell, Mesh,
+           VCoord->MinLayerCell, VCoord->MaxLayerCell, OnCell);
    if (!Kokkos::isfinite(KineticEnergySum)) {
       Err++;
       LOG_ERROR("AuxStateTest: KineticEnergy FAIL");
    }
 
    const Real VelocityDivSum =
-       sum(DefAuxState->KineticAux.VelocityDivCell, Mesh, VCoord, OnCell);
+       sum(DefAuxState->KineticAux.VelocityDivCell, Mesh, VCoord->MinLayerCell,
+           VCoord->MaxLayerCell, OnCell);
    if (!Kokkos::isfinite(VelocityDivSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: VelocityDivCell FAIL");
    }
 
-   const Real FluxLayerThickSum = sum(
-       DefAuxState->LayerThicknessAux.FluxLayerThickEdge, Mesh, VCoord, OnEdge);
+   const Real FluxLayerThickSum =
+       sum(DefAuxState->LayerThicknessAux.FluxLayerThickEdge, Mesh,
+           VCoord->MinLayerEdgeBot, VCoord->MaxLayerEdgeTop, OnEdge);
    if (!Kokkos::isfinite(FluxLayerThickSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: FluxLayerThickEdge FAIL");
    }
 
-   const Real MeanLayerThickSum = sum(
-       DefAuxState->LayerThicknessAux.MeanLayerThickEdge, Mesh, VCoord, OnEdge);
+   const Real MeanLayerThickSum =
+       sum(DefAuxState->LayerThicknessAux.MeanLayerThickEdge, Mesh,
+           VCoord->MinLayerEdgeBot, VCoord->MaxLayerEdgeTop, OnEdge);
    if (!Kokkos::isfinite(MeanLayerThickSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: MeanLayerThickEdge FAIL");
    }
 
    const Real RelVortVSum =
-       sum(DefAuxState->VorticityAux.RelVortVertex, Mesh, VCoord, OnVertex);
+       sum(DefAuxState->VorticityAux.RelVortVertex, Mesh,
+           VCoord->MinLayerVertexTop, VCoord->MaxLayerVertexBot, OnVertex);
    if (!Kokkos::isfinite(RelVortVSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: RelVortVertex FAIL");
    }
 
    const Real NormRelVortVSum =
-       sum(DefAuxState->VorticityAux.NormRelVortVertex, Mesh, VCoord, OnVertex);
+       sum(DefAuxState->VorticityAux.NormRelVortVertex, Mesh,
+           VCoord->MinLayerVertexTop, VCoord->MaxLayerVertexBot, OnVertex);
    if (!Kokkos::isfinite(NormRelVortVSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: NormRelVortVertex FAIL");
    }
 
-   const Real NormPlanetVortVSum = sum(
-       DefAuxState->VorticityAux.NormPlanetVortVertex, Mesh, VCoord, OnVertex);
+   const Real NormPlanetVortVSum =
+       sum(DefAuxState->VorticityAux.NormPlanetVortVertex, Mesh,
+           VCoord->MinLayerVertexTop, VCoord->MaxLayerVertexBot, OnVertex);
    if (!Kokkos::isfinite(NormPlanetVortVSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: NormPlanetVortVertex FAIL");
    }
 
    const Real NormRelVortESum =
-       sum(DefAuxState->VorticityAux.NormRelVortEdge, Mesh, VCoord, OnEdge);
+       sum(DefAuxState->VorticityAux.NormRelVortEdge, Mesh,
+           VCoord->MinLayerEdgeTop, VCoord->MaxLayerEdgeBot, OnEdge);
    if (!Kokkos::isfinite(NormRelVortESum)) {
       Err++;
       LOG_ERROR("AuxStateTest: NormRelVortEdge FAIL");
    }
 
    const Real NormPlanetVortESum =
-       sum(DefAuxState->VorticityAux.NormPlanetVortEdge, Mesh, VCoord, OnEdge);
+       sum(DefAuxState->VorticityAux.NormPlanetVortEdge, Mesh,
+           VCoord->MinLayerEdgeTop, VCoord->MinLayerEdgeBot, OnEdge);
    if (!Kokkos::isfinite(NormPlanetVortESum)) {
       Err++;
       LOG_ERROR("AuxStateTest: NormPlanetVortEdge FAIL");
    }
 
    const Real HTracersESum =
-       sum(DefAuxState->TracerAux.HTracersEdge, Mesh, VCoord, OnEdge);
+       sum(DefAuxState->TracerAux.HTracersEdge, Mesh, VCoord->MinLayerEdgeBot,
+           VCoord->MaxLayerEdgeTop, OnEdge);
    if (!Kokkos::isfinite(HTracersESum)) {
       Err++;
       LOG_ERROR("AuxStateTest: HTracersOnEdge FAIL");
    }
 
    const Real Del2TracersCSum =
-       sum(DefAuxState->TracerAux.Del2TracersCell, Mesh, VCoord, OnCell);
+       sum(DefAuxState->TracerAux.Del2TracersCell, Mesh, VCoord->MinLayerCell,
+           VCoord->MaxLayerCell, OnCell);
    if (!Kokkos::isfinite(Del2TracersCSum)) {
       Err++;
       LOG_ERROR("AuxStateTest: Del2TracersOnCell FAIL");
