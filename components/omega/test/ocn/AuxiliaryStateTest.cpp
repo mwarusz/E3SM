@@ -291,6 +291,30 @@ int testAuxState() {
       LOG_ERROR("AuxStateTest: Del2TracersOnCell FAIL");
    }
 
+   const Real Del2DivCellSum =
+       sum(DefAuxState->VelocityDel2Aux.Del2DivCell, Mesh, VCoord->MinLayerCell,
+           VCoord->MaxLayerCell, OnCell);
+   if (!Kokkos::isfinite(Del2DivCellSum)) {
+      Err++;
+      LOG_ERROR("AuxStateTest: Del2DivCell FAIL");
+   }
+
+   const Real Del2RelVortVertexSum =
+       sum(DefAuxState->VelocityDel2Aux.Del2RelVortVertex, Mesh,
+           VCoord->MinLayerVertexBot, VCoord->MaxLayerVertexTop, OnVertex);
+   if (!Kokkos::isfinite(Del2RelVortVertexSum)) {
+      Err++;
+      LOG_ERROR("AuxStateTest: Del2RelVortVertex FAIL");
+   }
+
+   const Real Del2EdgeSum =
+       sum(DefAuxState->VelocityDel2Aux.Del2Edge, Mesh, VCoord->MinLayerEdgeBot,
+           VCoord->MaxLayerEdgeTop, OnEdge);
+   if (!Kokkos::isfinite(Del2EdgeSum)) {
+      Err++;
+      LOG_ERROR("AuxStateTest: Del2Edge FAIL");
+   }
+
    AuxiliaryState::clear();
 
    return Err;
