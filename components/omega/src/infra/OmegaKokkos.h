@@ -379,6 +379,29 @@ KOKKOS_FUNCTION void parallelForInner(const TeamMember &Team, int UpperBound,
    }
 }
 
+template <int ChunkSize, class F>
+KOKKOS_FUNCTION void parallelForInnerChunked(const TeamMember &Team,
+                                             int LowerBound, int UpperBound,
+                                             const F &Functor) {
+   const int NItems  = UpperBound - LowerBound + 1;
+   const int NChunks = NItems / ChunkSize;
+   const int NRem    = NItems - NChunks * ChunkSize;
+
+   const auto Policy1 = TeamThreadRange(Team, NChunks);
+   Kokkos::parallel_for(Policy1, [=](int IChunk) {
+      const int I = LowerBound + ChunkSize * IChunk;
+      Functor(I, std::true_type{});
+   });
+
+   if (NRem > 0) {
+      const auto Policy2 = TeamThreadRange(Team, 1);
+      Kokkos::parallel_for(Policy2, [=](int IChunk) {
+         const int I = LowerBound + ChunkSize * NChunks;
+         Functor(I, std::false_type{});
+      });
+   }
+}
+
 // parallelReduceInner
 template <class F, class... R>
 KOKKOS_FUNCTION void parallelReduceInner(const TeamMember &Team, int UpperBound,

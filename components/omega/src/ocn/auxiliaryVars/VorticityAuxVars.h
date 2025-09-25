@@ -22,11 +22,10 @@ class VorticityAuxVars {
    VorticityAuxVars(const std::string &AuxStateSuffix, const HorzMesh *Mesh,
                     const VertCoord *VCoord);
 
+   template <class FC>
    KOKKOS_FUNCTION void
-   computeVarsOnVertex(int IVertex, int KChunk,
-                       const Array2DReal &LayerThickCell,
-                       const Array2DReal &NormalVelEdge) const {
-      const int KStart           = KChunk * VecLength;
+   computeVarsOnVertex(int IVertex, int K, const Array2DReal &LayerThickCell,
+                       const Array2DReal &NormalVelEdge, FC FullChunk) const {
       const Real InvAreaTriangle = 1._Real / AreaTriangle(IVertex);
 
       Real LayerThickVertex[VecLength] = {0};
@@ -37,7 +36,6 @@ class VorticityAuxVars {
          const int JEdge = EdgesOnVertex(IVertex, J);
 
          for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
             LayerThickVertex[KVec] += InvAreaTriangle *
                                       KiteAreasOnVertex(IVertex, J) *
                                       LayerThickCell(JCell, K);
@@ -48,7 +46,6 @@ class VorticityAuxVars {
       }
 
       for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const int K                    = KStart + KVec;
          const Real InvLayerThickVertex = 1._Real / LayerThickVertex[KVec];
 
          RelVortVertex(IVertex, K) = RelVortVertexTmp[KVec];
@@ -59,13 +56,13 @@ class VorticityAuxVars {
       }
    }
 
-   KOKKOS_FUNCTION void computeVarsOnEdge(int IEdge, int KChunk) const {
-      const int KStart   = KChunk * VecLength;
+   template <class FC>
+   KOKKOS_FUNCTION void computeVarsOnEdge(int IEdge, int K,
+                                          FC FullChunk) const {
       const int JVertex0 = VerticesOnEdge(IEdge, 0);
       const int JVertex1 = VerticesOnEdge(IEdge, 1);
 
       for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const int K = KStart + KVec;
          NormRelVortEdge(IEdge, K) =
              0.5_Real *
              (NormRelVortVertex(JVertex0, K) + NormRelVortVertex(JVertex1, K));

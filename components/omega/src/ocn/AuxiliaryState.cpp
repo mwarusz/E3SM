@@ -107,13 +107,20 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
           // const int KMin = MinLyrVertexBot(IVertex);
           // const int KRange = MaxLyrVertexTop(IVertex) - KMin + 1;
 
-          const int KMin   = MinLyrVertexTop(IVertex);
-          const int KRange = MaxLyrVertexBot(IVertex) - KMin + 1;
-          parallelForInner(Team, KRange, [=](const int KOff) {
-             const int K = KMin + KOff;
-             LocVorticityAux.computeVarsOnVertex(IVertex, K, LayerThickCell,
-                                                 NormalVelEdge);
-          });
+          // const int KMin   = MinLyrVertexTop(IVertex);
+          // const int KRange = MaxLyrVertexBot(IVertex) - KMin + 1;
+          // parallelForInner(Team, KRange, [=](const int KOff) {
+          //    const int K = KMin + KOff;
+          //    LocVorticityAux.computeVarsOnVertex(IVertex, K, LayerThickCell,
+          //                                        NormalVelEdge);
+          // });
+
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrVertexTop(IVertex), MaxLyrVertexBot(IVertex),
+              [=](int K, auto FullChunk) {
+                 LocVorticityAux.computeVarsOnVertex(IVertex, K, LayerThickCell,
+                                                     NormalVelEdge, FullChunk);
+              });
        });
 #endif
 
@@ -130,12 +137,18 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
 #if AUXV == 2
    parallelForOuter(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-          const int KMin   = MinLyrCell(ICell);
-          const int KRange = MaxLyrCell(ICell) - KMin + 1;
-          parallelForInner(Team, KRange, [=](const int KOff) {
-             const int K = KMin + KOff;
-             LocKineticAux.computeVarsOnCell(ICell, K, NormalVelEdge);
-          });
+          // const int KMin   = MinLyrCell(ICell);
+          // const int KRange = MaxLyrCell(ICell) - KMin + 1;
+          // parallelForInner(Team, KRange, [=](const int KOff) {
+          //    const int K = KMin + KOff;
+          //    LocKineticAux.computeVarsOnCell(ICell, K, NormalVelEdge);
+          // });
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrCell(ICell), MaxLyrCell(ICell),
+              [=](int K, auto FullChunk) {
+                 LocKineticAux.computeVarsOnCell(ICell, K, NormalVelEdge,
+                                                 FullChunk);
+              });
        });
 #endif
    Pacer::stop("AuxState:cellAuxState1", 2);
@@ -170,14 +183,24 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
           // const int KMin = MinLyrEdgeTop(IEdge);
           // const int KRange = MaxLyrEdgeBot(IEdge) - KMin + 1;
 
-          parallelForInner(Team, KRange, [=](const int KOff) {
-             const int K = KMin + KOff;
-             LocVorticityAux.computeVarsOnEdge(IEdge, K);
-             LocLayerThicknessAux.computeVarsOnEdge(IEdge, K, LayerThickCell,
-                                                    NormalVelEdge);
-             LocVelocityDel2Aux.computeVarsOnEdge(IEdge, K, VelocityDivCell,
-                                                  RelVortVertex);
-          });
+          // parallelForInner(Team, KRange, [=](const int KOff) {
+          //    const int K = KMin + KOff;
+          //    LocVorticityAux.computeVarsOnEdge(IEdge, K);
+          //    LocLayerThicknessAux.computeVarsOnEdge(IEdge, K, LayerThickCell,
+          //                                           NormalVelEdge);
+          //    LocVelocityDel2Aux.computeVarsOnEdge(IEdge, K, VelocityDivCell,
+          //                                         RelVortVertex);
+          // });
+
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrEdgeBot(IEdge), MaxLyrEdgeTop(IEdge),
+              [=](int K, auto FullChunk) {
+                 LocVorticityAux.computeVarsOnEdge(IEdge, K, FullChunk);
+                 LocLayerThicknessAux.computeVarsOnEdge(
+                     IEdge, K, LayerThickCell, NormalVelEdge, FullChunk);
+                 LocVelocityDel2Aux.computeVarsOnEdge(IEdge, K, VelocityDivCell,
+                                                      RelVortVertex, FullChunk);
+              });
        });
 #endif
    Pacer::stop("AuxState:edgeAuxState2", 2);
@@ -194,12 +217,18 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    parallelForOuter(
        {Mesh->NVerticesAll},
        KOKKOS_LAMBDA(int IVertex, const TeamMember &Team) {
-          const int KMin   = MinLyrVertexBot(IVertex);
-          const int KRange = MaxLyrVertexTop(IVertex) - KMin + 1;
-          parallelForInner(Team, KRange, [=](const int KOff) {
-             const int K = KMin + KOff;
-             LocVelocityDel2Aux.computeVarsOnVertex(IVertex, K);
-          });
+          // const int KMin   = MinLyrVertexBot(IVertex);
+          // const int KRange = MaxLyrVertexTop(IVertex) - KMin + 1;
+          // parallelForInner(Team, KRange, [=](const int KOff) {
+          //    const int K = KMin + KOff;
+          //    LocVelocityDel2Aux.computeVarsOnVertex(IVertex, K);
+          // });
+
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrVertexBot(IVertex), MaxLyrVertexTop(IVertex),
+              [=](int K, auto FullChunk) {
+                 LocVelocityDel2Aux.computeVarsOnVertex(IVertex, K, FullChunk);
+              });
        });
 #endif
    Pacer::stop("AuxState:vertexAuxState2", 2);
@@ -215,12 +244,18 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
 #if AUXV == 2
    parallelForOuter(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-          const int KMin   = MinLyrCell(ICell);
-          const int KRange = MaxLyrCell(ICell) - KMin + 1;
-          parallelForInner(Team, KRange, [=](const int KOff) {
-             const int K = KMin + KOff;
-             LocVelocityDel2Aux.computeVarsOnCell(ICell, K);
-          });
+          // const int KMin   = MinLyrCell(ICell);
+          // const int KRange = MaxLyrCell(ICell) - KMin + 1;
+          // parallelForInner(Team, KRange, [=](const int KOff) {
+          //    const int K = KMin + KOff;
+          //    LocVelocityDel2Aux.computeVarsOnCell(ICell, K);
+          // });
+
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrCell(ICell), MaxLyrCell(ICell),
+              [=](int K, auto FullChunk) {
+                 LocVelocityDel2Aux.computeVarsOnCell(ICell, K, FullChunk);
+              });
        });
 #endif
    Pacer::stop("AuxState:cellAuxState2", 2);
@@ -237,12 +272,20 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
 #if AUXV == 2
    parallelForOuter(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-          const int KMin   = MinLyrCell(ICell);
-          const int KRange = MaxLyrCell(ICell) - KMin + 1;
-          parallelForInner(Team, KRange, [=](const int KOff) {
-             const int K = KMin + KOff;
-             LocLayerThicknessAux.computeVarsOnCells(ICell, K, LayerThickCell);
-          });
+          // const int KMin   = MinLyrCell(ICell);
+          // const int KRange = MaxLyrCell(ICell) - KMin + 1;
+          // parallelForInner(Team, KRange, [=](const int KOff) {
+          //    const int K = KMin + KOff;
+          //    LocLayerThicknessAux.computeVarsOnCells(ICell, K,
+          //    LayerThickCell);
+          // });
+
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrCell(ICell), MaxLyrCell(ICell),
+              [=](int K, auto FullChunk) {
+                 LocLayerThicknessAux.computeVarsOnCells(
+                     ICell, K, LayerThickCell, FullChunk);
+              });
        });
 #endif
    Pacer::stop("AuxState:cellAuxState3", 2);
@@ -291,13 +334,21 @@ void AuxiliaryState::computeAll(const OceanState *State,
    parallelForOuter(
        {NTracers, Mesh->NEdgesAll},
        KOKKOS_LAMBDA(int LTracer, int IEdge, const TeamMember &Team) {
-          const int KMin   = MinLyrEdgeBot(IEdge);
-          const int KRange = MaxLyrEdgeTop(IEdge) - KMin + 1;
-          parallelForInner(Team, KRange, [=](const int KOff) {
-             const int K = KMin + KOff;
-             LocTracerAux.computeVarsOnEdge(LTracer, IEdge, K, NormalVelEdge,
-                                            LayerThickCell, TracerArray);
-          });
+          // const int KMin   = MinLyrEdgeBot(IEdge);
+          // const int KRange = MaxLyrEdgeTop(IEdge) - KMin + 1;
+          // parallelForInner(Team, KRange, [=](const int KOff) {
+          //    const int K = KMin + KOff;
+          //    LocTracerAux.computeVarsOnEdge(LTracer, IEdge, K, NormalVelEdge,
+          //                                   LayerThickCell, TracerArray);
+          // });
+
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrEdgeBot(IEdge), MaxLyrEdgeTop(IEdge),
+              [=](int K, auto FullChunk) {
+                 LocTracerAux.computeVarsOnEdge(LTracer, IEdge, K,
+                                                NormalVelEdge, LayerThickCell,
+                                                TracerArray, FullChunk);
+              });
        });
 #endif
    Pacer::stop("AuxState:edgeAuxState4", 2);
@@ -317,13 +368,22 @@ void AuxiliaryState::computeAll(const OceanState *State,
    parallelForOuter(
        {NTracers, Mesh->NCellsAll},
        KOKKOS_LAMBDA(int LTracer, int ICell, const TeamMember &Team) {
-          const int KMin   = MinLyrCell(ICell);
-          const int KRange = MaxLyrCell(ICell) - KMin + 1;
-          parallelForInner(Team, KRange, [=](const int KOff) {
-             const int K = KMin + KOff;
-             LocTracerAux.computeVarsOnCells(LTracer, ICell, K,
-                                             MeanLayerThickEdge, TracerArray);
-          });
+          // const int KMin   = MinLyrCell(ICell);
+          // const int KRange = MaxLyrCell(ICell) - KMin + 1;
+          // parallelForInner(Team, KRange, [=](const int KOff) {
+          //    const int K = KMin + KOff;
+          //    LocTracerAux.computeVarsOnCells(LTracer, ICell, K,
+          //                                    MeanLayerThickEdge,
+          //                                    TracerArray);
+          // });
+
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrCell(ICell), MaxLyrCell(ICell),
+              [=](int K, auto FullChunk) {
+                 LocTracerAux.computeVarsOnCells(LTracer, ICell, K,
+                                                 MeanLayerThickEdge,
+                                                 TracerArray, FullChunk);
+              });
        });
 #endif
    Pacer::stop("AuxState:cellAuxState4", 2);

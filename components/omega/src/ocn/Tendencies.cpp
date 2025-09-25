@@ -508,7 +508,7 @@ void Tendencies::computeThicknessTendencies(
        "computeLayerThickAux", {NEdgesAll, NChunks},
        KOKKOS_LAMBDA(int IEdge, int KChunk) {
           LayerThicknessAux.computeVarsOnEdge(IEdge, KChunk, LayerThickCell,
-                                              NormalVelEdge);
+                                              NormalVelEdge, std::true_type{});
        });
    Pacer::stop("Tend:computeLayerThickAux", 2);
 
@@ -553,7 +553,8 @@ void Tendencies::computeTracerTendencies(
        "computeTracerAuxEdge", {NTracers, NEdgesAll, NChunks},
        KOKKOS_LAMBDA(int LTracer, int IEdge, int KChunk) {
           TracerAux.computeVarsOnEdge(LTracer, IEdge, KChunk, NormalVelEdge,
-                                      LayerThickCell, TracerArray);
+                                      LayerThickCell, TracerArray,
+                                      std::true_type{});
        });
    Pacer::stop("Tend:computeTracerAuxEdge", 2);
 
@@ -564,7 +565,8 @@ void Tendencies::computeTracerTendencies(
        "computeTracerAuxCell", {NTracers, NCellsAll, NChunks},
        KOKKOS_LAMBDA(int LTracer, int ICell, int KChunk) {
           TracerAux.computeVarsOnCells(LTracer, ICell, KChunk,
-                                       MeanLayerThickEdge, TracerArray);
+                                       MeanLayerThickEdge, TracerArray,
+                                       std::true_type{});
        });
    Pacer::stop("Tend:computeTracerAuxCell", 2);
 

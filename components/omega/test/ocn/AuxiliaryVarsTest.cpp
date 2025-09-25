@@ -370,7 +370,8 @@ int testKineticAuxVars(const Array2DReal &LayerThicknessCell,
 
    parallelFor(
        {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int KLayer) {
-          KineticAux.computeVarsOnCell(ICell, KLayer, NormalVelocityEdge);
+          KineticAux.computeVarsOnCell(ICell, KLayer, NormalVelocityEdge,
+                                       std::true_type{});
        });
    const auto &NumKineticEnergyCell = KineticAux.KineticEnergyCell;
    const auto &NumVelocityDivCell   = KineticAux.VelocityDivCell;
@@ -470,7 +471,7 @@ int testLayerThicknessAuxVars(const Array2DReal &LayerThickCell,
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
           LayerThicknessAux.computeVarsOnEdge(IEdge, KLayer, LayerThickCell,
-                                              NormalVelEdge);
+                                              NormalVelEdge, std::true_type{});
        });
 
    const auto &NumFluxLayerThickEdge = LayerThicknessAux.FluxLayerThickEdge;
@@ -538,7 +539,7 @@ int testVorticityAuxVars(const Array2DReal &LayerThickCell,
        {Decomp->NVerticesHaloH(0), NVertLayers},
        KOKKOS_LAMBDA(int IVertex, int KLayer) {
           VorticityAux.computeVarsOnVertex(IVertex, KLayer, LayerThickCell,
-                                           NormalVelEdge);
+                                           NormalVelEdge, std::true_type{});
        });
 
    const auto &NumRelVortVertex        = VorticityAux.RelVortVertex;
@@ -589,7 +590,7 @@ int testVorticityAuxVars(const Array2DReal &LayerThickCell,
 
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          VorticityAux.computeVarsOnEdge(IEdge, KLayer);
+          VorticityAux.computeVarsOnEdge(IEdge, KLayer, std::true_type{});
        });
    const auto &NumNormRelVortEdge    = VorticityAux.NormRelVortEdge;
    const auto &NumNormPlanetVortEdge = VorticityAux.NormPlanetVortEdge;
@@ -656,7 +657,8 @@ int testVelocityDel2AuxVars(Real RTol) {
        {Decomp->NEdgesHaloH(1), NVertLayers},
        KOKKOS_LAMBDA(int IEdge, int KLayer) {
           VelocityDel2Aux.computeVarsOnEdge(IEdge, KLayer, ExactVelocityDivCell,
-                                            ExactRelVortVertex);
+                                            ExactRelVortVertex,
+                                            std::true_type{});
        });
    const auto &NumDel2Edge = VelocityDel2Aux.Del2Edge;
 
@@ -681,7 +683,7 @@ int testVelocityDel2AuxVars(Real RTol) {
 
    parallelFor(
        {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int KLayer) {
-          VelocityDel2Aux.computeVarsOnCell(ICell, KLayer);
+          VelocityDel2Aux.computeVarsOnCell(ICell, KLayer, std::true_type{});
        });
    const auto &NumDel2DivCell = VelocityDel2Aux.Del2DivCell;
 
@@ -706,7 +708,8 @@ int testVelocityDel2AuxVars(Real RTol) {
    parallelFor(
        {Mesh->NVerticesOwned, NVertLayers},
        KOKKOS_LAMBDA(int IVertex, int KLayer) {
-          VelocityDel2Aux.computeVarsOnVertex(IVertex, KLayer);
+          VelocityDel2Aux.computeVarsOnVertex(IVertex, KLayer,
+                                              std::true_type{});
        });
    const auto &NumDel2RelVortVertex = VelocityDel2Aux.Del2RelVortVertex;
 
@@ -764,7 +767,8 @@ int testTracerAuxVars(const Array2DReal &LayerThickCell,
        {NTracers, Mesh->NEdgesOwned, NVertLayers},
        KOKKOS_LAMBDA(int L, int IEdge, int KLayer) {
           TracerAux.computeVarsOnEdge(L, IEdge, KLayer, NormalVelEdge,
-                                      LayerThickCell, TracersOnCell);
+                                      LayerThickCell, TracersOnCell,
+                                      std::true_type{});
        });
 
    // Compute error measures and check errors for HTracersEdge
@@ -791,7 +795,7 @@ int testTracerAuxVars(const Array2DReal &LayerThickCell,
        {NTracers, Mesh->NCellsOwned, NVertLayers},
        KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
           TracerAux.computeVarsOnCells(L, ICell, KLayer, LayerThickEdge,
-                                       TracersOnCell);
+                                       TracersOnCell, std::true_type{});
        });
 
    // Compute error measures and check errors for Del2TracersCell

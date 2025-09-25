@@ -19,10 +19,10 @@ class VelocityDel2AuxVars {
    VelocityDel2AuxVars(const std::string &AuxStateSuffix, const HorzMesh *Mesh,
                        const VertCoord *VCoord);
 
+   template <class FC>
    KOKKOS_FUNCTION void
-   computeVarsOnEdge(int IEdge, int KChunk, const Array2DReal &VelocityDivCell,
-                     const Array2DReal &RelVortVertex) const {
-      const int KStart = KChunk * VecLength;
+   computeVarsOnEdge(int IEdge, int K, const Array2DReal &VelocityDivCell,
+                     const Array2DReal &RelVortVertex, FC FullChunk) const {
 
       const int JCell0   = CellsOnEdge(IEdge, 0);
       const int JCell1   = CellsOnEdge(IEdge, 1);
@@ -34,7 +34,6 @@ class VelocityDel2AuxVars {
           1._Real / Kokkos::max(DvEdge(IEdge), 0.25_Real * DcEdge(IEdge));
 
       for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const int K = KStart + KVec;
          const Real GradDiv =
              (VelocityDivCell(JCell1, K) - VelocityDivCell(JCell0, K)) *
              InvDcEdge;
@@ -45,9 +44,10 @@ class VelocityDel2AuxVars {
       }
    }
 
-   KOKKOS_FUNCTION void computeVarsOnCell(int ICell, int KChunk) const {
+   template <class FC>
+   KOKKOS_FUNCTION void computeVarsOnCell(int ICell, int K,
+                                          FC FullChunk) const {
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
-      const int KStart       = KChunk * VecLength;
 
       Real Del2DivCellTmp[VecLength] = {0};
 
@@ -55,20 +55,19 @@ class VelocityDel2AuxVars {
          const int JEdge     = EdgesOnCell(ICell, J);
          const Real AreaEdge = 0.5_Real * DvEdge(JEdge) * DcEdge(JEdge);
          for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
             Del2DivCellTmp[KVec] -= DvEdge(JEdge) * InvAreaCell *
                                     EdgeSignOnCell(ICell, J) *
                                     Del2Edge(JEdge, K);
          }
       }
       for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const int K           = KStart + KVec;
          Del2DivCell(ICell, K) = Del2DivCellTmp[KVec];
       }
    }
 
-   KOKKOS_FUNCTION void computeVarsOnVertex(int IVertex, int KChunk) const {
-      const int KStart           = KChunk * VecLength;
+   template <class FC>
+   KOKKOS_FUNCTION void computeVarsOnVertex(int IVertex, int K,
+                                            FC FullChunk) const {
       const Real InvAreaTriangle = 1._Real / AreaTriangle(IVertex);
 
       Real Del2RelVortVertexTmp[VecLength] = {0};
@@ -76,7 +75,6 @@ class VelocityDel2AuxVars {
       for (int J = 0; J < VertexDegree; ++J) {
          const int JEdge = EdgesOnVertex(IVertex, J);
          for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
             Del2RelVortVertexTmp[KVec] += InvAreaTriangle * DcEdge(JEdge) *
                                           EdgeSignOnVertex(IVertex, J) *
                                           Del2Edge(JEdge, K);
@@ -84,7 +82,6 @@ class VelocityDel2AuxVars {
       }
 
       for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const int K                   = KStart + KVec;
          Del2RelVortVertex(IVertex, K) = Del2RelVortVertexTmp[KVec];
       }
    }

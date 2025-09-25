@@ -23,15 +23,14 @@ class LayerThicknessAuxVars {
    LayerThicknessAuxVars(const std::string &AuxStateSuffix,
                          const HorzMesh *Mesh, const VertCoord *VCoord);
 
+   template <class FC>
    KOKKOS_FUNCTION void
-   computeVarsOnEdge(int IEdge, int KChunk, const Array2DReal &LayerThickCell,
-                     const Array2DReal &NormalVelEdge) const {
-      const int KStart = KChunk * VecLength;
+   computeVarsOnEdge(int IEdge, int K, const Array2DReal &LayerThickCell,
+                     const Array2DReal &NormalVelEdge, FC FullChunk) const {
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
 
       for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const int K = KStart + KVec;
          MeanLayerThickEdge(IEdge, K) =
              0.5_Real * (LayerThickCell(JCell0, K) + LayerThickCell(JCell1, K));
       }
@@ -39,7 +38,6 @@ class LayerThicknessAuxVars {
       switch (FluxThickEdgeChoice) {
       case FluxThickEdgeOption::Center:
          for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
             FluxLayerThickEdge(IEdge, K) =
                 0.5_Real *
                 (LayerThickCell(JCell0, K) + LayerThickCell(JCell1, K));
@@ -47,7 +45,6 @@ class LayerThicknessAuxVars {
          break;
       case FluxThickEdgeOption::Upwind:
          for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
             if (NormalVelEdge(IEdge, K) > 0) {
                FluxLayerThickEdge(IEdge, K) = LayerThickCell(JCell0, K);
             } else if (NormalVelEdge(IEdge, K) < 0) {
@@ -61,14 +58,13 @@ class LayerThicknessAuxVars {
       }
    }
 
-   KOKKOS_FUNCTION void
-   computeVarsOnCells(int ICell, int KChunk,
-                      const Array2DReal &LayerThickCell) const {
+   template <class FC>
+   KOKKOS_FUNCTION void computeVarsOnCells(int ICell, int K,
+                                           const Array2DReal &LayerThickCell,
+                                           FC FullChunk) const {
 
       // Temporary for stacked shallow water
-      const int KStart = KChunk * VecLength;
       for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const int K       = KStart + KVec;
          SshCell(ICell, K) = LayerThickCell(ICell, K) - BottomDepth(ICell);
       }
 

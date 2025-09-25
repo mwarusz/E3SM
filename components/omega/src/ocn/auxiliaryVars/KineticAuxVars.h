@@ -18,11 +18,11 @@ class KineticAuxVars {
    KineticAuxVars(const std::string &AuxStateSuffix, const HorzMesh *Mesh,
                   const VertCoord *VCoord);
 
-   KOKKOS_FUNCTION void
-   computeVarsOnCell(int ICell, int KChunk,
-                     const Array2DReal &NormalVelEdge) const {
+   template <class FC>
+   KOKKOS_FUNCTION void computeVarsOnCell(int ICell, int K,
+                                          const Array2DReal &NormalVelEdge,
+                                          FC FullChunk) const {
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
-      const int KStart       = KChunk * VecLength;
 
       Real KineticEnergyCellTmp[VecLength] = {0};
       Real VelocityDivCellTmp[VecLength]   = {0};
@@ -31,7 +31,6 @@ class KineticAuxVars {
          const int JEdge     = EdgesOnCell(ICell, J);
          const Real AreaEdge = 0.5_Real * DvEdge(JEdge) * DcEdge(JEdge);
          for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
             KineticEnergyCellTmp[KVec] += AreaEdge * 0.5_Real * InvAreaCell *
                                           NormalVelEdge(JEdge, K) *
                                           NormalVelEdge(JEdge, K);
@@ -41,7 +40,6 @@ class KineticAuxVars {
          }
       }
       for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const int K                 = KStart + KVec;
          KineticEnergyCell(ICell, K) = KineticEnergyCellTmp[KVec];
          VelocityDivCell(ICell, K)   = VelocityDivCellTmp[KVec];
       }

@@ -23,18 +23,17 @@ class TracerAuxVars {
    TracerAuxVars(const std::string &AuxStateSuffix, const HorzMesh *Mesh,
                  const VertCoord *VCoord, const I4 NTracers);
 
-   KOKKOS_FUNCTION void computeVarsOnEdge(int L, int IEdge, int KChunk,
-                                          const Array2DReal &NormalVelEdge,
-                                          const Array2DReal &HCell,
-                                          const Array3DReal &TrCell) const {
-      const int KStart = KChunk * VecLength;
+   template <class FC>
+   KOKKOS_FUNCTION void
+   computeVarsOnEdge(int L, int IEdge, int K, const Array2DReal &NormalVelEdge,
+                     const Array2DReal &HCell, const Array3DReal &TrCell,
+                     FC FullChunk) const {
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
 
       switch (TracersOnEdgeChoice) {
       case FluxTracerEdgeOption::Center:
          for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
             HTracersEdge(L, IEdge, K) =
                 0.5_Real * (HCell(JCell0, K) * TrCell(L, JCell0, K) +
                             HCell(JCell1, K) * TrCell(L, JCell1, K));
@@ -42,7 +41,6 @@ class TracerAuxVars {
          break;
       case FluxTracerEdgeOption::Upwind:
          for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K = KStart + KVec;
             if (NormalVelEdge(IEdge, K) > 0) {
                HTracersEdge(L, IEdge, K) =
                    HCell(JCell0, K) * TrCell(L, JCell0, K);
@@ -59,12 +57,12 @@ class TracerAuxVars {
       }
    }
 
+   template <class FC>
    KOKKOS_FUNCTION void
-   computeVarsOnCells(int L, int ICell, int KChunk,
+   computeVarsOnCells(int L, int ICell, int K,
                       const Array2DReal &LayerThickEdgeMean,
-                      const Array3DReal &TrCell) const {
+                      const Array3DReal &TrCell, FC FullChunk) const {
 
-      const int KStart       = KChunk * VecLength;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real Del2TrCellTmp[VecLength] = {0};
@@ -78,7 +76,6 @@ class TracerAuxVars {
          const Real DvDcEdge = DvEdge(JEdge) / DcEdge(JEdge);
 
          for (int KVec = 0; KVec < VecLength; ++KVec) {
-            const int K           = KStart + KVec;
             const Real TracerGrad = TrCell(L, JCell1, K) - TrCell(L, JCell0, K);
             Del2TrCellTmp[KVec] -= EdgeMask(JEdge, K) *
                                    EdgeSignOnCell(ICell, J) * DvDcEdge *
@@ -86,7 +83,6 @@ class TracerAuxVars {
          }
       }
       for (int KVec = 0; KVec < VecLength; ++KVec) {
-         const int K                  = KStart + KVec;
          Del2TracersCell(L, ICell, K) = Del2TrCellTmp[KVec] * InvAreaCell;
       }
    }
