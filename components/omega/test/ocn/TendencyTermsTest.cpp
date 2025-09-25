@@ -370,7 +370,7 @@ int testThickFluxDiv(int NVertLayers, Real RTol) {
    parallelFor(
        {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int KLayer) {
           ThickFluxDivOnC(NumThickFluxDiv, ICell, KLayer, OnesEdge,
-                          ThickFluxEdge);
+                          ThickFluxEdge, std::true_type{});
        });
 
    // Compute errors
@@ -447,7 +447,8 @@ int testPotVortHAdv(int NVertLayers, Real RTol) {
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
           PotVortHAdvOnE(NumPotVortHAdv, IEdge, KLayer, NormRelVortEdge,
-                         NormPlanetVortEdge, LayerThickEdge, NormVelEdge);
+                         NormPlanetVortEdge, LayerThickEdge, NormVelEdge,
+                         std::true_type{});
        });
 
    // Compute errors
@@ -498,7 +499,7 @@ int testKEGrad(int NVertLayers, Real RTol) {
    KEGradOnEdge KEGradOnE(Mesh, VCoord);
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          KEGradOnE(NumKEGrad, IEdge, KLayer, KECell);
+          KEGradOnE(NumKEGrad, IEdge, KLayer, KECell, std::true_type{});
        });
 
    // Compute errors
@@ -549,7 +550,7 @@ int testSSHGrad(int NVertLayers, Real RTol) {
    SSHGradOnEdge SSHGradOnE(Mesh, VCoord);
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          SSHGradOnE(NumSSHGrad, IEdge, KLayer, SSHCell);
+          SSHGradOnE(NumSSHGrad, IEdge, KLayer, SSHCell, std::true_type{});
        });
 
    // Compute errors
@@ -613,7 +614,8 @@ int testVelDiff(int NVertLayers, Real RTol) {
 
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          VelDiffOnE(NumVelDiff, IEdge, KLayer, DivCell, RVortVertex);
+          VelDiffOnE(NumVelDiff, IEdge, KLayer, DivCell, RVortVertex,
+                     std::true_type{});
        });
 
    // Compute errors
@@ -686,7 +688,8 @@ int testVelHyperDiff(int NVertLayers, Real RTol) {
 
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          VelHyperDiffOnE(NumVelHyperDiff, IEdge, KLayer, DivCell, RVortVertex);
+          VelHyperDiffOnE(NumVelHyperDiff, IEdge, KLayer, DivCell, RVortVertex,
+                          std::true_type{});
        });
 
    // Compute errors
@@ -891,7 +894,7 @@ int testTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
        {NTracers, Mesh->NCellsOwned, NVertLayers},
        KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
           TrHorzAdvOnC(NumTrFluxDiv, L, ICell, KLayer, NormalVelocity,
-                       HTrOnEdge);
+                       HTrOnEdge, std::true_type{});
        });
 
    ErrorMeasures TrHAdvErrors;
@@ -947,8 +950,8 @@ int testTracerDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
    parallelFor(
        {NTracers, Mesh->NCellsOwned, NVertLayers},
        KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
-          TrDiffOnC(NumTracerDiff, L, ICell, KLayer, TracerCell,
-                    LayerThickEdge);
+          TrDiffOnC(NumTracerDiff, L, ICell, KLayer, TracerCell, LayerThickEdge,
+                    std::true_type{});
        });
 
    ErrorMeasures TrDiffErrors;
@@ -997,7 +1000,8 @@ int testTracerHyperDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
    parallelFor(
        {NTracers, Mesh->NCellsOwned, NVertLayers},
        KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
-          TrHypDiffOnC(NumTracerHyperDiff, L, ICell, KLayer, TrDel2Cell);
+          TrHypDiffOnC(NumTracerHyperDiff, L, ICell, KLayer, TrDel2Cell,
+                       std::true_type{});
        });
 
    ErrorMeasures TrHyperDiffErrors;

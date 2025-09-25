@@ -32,18 +32,20 @@ class ThicknessFluxDivOnCell {
 
    /// The functor takes cell index, vertical chunk index, and thickness flux
    /// array as inputs, outputs the tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 ICell, I4 KChunk,
+   template <class FC>
+   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 ICell, I4 KStart,
                                    const Array2DReal &ThicknessFlux,
-                                   const Array2DReal &NormalVelEdge) const {
+                                   const Array2DReal &NormalVelEdge,
+                                   FC FullChunk) const {
+      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
 
-      const I4 KStart        = KChunk * VecLength;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real DivTmp[VecLength] = {0};
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
             const I4 K = KStart + KVec;
             DivTmp[KVec] -= DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
                             ThicknessFlux(JEdge, K) * NormalVelEdge(JEdge, K) *
@@ -51,7 +53,7 @@ class ThicknessFluxDivOnCell {
          }
       }
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(ICell, K) -= DivTmp[KVec];
       }
@@ -63,6 +65,7 @@ class ThicknessFluxDivOnCell {
    Array1DReal DvEdge;
    Array1DReal AreaCell;
    Array2DReal EdgeSignOnCell;
+   Array1DI4 MaxLayerCell;
 };
 
 /// Horizontal advection of potential vorticity defined on edges, for
@@ -78,18 +81,21 @@ class PotentialVortHAdvOnEdge {
    /// normalized relative vorticity, normalized planetary vorticity, layer
    /// thickness on edges, and normal velocity on edges as inputs,
    /// outputs the tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
-                                   const Array2DReal &NormRVortEdge,
-                                   const Array2DReal &NormFEdge,
-                                   const Array2DReal &FluxLayerThickEdge,
-                                   const Array2DReal &NormVelEdge) const {
+   template <class FC>
+   KOKKOS_FUNCTION void
+   operator()(const Array2DReal &Tend, I4 IEdge, I4 KStart,
+              const Array2DReal &NormRVortEdge, const Array2DReal &NormFEdge,
+              const Array2DReal &FluxLayerThickEdge,
+              const Array2DReal &NormVelEdge, FC FullChunk) const {
 
-      const I4 KStart         = KChunk * VecLength;
+      const int KLen =
+          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+
       Real VortTmp[VecLength] = {0};
 
       for (int J = 0; J < NEdgesOnEdge(IEdge); ++J) {
          I4 JEdge = EdgesOnEdge(IEdge, J);
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
             const I4 K    = KStart + KVec;
             Real NormVort = (NormRVortEdge(IEdge, K) + NormFEdge(IEdge, K) +
                              NormRVortEdge(JEdge, K) + NormFEdge(JEdge, K)) *
@@ -101,7 +107,7 @@ class PotentialVortHAdvOnEdge {
          }
       }
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(IEdge, K) += EdgeMask(IEdge, K) * VortTmp[KVec];
       }
@@ -112,6 +118,7 @@ class PotentialVortHAdvOnEdge {
    Array2DI4 EdgesOnEdge;
    Array2DReal WeightsOnEdge;
    Array2DReal EdgeMask;
+   Array1DI4 MaxLayerEdgeTop;
 };
 
 /// Gradient of kinetic energy defined on edges, for momentum equation
@@ -124,15 +131,18 @@ class KEGradOnEdge {
 
    /// The functor takes edge index, vertical chunk index, and kinetic energy
    /// array as inputs, outputs the tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
-                                   const Array2DReal &KECell) const {
+   template <class FC>
+   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KStart,
+                                   const Array2DReal &KECell,
+                                   FC FullChunk) const {
+      const int KLen =
+          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
 
-      const I4 KStart      = KChunk * VecLength;
       const I4 JCell0      = CellsOnEdge(IEdge, 0);
       const I4 JCell1      = CellsOnEdge(IEdge, 1);
       const Real InvDcEdge = 1._Real / DcEdge(IEdge);
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(IEdge, K) -= EdgeMask(IEdge, K) *
                            (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
@@ -143,6 +153,7 @@ class KEGradOnEdge {
    Array2DI4 CellsOnEdge;
    Array1DReal DcEdge;
    Array2DReal EdgeMask;
+   Array1DI4 MaxLayerEdgeTop;
 };
 
 /// Gradient of sea surface height defined on edges multipled by gravitational
@@ -156,15 +167,18 @@ class SSHGradOnEdge {
 
    /// The functor takes edge index, vertical chunk index, and array of
    /// layer thickness/SSH, outputs tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
-                                   const Array2DReal &SshCell) const {
+   template <class FC>
+   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KStart,
+                                   const Array2DReal &SshCell,
+                                   FC FullChunk) const {
+      const int KLen =
+          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
 
-      const I4 KStart      = KChunk * VecLength;
       const I4 ICell0      = CellsOnEdge(IEdge, 0);
       const I4 ICell1      = CellsOnEdge(IEdge, 1);
       const Real InvDcEdge = 1._Real / DcEdge(IEdge);
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(IEdge, K) -= EdgeMask(IEdge, K) * Grav *
                            (SshCell(ICell1, K) - SshCell(ICell0, K)) *
@@ -177,6 +191,7 @@ class SSHGradOnEdge {
    Array2DI4 CellsOnEdge;
    Array1DReal DcEdge;
    Array2DReal EdgeMask;
+   Array1DI4 MaxLayerEdgeTop;
 };
 
 /// Laplacian horizontal mixing, for momentum equation
@@ -192,11 +207,15 @@ class VelocityDiffusionOnEdge {
    /// The functor takes edge index, vertical chunk index, and arrays for
    /// divergence of horizontal velocity (defined at cell centers) and relative
    /// vorticity (defined at vertices), outputs tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+   template <class FC>
+   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KStart,
                                    const Array2DReal &DivCell,
-                                   const Array2DReal &RVortVertex) const {
+                                   const Array2DReal &RVortVertex,
+                                   FC FullChunk) const {
 
-      const I4 KStart = KChunk * VecLength;
+      const int KLen =
+          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
 
@@ -206,7 +225,7 @@ class VelocityDiffusionOnEdge {
       const Real DcEdgeInv = 1._Real / DcEdge(IEdge);
       const Real DvEdgeInv = 1._Real / DvEdge(IEdge);
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
          const Real Del2U =
              ((DivCell(ICell1, K) - DivCell(ICell0, K)) * DcEdgeInv -
@@ -225,6 +244,7 @@ class VelocityDiffusionOnEdge {
    Array1DReal DvEdge;
    Array1DReal MeshScalingDel2;
    Array2DReal EdgeMask;
+   Array1DI4 MaxLayerEdgeTop;
 };
 
 /// Biharmonic horizontal mixing, for momentum equation
@@ -241,11 +261,15 @@ class VelocityHyperDiffOnEdge {
    /// The functor takes the edge index, vertical chunk index, and arrays for
    /// the laplacian of divergence of horizontal velocity and the laplacian of
    /// the relative vorticity, outputs tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+   template <class FC>
+   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KStart,
                                    const Array2DReal &Del2DivCell,
-                                   const Array2DReal &Del2RVortVertex) const {
+                                   const Array2DReal &Del2RVortVertex,
+                                   FC FullChunk) const {
 
-      const I4 KStart = KChunk * VecLength;
+      const int KLen =
+          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
 
@@ -255,7 +279,7 @@ class VelocityHyperDiffOnEdge {
       const Real DcEdgeInv = 1._Real / DcEdge(IEdge);
       const Real DvEdgeInv = 1._Real / DvEdge(IEdge);
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
          const Real Del2U =
              (DivFactor * (Del2DivCell(ICell1, K) - Del2DivCell(ICell0, K)) *
@@ -275,6 +299,7 @@ class VelocityHyperDiffOnEdge {
    Array1DReal DvEdge;
    Array1DReal MeshScalingDel4;
    Array2DReal EdgeMask;
+   Array1DI4 MaxLayerEdgeTop;
 };
 
 /// Wind forcing
@@ -346,11 +371,13 @@ class TracerHorzAdvOnCell {
 
    TracerHorzAdvOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
 
+   template <class FC>
    KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
-                                   I4 KChunk, const Array2DReal &NormVelEdge,
-                                   const Array3DReal &HTracersOnEdge) const {
+                                   I4 KStart, const Array2DReal &NormVelEdge,
+                                   const Array3DReal &HTracersOnEdge,
+                                   FC FullChunk) const {
+      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
 
-      const I4 KStart        = KChunk * VecLength;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real HAdvTmp[VecLength] = {0};
@@ -380,6 +407,7 @@ class TracerHorzAdvOnCell {
    Array1DReal DvEdge;
    Array1DReal AreaCell;
    Array2DReal EdgeMask;
+   Array1DI4 MaxLayerCell;
 };
 
 // Tracer horizontal diffusion term
@@ -391,12 +419,13 @@ class TracerDiffOnCell {
 
    TracerDiffOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
 
-   KOKKOS_FUNCTION void
-   operator()(const Array3DReal &Tend, I4 L, I4 ICell, I4 KChunk,
-              const Array3DReal &TracerCell,
-              const Array2DReal &MeanLayerThickEdge) const {
+   template <class FC>
+   KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
+                                   I4 KStart, const Array3DReal &TracerCell,
+                                   const Array2DReal &MeanLayerThickEdge,
+                                   FC FullChunk) const {
 
-      const I4 KStart        = KChunk * VecLength;
+      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real DiffTmp[VecLength] = {0};
@@ -435,6 +464,7 @@ class TracerDiffOnCell {
    Array1DReal AreaCell;
    Array1DReal MeshScalingDel2;
    Array2DReal EdgeMask;
+   Array1DI4 MaxLayerCell;
 };
 
 // Tracer biharmonic horizontal mixing term
@@ -446,11 +476,12 @@ class TracerHyperDiffOnCell {
 
    TracerHyperDiffOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
 
+   template <class FC>
    KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
-                                   I4 KChunk,
-                                   const Array3DReal &TrDel2Cell) const {
+                                   I4 KStart, const Array3DReal &TrDel2Cell,
+                                   FC FullChunk) const {
 
-      const I4 KStart        = KChunk * VecLength;
+      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real HypTmp[VecLength] = {0};
@@ -489,6 +520,7 @@ class TracerHyperDiffOnCell {
    Array1DReal AreaCell;
    Array1DReal MeshScalingDel4;
    Array2DReal EdgeMask;
+   Array1DI4 MaxLayerCell;
 };
 
 } // namespace OMEGA

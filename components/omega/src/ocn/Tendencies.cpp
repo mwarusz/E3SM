@@ -14,6 +14,8 @@
 #include "Pacer.h"
 #include "Tracers.h"
 
+#define TENDV 2
+
 namespace OMEGA {
 
 Tendencies *Tendencies::DefaultTendencies = nullptr;
@@ -263,6 +265,10 @@ void Tendencies::computeThicknessTendenciesOnly(
     TimeInstant Time                ///< [in] Time
 ) {
 
+   const auto *VCoord          = VertCoord::getDefault();
+   const Array1DI4 &MinLyrCell = VCoord->MinLayerCell;
+   const Array1DI4 &MaxLyrCell = VCoord->MaxLayerCell;
+
    OMEGA_SCOPE(LocLayerThicknessTend, LayerThicknessTend);
    OMEGA_SCOPE(LocThicknessFluxDiv, ThicknessFluxDiv);
    Array2DReal NormalVelEdge;
@@ -270,7 +276,19 @@ void Tendencies::computeThicknessTendenciesOnly(
 
    Pacer::start("Tend:computeThicknessTendenciesOnly", 1);
 
+#if TENDV == 1
    deepCopy(LocLayerThicknessTend, 0);
+#else
+   parallelForOuter(
+       {NCellsAll}, KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
+          const int KMin   = MinLyrCell(ICell);
+          const int KRange = MaxLyrCell(ICell) - KMin + 1;
+          parallelForInner(Team, KRange, [=](int KOff) {
+             const int K                     = KMin + KOff;
+             LocLayerThicknessTend(ICell, K) = 0;
+          });
+       });
+#endif
 
    // Compute thickness flux divergence
    const Array2DReal &ThickFluxEdge =
@@ -278,11 +296,26 @@ void Tendencies::computeThicknessTendenciesOnly(
 
    if (LocThicknessFluxDiv.Enabled) {
       Pacer::start("Tend:thicknessFluxDiv", 2);
+#if TENDV == 1
       parallelFor(
           {NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
-             LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KChunk,
-                                 ThickFluxEdge, NormalVelEdge);
+             const int KStart = KChunk * VecLength;
+             LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KStart,
+                                 ThickFluxEdge, NormalVelEdge,
+                                 std::true_type{});
           });
+#else
+      parallelForOuter(
+          {NCellsAll}, KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
+             parallelForInnerChunked<VecLength>(
+                 Team, MinLyrCell(ICell), MaxLyrCell(ICell),
+                 [=](int KStart, auto FullChunk) {
+                    LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KStart,
+                                        ThickFluxEdge, NormalVelEdge,
+                                        FullChunk);
+                 });
+          });
+#endif
       Pacer::stop("Tend:thicknessFluxDiv", 2);
    }
 
@@ -307,6 +340,18 @@ void Tendencies::computeVelocityTendenciesOnly(
     TimeInstant Time                ///< [in] Time
 ) {
 
+   const auto *VCoord               = VertCoord::getDefault();
+   const Array1DI4 &MinLyrCell      = VCoord->MinLayerCell;
+   const Array1DI4 &MaxLyrCell      = VCoord->MaxLayerCell;
+   const Array1DI4 &MinLyrEdgeBot   = VCoord->MinLayerEdgeBot;
+   const Array1DI4 &MinLyrEdgeTop   = VCoord->MinLayerEdgeTop;
+   const Array1DI4 &MaxLyrEdgeTop   = VCoord->MaxLayerEdgeTop;
+   const Array1DI4 &MaxLyrEdgeBot   = VCoord->MaxLayerEdgeBot;
+   const Array1DI4 &MinLyrVertexBot = VCoord->MinLayerVertexBot;
+   const Array1DI4 &MinLyrVertexTop = VCoord->MinLayerVertexTop;
+   const Array1DI4 &MaxLyrVertexTop = VCoord->MaxLayerVertexTop;
+   const Array1DI4 &MaxLyrVertexBot = VCoord->MaxLayerVertexBot;
+
    OMEGA_SCOPE(LocNormalVelocityTend, NormalVelocityTend);
    OMEGA_SCOPE(LocPotientialVortHAdv, PotientialVortHAdv);
    OMEGA_SCOPE(LocKEGrad, KEGrad);
@@ -318,7 +363,19 @@ void Tendencies::computeVelocityTendenciesOnly(
 
    Pacer::start("Tend:computeVelocityTendenciesOnly", 1);
 
+#if TENDV == 1
    deepCopy(LocNormalVelocityTend, 0);
+#else
+   parallelForOuter(
+       {NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
+          const int KMin   = MinLyrEdgeTop(IEdge);
+          const int KRange = MaxLyrEdgeBot(IEdge) - KMin + 1;
+          parallelForInner(Team, KRange, [=](int KOff) {
+             const int K                     = KMin + KOff;
+             LocNormalVelocityTend(IEdge, K) = 0;
+          });
+       });
+#endif
 
    const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
 
@@ -331,12 +388,26 @@ void Tendencies::computeVelocityTendenciesOnly(
    State->getNormalVelocity(NormVelEdge, VelTimeLevel);
    if (LocPotientialVortHAdv.Enabled) {
       Pacer::start("Tend:potientialVortHAdv", 2);
+#if TENDV == 1
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
+             const int KStart = KChunk * VecLength;
+             LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KStart,
                                    NormRVortEdge, NormFEdge, FluxLayerThickEdge,
-                                   NormVelEdge);
+                                   NormVelEdge, std::true_type{});
           });
+#else
+      parallelForOuter(
+          {NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
+             parallelForInnerChunked<VecLength>(
+                 Team, MinLyrEdgeBot(IEdge), MaxLyrEdgeTop(IEdge),
+                 [=](int KStart, auto FullChunk) {
+                    LocPotientialVortHAdv(
+                        LocNormalVelocityTend, IEdge, KStart, NormRVortEdge,
+                        NormFEdge, FluxLayerThickEdge, NormVelEdge, FullChunk);
+                 });
+          });
+#endif
       Pacer::stop("Tend:potientialVortHAdv", 2);
    }
 
@@ -344,10 +415,24 @@ void Tendencies::computeVelocityTendenciesOnly(
    const Array2DReal &KECell = AuxState->KineticAux.KineticEnergyCell;
    if (LocKEGrad.Enabled) {
       Pacer::start("Tend:KEGrad", 2);
+#if TENDV == 1
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocKEGrad(LocNormalVelocityTend, IEdge, KChunk, KECell);
+             const int KStart = KChunk * VecLength;
+             LocKEGrad(LocNormalVelocityTend, IEdge, KStart, KECell,
+                       std::true_type{});
           });
+#else
+      parallelForOuter(
+          {NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
+             parallelForInnerChunked<VecLength>(
+                 Team, MinLyrEdgeBot(IEdge), MaxLyrEdgeTop(IEdge),
+                 [=](int KStart, auto FullChunk) {
+                    LocKEGrad(LocNormalVelocityTend, IEdge, KStart, KECell,
+                              FullChunk);
+                 });
+          });
+#endif
       Pacer::stop("Tend:KEGrad", 2);
    }
 
@@ -355,10 +440,24 @@ void Tendencies::computeVelocityTendenciesOnly(
    const Array2DReal &SSHCell = AuxState->LayerThicknessAux.SshCell;
    if (LocSSHGrad.Enabled) {
       Pacer::start("Tend:SSHGrad", 2);
+#if TENDV == 1
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocSSHGrad(LocNormalVelocityTend, IEdge, KChunk, SSHCell);
+             const int KStart = KChunk * VecLength;
+             LocSSHGrad(LocNormalVelocityTend, IEdge, KStart, SSHCell,
+                        std::true_type{});
           });
+#else
+      parallelForOuter(
+          {NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
+             parallelForInnerChunked<VecLength>(
+                 Team, MinLyrEdgeBot(IEdge), MaxLyrEdgeTop(IEdge),
+                 [=](int KStart, auto FullChunk) {
+                    LocSSHGrad(LocNormalVelocityTend, IEdge, KStart, SSHCell,
+                               FullChunk);
+                 });
+          });
+#endif
       Pacer::stop("Tend:SSHGrad", 2);
    }
 
@@ -367,11 +466,24 @@ void Tendencies::computeVelocityTendenciesOnly(
    const Array2DReal &RVortVertex = AuxState->VorticityAux.RelVortVertex;
    if (LocVelocityDiffusion.Enabled) {
       Pacer::start("Tend:velocityDiffusion", 2);
+#if TENDV == 1
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk, DivCell,
-                                  RVortVertex);
+             const int KStart = KChunk * VecLength;
+             LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KStart, DivCell,
+                                  RVortVertex, std::true_type{});
           });
+#else
+      parallelForOuter(
+          {NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
+             parallelForInnerChunked<VecLength>(
+                 Team, MinLyrEdgeBot(IEdge), MaxLyrEdgeTop(IEdge),
+                 [=](int KStart, auto FullChunk) {
+                    LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KStart,
+                                         DivCell, RVortVertex, FullChunk);
+                 });
+          });
+#endif
       Pacer::stop("Tend:velocityDiffusion", 2);
    }
 
@@ -381,11 +493,26 @@ void Tendencies::computeVelocityTendenciesOnly(
        AuxState->VelocityDel2Aux.Del2RelVortVertex;
    if (LocVelocityHyperDiff.Enabled) {
       Pacer::start("Tend:velocityHyperDiff", 2);
+#if TENDV == 1
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
-             LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
-                                  Del2DivCell, Del2RVortVertex);
+             const int KStart = KChunk * VecLength;
+             LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KStart,
+                                  Del2DivCell, Del2RVortVertex,
+                                  std::true_type{});
           });
+#else
+      parallelForOuter(
+          {NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
+             parallelForInnerChunked<VecLength>(
+                 Team, MinLyrEdgeBot(IEdge), MaxLyrEdgeTop(IEdge),
+                 [=](int KStart, auto FullChunk) {
+                    LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KStart,
+                                         Del2DivCell, Del2RVortVertex,
+                                         FullChunk);
+                 });
+          });
+#endif
       Pacer::stop("Tend:velocityHyperDiff", 2);
    }
 
@@ -395,11 +522,14 @@ void Tendencies::computeVelocityTendenciesOnly(
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
    if (LocWindForcing.Enabled) {
       Pacer::start("Tend:windForcing", 2);
+#if TENDV == 1
       parallelFor(
           {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocWindForcing(LocNormalVelocityTend, IEdge, KChunk,
                             NormalStressEdge, MeanLayerThickEdge);
           });
+#else
+#endif
       Pacer::stop("Tend:windForcing", 2);
    }
 
@@ -438,21 +568,52 @@ void Tendencies::computeTracerTendenciesOnly(
    OMEGA_SCOPE(LocTracerDiffusion, TracerDiffusion);
    OMEGA_SCOPE(LocTracerHyperDiff, TracerHyperDiff);
 
+   const auto *VCoord          = VertCoord::getDefault();
+   const Array1DI4 &MinLyrCell = VCoord->MinLayerCell;
+   const Array1DI4 &MaxLyrCell = VCoord->MaxLayerCell;
+
    Pacer::start("Tend:computeTracerTendenciesOnly", 1);
 
+#if TENDV == 1
    deepCopy(LocTracerTend, 0);
+#else
+   parallelForOuter(
+       {NTracers, NCellsAll},
+       KOKKOS_LAMBDA(I4 L, I4 ICell, const TeamMember &Team) {
+          const int KMin   = MinLyrCell(ICell);
+          const int KRange = MaxLyrCell(ICell) - KMin + 1;
+          parallelForInner(Team, KRange, [=](int KOff) {
+             const int K                = KMin + KOff;
+             LocTracerTend(L, ICell, K) = 0;
+          });
+       });
+#endif
 
    // compute tracer horizotal advection
    const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
    const Array3DReal &HTracersEdge  = AuxState->TracerAux.HTracersEdge;
    if (LocTracerHorzAdv.Enabled) {
       Pacer::start("Tend:tracerHorzAdv", 2);
+#if TENDV == 1
       parallelFor(
           {NTracers, NCellsAll, NChunks},
           KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
-             LocTracerHorzAdv(LocTracerTend, L, ICell, KChunk, NormalVelEdge,
-                              HTracersEdge);
+             const int KStart = KChunk * VecLength;
+             LocTracerHorzAdv(LocTracerTend, L, ICell, KStart, NormalVelEdge,
+                              HTracersEdge, std::true_type{});
           });
+#else
+      parallelForOuter(
+          {NTracers, NCellsAll},
+          KOKKOS_LAMBDA(I4 L, I4 ICell, const TeamMember &Team) {
+             parallelForInnerChunked<VecLength>(
+                 Team, MinLyrCell(ICell), MaxLyrCell(ICell),
+                 [=](int KStart, auto FullChunk) {
+                    LocTracerHorzAdv(LocTracerTend, L, ICell, KStart,
+                                     NormalVelEdge, HTracersEdge, FullChunk);
+                 });
+          });
+#endif
       Pacer::stop("Tend:tracerHorzAdv", 2);
    }
 
@@ -461,12 +622,27 @@ void Tendencies::computeTracerTendenciesOnly(
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
    if (LocTracerDiffusion.Enabled) {
       Pacer::start("Tend:tracerDiffusion", 2);
+#if TENDV == 1
       parallelFor(
           {NTracers, NCellsAll, NChunks},
           KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
-             LocTracerDiffusion(LocTracerTend, L, ICell, KChunk, TracerArray,
-                                MeanLayerThickEdge);
+             const int KStart = KChunk * VecLength;
+             LocTracerDiffusion(LocTracerTend, L, ICell, KStart, TracerArray,
+                                MeanLayerThickEdge, std::true_type{});
           });
+#else
+      parallelForOuter(
+          {NTracers, NCellsAll},
+          KOKKOS_LAMBDA(I4 L, I4 ICell, const TeamMember &Team) {
+             parallelForInnerChunked<VecLength>(
+                 Team, MinLyrCell(ICell), MaxLyrCell(ICell),
+                 [=](int KStart, auto FullChunk) {
+                    LocTracerDiffusion(LocTracerTend, L, ICell, KStart,
+                                       TracerArray, MeanLayerThickEdge,
+                                       FullChunk);
+                 });
+          });
+#endif
       Pacer::stop("Tend:tracerDiffusion", 2);
    }
 
@@ -474,12 +650,26 @@ void Tendencies::computeTracerTendenciesOnly(
    const Array3DReal &Del2TracersCell = AuxState->TracerAux.Del2TracersCell;
    if (LocTracerHyperDiff.Enabled) {
       Pacer::start("Tend:tracerHyperDiff", 2);
+#if TENDV == 1
       parallelFor(
           {NTracers, NCellsAll, NChunks},
           KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
-             LocTracerHyperDiff(LocTracerTend, L, ICell, KChunk,
-                                Del2TracersCell);
+             const int KStart = KChunk * VecLength;
+             LocTracerHyperDiff(LocTracerTend, L, ICell, KStart,
+                                Del2TracersCell, std::true_type{});
           });
+#else
+      parallelForOuter(
+          {NTracers, NCellsAll},
+          KOKKOS_LAMBDA(I4 L, I4 ICell, const TeamMember &Team) {
+             parallelForInnerChunked<VecLength>(
+                 Team, MinLyrCell(ICell), MaxLyrCell(ICell),
+                 [=](int KStart, auto FullChunk) {
+                    LocTracerHyperDiff(LocTracerTend, L, ICell, KStart,
+                                       Del2TracersCell, FullChunk);
+                 });
+          });
+#endif
       Pacer::stop("Tend:tracerHyperDiff", 2);
    }
 
@@ -502,15 +692,34 @@ void Tendencies::computeThicknessTendencies(
    OMEGA_SCOPE(LayerThickCell, LayerThick);
    OMEGA_SCOPE(NormalVelEdge, NormVel);
 
+   const auto *VCoord             = VertCoord::getDefault();
+   const Array1DI4 &MinLyrCell    = VCoord->MinLayerCell;
+   const Array1DI4 &MaxLyrCell    = VCoord->MaxLayerCell;
+   const Array1DI4 &MinLyrEdgeBot = VCoord->MinLayerEdgeBot;
+   const Array1DI4 &MaxLyrEdgeTop = VCoord->MaxLayerEdgeTop;
+
    Pacer::start("Tend:computeThicknessTendencies", 1);
 
    Pacer::start("Tend:computeLayerThickAux", 2);
+#if TENDV == 1
    parallelFor(
        "computeLayerThickAux", {NEdgesAll, NChunks},
        KOKKOS_LAMBDA(int IEdge, int KChunk) {
-          LayerThicknessAux.computeVarsOnEdge(IEdge, KChunk, LayerThickCell,
+          const int KStart = KChunk * VecLength;
+          LayerThicknessAux.computeVarsOnEdge(IEdge, KStart, LayerThickCell,
                                               NormalVelEdge, std::true_type{});
        });
+#else
+   parallelForOuter(
+       {NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrEdgeBot(IEdge), MaxLyrEdgeTop(IEdge),
+              [=](int K, auto FullChunk) {
+                 LayerThicknessAux.computeVarsOnEdge(IEdge, K, LayerThickCell,
+                                                     NormalVelEdge, FullChunk);
+              });
+       });
+#endif
    Pacer::stop("Tend:computeLayerThickAux", 2);
 
    computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
@@ -547,28 +756,64 @@ void Tendencies::computeTracerTendencies(
    OMEGA_SCOPE(LayerThickCell, State->LayerThickness[ThickTimeLevel]);
    OMEGA_SCOPE(NormalVelEdge, State->NormalVelocity[VelTimeLevel]);
 
+   const auto *VCoord             = VertCoord::getDefault();
+   const Array1DI4 &MinLyrCell    = VCoord->MinLayerCell;
+   const Array1DI4 &MaxLyrCell    = VCoord->MaxLayerCell;
+   const Array1DI4 &MinLyrEdgeBot = VCoord->MinLayerEdgeBot;
+   const Array1DI4 &MaxLyrEdgeTop = VCoord->MaxLayerEdgeTop;
+
    Pacer::start("Tend:computeTracerTendencies", 1);
 
    Pacer::start("Tend:computeTracerAuxEdge", 2);
+#if TENDV == 1
    parallelFor(
        "computeTracerAuxEdge", {NTracers, NEdgesAll, NChunks},
        KOKKOS_LAMBDA(int LTracer, int IEdge, int KChunk) {
-          TracerAux.computeVarsOnEdge(LTracer, IEdge, KChunk, NormalVelEdge,
+          const int KStart = KChunk * VecLength;
+          TracerAux.computeVarsOnEdge(LTracer, IEdge, KStart, NormalVelEdge,
                                       LayerThickCell, TracerArray,
                                       std::true_type{});
        });
+#else
+   parallelForOuter(
+       {NTracers, NEdgesAll},
+       KOKKOS_LAMBDA(int LTracer, int IEdge, const TeamMember &Team) {
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrEdgeBot(IEdge), MaxLyrEdgeTop(IEdge),
+              [=](int K, auto FullChunk) {
+                 TracerAux.computeVarsOnEdge(LTracer, IEdge, K, NormalVelEdge,
+                                             LayerThickCell, TracerArray,
+                                             FullChunk);
+              });
+       });
+#endif
    Pacer::stop("Tend:computeTracerAuxEdge", 2);
 
    const auto &MeanLayerThickEdge =
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
    Pacer::start("Tend:computeTracerAuxCell", 2);
+#if TENDV == 1
    parallelFor(
        "computeTracerAuxCell", {NTracers, NCellsAll, NChunks},
        KOKKOS_LAMBDA(int LTracer, int ICell, int KChunk) {
-          TracerAux.computeVarsOnCells(LTracer, ICell, KChunk,
+          const int KStart = KChunk * VecLength;
+          TracerAux.computeVarsOnCells(LTracer, ICell, KStart,
                                        MeanLayerThickEdge, TracerArray,
                                        std::true_type{});
        });
+#else
+   parallelForOuter(
+       {NTracers, NCellsAll},
+       KOKKOS_LAMBDA(int LTracer, int ICell, const TeamMember &Team) {
+          parallelForInnerChunked<VecLength>(
+              Team, MinLyrCell(ICell), MaxLyrCell(ICell),
+              [=](int K, auto FullChunk) {
+                 TracerAux.computeVarsOnCells(LTracer, ICell, K,
+                                              MeanLayerThickEdge, TracerArray,
+                                              FullChunk);
+              });
+       });
+#endif
    Pacer::stop("Tend:computeTracerAuxCell", 2);
 
    computeTracerTendenciesOnly(State, AuxState, TracerArray, ThickTimeLevel,
