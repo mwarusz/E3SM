@@ -23,9 +23,14 @@ class VorticityAuxVars {
                     const VertCoord *VCoord);
 
    template <class FC>
-   KOKKOS_FUNCTION void
-   computeVarsOnVertex(int IVertex, int K, const Array2DReal &LayerThickCell,
-                       const Array2DReal &NormalVelEdge, FC FullChunk) const {
+   KOKKOS_FUNCTION void computeVarsOnVertex(int IVertex, int KStart,
+                                            const Array2DReal &LayerThickCell,
+                                            const Array2DReal &NormalVelEdge,
+                                            FC FullChunk) const {
+
+      const int KLen =
+          FullChunk ? VecLength : MaxLayerVertexBot(IVertex) - KStart + 1;
+
       const Real InvAreaTriangle = 1._Real / AreaTriangle(IVertex);
 
       Real LayerThickVertex[VecLength] = {0};
@@ -35,7 +40,8 @@ class VorticityAuxVars {
          const int JCell = CellsOnVertex(IVertex, J);
          const int JEdge = EdgesOnVertex(IVertex, J);
 
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
+            const int K = KStart + KVec;
             LayerThickVertex[KVec] += InvAreaTriangle *
                                       KiteAreasOnVertex(IVertex, J) *
                                       LayerThickCell(JCell, K);
@@ -45,7 +51,8 @@ class VorticityAuxVars {
          }
       }
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
+         const int K                    = KStart + KVec;
          const Real InvLayerThickVertex = 1._Real / LayerThickVertex[KVec];
 
          RelVortVertex(IVertex, K) = RelVortVertexTmp[KVec];
@@ -57,12 +64,17 @@ class VorticityAuxVars {
    }
 
    template <class FC>
-   KOKKOS_FUNCTION void computeVarsOnEdge(int IEdge, int K,
+   KOKKOS_FUNCTION void computeVarsOnEdge(int IEdge, int KStart,
                                           FC FullChunk) const {
+
+      const int KLen =
+          FullChunk ? VecLength : MaxLayerEdgeBot(IEdge) - KStart + 1;
+
       const int JVertex0 = VerticesOnEdge(IEdge, 0);
       const int JVertex1 = VerticesOnEdge(IEdge, 1);
 
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
+         const int K = KStart + KVec;
          NormRelVortEdge(IEdge, K) =
              0.5_Real *
              (NormRelVortVertex(JVertex0, K) + NormRelVortVertex(JVertex1, K));
@@ -87,6 +99,8 @@ class VorticityAuxVars {
    Array1DReal AreaTriangle;
    Array2DI4 VerticesOnEdge;
    Array1DReal FVertex;
+   Array1DI4 MaxLayerVertexBot;
+   Array1DI4 MaxLayerEdgeBot;
 };
 
 } // namespace OMEGA

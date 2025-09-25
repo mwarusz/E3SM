@@ -19,9 +19,11 @@ class KineticAuxVars {
                   const VertCoord *VCoord);
 
    template <class FC>
-   KOKKOS_FUNCTION void computeVarsOnCell(int ICell, int K,
+   KOKKOS_FUNCTION void computeVarsOnCell(int ICell, int KStart,
                                           const Array2DReal &NormalVelEdge,
                                           FC FullChunk) const {
+      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
+
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       Real KineticEnergyCellTmp[VecLength] = {0};
@@ -30,7 +32,8 @@ class KineticAuxVars {
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const int JEdge     = EdgesOnCell(ICell, J);
          const Real AreaEdge = 0.5_Real * DvEdge(JEdge) * DcEdge(JEdge);
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
+            const int K = KStart + KVec;
             KineticEnergyCellTmp[KVec] += AreaEdge * 0.5_Real * InvAreaCell *
                                           NormalVelEdge(JEdge, K) *
                                           NormalVelEdge(JEdge, K);
@@ -39,7 +42,8 @@ class KineticAuxVars {
                                         NormalVelEdge(JEdge, K);
          }
       }
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
+         const int K                 = KStart + KVec;
          KineticEnergyCell(ICell, K) = KineticEnergyCellTmp[KVec];
          VelocityDivCell(ICell, K)   = VelocityDivCellTmp[KVec];
       }
@@ -56,6 +60,7 @@ class KineticAuxVars {
    Array1DReal DcEdge;
    Array1DReal DvEdge;
    Array1DReal AreaCell;
+   Array1DI4 MaxLayerCell;
 };
 
 } // namespace OMEGA

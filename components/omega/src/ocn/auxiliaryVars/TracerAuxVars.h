@@ -25,22 +25,28 @@ class TracerAuxVars {
 
    template <class FC>
    KOKKOS_FUNCTION void
-   computeVarsOnEdge(int L, int IEdge, int K, const Array2DReal &NormalVelEdge,
-                     const Array2DReal &HCell, const Array3DReal &TrCell,
-                     FC FullChunk) const {
+   computeVarsOnEdge(int L, int IEdge, int KStart,
+                     const Array2DReal &NormalVelEdge, const Array2DReal &HCell,
+                     const Array3DReal &TrCell, FC FullChunk) const {
+
+      const int KLen =
+          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
 
       switch (TracersOnEdgeChoice) {
       case FluxTracerEdgeOption::Center:
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
+            const int K = KStart + KVec;
             HTracersEdge(L, IEdge, K) =
                 0.5_Real * (HCell(JCell0, K) * TrCell(L, JCell0, K) +
                             HCell(JCell1, K) * TrCell(L, JCell1, K));
          }
          break;
       case FluxTracerEdgeOption::Upwind:
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
+            const int K = KStart + KVec;
             if (NormalVelEdge(IEdge, K) > 0) {
                HTracersEdge(L, IEdge, K) =
                    HCell(JCell0, K) * TrCell(L, JCell0, K);
@@ -59,9 +65,11 @@ class TracerAuxVars {
 
    template <class FC>
    KOKKOS_FUNCTION void
-   computeVarsOnCells(int L, int ICell, int K,
+   computeVarsOnCells(int L, int ICell, int KStart,
                       const Array2DReal &LayerThickEdgeMean,
                       const Array3DReal &TrCell, FC FullChunk) const {
+
+      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
@@ -75,14 +83,16 @@ class TracerAuxVars {
 
          const Real DvDcEdge = DvEdge(JEdge) / DcEdge(JEdge);
 
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
+            const int K           = KStart + KVec;
             const Real TracerGrad = TrCell(L, JCell1, K) - TrCell(L, JCell0, K);
             Del2TrCellTmp[KVec] -= EdgeMask(JEdge, K) *
                                    EdgeSignOnCell(ICell, J) * DvDcEdge *
                                    LayerThickEdgeMean(JEdge, K) * TracerGrad;
          }
       }
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
+         const int K                  = KStart + KVec;
          Del2TracersCell(L, ICell, K) = Del2TrCellTmp[KVec] * InvAreaCell;
       }
    }
@@ -100,6 +110,8 @@ class TracerAuxVars {
    Array1DReal DvEdge;
    Array1DReal AreaCell;
    Array2DReal EdgeMask;
+   Array1DI4 MaxLayerEdgeTop;
+   Array1DI4 MaxLayerCell;
 };
 
 } // namespace OMEGA
