@@ -28,8 +28,10 @@ class LayerThicknessAuxVars {
    computeVarsOnEdge(int IEdge, int KStart, const Array2DReal &LayerThickCell,
                      const Array2DReal &NormalVelEdge, FC FullChunk) const {
 
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerEdgeTop(IEdge) - KStart + 1);
 
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
@@ -82,7 +84,9 @@ class LayerThicknessAuxVars {
                                            const Array2DReal &LayerThickCell,
                                            FC FullChunk) const {
 
-      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
+      // const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart +
+      // 1;
+      const int KLen = Kokkos::min(VecLength, MaxLayerCell(ICell) - KStart + 1);
 
       // Temporary for stacked shallow water
       for (int KVec = 0; KVec < KLen; ++KVec) {

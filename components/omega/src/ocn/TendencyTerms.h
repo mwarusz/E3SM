@@ -37,7 +37,9 @@ class ThicknessFluxDivOnCell {
                                    const Array2DReal &ThicknessFlux,
                                    const Array2DReal &NormalVelEdge,
                                    FC FullChunk) const {
-      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
+      // const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart +
+      // 1;
+      const int KLen = Kokkos::min(VecLength, MaxLayerCell(ICell) - KStart + 1);
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
@@ -88,8 +90,10 @@ class PotentialVortHAdvOnEdge {
               const Array2DReal &FluxLayerThickEdge,
               const Array2DReal &NormVelEdge, FC FullChunk) const {
 
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerEdgeTop(IEdge) - KStart + 1);
 
       Real VortTmp[VecLength] = {0};
 
@@ -135,8 +139,10 @@ class KEGradOnEdge {
    KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KStart,
                                    const Array2DReal &KECell,
                                    FC FullChunk) const {
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerEdgeTop(IEdge) - KStart + 1);
 
       const I4 JCell0      = CellsOnEdge(IEdge, 0);
       const I4 JCell1      = CellsOnEdge(IEdge, 1);
@@ -178,8 +184,10 @@ class SSHGradOnEdge {
    KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KStart,
                                    const Array2DReal &SshCell,
                                    FC FullChunk) const {
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerEdgeTop(IEdge) - KStart + 1);
 
       const I4 ICell0      = CellsOnEdge(IEdge, 0);
       const I4 ICell1      = CellsOnEdge(IEdge, 1);
@@ -226,8 +234,10 @@ class VelocityDiffusionOnEdge {
                                    const Array2DReal &RVortVertex,
                                    FC FullChunk) const {
 
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerEdgeTop(IEdge) - KStart + 1);
 
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
@@ -284,8 +294,10 @@ class VelocityHyperDiffOnEdge {
                                    const Array2DReal &Del2RVortVertex,
                                    FC FullChunk) const {
 
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerEdgeTop(IEdge) - KStart + 1);
 
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
@@ -397,7 +409,9 @@ class TracerHorzAdvOnCell {
                                    I4 KStart, const Array2DReal &NormVelEdge,
                                    const Array3DReal &HTracersOnEdge,
                                    FC FullChunk) const {
-      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
+      // const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart +
+      // 1;
+      const int KLen = Kokkos::min(VecLength, MaxLayerCell(ICell) - KStart + 1);
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
@@ -449,7 +463,9 @@ class TracerDiffOnCell {
                                    const Array2DReal &MeanLayerThickEdge,
                                    FC FullChunk) const {
 
-      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
+      // const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart +
+      // 1;
+      const int KLen = Kokkos::min(VecLength, MaxLayerCell(ICell) - KStart + 1);
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       const auto LTracerCell = subview(TracerCell, L, Kokkos::ALL, Kokkos::ALL);
@@ -508,7 +524,9 @@ class TracerHyperDiffOnCell {
                                    I4 KStart, const Array3DReal &TrDel2Cell,
                                    FC FullChunk) const {
 
-      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
+      // const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart +
+      // 1;
+      const int KLen = Kokkos::min(VecLength, MaxLayerCell(ICell) - KStart + 1);
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       const auto LTrDel2Cell = subview(TrDel2Cell, L, Kokkos::ALL, Kokkos::ALL);

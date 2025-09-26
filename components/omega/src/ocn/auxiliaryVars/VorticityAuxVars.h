@@ -28,8 +28,10 @@ class VorticityAuxVars {
                                             const Array2DReal &NormalVelEdge,
                                             FC FullChunk) const {
 
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerVertexBot(IVertex) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerVertexBot(IVertex) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerVertexBot(IVertex) - KStart + 1);
 
       const Real InvAreaTriangle = 1._Real / AreaTriangle(IVertex);
 
@@ -67,8 +69,10 @@ class VorticityAuxVars {
    KOKKOS_FUNCTION void computeVarsOnEdge(int IEdge, int KStart,
                                           FC FullChunk) const {
 
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerEdgeBot(IEdge) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerEdgeTop(IEdge) - KStart + 1);
 
       const int JVertex0 = VerticesOnEdge(IEdge, 0);
       const int JVertex1 = VerticesOnEdge(IEdge, 1);

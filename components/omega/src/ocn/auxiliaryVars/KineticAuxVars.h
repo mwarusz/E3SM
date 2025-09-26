@@ -22,7 +22,9 @@ class KineticAuxVars {
    KOKKOS_FUNCTION void computeVarsOnCell(int ICell, int KStart,
                                           const Array2DReal &NormalVelEdge,
                                           FC FullChunk) const {
-      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
+      // const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart +
+      // 1;
+      const int KLen = Kokkos::min(VecLength, MaxLayerCell(ICell) - KStart + 1);
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 

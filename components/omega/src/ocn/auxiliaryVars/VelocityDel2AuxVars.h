@@ -24,8 +24,10 @@ class VelocityDel2AuxVars {
    computeVarsOnEdge(int IEdge, int KStart, const Array2DReal &VelocityDivCell,
                      const Array2DReal &RelVortVertex, FC FullChunk) const {
 
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerEdgeTop(IEdge) - KStart + 1);
 
       const int JCell0   = CellsOnEdge(IEdge, 0);
       const int JCell1   = CellsOnEdge(IEdge, 1);
@@ -59,7 +61,9 @@ class VelocityDel2AuxVars {
    KOKKOS_FUNCTION void computeVarsOnCell(int ICell, int KStart,
                                           FC FullChunk) const {
 
-      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
+      // const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart +
+      // 1;
+      const int KLen = Kokkos::min(VecLength, MaxLayerCell(ICell) - KStart + 1);
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
@@ -84,8 +88,10 @@ class VelocityDel2AuxVars {
    template <class FC>
    KOKKOS_FUNCTION void computeVarsOnVertex(int IVertex, int KStart,
                                             FC FullChunk) const {
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerVertexTop(IVertex) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerVertexTop(IVertex) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerVertexTop(IVertex) - KStart + 1);
 
       const Real InvAreaTriangle = 1._Real / AreaTriangle(IVertex);
 

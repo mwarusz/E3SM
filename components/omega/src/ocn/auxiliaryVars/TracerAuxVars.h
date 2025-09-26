@@ -29,8 +29,10 @@ class TracerAuxVars {
                      const Array2DReal &NormalVelEdge, const Array2DReal &HCell,
                      const Array3DReal &TrCell, FC FullChunk) const {
 
+      // const int KLen =
+      //     FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
       const int KLen =
-          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
+          Kokkos::min(VecLength, MaxLayerEdgeTop(IEdge) - KStart + 1);
 
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
@@ -78,7 +80,9 @@ class TracerAuxVars {
                       const Array2DReal &LayerThickEdgeMean,
                       const Array3DReal &TrCell, FC FullChunk) const {
 
-      const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
+      // const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart +
+      // 1;
+      const int KLen = Kokkos::min(VecLength, MaxLayerCell(ICell) - KStart + 1);
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
