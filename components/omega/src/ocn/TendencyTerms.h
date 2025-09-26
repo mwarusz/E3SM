@@ -385,7 +385,7 @@ class TracerHorzAdvOnCell {
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
 
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
             const I4 K = KStart + KVec;
             HAdvTmp[KVec] -= EdgeMask(JEdge, K) * DvEdge(JEdge) *
                              EdgeSignOnCell(ICell, J) *
@@ -393,7 +393,7 @@ class TracerHorzAdvOnCell {
                              NormVelEdge(JEdge, K) * InvAreaCell;
          }
       }
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(L, ICell, K) -= HAdvTmp[KVec];
       }
@@ -439,7 +439,7 @@ class TracerDiffOnCell {
          const Real RTemp =
              MeshScalingDel2(JEdge) * DvEdge(JEdge) / DcEdge(JEdge);
 
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
             const I4 K = KStart + KVec;
             const Real TracerGrad =
                 (TracerCell(L, JCell1, K) - TracerCell(L, JCell0, K));
@@ -448,7 +448,7 @@ class TracerDiffOnCell {
                              RTemp * MeanLayerThickEdge(JEdge, K) * TracerGrad;
          }
       }
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(L, ICell, K) += EddyDiff2 * DiffTmp[KVec] * InvAreaCell;
       }
@@ -495,7 +495,7 @@ class TracerHyperDiffOnCell {
          const Real RTemp =
              MeshScalingDel4(JEdge) * DvEdge(JEdge) / DcEdge(JEdge);
 
-         for (int KVec = 0; KVec < VecLength; ++KVec) {
+         for (int KVec = 0; KVec < KLen; ++KVec) {
             const I4 K = KStart + KVec;
             const Real Del2TrGrad =
                 (TrDel2Cell(L, JCell1, K) - TrDel2Cell(L, JCell0, K));
@@ -504,7 +504,7 @@ class TracerHyperDiffOnCell {
                             RTemp * Del2TrGrad;
          }
       }
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
          Tend(L, ICell, K) -= EddyDiff4 * HypTmp[KVec] * InvAreaCell;
       }

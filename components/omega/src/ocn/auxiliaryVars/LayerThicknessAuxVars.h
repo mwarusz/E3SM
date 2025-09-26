@@ -73,7 +73,7 @@ class LayerThicknessAuxVars {
       const int KLen = FullChunk ? VecLength : MaxLayerCell(ICell) - KStart + 1;
 
       // Temporary for stacked shallow water
-      for (int KVec = 0; KVec < VecLength; ++KVec) {
+      for (int KVec = 0; KVec < KLen; ++KVec) {
          const int K       = KStart + KVec;
          SshCell(ICell, K) = LayerThickCell(ICell, K) - BottomDepth(ICell);
       }
