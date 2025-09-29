@@ -68,7 +68,7 @@ class VorticityAuxVars {
                                           FC FullChunk) const {
 
       const int KLen =
-          FullChunk ? VecLength : MaxLayerEdgeBot(IEdge) - KStart + 1;
+          FullChunk ? VecLength : MaxLayerEdgeTop(IEdge) - KStart + 1;
 
       const int JVertex0 = VerticesOnEdge(IEdge, 0);
       const int JVertex1 = VerticesOnEdge(IEdge, 1);
@@ -113,7 +113,7 @@ class VorticityAuxVars {
    Array2DI4 VerticesOnEdge;
    Array1DReal FVertex;
    Array1DI4 MaxLayerVertexBot;
-   Array1DI4 MaxLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
 };
 
 } // namespace OMEGA

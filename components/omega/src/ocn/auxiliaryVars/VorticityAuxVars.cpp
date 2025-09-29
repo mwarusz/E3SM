@@ -26,7 +26,7 @@ VorticityAuxVars::VorticityAuxVars(const std::string &AuxStateSuffix,
       AreaTriangle(Mesh->AreaTriangle), FVertex(Mesh->FVertex),
       VerticesOnEdge(Mesh->VerticesOnEdge),
       MaxLayerVertexBot(VCoord->MaxLayerVertexBot),
-      MaxLayerEdgeBot(VCoord->MaxLayerEdgeBot) {}
+      MaxLayerEdgeTop(VCoord->MaxLayerEdgeTop) {}
 
 void VorticityAuxVars::registerFields(const std::string &AuxGroupName,
                                       const std::string &MeshName) const {

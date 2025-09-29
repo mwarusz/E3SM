@@ -165,9 +165,6 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
 #if AUXV == 2
    parallelForOuter(
        {Mesh->NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
-          const int KMin   = MinLyrEdgeBot(IEdge);
-          const int KRange = MaxLyrEdgeTop(IEdge) - KMin + 1;
-
           parallelForInnerChunked<VecLength>(
               Team, MinLyrEdgeBot(IEdge), MaxLyrEdgeTop(IEdge),
               [=](int K, auto FullChunk) {
