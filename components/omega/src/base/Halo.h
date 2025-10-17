@@ -772,7 +772,7 @@ class Halo {
       // Add more context for timers in this function
       // BUG: fails when there is no parent timer
       // Uncomment after fixing in Pacer
-      // Pacer::addParentPrefix();
+      Pacer::addParentPrefix();
 
       I4 IErr{0}; // error code
 
@@ -909,7 +909,7 @@ class Halo {
 
       // BUG: fails when there is no parent timer
       // Uncomment after fixing in Pacer
-      // Pacer::removeParentPrefix();
+      Pacer::removeParentPrefix();
 
       return IErr;
    } // end exchangeFullArrayHalo
