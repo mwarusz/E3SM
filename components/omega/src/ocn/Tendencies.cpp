@@ -221,10 +221,10 @@ Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
                        Config *Options,         ///< [in] Configuration options
                        CustomTendencyType InCustomThicknessTend,
                        CustomTendencyType InCustomVelocityTend)
-    : ThicknessFluxDiv(Mesh), PotientialVortHAdv(Mesh), KEGrad(Mesh),
-      SSHGrad(Mesh), VelocityDiffusion(Mesh), VelocityHyperDiff(Mesh),
-      WindForcing(Mesh), BottomDrag(Mesh, VCoord), TracerHorzAdv(Mesh),
-      TracerDiffusion(Mesh), TracerHyperDiff(Mesh),
+    : Mesh(Mesh), ThicknessFluxDiv(Mesh), PotientialVortHAdv(Mesh),
+      KEGrad(Mesh), SSHGrad(Mesh), VelocityDiffusion(Mesh),
+      VelocityHyperDiff(Mesh), WindForcing(Mesh), BottomDrag(Mesh, VCoord),
+      TracerHorzAdv(Mesh), TracerDiffusion(Mesh), TracerHyperDiff(Mesh),
       CustomThicknessTend(InCustomThicknessTend),
       CustomVelocityTend(InCustomVelocityTend) {
 
@@ -236,11 +236,8 @@ Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
    TracerTend = Array3DReal("TracerTend", NTracersIn, Mesh->NCellsSize,
                             VCoord->NVertLayers);
 
-   // Array dimension lengths
-   NCellsAll = Mesh->NCellsAll;
-   NEdgesAll = Mesh->NEdgesAll;
-   NTracers  = NTracersIn;
-   NChunks   = VCoord->NVertLayers / VecLength;
+   NTracers = NTracersIn;
+   NChunks  = VCoord->NVertLayers / VecLength;
 
 } // end constructor
 
@@ -278,7 +275,7 @@ void Tendencies::computeThicknessTendenciesOnly(
    if (LocThicknessFluxDiv.Enabled) {
       Pacer::start("Tend:thicknessFluxDiv", 2);
       parallelFor(
-          {NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
+          {Mesh->NCellsAll, NChunks}, KOKKOS_LAMBDA(int ICell, int KChunk) {
              LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KChunk,
                                  ThickFluxEdge, NormalVelEdge);
           });
@@ -331,7 +328,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    if (LocPotientialVortHAdv.Enabled) {
       Pacer::start("Tend:potientialVortHAdv", 2);
       parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {Mesh->NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
                                    NormRVortEdge, NormFEdge, FluxLayerThickEdge,
                                    NormVelEdge);
@@ -344,7 +341,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    if (LocKEGrad.Enabled) {
       Pacer::start("Tend:KEGrad", 2);
       parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {Mesh->NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocKEGrad(LocNormalVelocityTend, IEdge, KChunk, KECell);
           });
       Pacer::stop("Tend:KEGrad", 2);
@@ -355,7 +352,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    if (LocSSHGrad.Enabled) {
       Pacer::start("Tend:SSHGrad", 2);
       parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {Mesh->NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocSSHGrad(LocNormalVelocityTend, IEdge, KChunk, SSHCell);
           });
       Pacer::stop("Tend:SSHGrad", 2);
@@ -367,7 +364,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    if (LocVelocityDiffusion.Enabled) {
       Pacer::start("Tend:velocityDiffusion", 2);
       parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {Mesh->NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk, DivCell,
                                   RVortVertex);
           });
@@ -381,7 +378,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    if (LocVelocityHyperDiff.Enabled) {
       Pacer::start("Tend:velocityHyperDiff", 2);
       parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {Mesh->NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
                                   Del2DivCell, Del2RVortVertex);
           });
@@ -395,7 +392,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    if (LocWindForcing.Enabled) {
       Pacer::start("Tend:windForcing", 2);
       parallelFor(
-          {NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
+          {Mesh->NEdgesAll, NChunks}, KOKKOS_LAMBDA(int IEdge, int KChunk) {
              LocWindForcing(LocNormalVelocityTend, IEdge, KChunk,
                             NormalStressEdge, MeanLayerThickEdge);
           });
@@ -406,7 +403,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    if (LocBottomDrag.Enabled) {
       Pacer::start("Tend:bottomDrag", 2);
       parallelFor(
-          {NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
+          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
              LocBottomDrag(LocNormalVelocityTend, IEdge, NormalVelEdge, KECell,
                            MeanLayerThickEdge);
           });
@@ -447,7 +444,7 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerHorzAdv.Enabled) {
       Pacer::start("Tend:tracerHorzAdv", 2);
       parallelFor(
-          {NTracers, NCellsAll, NChunks},
+          {NTracers, Mesh->NCellsAll, NChunks},
           KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
              LocTracerHorzAdv(LocTracerTend, L, ICell, KChunk, NormalVelEdge,
                               HTracersEdge);
@@ -461,7 +458,7 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerDiffusion.Enabled) {
       Pacer::start("Tend:tracerDiffusion", 2);
       parallelFor(
-          {NTracers, NCellsAll, NChunks},
+          {NTracers, Mesh->NCellsAll, NChunks},
           KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
              LocTracerDiffusion(LocTracerTend, L, ICell, KChunk, TracerArray,
                                 MeanLayerThickEdge);
@@ -474,7 +471,7 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerHyperDiff.Enabled) {
       Pacer::start("Tend:tracerHyperDiff", 2);
       parallelFor(
-          {NTracers, NCellsAll, NChunks},
+          {NTracers, Mesh->NCellsAll, NChunks},
           KOKKOS_LAMBDA(int L, int ICell, int KChunk) {
              LocTracerHyperDiff(LocTracerTend, L, ICell, KChunk,
                                 Del2TracersCell);
@@ -505,7 +502,7 @@ void Tendencies::computeThicknessTendencies(
 
    Pacer::start("Tend:computeLayerThickAux", 2);
    parallelFor(
-       "computeLayerThickAux", {NEdgesAll, NChunks},
+       "computeLayerThickAux", {Mesh->NEdgesAll, NChunks},
        KOKKOS_LAMBDA(int IEdge, int KChunk) {
           LayerThicknessAux.computeVarsOnEdge(IEdge, KChunk, LayerThickCell,
                                               NormalVelEdge);
@@ -550,7 +547,7 @@ void Tendencies::computeTracerTendencies(
 
    Pacer::start("Tend:computeTracerAuxEdge", 2);
    parallelFor(
-       "computeTracerAuxEdge", {NTracers, NEdgesAll, NChunks},
+       "computeTracerAuxEdge", {NTracers, Mesh->NEdgesAll, NChunks},
        KOKKOS_LAMBDA(int LTracer, int IEdge, int KChunk) {
           TracerAux.computeVarsOnEdge(LTracer, IEdge, KChunk, NormalVelEdge,
                                       LayerThickCell, TracerArray);
@@ -561,7 +558,7 @@ void Tendencies::computeTracerTendencies(
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
    Pacer::start("Tend:computeTracerAuxCell", 2);
    parallelFor(
-       "computeTracerAuxCell", {NTracers, NCellsAll, NChunks},
+       "computeTracerAuxCell", {NTracers, Mesh->NCellsAll, NChunks},
        KOKKOS_LAMBDA(int LTracer, int ICell, int KChunk) {
           TracerAux.computeVarsOnCells(LTracer, ICell, KChunk,
                                        MeanLayerThickEdge, TracerArray);
