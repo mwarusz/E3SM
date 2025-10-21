@@ -40,7 +40,9 @@ void VertCoord::init2() {
 
    Config *OmegaConfig = Config::getOmegaConfig();
 
-   DefaultVertCoord->completeSetup(OmegaConfig);
+   Halo *MeshHalo = Halo::getDefault();
+
+   DefaultVertCoord->completeSetup(OmegaConfig, MeshHalo);
 
 } // end init2
 
@@ -128,7 +130,8 @@ VertCoord::VertCoord(const std::string &Name_, //< [in] Name for new VertCoord
 
 //------------------------------------------------------------------------------
 // Complete construction of new VertCoord instance
-void VertCoord::completeSetup(Config *Options //< [in] configuration options
+void VertCoord::completeSetup(Config *Options, //< [in] configuration options
+                              Halo *MeshHalo   //< [in] mesh halo
 ) {
 
    // Define field metadata
@@ -203,6 +206,11 @@ void VertCoord::completeSetup(Config *Options //< [in] configuration options
           LocMinLayerCell(ICell) -= 1;
           LocMaxLayerCell(ICell) -= 1;
        });
+
+   // Exchange halos since IOStreams reads only owned cells, but
+   // we need halos filled for over-computation
+   MeshHalo->exchangeFullArrayHalo(MinLayerCell, OnCell);
+   MeshHalo->exchangeFullArrayHalo(MaxLayerCell, OnCell);
 
    // Compute Edge and Vertex vertical ranges
    minMaxLayerEdge();
