@@ -338,7 +338,8 @@ int testThickFluxDiv(int NVertLayers, Real RTol) {
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array2DReal ExactThickFluxDiv("ExactThickFluxDiv", Mesh->NCellsOwned,
@@ -365,7 +366,7 @@ int testThickFluxDiv(int NVertLayers, Real RTol) {
    // Compute numerical result
    Array2DReal NumThickFluxDiv("NumThickFluxDiv", Mesh->NCellsOwned,
                                NVertLayers);
-   ThicknessFluxDivOnCell ThickFluxDivOnC(Mesh);
+   ThicknessFluxDivOnCell ThickFluxDivOnC(Mesh, VCoord);
    parallelFor(
        {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int KLayer) {
           ThickFluxDivOnC(NumThickFluxDiv, ICell, KLayer, OnesEdge,
@@ -393,7 +394,8 @@ int testPotVortHAdv(int NVertLayers, Real RTol) {
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array2DReal ExactPotVortHAdv("ExactPotVortHAdv", Mesh->NEdgesOwned,
@@ -441,7 +443,7 @@ int testPotVortHAdv(int NVertLayers, Real RTol) {
    // Compute numerical result
    Array2DReal NumPotVortHAdv("NumPotVortHAdv", Mesh->NEdgesOwned, NVertLayers);
 
-   PotentialVortHAdvOnEdge PotVortHAdvOnE(Mesh);
+   PotentialVortHAdvOnEdge PotVortHAdvOnE(Mesh, VCoord);
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
           PotVortHAdvOnE(NumPotVortHAdv, IEdge, KLayer, NormRelVortEdge,
@@ -469,7 +471,8 @@ int testKEGrad(int NVertLayers, Real RTol) {
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array2DReal ExactKEGrad("ExactKEGrad", Mesh->NEdgesOwned, NVertLayers);
@@ -491,7 +494,7 @@ int testKEGrad(int NVertLayers, Real RTol) {
    // Compute numerical result
    Array2DReal NumKEGrad("NumKEGrad", Mesh->NEdgesOwned, NVertLayers);
 
-   KEGradOnEdge KEGradOnE(Mesh);
+   KEGradOnEdge KEGradOnE(Mesh, VCoord);
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
           KEGradOnE(NumKEGrad, IEdge, KLayer, KECell);
@@ -517,7 +520,8 @@ int testSSHGrad(int NVertLayers, Real RTol) {
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array2DReal ExactSSHGrad("ExactSSHGrad", Mesh->NEdgesOwned, NVertLayers);
@@ -539,7 +543,7 @@ int testSSHGrad(int NVertLayers, Real RTol) {
    // Compute numerical result
    Array2DReal NumSSHGrad("NumSSHGrad", Mesh->NEdgesOwned, NVertLayers);
 
-   SSHGradOnEdge SSHGradOnE(Mesh);
+   SSHGradOnEdge SSHGradOnE(Mesh, VCoord);
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
           SSHGradOnE(NumSSHGrad, IEdge, KLayer, SSHCell);
@@ -562,14 +566,15 @@ int testVelDiff(int NVertLayers, Real RTol) {
    Error Err1;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    Config *OmegaConfig = Config::getOmegaConfig();
    Config TendConfig("Tendencies");
    Err1 += OmegaConfig->get(TendConfig);
    CHECK_ERROR_ABORT(Err1, "Tendencies: Tendencies group not found in Config");
 
-   VelocityDiffusionOnEdge VelDiffOnE(Mesh);
+   VelocityDiffusionOnEdge VelDiffOnE(Mesh, VCoord);
    Err1 += TendConfig.get("ViscDel2", VelDiffOnE.ViscDel2);
    CHECK_ERROR_ABORT(Err1, "Tendencies: ViscDel2 not found in TendConfig");
 
@@ -627,14 +632,15 @@ int testVelHyperDiff(int NVertLayers, Real RTol) {
    Error Err1;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    Config *OmegaConfig = Config::getOmegaConfig();
    Config TendConfig("Tendencies");
    Err1 += OmegaConfig->get(TendConfig);
    CHECK_ERROR_ABORT(Err1, "Tendencies: Tendencies group not found in Config");
 
-   VelocityHyperDiffOnEdge VelHyperDiffOnE(Mesh);
+   VelocityHyperDiffOnEdge VelHyperDiffOnE(Mesh, VCoord);
    Err1 += TendConfig.get("ViscDel4", VelHyperDiffOnE.ViscDel4);
    CHECK_ERROR_ABORT(Err1, "Tendencies: ViscDel4 not found in TendConfig");
 
@@ -697,7 +703,8 @@ int testWindForcing(int NVertLayers) {
    int Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    const Real SaltWaterDensity = 0.987654321;
 
@@ -737,7 +744,7 @@ int testWindForcing(int NVertLayers) {
    // Compute numerical result
    Array2DReal NumWindForcing("NumWindForcing", Mesh->NEdgesOwned, NVertLayers);
 
-   WindForcingOnEdge WindForcingOnE(Mesh);
+   WindForcingOnEdge WindForcingOnE(Mesh, VCoord);
    WindForcingOnE.SaltWaterDensity = SaltWaterDensity;
 
    parallelFor(
@@ -840,7 +847,8 @@ int testTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
    I4 Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array3DReal ExactTrFluxDiv("ExactTrFluxDiv", NTracers, Mesh->NCellsOwned,
@@ -869,7 +877,7 @@ int testTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
    // Compute numerical result
    Array3DReal NumTrFluxDiv("NumTrFluxDiv", NTracers, Mesh->NCellsOwned,
                             NVertLayers);
-   TracerHorzAdvOnCell TrHorzAdvOnC(Mesh);
+   TracerHorzAdvOnCell TrHorzAdvOnC(Mesh, VCoord);
    parallelFor(
        {NTracers, Mesh->NCellsOwned, NVertLayers},
        KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
@@ -896,7 +904,8 @@ int testTracerDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
    I4 Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array3DReal ExactTracerDiff("ExactTracerDiff", NTracers, Mesh->NCellsOwned,
@@ -923,7 +932,7 @@ int testTracerDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
    // Compute numerical result
    Array3DReal NumTracerDiff("NumTracerDiff", NTracers, Mesh->NCellsOwned,
                              NVertLayers);
-   TracerDiffOnCell TrDiffOnC(Mesh);
+   TracerDiffOnCell TrDiffOnC(Mesh, VCoord);
    TrDiffOnC.EddyDiff2 = 1._Real;
 
    parallelFor(
@@ -952,7 +961,8 @@ int testTracerHyperDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
    I4 Err = 0;
    TestSetup Setup;
 
-   const auto Mesh = HorzMesh::getDefault();
+   const auto Mesh   = HorzMesh::getDefault();
+   const auto VCoord = VertCoord::getDefault();
 
    // Compute exact result
    Array3DReal ExactTracerHyperDiff("ExactTracerHyperDiff", NTracers,
@@ -973,7 +983,7 @@ int testTracerHyperDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
    // Compute numerical result
    Array3DReal NumTracerHyperDiff("NumTracerHyperDiff", NTracers,
                                   Mesh->NCellsOwned, NVertLayers);
-   TracerHyperDiffOnCell TrHypDiffOnC(Mesh);
+   TracerHyperDiffOnCell TrHypDiffOnC(Mesh, VCoord);
    TrHypDiffOnC.EddyDiff4 = 1._Real;
    parallelFor(
        {NTracers, Mesh->NCellsOwned, NVertLayers},
@@ -1048,8 +1058,7 @@ int tendencyTermsTest(const std::string &MeshFile = DefaultMeshFile) {
 
    initTendTest(MeshFile, NVertLayers);
 
-   const auto &Mesh = HorzMesh::getDefault();
-   int NTracers     = 3;
+   int NTracers = 3;
 
    const Real RTol = sizeof(Real) == 4 ? 2e-2 : 1e-5;
 
