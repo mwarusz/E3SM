@@ -15,6 +15,7 @@
 #include "DataTypes.h"
 #include "Decomp.h"
 #include "Error.h"
+#include "Halo.h"
 #include "HorzMesh.h"
 #include "Logging.h"
 #include "MachEnv.h"
@@ -152,7 +153,8 @@ class VertCoord {
    );
 
    /// Read InitialVertCoord stream and complete initialization
-   void completeSetup(Config *Options /// [in] configuration options
+   void completeSetup(Config *Options, /// [in] configuration options
+                      Halo *MeshHalo   /// [in] mesh halo
    );
 
    /// Copy member arrays from device to host
