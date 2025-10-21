@@ -172,11 +172,8 @@ int initTimeStepperTest(const std::string &mesh) {
 
    // Initialize the vertical coordinate and reset NVertLayers to 1
    VertCoord::init1();
-   auto *DefVertCoord        = VertCoord::getDefault();
-   DefVertCoord->NVertLayers = 1;
-   Dimension::destroy("NVertLayers");
-   std::shared_ptr<Dimension> VertDim =
-       Dimension::create("NVertLayers", NVertLayers);
+   auto *DefVertCoord = VertCoord::getDefault();
+   resetVertCoord(DefVertCoord, NVertLayers);
 
    HorzMesh::init();
    Tracers::init();

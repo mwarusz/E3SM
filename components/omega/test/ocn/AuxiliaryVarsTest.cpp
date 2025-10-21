@@ -830,11 +830,7 @@ int initAuxVarsTest(const std::string &mesh) {
 
    VertCoord::init1();
    // Reset NVertLayers to the test value
-   auto *DefVertCoord        = VertCoord::getDefault();
-   DefVertCoord->NVertLayers = NVertLayers;
-   Dimension::destroy("NVertLayers");
-   std::shared_ptr<Dimension> VertDim =
-       Dimension::create("NVertLayers", NVertLayers);
+   resetVertCoord(VertCoord::getDefault(), NVertLayers);
 
    HorzMesh::init();
 
