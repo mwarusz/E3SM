@@ -208,7 +208,7 @@ int initTimeStepperTest(const std::string &mesh) {
    }
 
    auto *TestAuxState = AuxiliaryState::create("TestAuxState", DefMesh, DefHalo,
-                                               NVertLayers, NTracers);
+                                               DefVertCoord, NTracers);
 
    Config *OmegaConfig = Config::getOmegaConfig();
    TestAuxState->readConfigOptions(OmegaConfig);
