@@ -2,11 +2,13 @@
 #define OMEGA_OCEAN_TEST_COMMON_H
 
 #include "DataTypes.h"
+#include "Dimension.h"
 #include "Halo.h"
 #include "HorzMesh.h"
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OmegaKokkos.h"
+#include "VertCoord.h"
 
 namespace OMEGA {
 
@@ -66,6 +68,25 @@ KOKKOS_INLINE_FUNCTION void tangentVector(Real (&TanVec)[3],
 enum class EdgeComponent { Normal, Tangential };
 enum class Geometry { Planar, Spherical };
 enum class ExchangeHalos { Yes, No };
+
+//  change the number of layers in a vertical coordinate to a constant value
+void resetVertCoord(VertCoord *VCoord, int NVertLayers) {
+   VCoord->NVertLayers   = NVertLayers;
+   VCoord->NVertLayersP1 = NVertLayers + 1;
+
+   deepCopy(VCoord->MinLayerCell, 0);
+   deepCopy(VCoord->MaxLayerCell, NVertLayers - 1);
+
+   VCoord->minMaxLayerEdge();
+   VCoord->minMaxLayerVertex();
+
+   Dimension::destroy("NVertLayers");
+   Dimension::destroy("NVertLayersP1");
+   std::shared_ptr<Dimension> VertDim =
+       Dimension::create("NVertLayers", NVertLayers);
+   std::shared_ptr<Dimension> VertDimP1 =
+       Dimension::create("NVertLayersP1", NVertLayers + 1);
+}
 
 // set scalar field on chosen elements (cells/vertices/edges) based on
 // analytical formula and optionally exchange halos
