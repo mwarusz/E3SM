@@ -117,13 +117,10 @@ int initAuxStateTest(const std::string &mesh) {
    }
 
    VertCoord::init1();
-   // Remove this and call init2 once AuxState is converted
-   resetVertCoord(VertCoord::getDefault(),
-                  VertCoord::getDefault()->NVertLayers);
 
    HorzMesh::init();
 
-   // VertCoord::init2();
+   VertCoord::init2();
 
    Tracers::init();
    int StateErr = OceanState::init();
