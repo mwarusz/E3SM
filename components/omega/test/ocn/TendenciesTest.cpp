@@ -124,14 +124,10 @@ int initTendenciesTest(const std::string &mesh) {
 
    VertCoord::init1();
 
-   // Remove this and call init2 once Tendencies are converted
-   resetVertCoord(VertCoord::getDefault(),
-                  VertCoord::getDefault()->NVertLayers);
-
    HorzMesh::init();
    Tracers::init();
 
-   // VertCoord::init2();
+   VertCoord::init2();
 
    int StateErr = OceanState::init();
    if (StateErr != 0) {
