@@ -9,6 +9,7 @@
 #include "Halo.h"
 #include "HorzMesh.h"
 #include "IO.h"
+#include "IOStream.h"
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OceanTestCommon.h"
@@ -51,8 +52,9 @@ int initState() {
    int Err = 0;
 
    TestSetup Setup;
-   auto *Mesh  = HorzMesh::getDefault();
-   auto *State = OceanState::getDefault();
+   auto *Mesh   = HorzMesh::getDefault();
+   auto *VCoord = VertCoord::getDefault();
+   auto *State  = OceanState::getDefault();
 
    Array2DReal LayerThickCell;
    Array2DReal NormalVelEdge;
@@ -65,21 +67,28 @@ int initState() {
 
    int NTracers = Tracers::getNumTracers();
 
+   deepCopy(LayerThickCell, NAN);
+   deepCopy(NormalVelEdge, NAN);
+   deepCopy(TracersCell, NAN);
+
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.layerThickness(X, Y); },
-       LayerThickCell, Geom, Mesh, OnCell);
+       LayerThickCell, Geom, Mesh, OnCell, VCoord->MinLayerCell,
+       VCoord->MaxLayerCell, ExchangeHalos::Yes, SetBoundary::Yes);
 
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.tracer(X, Y); },
-       TracersCell, Geom, Mesh, OnCell);
+       TracersCell, Geom, Mesh, OnCell, VCoord->MinLayerCell,
+       VCoord->MaxLayerCell, ExchangeHalos::Yes, SetBoundary::Yes);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real Lon, Real Lat) {
           VecField[0] = Setup.velocityX(Lon, Lat);
           VecField[1] = Setup.velocityY(Lon, Lat);
        },
-       NormalVelEdge, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::Yes,
-       CartProjection::No);
+       NormalVelEdge, EdgeComponent::Normal, Geom, Mesh,
+       VCoord->MinLayerEdgeTop, VCoord->MaxLayerEdgeBot, ExchangeHalos::Yes,
+       CartProjection::No, SetBoundary::Yes);
 
    return Err;
 }
@@ -104,6 +113,9 @@ int initTendenciesTest(const std::string &mesh) {
    IO::init(DefComm);
    Decomp::init(mesh);
 
+   // Initialize streams
+   IOStream::init();
+
    int HaloErr = Halo::init();
    if (HaloErr != 0) {
       Err++;
@@ -111,8 +123,15 @@ int initTendenciesTest(const std::string &mesh) {
    }
 
    VertCoord::init1();
+
+   // Remove this and call init2 once Tendencies are converted
+   resetVertCoord(VertCoord::getDefault(),
+                  VertCoord::getDefault()->NVertLayers);
+
    HorzMesh::init();
    Tracers::init();
+
+   // VertCoord::init2();
 
    int StateErr = OceanState::init();
    if (StateErr != 0) {
@@ -191,21 +210,24 @@ int testTendencies() {
    int NTracers    = Tracers::getNumTracers();
 
    const Real LayerThickTendSum =
-       sum(DefTendencies->LayerThicknessTend, NCellsOwned);
+       sum(DefTendencies->LayerThicknessTend, NCellsOwned, VCoord->MinLayerCell,
+           VCoord->MaxLayerCell);
    if (!Kokkos::isfinite(LayerThickTendSum) || LayerThickTendSum == 0) {
       Err++;
       LOG_ERROR("TendenciesTest: LayerThickTend FAIL");
    }
 
    const Real NormVelTendSum =
-       sum(DefTendencies->NormalVelocityTend, NEdgesOwned);
+       sum(DefTendencies->NormalVelocityTend, NEdgesOwned,
+           VCoord->MinLayerEdgeBot, VCoord->MaxLayerEdgeTop);
    if (!Kokkos::isfinite(NormVelTendSum) || NormVelTendSum == 0) {
       Err++;
       LOG_ERROR("TendenciesTest: NormVelTendSum FAIL");
    }
 
    const Real TraceTendSum =
-       sum(DefTendencies->TracerTend, NTracers, NCellsOwned);
+       sum(DefTendencies->TracerTend, NTracers, NCellsOwned,
+           VCoord->MinLayerCell, VCoord->MaxLayerCell);
    if (!Kokkos::isfinite(TraceTendSum) || TraceTendSum == 0) {
       Err++;
       LOG_ERROR("TendenciesTest: TraceTendSum FAIL");
