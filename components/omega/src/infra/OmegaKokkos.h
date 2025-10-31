@@ -14,6 +14,11 @@
 #include <functional>
 #include <type_traits>
 #include <utility>
+#ifdef KOKKOS_ENABLE_CUDA
+#include <cuda/std/tuple>
+#else
+#include <tuple>
+#endif
 
 namespace OMEGA {
 
@@ -72,18 +77,36 @@ template <class T> struct ArrayRank {
 
 using ExecSpace       = MemSpace::execution_space;
 using HostExecSpace   = HostMemSpace::execution_space;
-using TeamPolicy      = Kokkos::TeamPolicy<ExecSpace>;
+using TeamPolicy      = Kokkos::TeamPolicy<ExecSpace, Kokkos::IndexType<int>>;
 using TeamMember      = TeamPolicy::member_type;
 using ScratchMemSpace = ExecSpace::scratch_memory_space;
 using Kokkos::MemoryUnmanaged;
 using Kokkos::PerTeam;
 using Kokkos::TeamThreadRange;
+using Kokkos::ThreadVectorRange;
 
 /// team_size for hierarchical parallelism
 #ifdef OMEGA_TARGET_DEVICE
-constexpr int OMEGA_TEAMSIZE = 64;
+
+#ifdef KOKKOS_ENABLE_HIP
+constexpr int OMEGA_TEAMSIZE   = 8;
+constexpr int OMEGA_VECTORSIZE = 32;
+#endif
+
+#ifdef KOKKOS_ENABLE_SYCL
+constexpr int OMEGA_TEAMSIZE   = 8;
+constexpr int OMEGA_VECTORSIZE = 16;
+#endif
+
+#ifdef KOKKOS_ENABLE_CUDA
+constexpr int OMEGA_TEAMSIZE   = 8;
+constexpr int OMEGA_VECTORSIZE = 16;
+#endif
+
 #else
-constexpr int OMEGA_TEAMSIZE = 1;
+
+constexpr int OMEGA_TEAMSIZE   = 1;
+constexpr int OMEGA_VECTORSIZE = 1;
 #endif
 
 // Takes a functor that uses multidimensional indexing
@@ -314,10 +337,6 @@ inline void parallelReduce(const int (&UpperBounds)[N], F &&Functor,
 #define INNER_LAMBDA [=]
 // #define INNER_LAMBDA [&]
 
-KOKKOS_INLINE_FUNCTION void teamBarrier(const TeamMember &Team) {
-   Team.team_barrier();
-}
-
 // parallelForOuter: with label
 template <int N, class F>
 inline void parallelForOuter(const std::string &Label,
@@ -329,11 +348,16 @@ inline void parallelForOuter(const std::string &Label,
       LinBound *= UpperBounds[Rank];
    }
 
-   auto Policy = TeamPolicy(LinBound, OMEGA_TEAMSIZE);
+   const int NTeams = (LinBound + OMEGA_TEAMSIZE - 1) / OMEGA_TEAMSIZE;
+   auto Policy      = TeamPolicy(NTeams, OMEGA_TEAMSIZE, OMEGA_VECTORSIZE);
    Kokkos::parallel_for(
        Label, Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
-          const int TeamId = Team.league_rank();
-          LinFunctor(TeamId, Team);
+          const int TeamId   = Team.league_rank();
+          const int ThreadId = Team.team_rank();
+          const int Id       = TeamId * OMEGA_TEAMSIZE + ThreadId;
+          if (Id < LinBound) {
+             LinFunctor(Id, Team);
+          }
        });
 }
 
@@ -347,34 +371,26 @@ inline void parallelForOuter(const int (&UpperBounds)[N], F &&Functor) {
 template <class F>
 KOKKOS_FUNCTION void parallelForInner(const TeamMember &Team, int UpperBound,
                                       F &&Functor) {
-   const auto Policy = TeamThreadRange(Team, UpperBound);
-   Kokkos::parallel_for(Policy, std::forward<F>(Functor));
+   if constexpr (OMEGA_VECTORSIZE == 1) {
+      const auto Policy = TeamThreadRange(Team, UpperBound);
+      Kokkos::parallel_for(Policy, std::forward<F>(Functor));
+   } else {
+      const auto Policy = ThreadVectorRange(Team, UpperBound);
+      Kokkos::parallel_for(Policy, std::forward<F>(Functor));
+   }
 }
 
-// This struct is used to get the right accumulator type to be used in
-// the outer parallel lambda based on the final reduction variable type.
-// The final reduction variable can be either a reference to
-// an arithmetic type (int&, Real&) or a Kokkos reducer (Kokkos::Max<Real>).
-// We need to know this type because nvcc does not allow generic lambdas.
-template <class T, class Enable = void> struct AccumTypeHelper;
-
-template <class T>
-struct AccumTypeHelper<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
-   using Type = T;
-};
-
-template <class T>
-struct AccumTypeHelper<T, std::enable_if_t<Kokkos::is_reducer_v<T>>> {
-   using Type = typename T::value_type;
-};
-
-template <class T> using AccumType = typename AccumTypeHelper<T>::Type;
-
-// parallelReduceOuter: with label
 template <int N, class F, class... R>
-inline void parallelReduceOuter(const std::string &Label,
-                                const int (&UpperBounds)[N], F &&Functor,
-                                R &&...Reducers) {
+inline void parallelReduceOuterImpl(const std::string &Label,
+                                    const int (&UpperBounds)[N], F &&Functor,
+                                    R &&...Reducers) {
+#ifdef KOKKOS_ENABLE_CUDA
+   using cuda::std::apply;
+   using cuda::std::tuple;
+#else
+   using std::apply;
+   using std::tuple;
+#endif
 
    auto LinFunctor = LinearIdxWrapper{std::forward<F>(Functor), UpperBounds};
    int LinBound    = 1;
@@ -382,15 +398,68 @@ inline void parallelReduceOuter(const std::string &Label,
       LinBound *= UpperBounds[Rank];
    }
 
-   auto Policy = TeamPolicy(LinBound, OMEGA_TEAMSIZE);
+   const int NTeams = (LinBound + OMEGA_TEAMSIZE - 1) / OMEGA_TEAMSIZE;
+   auto Policy      = TeamPolicy(NTeams, OMEGA_TEAMSIZE, OMEGA_VECTORSIZE);
    Kokkos::parallel_reduce(
        Label, Policy,
-       KOKKOS_LAMBDA(const TeamMember &Team,
-                     AccumType<std::remove_reference_t<R>> &...Accums) {
+       KOKKOS_LAMBDA(
+           const TeamMember &Team,
+           typename std::remove_reference_t<R>::value_type &...TeamAccums) {
           const int TeamId = Team.league_rank();
-          LinFunctor(TeamId, Team, Accums...);
+
+          tuple<typename std::remove_reference_t<R>::value_type...>
+              TeamValsTuple;
+
+          auto TeamReducersTuple = apply(
+              [&](auto &...TeamVals) {
+                 return tuple<std::remove_reference_t<R>...>(TeamVals...);
+              },
+              TeamValsTuple);
+
+          apply(
+              [&](auto &...TeamReducers) {
+                 Kokkos::parallel_reduce(
+                     TeamThreadRange(Team, OMEGA_TEAMSIZE),
+                     INNER_LAMBDA(int ThreadId, auto &...ThreadAccums) {
+                        const int Id = TeamId * OMEGA_TEAMSIZE + ThreadId;
+
+                        if (Id < LinBound) {
+                           LinFunctor(Id, Team, ThreadAccums...);
+                        }
+                     },
+                     TeamReducers...);
+              },
+              TeamReducersTuple);
+
+          Kokkos::single(Kokkos::PerTeam(Team), [&]() {
+             apply(
+                 [&](auto &...TeamReducers) {
+                    (TeamReducers.join(TeamAccums, TeamReducers.reference()),
+                     ...);
+                 },
+                 TeamReducersTuple);
+          });
        },
        std::forward<R>(Reducers)...);
+}
+
+template <class T> auto forwardReductionArg(T &&arg) {
+   using DerefT = std::remove_reference_t<T>;
+   if constexpr (Kokkos::is_reducer_v<DerefT>) {
+      return std::forward<T>(arg);
+   } else {
+      static_assert(std::is_arithmetic_v<DerefT>);
+      return Kokkos::Sum<DerefT>(arg);
+   }
+}
+
+// parallelReduceOuter: with label
+template <int N, class F, class... R>
+inline void parallelReduceOuter(const std::string &Label,
+                                const int (&UpperBounds)[N], F &&Functor,
+                                R &&...Reducers) {
+   parallelReduceOuterImpl(Label, UpperBounds, std::forward<F>(Functor),
+                           forwardReductionArg(Reducers)...);
 }
 
 // parallelReduceOuter: without label
@@ -405,7 +474,7 @@ inline void parallelReduceOuter(const int (&UpperBounds)[N], F &&Functor,
 template <class F, class... R>
 KOKKOS_FUNCTION void parallelReduceInner(const TeamMember &Team, int UpperBound,
                                          F &&Functor, R &&...Reducers) {
-   const auto Policy = TeamThreadRange(Team, UpperBound);
+   const auto Policy = ThreadVectorRange(Team, UpperBound);
    Kokkos::parallel_reduce(Policy, std::forward<F>(Functor),
                            std::forward<R>(Reducers)...);
 }
@@ -414,7 +483,7 @@ KOKKOS_FUNCTION void parallelReduceInner(const TeamMember &Team, int UpperBound,
 template <class F, class... R>
 KOKKOS_FUNCTION void parallelScanInner(const TeamMember &Team, int UpperBound,
                                        F &&Functor, R &&...Reducers) {
-   const auto Policy = TeamThreadRange(Team, UpperBound);
+   const auto Policy = ThreadVectorRange(Team, UpperBound);
    Kokkos::parallel_scan(Policy, std::forward<F>(Functor),
                          std::forward<R>(Reducers)...);
 }
