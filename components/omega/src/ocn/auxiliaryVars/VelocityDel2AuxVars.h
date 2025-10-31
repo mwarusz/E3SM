@@ -52,7 +52,7 @@ class VelocityDel2AuxVars {
    KOKKOS_FUNCTION void computeVarsOnCell(const TeamMember &Team,
                                           int ICell) const {
 
-      Scratch1DReal Del2DivCellTmp(Team.team_scratch(0), NVertLayers);
+      auto Del2DivCellTmp = getScratch<Scratch1DReal>(Team, NVertLayers);
 
       const int KMin   = MinLayerCell(ICell);
       const int KMax   = MaxLayerCell(ICell);
@@ -88,7 +88,7 @@ class VelocityDel2AuxVars {
    KOKKOS_FUNCTION void computeVarsOnVertex(const TeamMember &Team,
                                             int IVertex) const {
 
-      Scratch1DReal Del2RelVortVertexTmp(Team.team_scratch(0), NVertLayers);
+      auto Del2RelVortVertexTmp = getScratch<Scratch1DReal>(Team, NVertLayers);
 
       const int KMin   = MinLayerVertexBot(IVertex);
       const int KMax   = MaxLayerVertexTop(IVertex);

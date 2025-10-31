@@ -37,7 +37,7 @@ class ThicknessFluxDivOnCell {
                                    const Array2DReal &ThicknessFlux,
                                    const Array2DReal &NormalVelEdge) const {
 
-      Scratch1DReal TendTmp(Team.team_scratch(0), NVertLayers);
+      auto TendTmp = getScratch<Scratch1DReal>(Team, NVertLayers);
 
       const I4 KMinCell   = MinLayerCell(ICell);
       const I4 KMaxCell   = MaxLayerCell(ICell);
@@ -106,7 +106,7 @@ class PotentialVortHAdvOnEdge {
                                    const Array2DReal &FluxLayerThickEdge,
                                    const Array2DReal &NormVelEdge) const {
 
-      Scratch1DReal TendTmp(Team.team_scratch(0), NVertLayers);
+      auto TendTmp = getScratch<Scratch1DReal>(Team, NVertLayers);
 
       const I4 KMin   = MinLayerEdgeBot(IEdge);
       const I4 KMax   = MaxLayerEdgeTop(IEdge);
@@ -425,7 +425,7 @@ class TracerHorzAdvOnCell {
                                    const Array2DReal &NormVelEdge,
                                    const Array3DReal &HTracersOnEdge) const {
 
-      Scratch1DReal TendTmp(Team.team_scratch(0), NVertLayers);
+      auto TendTmp = getScratch<Scratch1DReal>(Team, NVertLayers);
 
       const I4 KMinCell    = MinLayerCell(ICell);
       const I4 KMaxCell    = MaxLayerCell(ICell);
@@ -490,7 +490,7 @@ class TracerDiffOnCell {
               const Array3DReal &TracerCell,
               const Array2DReal &MeanLayerThickEdge) const {
 
-      Scratch1DReal TendTmp(Team.team_scratch(0), NVertLayers);
+      auto TendTmp = getScratch<Scratch1DReal>(Team, NVertLayers);
 
       const I4 KMinCell   = MinLayerCell(ICell);
       const I4 KMaxCell   = MaxLayerCell(ICell);
@@ -564,7 +564,7 @@ class TracerHyperDiffOnCell {
                                    const Array3DReal &Tend, I4 L, I4 ICell,
                                    const Array3DReal &TrDel2Cell) const {
 
-      Scratch1DReal TendTmp(Team.team_scratch(0), NVertLayers);
+      auto TendTmp = getScratch<Scratch1DReal>(Team, NVertLayers);
 
       const I4 KMinCell   = MinLayerCell(ICell);
       const I4 KMaxCell   = MaxLayerCell(ICell);

@@ -22,8 +22,8 @@ class KineticAuxVars {
    computeVarsOnCell(const TeamMember &Team, int ICell,
                      const Array2DReal &NormalVelEdge) const {
 
-      Scratch1DReal KineticEnergyCellTmp(Team.team_scratch(0), NVertLayers);
-      Scratch1DReal VelocityDivCellTmp(Team.team_scratch(0), NVertLayers);
+      auto KineticEnergyCellTmp = getScratch<Scratch1DReal>(Team, NVertLayers);
+      auto VelocityDivCellTmp   = getScratch<Scratch1DReal>(Team, NVertLayers);
 
       const int KMin   = MinLayerCell(ICell);
       const int KMax   = MaxLayerCell(ICell);

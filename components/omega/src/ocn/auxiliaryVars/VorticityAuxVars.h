@@ -27,8 +27,8 @@ class VorticityAuxVars {
                        const Array2DReal &LayerThickCell,
                        const Array2DReal &NormalVelEdge) const {
 
-      Scratch1DReal LayerThickVertex(Team.team_scratch(0), NVertLayers);
-      Scratch1DReal RelVortVertexTmp(Team.team_scratch(0), NVertLayers);
+      auto LayerThickVertex = getScratch<Scratch1DReal>(Team, NVertLayers);
+      auto RelVortVertexTmp = getScratch<Scratch1DReal>(Team, NVertLayers);
 
       const int KMinVertex   = MinLayerVertexTop(IVertex);
       const int KMaxVertex   = MaxLayerVertexBot(IVertex);

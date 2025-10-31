@@ -70,7 +70,7 @@ class TracerAuxVars {
                       const Array2DReal &LayerThickEdgeMean,
                       const Array3DReal &TrCell) const {
 
-      Scratch1DReal Del2TrCellTmp(Team.team_scratch(0), NVertLayers);
+      auto Del2TrCellTmp = getScratch<Scratch1DReal>(Team, NVertLayers);
 
       const int KMinCell   = MinLayerCell(ICell);
       const int KMaxCell   = MaxLayerCell(ICell);
