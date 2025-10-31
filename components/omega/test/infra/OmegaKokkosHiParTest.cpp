@@ -206,7 +206,7 @@ Error testHiparReduce1DReduce1D(int N1) {
               },
               SumInner);
 
-          Kokkos::single(PerTeam(Team), [&]() { AccumOuter += SumInner; });
+          AccumOuter += SumInner;
        },
        Sum1);
 
@@ -249,7 +249,7 @@ Error testHiparReduce1DReduce1D(int N1) {
               },
               SumInner, Kokkos::Max<I4>(MaxInner));
 
-          Kokkos::single(PerTeam(Team), [&]() { AccumSumOuter += SumInner; });
+          AccumSumOuter += SumInner;
           AccumMaxOuter = Kokkos::max(AccumMaxOuter, MaxInner);
        },
        Sum2, Kokkos::Max<I4>(Max2));
@@ -311,14 +311,10 @@ Error testHiparFor1DMultiple1D(int N1, int N2) {
               Team, N2P1,
               INNER_LAMBDA(int J2) { A(J1, J2) = f2(J1, J2, N1, N2P1); });
 
-          teamBarrier(Team);
-
           parallelForInner(
               Team, N2, INNER_LAMBDA(int J2) {
                  B(J1, J2) = (A(J1, J2) + A(J1, J2 + 1)) / 2;
               });
-
-          teamBarrier(Team);
 
           parallelScanInner(
               Team, N2, INNER_LAMBDA(int J2, I4 &Accum, bool IsFinal) {
@@ -332,8 +328,6 @@ Error testHiparFor1DMultiple1D(int N1, int N2) {
              parallelForInner(
                  Team, N2, INNER_LAMBDA(int J2) { C(J1, J2) += 1; });
           }
-
-          teamBarrier(Team);
 
           parallelReduceInner(
               Team, N2, INNER_LAMBDA(int J2, I4 &Accum) { Accum += C(J1, J2); },
@@ -519,7 +513,7 @@ Error testHiparReduce2DReduce1D(int N1, int N2) {
               },
               SumInner);
 
-          Kokkos::single(PerTeam(Team), [&]() { AccumOuter += SumInner; });
+          AccumOuter += SumInner;
        },
        Sum1);
 
@@ -564,7 +558,7 @@ Error testHiparReduce2DReduce1D(int N1, int N2) {
               },
               SumInner, Kokkos::Max<I4>(MaxInner));
 
-          Kokkos::single(PerTeam(Team), [&]() { AccumSumOuter += SumInner; });
+          AccumSumOuter += SumInner;
           AccumMaxOuter = Kokkos::max(AccumMaxOuter, MaxInner);
        },
        Sum2, Kokkos::Max<I4>(Max2));
@@ -629,14 +623,10 @@ Error testHiparFor2DMultiple1D(int N1, int N2, int N3) {
                  A(J1, J2, J3) = f3(J1, J2, J3, N1, N2, N3P1);
               });
 
-          teamBarrier(Team);
-
           parallelForInner(
               Team, N3, INNER_LAMBDA(int J3) {
                  B(J1, J2, J3) = (A(J1, J2, J3) + A(J1, J2, J3 + 1)) / 2;
               });
-
-          teamBarrier(Team);
 
           parallelScanInner(
               Team, N3, INNER_LAMBDA(int J3, I4 &Accum, bool IsFinal) {
@@ -650,8 +640,6 @@ Error testHiparFor2DMultiple1D(int N1, int N2, int N3) {
              parallelForInner(
                  Team, N3, INNER_LAMBDA(int J3) { C(J1, J2, J3) += 1; });
           }
-
-          teamBarrier(Team);
 
           parallelReduceInner(
               Team, N3,

@@ -148,8 +148,7 @@ void testEosLinear() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          OuterCount += NumMismatchesCol;
        },
        NumMismatches);
 
@@ -219,8 +218,7 @@ void testEosLinearDisplaced() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          OuterCount += NumMismatchesCol;
        },
        NumMismatches);
 
@@ -330,8 +328,7 @@ void testBruntVaisalaFreqSqLinear() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          OuterCount += NumMismatchesCol;
        },
        NumMismatches);
 
@@ -413,8 +410,7 @@ void testEosTeos10() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          OuterCount += NumMismatchesCol;
        },
        NumMismatches);
 
@@ -484,8 +480,7 @@ void testEosTeos10Displaced() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          OuterCount += NumMismatchesCol;
        },
        NumMismatches);
 
@@ -594,8 +589,7 @@ void testBruntVaisalaFreqSqTeos10() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          OuterCount += NumMismatchesCol;
        },
        NumMismatches);
 
