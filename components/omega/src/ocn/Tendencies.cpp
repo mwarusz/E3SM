@@ -532,15 +532,8 @@ void Tendencies::computeTracerTendenciesOnly(
       parallelForOuter(
           {NTracers, Mesh->NCellsAll},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocTracerHorzAdv(LocTracerTend, L, ICell, KChunk,
-                                     NormalVelEdge, HTracersEdge);
-                 });
+             LocTracerHorzAdv(Team, LocTracerTend, L, ICell, NormalVelEdge,
+                              HTracersEdge);
           });
       Pacer::stop("Tend:tracerHorzAdv", 2);
    }
@@ -553,15 +546,8 @@ void Tendencies::computeTracerTendenciesOnly(
       parallelForOuter(
           {NTracers, Mesh->NCellsAll},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocTracerDiffusion(LocTracerTend, L, ICell, KChunk,
-                                       TracerArray, MeanLayerThickEdge);
-                 });
+             LocTracerDiffusion(Team, LocTracerTend, L, ICell, TracerArray,
+                                MeanLayerThickEdge);
           });
       Pacer::stop("Tend:tracerDiffusion", 2);
    }
@@ -573,15 +559,7 @@ void Tendencies::computeTracerTendenciesOnly(
       parallelForOuter(
           {NTracers, Mesh->NCellsAll},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocTracerHyperDiff(LocTracerTend, L, ICell, KChunk,
-                                       Del2TracersCell);
-                 });
+             LocTracerHyperDiff(Team, LocTracerTend, L, ICell, Del2TracersCell);
           });
       Pacer::stop("Tend:tracerHyperDiff", 2);
    }

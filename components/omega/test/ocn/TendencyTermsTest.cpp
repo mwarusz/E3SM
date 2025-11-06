@@ -878,11 +878,10 @@ int testTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
    Array3DReal NumTrFluxDiv("NumTrFluxDiv", NTracers, Mesh->NCellsOwned,
                             NVertLayers);
    TracerHorzAdvOnCell TrHorzAdvOnC(Mesh, VCoord);
-   parallelFor(
-       {NTracers, Mesh->NCellsOwned, NVertLayers},
-       KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
-          TrHorzAdvOnC(NumTrFluxDiv, L, ICell, KLayer, NormalVelocity,
-                       HTrOnEdge);
+   parallelForOuter(
+       {NTracers, Mesh->NCellsOwned},
+       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          TrHorzAdvOnC(Team, NumTrFluxDiv, L, ICell, NormalVelocity, HTrOnEdge);
        });
 
    ErrorMeasures TrHAdvErrors;
@@ -935,11 +934,10 @@ int testTracerDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
    TracerDiffOnCell TrDiffOnC(Mesh, VCoord);
    TrDiffOnC.EddyDiff2 = 1._Real;
 
-   parallelFor(
-       {NTracers, Mesh->NCellsOwned, NVertLayers},
-       KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
-          TrDiffOnC(NumTracerDiff, L, ICell, KLayer, TracerCell,
-                    LayerThickEdge);
+   parallelForOuter(
+       {NTracers, Mesh->NCellsOwned},
+       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          TrDiffOnC(Team, NumTracerDiff, L, ICell, TracerCell, LayerThickEdge);
        });
 
    ErrorMeasures TrDiffErrors;
@@ -985,10 +983,10 @@ int testTracerHyperDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
                                   Mesh->NCellsOwned, NVertLayers);
    TracerHyperDiffOnCell TrHypDiffOnC(Mesh, VCoord);
    TrHypDiffOnC.EddyDiff4 = 1._Real;
-   parallelFor(
-       {NTracers, Mesh->NCellsOwned, NVertLayers},
-       KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
-          TrHypDiffOnC(NumTracerHyperDiff, L, ICell, KLayer, TrDel2Cell);
+   parallelForOuter(
+       {NTracers, Mesh->NCellsOwned},
+       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          TrHypDiffOnC(Team, NumTracerHyperDiff, L, ICell, TrDel2Cell);
        });
 
    ErrorMeasures TrHyperDiffErrors;

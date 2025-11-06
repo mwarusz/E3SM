@@ -373,33 +373,26 @@ class TracerHorzAdvOnCell {
 
    TracerHorzAdvOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
 
-   KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
-                                   I4 KChunk, const Array2DReal &NormVelEdge,
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
+                                   const Array3DReal &Tend, I4 L, I4 ICell,
+                                   const Array2DReal &NormVelEdge,
                                    const Array3DReal &HTracersOnEdge) const {
 
-      const I4 KStartCell = chunkStart(KChunk, MinLayerCell(ICell));
-      const I4 KLenCell = chunkLength(KChunk, KStartCell, MaxLayerCell(ICell));
-      const I4 KEndCell = KStartCell + KLenCell - 1;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
-
-      Real HAdvTmp[VecLength] = {0};
-
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
-         const I4 JEdge      = EdgesOnCell(ICell, J);
-         const I4 KStartEdge = Kokkos::max(KStartCell, MinLayerEdgeBot(JEdge));
-         const I4 KEndEdge   = Kokkos::min(KEndCell, MaxLayerEdgeTop(JEdge));
+         const I4 JEdge = EdgesOnCell(ICell, J);
 
-         for (int K = KStartEdge; K <= KEndEdge; ++K) {
-            const I4 KVec = K - KStartCell;
-            HAdvTmp[KVec] -= EdgeMask(JEdge, K) * DvEdge(JEdge) *
-                             EdgeSignOnCell(ICell, J) *
-                             HTracersOnEdge(L, JEdge, K) *
-                             NormVelEdge(JEdge, K) * InvAreaCell;
-         }
-      }
-      for (int KVec = 0; KVec < KLenCell; ++KVec) {
-         const I4 K = KStartCell + KVec;
-         Tend(L, ICell, K) -= HAdvTmp[KVec];
+         const I4 KMin    = MinLayerEdgeBot(JEdge);
+         const I4 KMax    = MaxLayerEdgeTop(JEdge);
+         const int KRange = vertRange(KMin, KMax);
+         parallelForInner(
+             Team, KRange, INNER_LAMBDA(int KOff) {
+                const I4 K = KMin + KOff;
+                Tend(L, ICell, K) += EdgeMask(JEdge, K) * DvEdge(JEdge) *
+                                     EdgeSignOnCell(ICell, J) *
+                                     HTracersOnEdge(L, JEdge, K) *
+                                     NormVelEdge(JEdge, K) * InvAreaCell;
+             });
       }
    }
 
@@ -427,40 +420,35 @@ class TracerDiffOnCell {
    TracerDiffOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    KOKKOS_FUNCTION void
-   operator()(const Array3DReal &Tend, I4 L, I4 ICell, I4 KChunk,
+   operator()(const TeamMember &Team, const Array3DReal &Tend, I4 L, I4 ICell,
               const Array3DReal &TracerCell,
               const Array2DReal &MeanLayerThickEdge) const {
 
-      const I4 KStartCell = chunkStart(KChunk, MinLayerCell(ICell));
-      const I4 KLenCell = chunkLength(KChunk, KStartCell, MaxLayerCell(ICell));
-      const I4 KEndCell = KStartCell + KLenCell - 1;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
-
-      Real DiffTmp[VecLength] = {0};
-
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
-         const I4 JEdge      = EdgesOnCell(ICell, J);
-         const I4 KStartEdge = Kokkos::max(KStartCell, MinLayerEdgeBot(JEdge));
-         const I4 KEndEdge   = Kokkos::min(KEndCell, MaxLayerEdgeTop(JEdge));
 
+         const I4 JEdge  = EdgesOnCell(ICell, J);
          const I4 JCell0 = CellsOnEdge(JEdge, 0);
          const I4 JCell1 = CellsOnEdge(JEdge, 1);
 
          const Real RTemp =
              MeshScalingDel2(JEdge) * DvEdge(JEdge) / DcEdge(JEdge);
 
-         for (int K = KStartEdge; K <= KEndEdge; ++K) {
-            const I4 KVec = K - KStartCell;
-            const Real TracerGrad =
-                (TracerCell(L, JCell1, K) - TracerCell(L, JCell0, K));
+         const I4 KMin    = MinLayerEdgeBot(JEdge);
+         const I4 KMax    = MaxLayerEdgeTop(JEdge);
+         const int KRange = vertRange(KMin, KMax);
 
-            DiffTmp[KVec] -= EdgeMask(JEdge, K) * EdgeSignOnCell(ICell, J) *
-                             RTemp * MeanLayerThickEdge(JEdge, K) * TracerGrad;
-         }
-      }
-      for (int KVec = 0; KVec < KLenCell; ++KVec) {
-         const I4 K = KStartCell + KVec;
-         Tend(L, ICell, K) += EddyDiff2 * DiffTmp[KVec] * InvAreaCell;
+         parallelForInner(
+             Team, KRange, INNER_LAMBDA(int KOff) {
+                const int K = KMin + KOff;
+                const Real TracerGrad =
+                    (TracerCell(L, JCell1, K) - TracerCell(L, JCell0, K));
+
+                Tend(L, ICell, K) -= EddyDiff2 * EdgeMask(JEdge, K) *
+                                     EdgeSignOnCell(ICell, J) * RTemp *
+                                     MeanLayerThickEdge(JEdge, K) * TracerGrad *
+                                     InvAreaCell;
+             });
       }
    }
 
@@ -489,40 +477,35 @@ class TracerHyperDiffOnCell {
 
    TracerHyperDiffOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
 
-   KOKKOS_FUNCTION void operator()(const Array3DReal &Tend, I4 L, I4 ICell,
-                                   I4 KChunk,
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
+                                   const Array3DReal &Tend, I4 L, I4 ICell,
                                    const Array3DReal &TrDel2Cell) const {
 
-      const I4 KStartCell = chunkStart(KChunk, MinLayerCell(ICell));
-      const I4 KLenCell = chunkLength(KChunk, KStartCell, MaxLayerCell(ICell));
-      const I4 KEndCell = KStartCell + KLenCell - 1;
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
-      Real HypTmp[VecLength] = {0};
-
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
-         const I4 JEdge      = EdgesOnCell(ICell, J);
-         const I4 KStartEdge = Kokkos::max(KStartCell, MinLayerEdgeBot(JEdge));
-         const I4 KEndEdge   = Kokkos::min(KEndCell, MaxLayerEdgeTop(JEdge));
+         const I4 JEdge = EdgesOnCell(ICell, J);
 
          const I4 JCell0 = CellsOnEdge(JEdge, 0);
          const I4 JCell1 = CellsOnEdge(JEdge, 1);
 
+         const I4 KMin    = MinLayerEdgeBot(JEdge);
+         const I4 KMax    = MaxLayerEdgeTop(JEdge);
+         const int KRange = vertRange(KMin, KMax);
+
          const Real RTemp =
              MeshScalingDel4(JEdge) * DvEdge(JEdge) / DcEdge(JEdge);
 
-         for (int K = KStartEdge; K <= KEndEdge; ++K) {
-            const I4 KVec = K - KStartCell;
-            const Real Del2TrGrad =
-                (TrDel2Cell(L, JCell1, K) - TrDel2Cell(L, JCell0, K));
+         parallelForInner(
+             Team, KRange, INNER_LAMBDA(int KOff) {
+                const int K = KMin + KOff;
+                const Real Del2TrGrad =
+                    (TrDel2Cell(L, JCell1, K) - TrDel2Cell(L, JCell0, K));
 
-            HypTmp[KVec] -= EdgeMask(JEdge, K) * EdgeSignOnCell(ICell, J) *
-                            RTemp * Del2TrGrad;
-         }
-      }
-      for (int KVec = 0; KVec < KLenCell; ++KVec) {
-         const I4 K = KStartCell + KVec;
-         Tend(L, ICell, K) -= EddyDiff4 * HypTmp[KVec] * InvAreaCell;
+                Tend(L, ICell, K) += EdgeMask(JEdge, K) *
+                                     EdgeSignOnCell(ICell, J) * RTemp *
+                                     Del2TrGrad * EddyDiff4 * InvAreaCell;
+             });
       }
    }
 
