@@ -882,7 +882,8 @@ int testTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
        {NTracers, Mesh->NCellsOwned},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           TrHorzAdvOnC(Team, NumTrFluxDiv, L, ICell, NormalVelocity, HTrOnEdge);
-       });
+       },
+       VCoord->NVertLayers * sizeof(Real));
 
    ErrorMeasures TrHAdvErrors;
    Err +=
@@ -938,7 +939,8 @@ int testTracerDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
        {NTracers, Mesh->NCellsOwned},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           TrDiffOnC(Team, NumTracerDiff, L, ICell, TracerCell, LayerThickEdge);
-       });
+       },
+       VCoord->NVertLayers * sizeof(Real));
 
    ErrorMeasures TrDiffErrors;
    Err += computeErrors(TrDiffErrors, NumTracerDiff, ExactTracerDiff, Mesh,
@@ -987,7 +989,8 @@ int testTracerHyperDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
        {NTracers, Mesh->NCellsOwned},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           TrHypDiffOnC(Team, NumTracerHyperDiff, L, ICell, TrDel2Cell);
-       });
+       },
+       VCoord->NVertLayers * sizeof(Real));
 
    ErrorMeasures TrHyperDiffErrors;
    Err += computeErrors(TrHyperDiffErrors, NumTracerHyperDiff,

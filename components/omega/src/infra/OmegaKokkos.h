@@ -79,6 +79,9 @@ using Kokkos::MemoryUnmanaged;
 using Kokkos::PerTeam;
 using Kokkos::TeamThreadRange;
 
+using Scratch1DReal =
+    Kokkos::View<Real *, MemLayout, ScratchMemSpace, MemoryUnmanaged>;
+
 /// team_size for hierarchical parallelism
 #ifdef OMEGA_TARGET_DEVICE
 constexpr int OMEGA_TEAMSIZE = 64;
@@ -321,7 +324,8 @@ KOKKOS_INLINE_FUNCTION void teamBarrier(const TeamMember &Team) {
 // parallelForOuter: with label
 template <int N, class F>
 inline void parallelForOuter(const std::string &Label,
-                             const int (&UpperBounds)[N], F &&Functor) {
+                             const int (&UpperBounds)[N], F &&Functor,
+                             int ScratchSize = 0) {
 
    auto LinFunctor = LinearIdxWrapper{std::forward<F>(Functor), UpperBounds};
    int LinBound    = 1;
@@ -330,6 +334,7 @@ inline void parallelForOuter(const std::string &Label,
    }
 
    auto Policy = TeamPolicy(LinBound, OMEGA_TEAMSIZE);
+   Policy.set_scratch_size(0, Kokkos::PerTeam(ScratchSize));
    Kokkos::parallel_for(
        Label, Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
           const int TeamId = Team.league_rank();
@@ -339,8 +344,9 @@ inline void parallelForOuter(const std::string &Label,
 
 // parallelForOuter: without label
 template <int N, class F>
-inline void parallelForOuter(const int (&UpperBounds)[N], F &&Functor) {
-   parallelForOuter("", UpperBounds, std::forward<F>(Functor));
+inline void parallelForOuter(const int (&UpperBounds)[N], F &&Functor,
+                             int ScratchSize = 0) {
+   parallelForOuter("", UpperBounds, std::forward<F>(Functor), ScratchSize);
 }
 
 // parallelForInner

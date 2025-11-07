@@ -378,6 +378,18 @@ class TracerHorzAdvOnCell {
                                    const Array2DReal &NormVelEdge,
                                    const Array3DReal &HTracersOnEdge) const {
 
+      Scratch1DReal TendTmp(Team.team_scratch(0), NVertLayers);
+
+      const I4 KMinCell    = MinLayerCell(ICell);
+      const I4 KMaxCell    = MaxLayerCell(ICell);
+      const int KRangeCell = vertRange(KMinCell, KMaxCell);
+
+      parallelForInner(
+          Team, KRangeCell, INNER_LAMBDA(int KOff) {
+             const I4 K = KMinCell + KOff;
+             TendTmp(K) = 0;
+          });
+
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
@@ -388,15 +400,22 @@ class TracerHorzAdvOnCell {
          parallelForInner(
              Team, KRange, INNER_LAMBDA(int KOff) {
                 const I4 K = KMin + KOff;
-                Tend(L, ICell, K) += EdgeMask(JEdge, K) * DvEdge(JEdge) *
-                                     EdgeSignOnCell(ICell, J) *
-                                     HTracersOnEdge(L, JEdge, K) *
-                                     NormVelEdge(JEdge, K) * InvAreaCell;
+                TendTmp(K) += EdgeMask(JEdge, K) * DvEdge(JEdge) *
+                              EdgeSignOnCell(ICell, J) *
+                              HTracersOnEdge(L, JEdge, K) *
+                              NormVelEdge(JEdge, K) * InvAreaCell;
              });
       }
+
+      parallelForInner(
+          Team, KRangeCell, INNER_LAMBDA(int KOff) {
+             const I4 K = KMinCell + KOff;
+             Tend(L, ICell, K) += TendTmp(K);
+          });
    }
 
  private:
+   I4 NVertLayers;
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DI4 CellsOnEdge;
@@ -424,6 +443,17 @@ class TracerDiffOnCell {
               const Array3DReal &TracerCell,
               const Array2DReal &MeanLayerThickEdge) const {
 
+      Scratch1DReal TendTmp(Team.team_scratch(0), NVertLayers);
+      const I4 KMinCell    = MinLayerCell(ICell);
+      const I4 KMaxCell    = MaxLayerCell(ICell);
+      const int KRangeCell = vertRange(KMinCell, KMaxCell);
+
+      parallelForInner(
+          Team, KRangeCell, INNER_LAMBDA(int KOff) {
+             const I4 K = KMinCell + KOff;
+             TendTmp(K) = 0;
+          });
+
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
 
@@ -444,15 +474,20 @@ class TracerDiffOnCell {
                 const Real TracerGrad =
                     (TracerCell(L, JCell1, K) - TracerCell(L, JCell0, K));
 
-                Tend(L, ICell, K) -= EddyDiff2 * EdgeMask(JEdge, K) *
-                                     EdgeSignOnCell(ICell, J) * RTemp *
-                                     MeanLayerThickEdge(JEdge, K) * TracerGrad *
-                                     InvAreaCell;
+                TendTmp(K) -= EdgeMask(JEdge, K) * EdgeSignOnCell(ICell, J) *
+                              RTemp * MeanLayerThickEdge(JEdge, K) * TracerGrad;
              });
       }
+
+      parallelForInner(
+          Team, KRangeCell, INNER_LAMBDA(int KOff) {
+             const I4 K = KMinCell + KOff;
+             Tend(L, ICell, K) += EddyDiff2 * TendTmp(K) * InvAreaCell;
+          });
    }
 
  private:
+   I4 NVertLayers;
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DI4 CellsOnEdge;
@@ -481,6 +516,17 @@ class TracerHyperDiffOnCell {
                                    const Array3DReal &Tend, I4 L, I4 ICell,
                                    const Array3DReal &TrDel2Cell) const {
 
+      Scratch1DReal TendTmp(Team.team_scratch(0), NVertLayers);
+      const I4 KMinCell    = MinLayerCell(ICell);
+      const I4 KMaxCell    = MaxLayerCell(ICell);
+      const int KRangeCell = vertRange(KMinCell, KMaxCell);
+
+      parallelForInner(
+          Team, KRangeCell, INNER_LAMBDA(int KOff) {
+             const I4 K = KMinCell + KOff;
+             TendTmp(K) = 0;
+          });
+
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
@@ -502,14 +548,20 @@ class TracerHyperDiffOnCell {
                 const Real Del2TrGrad =
                     (TrDel2Cell(L, JCell1, K) - TrDel2Cell(L, JCell0, K));
 
-                Tend(L, ICell, K) += EdgeMask(JEdge, K) *
-                                     EdgeSignOnCell(ICell, J) * RTemp *
-                                     Del2TrGrad * EddyDiff4 * InvAreaCell;
+                TendTmp(K) += EdgeMask(JEdge, K) * EdgeSignOnCell(ICell, J) *
+                              RTemp * Del2TrGrad;
              });
       }
+
+      parallelForInner(
+          Team, KRangeCell, INNER_LAMBDA(int KOff) {
+             const I4 K = KMinCell + KOff;
+             Tend(L, ICell, K) += EddyDiff4 * InvAreaCell * TendTmp(K);
+          });
    }
 
  private:
+   I4 NVertLayers;
    Array1DI4 NEdgesOnCell;
    Array2DI4 EdgesOnCell;
    Array2DI4 CellsOnEdge;

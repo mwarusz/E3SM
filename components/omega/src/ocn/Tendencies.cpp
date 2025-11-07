@@ -534,7 +534,8 @@ void Tendencies::computeTracerTendenciesOnly(
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
              LocTracerHorzAdv(Team, LocTracerTend, L, ICell, NormalVelEdge,
                               HTracersEdge);
-          });
+          },
+          VCoord->NVertLayers * sizeof(Real));
       Pacer::stop("Tend:tracerHorzAdv", 2);
    }
 
@@ -548,7 +549,8 @@ void Tendencies::computeTracerTendenciesOnly(
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
              LocTracerDiffusion(Team, LocTracerTend, L, ICell, TracerArray,
                                 MeanLayerThickEdge);
-          });
+          },
+          VCoord->NVertLayers * sizeof(Real));
       Pacer::stop("Tend:tracerDiffusion", 2);
    }
 
@@ -560,7 +562,8 @@ void Tendencies::computeTracerTendenciesOnly(
           {NTracers, Mesh->NCellsAll},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
              LocTracerHyperDiff(Team, LocTracerTend, L, ICell, Del2TracersCell);
-          });
+          },
+          VCoord->NVertLayers * sizeof(Real));
       Pacer::stop("Tend:tracerHyperDiff", 2);
    }
 
