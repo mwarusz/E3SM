@@ -291,17 +291,12 @@ void Tendencies::computeThicknessTendenciesOnly(
    if (LocThicknessFluxDiv.Enabled) {
       Pacer::start("Tend:thicknessFluxDiv", 2);
       parallelForOuter(
-          {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocThicknessFluxDiv(LocLayerThicknessTend, ICell, KChunk,
-                                        ThickFluxEdge, NormalVelEdge);
-                 });
-          });
+          {Mesh->NCellsAll},
+          KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
+             LocThicknessFluxDiv(Team, LocLayerThicknessTend, ICell,
+                                 ThickFluxEdge, NormalVelEdge);
+          },
+          VCoord->NVertLayers * sizeof(Real));
       Pacer::stop("Tend:thicknessFluxDiv", 2);
    }
 
@@ -364,18 +359,13 @@ void Tendencies::computeVelocityTendenciesOnly(
    if (LocPotientialVortHAdv.Enabled) {
       Pacer::start("Tend:potientialVortHAdv", 2);
       parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = MinLayerEdgeBot(IEdge);
-             const int KMax   = MaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocPotientialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
-                                          NormRVortEdge, NormFEdge,
-                                          FluxLayerThickEdge, NormVelEdge);
-                 });
-          });
+          {Mesh->NEdgesAll},
+          KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+             LocPotientialVortHAdv(Team, LocNormalVelocityTend, IEdge,
+                                   NormRVortEdge, NormFEdge, FluxLayerThickEdge,
+                                   NormVelEdge);
+          },
+          VCoord->NVertLayers * sizeof(Real));
       Pacer::stop("Tend:potientialVortHAdv", 2);
    }
 
@@ -385,13 +375,7 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::start("Tend:KEGrad", 2);
       parallelForOuter(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = MinLayerEdgeBot(IEdge);
-             const int KMax   = MaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocKEGrad(LocNormalVelocityTend, IEdge, KChunk, KECell);
-                 });
+             LocKEGrad(Team, LocNormalVelocityTend, IEdge, KECell);
           });
       Pacer::stop("Tend:KEGrad", 2);
    }
@@ -402,13 +386,7 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::start("Tend:SSHGrad", 2);
       parallelForOuter(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = MinLayerEdgeBot(IEdge);
-             const int KMax   = MaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocSSHGrad(LocNormalVelocityTend, IEdge, KChunk, SSHCell);
-                 });
+             LocSSHGrad(Team, LocNormalVelocityTend, IEdge, SSHCell);
           });
       Pacer::stop("Tend:SSHGrad", 2);
    }
@@ -420,14 +398,8 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::start("Tend:velocityDiffusion", 2);
       parallelForOuter(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = MinLayerEdgeBot(IEdge);
-             const int KMax   = MaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk,
-                                         DivCell, RVortVertex);
-                 });
+             LocVelocityDiffusion(Team, LocNormalVelocityTend, IEdge, DivCell,
+                                  RVortVertex);
           });
       Pacer::stop("Tend:velocityDiffusion", 2);
    }
@@ -440,14 +412,8 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::start("Tend:velocityHyperDiff", 2);
       parallelForOuter(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = MinLayerEdgeBot(IEdge);
-             const int KMax   = MaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
-                                         Del2DivCell, Del2RVortVertex);
-                 });
+             LocVelocityHyperDiff(Team, LocNormalVelocityTend, IEdge,
+                                  Del2DivCell, Del2RVortVertex);
           });
       Pacer::stop("Tend:velocityHyperDiff", 2);
    }

@@ -367,11 +367,13 @@ int testThickFluxDiv(int NVertLayers, Real RTol) {
    Array2DReal NumThickFluxDiv("NumThickFluxDiv", Mesh->NCellsOwned,
                                NVertLayers);
    ThicknessFluxDivOnCell ThickFluxDivOnC(Mesh, VCoord);
-   parallelFor(
-       {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int KLayer) {
-          ThickFluxDivOnC(NumThickFluxDiv, ICell, KLayer, OnesEdge,
+   parallelForOuter(
+       {Mesh->NCellsOwned},
+       KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
+          ThickFluxDivOnC(Team, NumThickFluxDiv, ICell, OnesEdge,
                           ThickFluxEdge);
-       });
+       },
+       VCoord->NVertLayers * sizeof(Real));
 
    // Compute errors
    ErrorMeasures TFDivErrors;
@@ -444,11 +446,13 @@ int testPotVortHAdv(int NVertLayers, Real RTol) {
    Array2DReal NumPotVortHAdv("NumPotVortHAdv", Mesh->NEdgesOwned, NVertLayers);
 
    PotentialVortHAdvOnEdge PotVortHAdvOnE(Mesh, VCoord);
-   parallelFor(
-       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          PotVortHAdvOnE(NumPotVortHAdv, IEdge, KLayer, NormRelVortEdge,
+   parallelForOuter(
+       {Mesh->NEdgesOwned},
+       KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          PotVortHAdvOnE(Team, NumPotVortHAdv, IEdge, NormRelVortEdge,
                          NormPlanetVortEdge, LayerThickEdge, NormVelEdge);
-       });
+       },
+       VCoord->NVertLayers * sizeof(Real));
 
    // Compute errors
    ErrorMeasures PotVortHAdvErrors;
@@ -495,9 +499,9 @@ int testKEGrad(int NVertLayers, Real RTol) {
    Array2DReal NumKEGrad("NumKEGrad", Mesh->NEdgesOwned, NVertLayers);
 
    KEGradOnEdge KEGradOnE(Mesh, VCoord);
-   parallelFor(
-       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          KEGradOnE(NumKEGrad, IEdge, KLayer, KECell);
+   parallelForOuter(
+       {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          KEGradOnE(Team, NumKEGrad, IEdge, KECell);
        });
 
    // Compute errors
@@ -544,9 +548,9 @@ int testSSHGrad(int NVertLayers, Real RTol) {
    Array2DReal NumSSHGrad("NumSSHGrad", Mesh->NEdgesOwned, NVertLayers);
 
    SSHGradOnEdge SSHGradOnE(Mesh, VCoord);
-   parallelFor(
-       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          SSHGradOnE(NumSSHGrad, IEdge, KLayer, SSHCell);
+   parallelForOuter(
+       {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          SSHGradOnE(Team, NumSSHGrad, IEdge, SSHCell);
        });
 
    // Compute errors
@@ -606,9 +610,9 @@ int testVelDiff(int NVertLayers, Real RTol) {
    // Compute numerical result
    Array2DReal NumVelDiff("NumVelDiff", Mesh->NEdgesOwned, NVertLayers);
 
-   parallelFor(
-       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          VelDiffOnE(NumVelDiff, IEdge, KLayer, DivCell, RVortVertex);
+   parallelForOuter(
+       {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          VelDiffOnE(Team, NumVelDiff, IEdge, DivCell, RVortVertex);
        });
 
    // Compute errors
@@ -677,9 +681,9 @@ int testVelHyperDiff(int NVertLayers, Real RTol) {
    Array2DReal NumVelHyperDiff("NumVelHyperDiff", Mesh->NEdgesOwned,
                                NVertLayers);
 
-   parallelFor(
-       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          VelHyperDiffOnE(NumVelHyperDiff, IEdge, KLayer, DivCell, RVortVertex);
+   parallelForOuter(
+       {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          VelHyperDiffOnE(Team, NumVelHyperDiff, IEdge, DivCell, RVortVertex);
        });
 
    // Compute errors
