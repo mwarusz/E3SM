@@ -8,7 +8,8 @@ namespace OMEGA {
 
 KineticAuxVars::KineticAuxVars(const std::string &AuxStateSuffix,
                                const HorzMesh *Mesh, const VertCoord *VCoord)
-    : KineticEnergyCell("KineticEnergyCell" + AuxStateSuffix, Mesh->NCellsSize,
+    : NVertLayers(VCoord->NVertLayers),
+      KineticEnergyCell("KineticEnergyCell" + AuxStateSuffix, Mesh->NCellsSize,
                         VCoord->NVertLayers),
       VelocityDivCell("VelocityDivCell" + AuxStateSuffix, Mesh->NCellsSize,
                       VCoord->NVertLayers),

@@ -8,7 +8,8 @@ namespace OMEGA {
 TracerAuxVars::TracerAuxVars(const std::string &AuxStateSuffix,
                              const HorzMesh *Mesh, const VertCoord *VCoord,
                              const I4 NTracers)
-    : HTracersEdge("ThickTracersEdge" + AuxStateSuffix, NTracers,
+    : NVertLayers(VCoord->NVertLayers),
+      HTracersEdge("ThickTracersEdge" + AuxStateSuffix, NTracers,
                    Mesh->NEdgesSize, VCoord->NVertLayers),
       Del2TracersCell("Del2TracerCell" + AuxStateSuffix, NTracers,
                       Mesh->NCellsSize, VCoord->NVertLayers),

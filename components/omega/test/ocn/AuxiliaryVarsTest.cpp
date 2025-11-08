@@ -366,10 +366,12 @@ int testKineticAuxVars(const Array2DReal &LayerThicknessCell,
 
    KineticAuxVars KineticAux("", Mesh, VCoord);
 
-   parallelFor(
-       {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int KLayer) {
-          KineticAux.computeVarsOnCell(ICell, KLayer, NormalVelocityEdge);
-       });
+   parallelForOuter(
+       {Mesh->NCellsOwned},
+       KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
+          KineticAux.computeVarsOnCell(Team, ICell, NormalVelocityEdge);
+       },
+       2 * sizeof(Real) * VCoord->NVertLayers);
    const auto &NumKineticEnergyCell = KineticAux.KineticEnergyCell;
    const auto &NumVelocityDivCell   = KineticAux.VelocityDivCell;
 
@@ -464,9 +466,9 @@ int testLayerThicknessAuxVars(const Array2DReal &LayerThickCell,
 
    LayerThicknessAuxVars LayerThicknessAux("", Mesh, VCoord);
    LayerThicknessAux.FluxThickEdgeChoice = FluxThickEdgeOption::Upwind;
-   parallelFor(
-       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          LayerThicknessAux.computeVarsOnEdge(IEdge, KLayer, LayerThickCell,
+   parallelForOuter(
+       {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          LayerThicknessAux.computeVarsOnEdge(Team, IEdge, LayerThickCell,
                                               NormalVelEdge);
        });
 
@@ -530,12 +532,13 @@ int testVorticityAuxVars(const Array2DReal &LayerThickCell,
 
    // Compute numerical results for vertex variables
 
-   parallelFor(
-       {Decomp->NVerticesHaloH(0), NVertLayers},
-       KOKKOS_LAMBDA(int IVertex, int KLayer) {
-          VorticityAux.computeVarsOnVertex(IVertex, KLayer, LayerThickCell,
+   parallelForOuter(
+       {Decomp->NVerticesHaloH(0)},
+       KOKKOS_LAMBDA(int IVertex, const TeamMember &Team) {
+          VorticityAux.computeVarsOnVertex(Team, IVertex, LayerThickCell,
                                            NormalVelEdge);
-       });
+       },
+       2 * VCoord->NVertLayers * sizeof(Real));
 
    const auto &NumRelVortVertex        = VorticityAux.RelVortVertex;
    const auto &NumNormRelVortVertex    = VorticityAux.NormRelVortVertex;
@@ -583,9 +586,9 @@ int testVorticityAuxVars(const Array2DReal &LayerThickCell,
 
    // Compute numerical results for vertex variables
 
-   parallelFor(
-       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          VorticityAux.computeVarsOnEdge(IEdge, KLayer);
+   parallelForOuter(
+       {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          VorticityAux.computeVarsOnEdge(Team, IEdge);
        });
    const auto &NumNormRelVortEdge    = VorticityAux.NormRelVortEdge;
    const auto &NumNormPlanetVortEdge = VorticityAux.NormPlanetVortEdge;
@@ -647,10 +650,10 @@ int testVelocityDel2AuxVars(Real RTol) {
 
    // Compute numerical Del2
 
-   parallelFor(
-       {Decomp->NEdgesHaloH(1), NVertLayers},
-       KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          VelocityDel2Aux.computeVarsOnEdge(IEdge, KLayer, ExactVelocityDivCell,
+   parallelForOuter(
+       {Decomp->NEdgesHaloH(1)},
+       KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          VelocityDel2Aux.computeVarsOnEdge(Team, IEdge, ExactVelocityDivCell,
                                             ExactRelVortVertex);
        });
    const auto &NumDel2Edge = VelocityDel2Aux.Del2Edge;
@@ -673,10 +676,12 @@ int testVelocityDel2AuxVars(Real RTol) {
 
    // Compute numerical Del2Div
 
-   parallelFor(
-       {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int KLayer) {
-          VelocityDel2Aux.computeVarsOnCell(ICell, KLayer);
-       });
+   parallelForOuter(
+       {Mesh->NCellsOwned},
+       KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
+          VelocityDel2Aux.computeVarsOnCell(Team, ICell);
+       },
+       VCoord->NVertLayers * sizeof(Real));
    const auto &NumDel2DivCell = VelocityDel2Aux.Del2DivCell;
 
    // Compute error measures and check errors for Del2Div
@@ -697,11 +702,12 @@ int testVelocityDel2AuxVars(Real RTol) {
 
    // Compute numerical Del2RelVort
 
-   parallelFor(
-       {Mesh->NVerticesOwned, NVertLayers},
-       KOKKOS_LAMBDA(int IVertex, int KLayer) {
-          VelocityDel2Aux.computeVarsOnVertex(IVertex, KLayer);
-       });
+   parallelForOuter(
+       {Mesh->NVerticesOwned},
+       KOKKOS_LAMBDA(int IVertex, const TeamMember &Team) {
+          VelocityDel2Aux.computeVarsOnVertex(Team, IVertex);
+       },
+       VCoord->NVertLayers * sizeof(Real));
    const auto &NumDel2RelVortVertex = VelocityDel2Aux.Del2RelVortVertex;
 
    // Compute error measures and check errors for Del2RelVort
@@ -754,10 +760,10 @@ int testTracerAuxVars(const Array2DReal &LayerThickCell,
 
    // Compute numerical HTracersEdge
 
-   parallelFor(
-       {NTracers, Mesh->NEdgesOwned, NVertLayers},
-       KOKKOS_LAMBDA(int L, int IEdge, int KLayer) {
-          TracerAux.computeVarsOnEdge(L, IEdge, KLayer, NormalVelEdge,
+   parallelForOuter(
+       {NTracers, Mesh->NEdgesOwned},
+       KOKKOS_LAMBDA(int L, int IEdge, const TeamMember &Team) {
+          TracerAux.computeVarsOnEdge(Team, L, IEdge, NormalVelEdge,
                                       LayerThickCell, TracersOnCell);
        });
 
@@ -780,12 +786,13 @@ int testTracerAuxVars(const Array2DReal &LayerThickCell,
 
    // Compute numerical Del2TracerCell
 
-   parallelFor(
-       {NTracers, Mesh->NCellsOwned, NVertLayers},
-       KOKKOS_LAMBDA(int L, int ICell, int KLayer) {
-          TracerAux.computeVarsOnCells(L, ICell, KLayer, LayerThickEdge,
+   parallelForOuter(
+       {NTracers, Mesh->NCellsOwned},
+       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          TracerAux.computeVarsOnCells(Team, L, ICell, LayerThickEdge,
                                        TracersOnCell);
-       });
+       },
+       VCoord->NVertLayers * sizeof(Real));
 
    // Compute error measures and check errors for Del2TracersCell
 

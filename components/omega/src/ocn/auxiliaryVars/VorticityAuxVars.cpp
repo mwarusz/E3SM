@@ -9,7 +9,8 @@ namespace OMEGA {
 VorticityAuxVars::VorticityAuxVars(const std::string &AuxStateSuffix,
                                    const HorzMesh *Mesh,
                                    const VertCoord *VCoord)
-    : RelVortVertex("RelVortVertex" + AuxStateSuffix, Mesh->NVerticesSize,
+    : NVertLayers(VCoord->NVertLayers),
+      RelVortVertex("RelVortVertex" + AuxStateSuffix, Mesh->NVerticesSize,
                     VCoord->NVertLayers),
       NormRelVortVertex("NormRelVortVertex" + AuxStateSuffix,
                         Mesh->NVerticesSize, VCoord->NVertLayers),

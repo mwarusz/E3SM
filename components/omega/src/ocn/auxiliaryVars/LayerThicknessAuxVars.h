@@ -24,57 +24,65 @@ class LayerThicknessAuxVars {
                          const HorzMesh *Mesh, const VertCoord *VCoord);
 
    KOKKOS_FUNCTION void
-   computeVarsOnEdge(int IEdge, int KChunk, const Array2DReal &LayerThickCell,
+   computeVarsOnEdge(const TeamMember &Team, int IEdge,
+                     const Array2DReal &LayerThickCell,
                      const Array2DReal &NormalVelEdge) const {
-      const int KStart = chunkStart(KChunk, MinLayerEdgeBot(IEdge));
-      const int KLen   = chunkLength(KChunk, KStart, MaxLayerEdgeTop(IEdge));
+      const int KMin   = MinLayerEdgeBot(IEdge);
+      const int KMax   = MaxLayerEdgeTop(IEdge);
+      const int KRange = vertRange(KMin, KMax);
 
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const int K = KStart + KVec;
-         MeanLayerThickEdge(IEdge, K) =
-             0.5_Real * (LayerThickCell(JCell0, K) + LayerThickCell(JCell1, K));
-      }
+      parallelForInner(
+          Team, KRange, INNER_LAMBDA(int KOff) {
+             const I4 K = KMin + KOff;
+             MeanLayerThickEdge(IEdge, K) =
+                 0.5_Real *
+                 (LayerThickCell(JCell0, K) + LayerThickCell(JCell1, K));
+          });
 
       switch (FluxThickEdgeChoice) {
       case FluxThickEdgeOption::Center:
-         for (int KVec = 0; KVec < KLen; ++KVec) {
-            const int K = KStart + KVec;
-            FluxLayerThickEdge(IEdge, K) =
-                0.5_Real *
-                (LayerThickCell(JCell0, K) + LayerThickCell(JCell1, K));
-         }
+         parallelForInner(
+             Team, KRange, INNER_LAMBDA(int KOff) {
+                const I4 K = KMin + KOff;
+                FluxLayerThickEdge(IEdge, K) =
+                    0.5_Real *
+                    (LayerThickCell(JCell0, K) + LayerThickCell(JCell1, K));
+             });
          break;
       case FluxThickEdgeOption::Upwind:
-         for (int KVec = 0; KVec < KLen; ++KVec) {
-            const int K = KStart + KVec;
-            if (NormalVelEdge(IEdge, K) > 0) {
-               FluxLayerThickEdge(IEdge, K) = LayerThickCell(JCell0, K);
-            } else if (NormalVelEdge(IEdge, K) < 0) {
-               FluxLayerThickEdge(IEdge, K) = LayerThickCell(JCell1, K);
-            } else {
-               FluxLayerThickEdge(IEdge, K) = Kokkos::max(
-                   LayerThickCell(JCell0, K), LayerThickCell(JCell1, K));
-            }
-         }
+         parallelForInner(
+             Team, KRange, INNER_LAMBDA(int KOff) {
+                const I4 K = KMin + KOff;
+                if (NormalVelEdge(IEdge, K) > 0) {
+                   FluxLayerThickEdge(IEdge, K) = LayerThickCell(JCell0, K);
+                } else if (NormalVelEdge(IEdge, K) < 0) {
+                   FluxLayerThickEdge(IEdge, K) = LayerThickCell(JCell1, K);
+                } else {
+                   FluxLayerThickEdge(IEdge, K) = Kokkos::max(
+                       LayerThickCell(JCell0, K), LayerThickCell(JCell1, K));
+                }
+             });
          break;
       }
    }
 
    KOKKOS_FUNCTION void
-   computeVarsOnCells(int ICell, int KChunk,
+   computeVarsOnCells(const TeamMember &Team, int ICell,
                       const Array2DReal &LayerThickCell) const {
 
       // Temporary for stacked shallow water
-      const int KStart = chunkStart(KChunk, MinLayerCell(ICell));
-      const int KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const int KMin   = MinLayerCell(ICell);
+      const int KMax   = MaxLayerCell(ICell);
+      const int KRange = vertRange(KMin, KMax);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const int K       = KStart + KVec;
-         SshCell(ICell, K) = LayerThickCell(ICell, K) - BottomDepth(ICell);
-      }
+      parallelForInner(
+          Team, KRange, INNER_LAMBDA(int KOff) {
+             const I4 K        = KMin + KOff;
+             SshCell(ICell, K) = LayerThickCell(ICell, K) - BottomDepth(ICell);
+          });
 
       /*
       Real TotalThickness = 0.0;
