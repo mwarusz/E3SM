@@ -543,6 +543,15 @@ void VertCoord::setStreamArrays(const bool ReadStream) {
           LocMaxLayerCell(ICell) -= 1;
        });
 
+   // The index ICell = NCellsAll is represents an inactive cell
+   OMEGA_SCOPE(LocNCellsAll, NCellsAll);
+   OMEGA_SCOPE(LocNVertLayersP1, NVertLayersP1);
+   parallelFor(
+       {1}, KOKKOS_LAMBDA(const int &) {
+          LocMinLayerCell(LocNCellsAll) = LocNVertLayersP1;
+          LocMaxLayerCell(LocNCellsAll) = -1;
+       });
+
    // Make host copies for device arrays read from mesh file
    MaxLayerCellH = createHostMirrorCopy(MaxLayerCell);
    MinLayerCellH = createHostMirrorCopy(MinLayerCell);
