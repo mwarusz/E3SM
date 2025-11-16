@@ -82,7 +82,7 @@ VertCoord::VertCoord(const std::string &Name_, //< [in] Name for new VertCoord
       ABORT_ERROR("VertCoord: Unknown MovementWeightType requested");
    }
 
-   // Fetch reference desnity from Config
+   // Fetch reference density from Config
    Config TendConfig("Tendencies");
    Err.reset();
    Err += Options->get(TendConfig);
