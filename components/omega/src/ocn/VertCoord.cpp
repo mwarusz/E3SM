@@ -24,10 +24,10 @@ std::map<std::string, std::unique_ptr<VertCoord>> VertCoord::AllVertCoords;
 
 //------------------------------------------------------------------------------
 // Initialize the default vertical coordinate, requires prior initialization
-// of Decomp. The optional arguments simplify the use of the VertCoord in some
-// unit tests. If ReadStream is false, the InitialVertCoord stream will not be
-// read during construction. If a value for NVertLayers is passed as argument,
-// the dimension will not be read from the mesh file.
+// of Decomp and Halo. The optional arguments simplify the use of the VertCoord
+// in some unit tests. If ReadStream is false, the InitialVertCoord stream will
+// not be read during construction. If a value for NVertLayers is passed as
+// argument, the dimension will not be read from the mesh file.
 void VertCoord::init(
     const bool
         ReadStream, //< [in] optional argument to read stream, true by default
@@ -38,10 +38,12 @@ void VertCoord::init(
 
    Decomp *DefDecomp = Decomp::getDefault();
 
+   Halo *DefHalo = Halo::getDefault();
+
    Config *OmegaConfig = Config::getOmegaConfig();
 
-   VertCoord::DefaultVertCoord =
-       create("Default", DefDecomp, OmegaConfig, ReadStream, InNVertLayers);
+   VertCoord::DefaultVertCoord = create("Default", DefDecomp, DefHalo,
+                                        OmegaConfig, ReadStream, InNVertLayers);
 
 } // end init
 
@@ -49,6 +51,7 @@ void VertCoord::init(
 // Construct a new VertCoord instance given a Decomp.
 VertCoord::VertCoord(const std::string &Name_, //< [in] Name for new VertCoord
                      const Decomp *Decomp,     //< [in] associated Decomp
+                     Halo *MeshHalo,           //< [in] mesh halo exchanger
                      Config *Options,          //< [in] configuration options
                      const bool ReadStream,    //< [in] logical to read stream
                      const int InNVertLayers   //< [in] int to set vertical dim
@@ -176,11 +179,11 @@ VertCoord::VertCoord(const std::string &Name_, //< [in] Name for new VertCoord
    defineFields();
 
    // Set MinLayerCell, MaxLayerCell, and BottomDepth arrays
-   setStreamArrays(ReadStream);
+   setStreamArrays(ReadStream, MeshHalo);
 
    // Compute Edge and Vertex vertical ranges
-   minMaxLayerEdge();
-   minMaxLayerVertex();
+   minMaxLayerEdge(MeshHalo);
+   minMaxLayerVertex(MeshHalo);
 
    // Set computational masks
    setMasks();
@@ -195,6 +198,7 @@ VertCoord::VertCoord(const std::string &Name_, //< [in] Name for new VertCoord
 VertCoord *VertCoord::create(
     const std::string &Name, // [in] name for new VertCoord
     const Decomp *Decomp,    // [in] associated Decomp
+    Halo *MeshHalo,          // [in] mesh halo exchanger
     Config *Options,         // [in] configuration options
     const bool ReadStream,   // [in] optional logical to read stream
     const int InNVertLayers  // [in] optional int to set vertical dim
@@ -210,8 +214,8 @@ VertCoord *VertCoord::create(
 
    // create a new VertCoord on the heap and put it in a map of unique_ptrs,
    // which will manage its lifetime
-   auto *NewVertCoord =
-       new VertCoord(Name, Decomp, Options, ReadStream, InNVertLayers);
+   auto *NewVertCoord = new VertCoord(Name, Decomp, MeshHalo, Options,
+                                      ReadStream, InNVertLayers);
    AllVertCoords.emplace(Name, NewVertCoord);
 
    return NewVertCoord;
@@ -448,7 +452,7 @@ void VertCoord::clear() {
 //------------------------------------------------------------------------------
 // If ReadStream = true, read MinLayerCell, MaxLayerCell, and BottomDepth from
 // the initial stream. If ReadStream = false, default values are used.
-void VertCoord::setStreamArrays(const bool ReadStream) {
+void VertCoord::setStreamArrays(const bool ReadStream, Halo *MeshHalo) {
 
    Error Err; // Error code
 
@@ -543,6 +547,10 @@ void VertCoord::setStreamArrays(const bool ReadStream) {
           LocMaxLayerCell(ICell) -= 1;
        });
 
+   // Exchange halos since stream only reads owned cells
+   MeshHalo->exchangeFullArrayHalo(MinLayerCell, OnCell);
+   MeshHalo->exchangeFullArrayHalo(MaxLayerCell, OnCell);
+
    // The index ICell = NCellsAll is represents an inactive cell
    OMEGA_SCOPE(LocNCellsAll, NCellsAll);
    OMEGA_SCOPE(LocNVertLayersP1, NVertLayersP1);
@@ -561,7 +569,7 @@ void VertCoord::setStreamArrays(const bool ReadStream) {
 //------------------------------------------------------------------------------
 // Compute min and max layer indices for edges based on MinLayerCell and
 // MaxLayerCell
-void VertCoord::minMaxLayerEdge() {
+void VertCoord::minMaxLayerEdge(Halo *MeshHalo) {
 
    MinLayerEdgeTop = Array1DI4("MinLayerEdgeTop", NEdgesSize);
    MinLayerEdgeBot = Array1DI4("MinLayerEdgeBot", NEdgesSize);
@@ -577,15 +585,16 @@ void VertCoord::minMaxLayerEdge() {
    OMEGA_SCOPE(LocMaxLayerEdgeTop, MaxLayerEdgeTop);
    OMEGA_SCOPE(LocMaxLayerEdgeBot, MaxLayerEdgeBot);
    parallelFor(
-       {NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
+       {NEdgesOwned}, KOKKOS_LAMBDA(int IEdge) {
           I4 Lyr1;
           I4 Lyr2;
           const I4 ICell1 = LocCellsOnEdge(IEdge, 0);
           const I4 ICell2 = LocCellsOnEdge(IEdge, 1);
-          Lyr1            = LocMaxLayerCell(ICell1) == -1 ? LocNVertLayersP1
-                                                          : LocMinLayerCell(ICell1);
-          Lyr2            = LocMaxLayerCell(ICell2) == -1 ? LocNVertLayersP1
-                                                          : LocMinLayerCell(ICell2);
+
+          Lyr1 = LocMaxLayerCell(ICell1) == -1 ? LocNVertLayersP1
+                                               : LocMinLayerCell(ICell1);
+          Lyr2 = LocMaxLayerCell(ICell2) == -1 ? LocNVertLayersP1
+                                               : LocMinLayerCell(ICell2);
           LocMinLayerEdgeTop(IEdge) = Kokkos::min(Lyr1, Lyr2);
 
           Lyr1 = LocMaxLayerCell(ICell1) == -1 ? 0 : LocMinLayerCell(ICell1);
@@ -597,6 +606,11 @@ void VertCoord::minMaxLayerEdge() {
           LocMaxLayerEdgeBot(IEdge) =
               Kokkos::max(LocMaxLayerCell(ICell1), LocMaxLayerCell(ICell2));
        });
+
+   MeshHalo->exchangeFullArrayHalo(MinLayerEdgeTop, OnEdge);
+   MeshHalo->exchangeFullArrayHalo(MinLayerEdgeBot, OnEdge);
+   MeshHalo->exchangeFullArrayHalo(MaxLayerEdgeTop, OnEdge);
+   MeshHalo->exchangeFullArrayHalo(MaxLayerEdgeBot, OnEdge);
 
    OMEGA_SCOPE(LocNEdgesAll, NEdgesAll);
    parallelFor(
@@ -616,7 +630,7 @@ void VertCoord::minMaxLayerEdge() {
 //------------------------------------------------------------------------------
 // Compute min and max layer indices for vertices based on MinLayerCell and
 // MaxLayerCell
-void VertCoord::minMaxLayerVertex() {
+void VertCoord::minMaxLayerVertex(Halo *MeshHalo) {
 
    MinLayerVertexTop = Array1DI4("MinLayerVertexTop", NVerticesSize);
    MinLayerVertexBot = Array1DI4("MinLayerVertexBot", NVerticesSize);
@@ -634,7 +648,7 @@ void VertCoord::minMaxLayerVertex() {
    OMEGA_SCOPE(LocMaxLayerVertexBot, MaxLayerVertexBot);
 
    parallelFor(
-       {NVerticesAll}, KOKKOS_LAMBDA(int IVertex) {
+       {NVerticesOwned}, KOKKOS_LAMBDA(int IVertex) {
           I4 Lyr;
           I4 ICell = LocCellsOnVertex(IVertex, 0);
           Lyr      = LocMaxLayerCell(ICell) == -1 ? 0 : LocMinLayerCell(ICell);
@@ -674,6 +688,12 @@ void VertCoord::minMaxLayerVertex() {
                  LocMaxLayerVertexTop(IVertex), LocMaxLayerCell(ICell));
           }
        });
+
+   MeshHalo->exchangeFullArrayHalo(MinLayerVertexTop, OnVertex);
+   MeshHalo->exchangeFullArrayHalo(MinLayerVertexBot, OnVertex);
+   MeshHalo->exchangeFullArrayHalo(MaxLayerVertexTop, OnVertex);
+   MeshHalo->exchangeFullArrayHalo(MaxLayerVertexBot, OnVertex);
+
    OMEGA_SCOPE(LocNVerticesAll, NVerticesAll);
    parallelFor(
        {1}, KOKKOS_LAMBDA(const int &) {

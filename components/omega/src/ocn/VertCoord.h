@@ -15,6 +15,7 @@
 #include "DataTypes.h"
 #include "Decomp.h"
 #include "Error.h"
+#include "Halo.h"
 #include "HorzMesh.h"
 #include "Logging.h"
 #include "MachEnv.h"
@@ -61,6 +62,7 @@ class VertCoord {
    /// construct a new vertical coordinate object
    VertCoord(const std::string &Name,  ///< [in] Name for new VertCoord
              const Decomp *MeshDecomp, ///< [in] associated Decomp
+             Halo *MeshHalo,           ///< [in] mesh halo exchanger
              Config *Options,          ///< [in] configuration options
              const bool ReadStream,    ///< [in] logical to read stream
              const int NVertLayers     ///< [in] int to set vertical dim
@@ -170,6 +172,7 @@ class VertCoord {
    static VertCoord *
    create(const std::string &Name,      /// [in] name for new VertCoord
           const Decomp *MeshDecomp,     /// [in] associated Decomp
+          Halo *MeshHalo,               /// [in] mesh halo exchanger
           Config *Options,              /// [in] configuration options
           const bool ReadStream = true, /// [in] optional logical to read stream
           const int NVertLayers = 0 /// [in] optional int to set vertical dim
@@ -197,9 +200,9 @@ class VertCoord {
    static VertCoord *get(std::string name);
 
    // Array initialization methods
-   void setStreamArrays(const bool ReadStream);
-   void minMaxLayerEdge();
-   void minMaxLayerVertex();
+   void setStreamArrays(const bool ReadStream, Halo *MeshHalo);
+   void minMaxLayerEdge(Halo *MeshHalo);
+   void minMaxLayerVertex(Halo *MeshHalo);
    void initMovementWeights();
 
    /// Initialize computational masks

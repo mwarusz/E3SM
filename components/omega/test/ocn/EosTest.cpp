@@ -74,6 +74,9 @@ I4 initEosTest(const std::string &mesh) {
    /// Initialize decomposition
    Decomp::init(mesh);
 
+   /// Initialize Halo
+   Halo::init();
+
    /// Initialize mesh
    HorzMesh::init();
 
@@ -288,6 +291,7 @@ int testEosTeos10Displaced() {
 void finalizeEosTest() {
    VertCoord::clear();
    HorzMesh::clear();
+   Halo::clear();
    Decomp::clear();
    Field::clear();
    Dimension::clear();
