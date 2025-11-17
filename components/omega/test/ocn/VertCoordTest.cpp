@@ -480,28 +480,24 @@ int main(int argc, char *argv[]) {
          Expected  = std::min(-2 * CellID1, -2 * CellID2);
          Real Diff = std::abs(DefVertCoord->MinLayerEdgeTopH(IEdge) - Expected);
          if (Diff > 1e-10) {
-            LOG_INFO("1:{},{},,{}", IEdge, Diff, Expected);
             Err += 1;
          }
          /// MinLayerEdgeBot is the max of the min cell values on edge
          Expected = std::max(-2 * CellID1, -2 * CellID2);
          Diff     = std::abs(DefVertCoord->MinLayerEdgeBotH(IEdge) - Expected);
          if (Diff > 1e-10) {
-            LOG_INFO("2:{},{},,{}", IEdge, Diff, Expected);
             Err += 1;
          }
          /// MaxLayerEdgeTop is the min of the max cell values on edge
          Expected = std::min(2 * CellID1, 2 * CellID2);
          Diff     = std::abs(DefVertCoord->MaxLayerEdgeTopH(IEdge) - Expected);
          if (Diff > 1e-10) {
-            LOG_INFO("3:{},{},,{}", IEdge, Diff, Expected);
             Err += 1;
          }
          /// MaxLayerEdgeBot is the max of the max cell values on edge
          Expected = std::max(2 * CellID1, 2 * CellID2);
          Diff     = std::abs(DefVertCoord->MaxLayerEdgeBotH(IEdge) - Expected);
          if (Diff > 1e-10) {
-            LOG_INFO("4:{},{},,{}", IEdge, Diff, Expected);
             Err += 1;
          }
       }
