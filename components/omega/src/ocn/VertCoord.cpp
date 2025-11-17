@@ -59,7 +59,7 @@ VertCoord::VertCoord(const std::string &Name_, //< [in] Name for new VertCoord
    Error Err; // Error code
 
    // If ReadStream is true, a prescribed value for NVertLayers is not valid
-   if (ReadStream == true and InVertLayers != 0) {
+   if (ReadStream == true and InNVertLayers != 0) {
       ABORT_ERROR("VertCoord: ReadStream is true but a value for NVertLayers "
                   "is explicitly provided, which is not a valid combination");
    }
