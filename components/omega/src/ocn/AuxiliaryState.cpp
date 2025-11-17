@@ -1,5 +1,6 @@
 #include "AuxiliaryState.h"
 #include "Config.h"
+#include "Eos.h"
 #include "Field.h"
 #include "Logging.h"
 #include "Pacer.h"
@@ -18,8 +19,7 @@ static std::string stripDefault(const std::string &Name) {
 // Constructor. Constructs the member auxiliary variables and registers their
 // fields with IOStreams
 AuxiliaryState::AuxiliaryState(const std::string &Name, const HorzMesh *Mesh,
-                               Halo *MeshHalo, const VertCoord *VCoord,
-                               int NTracers)
+                               Halo *MeshHalo, VertCoord *VCoord, int NTracers)
     : Mesh(Mesh), MeshHalo(MeshHalo), VCoord(VCoord), Name(stripDefault(Name)),
       KineticAux(stripDefault(Name), Mesh, VCoord),
       LayerThicknessAux(stripDefault(Name), Mesh, VCoord),
@@ -57,9 +57,55 @@ AuxiliaryState::~AuxiliaryState() {
    FieldGroup::destroy(GroupName);
 }
 
+// Compute the auxiliary variables needed for vertical dynamics
+void AuxiliaryState::computeVertAux(const OceanState *State,
+                                    const Array3DReal &TracerArray,
+                                    int ThickTimeLevel) const {
+
+   Eos *EosInstance = Eos::getInstance();
+
+   if (!EosInstance) {
+      LOG_WARN("Eos has not been initialized. Skipping calculation of vertical "
+               "auxiliary variables");
+      return;
+   }
+
+   // get layer thickness
+   Array2DReal LayerThickCell;
+   State->getLayerThickness(LayerThickCell, ThickTimeLevel);
+
+   // get temperature and salinity
+   I4 ConservTempIdx;
+   I4 AbsSalinityIdx;
+   Tracers::getIndex(ConservTempIdx, "Temperature");
+   Tracers::getIndex(AbsSalinityIdx, "Salinity");
+
+   const auto ConservTemp =
+       Kokkos::subview(TracerArray, ConservTempIdx, Kokkos::ALL, Kokkos::ALL);
+   const auto AbsSalinity =
+       Kokkos::subview(TracerArray, AbsSalinityIdx, Kokkos::ALL, Kokkos::ALL);
+
+   // TODO: compute surface pressure
+   Array1DReal SurfacePressure("SurfacePressure", Mesh->NCellsSize);
+   deepCopy(SurfacePressure, 1e5);
+
+   // compute pressure
+   VCoord->computePressure(LayerThickCell, SurfacePressure);
+
+   // compute specific volume
+   EosInstance->computeSpecVol(ConservTemp, AbsSalinity, VCoord->PressureMid);
+
+   // compute height
+   VCoord->computeZHeight(LayerThickCell, EosInstance->SpecVol);
+}
+
 // Compute the auxiliary variables needed for momentum equation
-void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
-                                   int VelTimeLevel) const {
+void AuxiliaryState::computeMomAux(const OceanState *State,
+                                   const Array3DReal &TracerArray,
+                                   int ThickTimeLevel, int VelTimeLevel) const {
+
+   computeVertAux(State, TracerArray, ThickTimeLevel);
+
    Array2DReal LayerThickCell;
    Array2DReal NormalVelEdge;
    State->getLayerThickness(LayerThickCell, ThickTimeLevel);
@@ -224,7 +270,7 @@ void AuxiliaryState::computeAll(const OceanState *State,
 
    Pacer::start("AuxState:computeAll", 1);
 
-   computeMomAux(State, ThickTimeLevel, VelTimeLevel);
+   computeMomAux(State, TracerArray, ThickTimeLevel, VelTimeLevel);
 
    Pacer::start("AuxState:edgeAuxState4", 2);
    parallelForOuter(
@@ -272,8 +318,7 @@ void AuxiliaryState::computeAll(const OceanState *State,
 // Create a non-default auxiliary state
 AuxiliaryState *AuxiliaryState::create(const std::string &Name,
                                        const HorzMesh *Mesh, Halo *MeshHalo,
-                                       const VertCoord *VCoord,
-                                       const int NTracers) {
+                                       VertCoord *VCoord, const int NTracers) {
    if (AllAuxStates.find(Name) != AllAuxStates.end()) {
       LOG_ERROR("Attempted to create a new AuxiliaryState with name {} but it "
                 "already exists",
@@ -291,9 +336,9 @@ AuxiliaryState *AuxiliaryState::create(const std::string &Name,
 // Create the default auxiliary state. Assumes that HorzMesh, VertCoord and
 // Halo have been initialized.
 void AuxiliaryState::init() {
-   const HorzMesh *DefMesh    = HorzMesh::getDefault();
-   Halo *DefHalo              = Halo::getDefault();
-   const VertCoord *DefVCoord = VertCoord::getDefault();
+   const HorzMesh *DefMesh = HorzMesh::getDefault();
+   Halo *DefHalo           = Halo::getDefault();
+   VertCoord *DefVCoord    = VertCoord::getDefault();
 
    int NTracers = Tracers::getNumTracers();
 
