@@ -302,6 +302,82 @@ class VelocityHyperDiffOnEdge {
    Array1DI4 MaxLayerEdgeTop;
 };
 
+/// Pressure gradient contribution from sloping surfaces
+class PresGradZOnEdge {
+ public:
+   bool Enabled;
+
+   /// constructor declaration
+   PresGradZOnEdge(const HorzMesh *Mesh, const VertCoord *VCoord);
+
+   /// The functor takes edge index, vertical chunk index, and arrays for
+   /// interface height, layer specific volume, layer thickness on edge,
+   /// interface pressure, and outputs tendency array
+   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+                                   const Array2DReal &ZInterface,
+                                   const Array2DReal &SpecVol,
+                                   const Array2DReal &LayerThickEdge,
+                                   const Array2DReal &PressureInterface) const {
+
+      const I4 KStart = chunkStart(KChunk, MinLayerEdgeBot(IEdge));
+      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerEdgeTop(IEdge));
+
+      const I4 ICell0 = CellsOnEdge(IEdge, 0);
+      const I4 ICell1 = CellsOnEdge(IEdge, 1);
+
+      for (int KVec = 0; KVec < KLen; ++KVec) {
+         const I4 K = KStart + KVec;
+
+         // Average SpecVol to vertical interfaces at ICell0 and ICell1
+         const Real SpecVolICell0K =
+             0.5_Real *
+             (SpecVol(ICell0, K) +
+              SpecVol(ICell0, Kokkos::max(K - 1, MinLayerCell(ICell0))));
+         const Real SpecVolICell1K =
+             0.5_Real *
+             (SpecVol(ICell1, K) +
+              SpecVol(ICell1, Kokkos::max(K - 1, MinLayerCell(ICell1))));
+
+         const Real SpecVolICell0KP1 =
+             0.5_Real *
+             (SpecVol(ICell0, K) +
+              SpecVol(ICell0, Kokkos::min(K + 1, MaxLayerCell(ICell0))));
+         const Real SpecVolICell1KP1 =
+             0.5_Real *
+             (SpecVol(ICell1, K) +
+              SpecVol(ICell1, Kokkos::min(K + 1, MaxLayerCell(ICell1))));
+
+         const Real PAlphaEdgeK =
+             0.5_Real * (PressureInterface(ICell1, K) * SpecVolICell1K +
+                         PressureInterface(ICell0, K) * SpecVolICell0K);
+
+         const Real PAlphaEdgeKP1 =
+             0.5_Real * (PressureInterface(ICell1, K + 1) * SpecVolICell1KP1 +
+                         PressureInterface(ICell0, K + 1) * SpecVolICell0KP1);
+
+         const Real InvDcEdge         = 1._Real / DcEdge(IEdge);
+         const Real InvLayerThickEdge = 1._Real / LayerThickEdge(IEdge, K);
+
+         const Real ZGradTerm =
+             -InvDcEdge * InvLayerThickEdge *
+             (PAlphaEdgeK * (ZInterface(ICell1, K) - ZInterface(ICell0, K)) -
+              PAlphaEdgeKP1 *
+                  (ZInterface(ICell1, K + 1) - ZInterface(ICell0, K + 1)));
+
+         Tend(IEdge, K) += EdgeMask(IEdge, K) * ZGradTerm;
+      }
+   }
+
+ private:
+   Array2DI4 CellsOnEdge;
+   Array1DReal DcEdge;
+   Array2DReal EdgeMask;
+   Array1DI4 MinLayerCell;
+   Array1DI4 MaxLayerCell;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
+};
+
 /// Wind forcing
 class WindForcingOnEdge {
  public:
