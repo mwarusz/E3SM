@@ -10,6 +10,7 @@
 
 #include "Tendencies.h"
 #include "CustomTendencyTerms.h"
+#include "Eos.h"
 #include "Error.h"
 #include "Pacer.h"
 #include "Tracers.h"
@@ -164,6 +165,11 @@ void Tendencies::readTendConfig(
       CHECK_ERROR_ABORT(Err, "Tendencies: DivFactor not found in TendConfig");
    }
 
+   Err += TendConfig->get("PresGradZEnable", this->PresGradZ.Enabled);
+
+   CHECK_ERROR_ABORT(Err,
+                     "Tendencies: PresGradZEnable not found in TendConfig");
+
    Err += TendConfig->get("TracerHorzAdvTendencyEnable",
                           this->TracerHorzAdv.Enabled);
    CHECK_ERROR_ABORT(
@@ -224,10 +230,10 @@ Tendencies::Tendencies(const std::string &Name, ///< [in] Name for tendencies
     : Mesh(Mesh), VCoord(VCoord), ThicknessFluxDiv(Mesh, VCoord),
       PotientialVortHAdv(Mesh, VCoord), KEGrad(Mesh, VCoord),
       SSHGrad(Mesh, VCoord), VelocityDiffusion(Mesh, VCoord),
-      VelocityHyperDiff(Mesh, VCoord), WindForcing(Mesh, VCoord),
-      BottomDrag(Mesh, VCoord), TracerHorzAdv(Mesh, VCoord),
-      TracerDiffusion(Mesh, VCoord), TracerHyperDiff(Mesh, VCoord),
-      CustomThicknessTend(InCustomThicknessTend),
+      VelocityHyperDiff(Mesh, VCoord), PresGradZ(Mesh, VCoord),
+      WindForcing(Mesh, VCoord), BottomDrag(Mesh, VCoord),
+      TracerHorzAdv(Mesh, VCoord), TracerDiffusion(Mesh, VCoord),
+      TracerHyperDiff(Mesh, VCoord), CustomThicknessTend(InCustomThicknessTend),
       CustomVelocityTend(InCustomVelocityTend) {
 
    // Tendency arrays
@@ -331,6 +337,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    OMEGA_SCOPE(LocSSHGrad, SSHGrad);
    OMEGA_SCOPE(LocVelocityDiffusion, VelocityDiffusion);
    OMEGA_SCOPE(LocVelocityHyperDiff, VelocityHyperDiff);
+   OMEGA_SCOPE(LocPresGradZ, PresGradZ);
    OMEGA_SCOPE(LocWindForcing, WindForcing);
    OMEGA_SCOPE(LocBottomDrag, BottomDrag);
    OMEGA_SCOPE(MinLayerEdgeBot, VCoord->MinLayerEdgeBot);
@@ -451,10 +458,42 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::stop("Tend:velocityHyperDiff", 2);
    }
 
-   // Compute wind forcing
-   const auto &NormalStressEdge = AuxState->WindForcingAux.NormalStressEdge;
    const auto &MeanLayerThickEdge =
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
+
+   if (LocPresGradZ.Enabled) {
+      Pacer::start("Tend:presGradZ", 2);
+
+      Eos *EosInstance = Eos::getInstance();
+
+      if (!EosInstance) {
+         LOG_WARN("Eos has not been initialized. Skipping calculation of "
+                  "presGradZ tendency");
+      } else {
+
+         const Array2DReal &ZInterface        = VCoord->ZInterface;
+         const Array2DReal &SpecVol           = EosInstance->SpecVol;
+         const Array2DReal &PressureInterface = VCoord->PressureInterface;
+
+         parallelForOuter(
+             {Mesh->NEdgesAll},
+             KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+                const int KMin   = MinLayerEdgeBot(IEdge);
+                const int KMax   = MaxLayerEdgeTop(IEdge);
+                const int KRange = vertRangeChunked(KMin, KMax);
+                parallelForInner(
+                    Team, KRange, INNER_LAMBDA(int KChunk) {
+                       LocPresGradZ(LocNormalVelocityTend, IEdge, KChunk,
+                                    ZInterface, SpecVol, MeanLayerThickEdge,
+                                    PressureInterface);
+                    });
+             });
+         Pacer::stop("Tend:presGradZ", 2);
+      }
+   }
+
+   // Compute wind forcing
+   const auto &NormalStressEdge = AuxState->WindForcingAux.NormalStressEdge;
    if (LocWindForcing.Enabled) {
       Pacer::start("Tend:windForcing", 2);
       parallelForOuter(
