@@ -92,8 +92,27 @@ void AuxiliaryState::computeVertAux(const OceanState *State,
    // compute pressure
    VCoord->computePressure(LayerThickCell, SurfacePressure);
 
+   // convert PressureMid to dbars since that's what Eos expects
+   // TODO: allocating a new array here is slow
+   Array2DReal PressureMidDbar("PressureMidDbar", VCoord->PressureMid.layout());
+   const auto &MinLayerCell = VCoord->MinLayerCell;
+   const auto &MaxLayerCell = VCoord->MaxLayerCell;
+   const auto &PressureMid  = VCoord->PressureMid;
+   parallelForOuter(
+       "convertPresDbar", {Mesh->NCellsAll},
+       KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
+          const int KMin   = MinLayerCell(ICell);
+          const int KMax   = MaxLayerCell(ICell);
+          const int KRange = vertRange(KMin, KMax);
+          parallelForInner(
+              Team, KRange, INNER_LAMBDA(int KChunk) {
+                 const int K               = KMin + KChunk;
+                 PressureMidDbar(ICell, K) = PressureMid(ICell, K) / 1e5;
+              });
+       });
+
    // compute specific volume
-   EosInstance->computeSpecVol(ConservTemp, AbsSalinity, VCoord->PressureMid);
+   EosInstance->computeSpecVol(ConservTemp, AbsSalinity, PressureMidDbar);
 
    // compute height
    VCoord->computeZHeight(LayerThickCell, EosInstance->SpecVol);
