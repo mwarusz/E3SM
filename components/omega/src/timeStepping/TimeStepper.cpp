@@ -8,6 +8,7 @@
 #include "Config.h"
 #include "Error.h"
 #include "ForwardBackwardStepper.h"
+#include "Pacer.h"
 #include "RungeKutta2Stepper.h"
 #include "RungeKutta4Stepper.h"
 
@@ -399,6 +400,7 @@ void TimeStepper::updateThicknessByTend(OceanState *State1, int TimeLevel1,
    OMEGA_SCOPE(MinLayerCell, VCoord->MinLayerCell);
    OMEGA_SCOPE(MaxLayerCell, VCoord->MaxLayerCell);
 
+   Pacer::start("Stepper:updateThickByTend", 2);
    parallelForOuter(
        "updateThickByTend", {Mesh->NCellsAll},
        KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
@@ -414,6 +416,7 @@ void TimeStepper::updateThicknessByTend(OceanState *State1, int TimeLevel1,
                      CoeffSeconds * LayerThickTend(ICell, K);
               });
        });
+   Pacer::stop("Stepper:updateThickByTend", 2);
 }
 
 //------------------------------------------------------------------------------
@@ -434,6 +437,7 @@ void TimeStepper::updateVelocityByTend(OceanState *State1, int TimeLevel1,
    OMEGA_SCOPE(MinLayerEdgeBot, VCoord->MinLayerEdgeBot);
    OMEGA_SCOPE(MaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
 
+   Pacer::start("Stepper:updateVelByTend", 2);
    parallelForOuter(
        "updateVelByTend", {Mesh->NEdgesAll},
        KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
@@ -448,6 +452,7 @@ void TimeStepper::updateVelocityByTend(OceanState *State1, int TimeLevel1,
                                         CoeffSeconds * NormalVelTend(IEdge, K);
               });
        });
+   Pacer::stop("Stepper:updateVelByTend", 2);
 }
 
 //------------------------------------------------------------------------------
@@ -481,6 +486,7 @@ void TimeStepper::updateTracersByTend(const Array3DReal &NextTracers,
    R8 CoeffSeconds;
    Coeff.get(CoeffSeconds, TimeUnits::Seconds);
 
+   Pacer::start("Stepper:updateTracersByTend", 2);
    parallelForOuter(
        "updateTracersByTend", {NTracers, Mesh->NCellsAll},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
@@ -496,6 +502,7 @@ void TimeStepper::updateTracersByTend(const Array3DReal &NextTracers,
                      LayerThick1(ICell, K);
               });
        });
+   Pacer::stop("Stepper:updateTracersByTend", 2);
 }
 
 //------------------------------------------------------------------------------
@@ -509,6 +516,7 @@ void TimeStepper::weightTracers(const Array3DReal &NextTracers,
    OMEGA_SCOPE(MinLayerCell, VCoord->MinLayerCell);
    OMEGA_SCOPE(MaxLayerCell, VCoord->MaxLayerCell);
 
+   Pacer::start("Stepper:weightTracers", 2);
    parallelForOuter(
        "weightTracers", {NTracers, Mesh->NCellsAll},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
@@ -522,6 +530,7 @@ void TimeStepper::weightTracers(const Array3DReal &NextTracers,
                      CurTracers(L, ICell, K) * CurThickness(ICell, K);
               });
        });
+   Pacer::stop("Stepper:weightTracers", 2);
 }
 
 //------------------------------------------------------------------------------
@@ -538,6 +547,7 @@ void TimeStepper::accumulateTracersUpdate(const Array3DReal &AccumTracer,
    R8 CoeffSeconds;
    Coeff.get(CoeffSeconds, TimeUnits::Seconds);
 
+   Pacer::start("Stepper:accumulateTracersUpdate", 2);
    parallelForOuter(
        "accumulateTracersUpdate", {NTracers, Mesh->NCellsAll},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
@@ -551,6 +561,7 @@ void TimeStepper::accumulateTracersUpdate(const Array3DReal &AccumTracer,
                      CoeffSeconds * TracerTend(L, ICell, K);
               });
        });
+   Pacer::stop("Stepper:accumulateTracersUpdate", 2);
 }
 
 //------------------------------------------------------------------------------
@@ -564,6 +575,7 @@ void TimeStepper::finalizeTracersUpdate(const Array3DReal &NextTracers,
    OMEGA_SCOPE(MinLayerCell, VCoord->MinLayerCell);
    OMEGA_SCOPE(MaxLayerCell, VCoord->MaxLayerCell);
 
+   Pacer::start("Stepper:finalizeTracersUpdate", 2);
    parallelForOuter(
        "finalizeTracersUpdate", {NTracers, Mesh->NCellsAll},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
@@ -576,6 +588,7 @@ void TimeStepper::finalizeTracersUpdate(const Array3DReal &NextTracers,
                  NextTracers(L, ICell, K) /= NextThick(ICell, K);
               });
        });
+   Pacer::stop("Stepper:finalizeTracersUpdate", 2);
 }
 
 } // namespace OMEGA
