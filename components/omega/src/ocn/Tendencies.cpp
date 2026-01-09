@@ -267,6 +267,7 @@ void Tendencies::computeThicknessTendenciesOnly(
 
    Pacer::start("Tend:computeThicknessTendenciesOnly", 1);
 
+   Pacer::start("Tend:zeroThickTend", 2);
    parallelForOuter(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
           const int KMin   = MinLayerCell(ICell);
@@ -279,6 +280,7 @@ void Tendencies::computeThicknessTendenciesOnly(
                  LocLayerThicknessTend(ICell, K) = 0;
               });
        });
+   Pacer::stop("Tend:zeroThickTend", 2);
 
    // Compute thickness flux divergence
    const Array2DReal &ThickFluxEdge =
@@ -335,6 +337,7 @@ void Tendencies::computeVelocityTendenciesOnly(
 
    Pacer::start("Tend:computeVelocityTendenciesOnly", 1);
 
+   Pacer::start("Tend:zeroVelocityTend", 2);
    parallelForOuter(
        {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
           const int KMin   = MinLayerEdgeBot(IEdge);
@@ -347,6 +350,7 @@ void Tendencies::computeVelocityTendenciesOnly(
                  LocNormalVelocityTend(IEdge, K) = 0;
               });
        });
+   Pacer::stop("Tend:zeroVelocityTend", 2);
 
    const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
 
@@ -507,6 +511,7 @@ void Tendencies::computeTracerTendenciesOnly(
 
    Pacer::start("Tend:computeTracerTendenciesOnly", 1);
 
+   Pacer::start("Tend:zeroTracerTend", 2);
    parallelForOuter(
        {NTracers, Mesh->NCellsAll},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
@@ -519,6 +524,7 @@ void Tendencies::computeTracerTendenciesOnly(
                  LocTracerTend(L, ICell, K) = 0;
               });
        });
+   Pacer::stop("Tend:zeroTracerTend", 2);
 
    // compute tracer horizotal advection
    const Array2DReal &NormalVelEdge = State->NormalVelocity[VelTimeLevel];
