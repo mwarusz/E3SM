@@ -73,11 +73,20 @@ template <class T> struct ArrayRank {
 using ExecSpace       = MemSpace::execution_space;
 using HostExecSpace   = HostMemSpace::execution_space;
 using TeamPolicy      = Kokkos::TeamPolicy<ExecSpace>;
-using TeamMember      = TeamPolicy::member_type;
 using ScratchMemSpace = ExecSpace::scratch_memory_space;
 using Kokkos::MemoryUnmanaged;
 using Kokkos::PerTeam;
 using Kokkos::TeamThreadRange;
+
+using KokkosMember = TeamPolicy::member_type;
+struct TeamMember {
+   const KokkosMember &KokkosTeam;
+};
+
+template <class F>
+KOKKOS_INLINE_FUNCTION void singlePerTeam(const TeamMember &Team, F &&f) {
+   Kokkos::single(Kokkos::PerTeam(Team.KokkosTeam), std::forward<F>(f));
+}
 
 /// team_size for hierarchical parallelism
 #ifdef OMEGA_TARGET_DEVICE
@@ -315,7 +324,7 @@ inline void parallelReduce(const int (&UpperBounds)[N], F &&Functor,
 // #define INNER_LAMBDA [&]
 
 KOKKOS_INLINE_FUNCTION void teamBarrier(const TeamMember &Team) {
-   Team.team_barrier();
+   Team.KokkosTeam.team_barrier();
 }
 
 // parallelForOuter: with label
@@ -331,9 +340,10 @@ inline void parallelForOuter(const std::string &Label,
 
    auto Policy = TeamPolicy(LinBound, OMEGA_TEAMSIZE);
    Kokkos::parallel_for(
-       Label, Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
-          const int TeamId = Team.league_rank();
-          LinFunctor(TeamId, Team);
+       Label, Policy, KOKKOS_LAMBDA(const KokkosMember &Team) {
+          const int TeamId     = Team.league_rank();
+          const auto OmegaTeam = TeamMember{Team};
+          LinFunctor(TeamId, OmegaTeam);
        });
 }
 
@@ -347,7 +357,7 @@ inline void parallelForOuter(const int (&UpperBounds)[N], F &&Functor) {
 template <class F>
 KOKKOS_FUNCTION void parallelForInner(const TeamMember &Team, int UpperBound,
                                       F &&Functor) {
-   const auto Policy = TeamThreadRange(Team, UpperBound);
+   const auto Policy = TeamThreadRange(Team.KokkosTeam, UpperBound);
    Kokkos::parallel_for(Policy, std::forward<F>(Functor));
 }
 
@@ -385,10 +395,11 @@ inline void parallelReduceOuter(const std::string &Label,
    auto Policy = TeamPolicy(LinBound, OMEGA_TEAMSIZE);
    Kokkos::parallel_reduce(
        Label, Policy,
-       KOKKOS_LAMBDA(const TeamMember &Team,
+       KOKKOS_LAMBDA(const KokkosMember &Team,
                      AccumType<std::remove_reference_t<R>> &...Accums) {
-          const int TeamId = Team.league_rank();
-          LinFunctor(TeamId, Team, Accums...);
+          const int TeamId     = Team.league_rank();
+          const auto OmegaTeam = TeamMember{Team};
+          LinFunctor(TeamId, OmegaTeam, Accums...);
        },
        std::forward<R>(Reducers)...);
 }
@@ -405,7 +416,7 @@ inline void parallelReduceOuter(const int (&UpperBounds)[N], F &&Functor,
 template <class F, class... R>
 KOKKOS_FUNCTION void parallelReduceInner(const TeamMember &Team, int UpperBound,
                                          F &&Functor, R &&...Reducers) {
-   const auto Policy = TeamThreadRange(Team, UpperBound);
+   const auto Policy = TeamThreadRange(Team.KokkosTeam, UpperBound);
    Kokkos::parallel_reduce(Policy, std::forward<F>(Functor),
                            std::forward<R>(Reducers)...);
 }
@@ -414,7 +425,7 @@ KOKKOS_FUNCTION void parallelReduceInner(const TeamMember &Team, int UpperBound,
 template <class F, class... R>
 KOKKOS_FUNCTION void parallelScanInner(const TeamMember &Team, int UpperBound,
                                        F &&Functor, R &&...Reducers) {
-   const auto Policy = TeamThreadRange(Team, UpperBound);
+   const auto Policy = TeamThreadRange(Team.KokkosTeam, UpperBound);
    Kokkos::parallel_scan(Policy, std::forward<F>(Functor),
                          std::forward<R>(Reducers)...);
 }

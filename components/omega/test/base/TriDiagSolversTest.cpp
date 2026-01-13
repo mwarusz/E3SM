@@ -173,7 +173,7 @@ Real runDiffManufactured(int NCells) {
       const Real TimeNext = (Step + 1) * TimeStep;
 
       Kokkos::parallel_for(
-          Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+          Policy, KOKKOS_LAMBDA(const KokkosMember &Member) {
              TriDiagDiffScratch Scratch(Member, NCells);
 
              // Setup the system to be solved
@@ -321,7 +321,7 @@ Real runDiffusionStability(bool UseGeneralSolver, Real DiffValue) {
          TeamPolicy Policy = TriDiagSolver::makeTeamPolicy(1, NCells);
 
          Kokkos::parallel_for(
-             Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+             Policy, KOKKOS_LAMBDA(const KokkosMember &Member) {
                 TriDiagScratch Scratch(Member, NCells);
 
                 // Setup the system to be solved in the form expected by the
@@ -372,7 +372,7 @@ Real runDiffusionStability(bool UseGeneralSolver, Real DiffValue) {
          TeamPolicy Policy = TriDiagDiffSolver::makeTeamPolicy(1, NCells);
 
          Kokkos::parallel_for(
-             Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+             Policy, KOKKOS_LAMBDA(const KokkosMember &Member) {
                 TriDiagDiffScratch Scratch(Member, NCells);
 
                 // Setup the system to be solved in the form expected by the

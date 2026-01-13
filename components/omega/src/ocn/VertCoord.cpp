@@ -830,7 +830,7 @@ void VertCoord::computePressure(
 
    const auto Policy = TeamPolicy(NCellsAll, OMEGA_TEAMSIZE, 1);
    Kokkos::parallel_for(
-       "computePressure", Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+       "computePressure", Policy, KOKKOS_LAMBDA(const KokkosMember &Member) {
           const I4 ICell = Member.league_rank();
           const I4 KMin  = LocMinLayerCell(ICell);
           const I4 KMax  = LocMaxLayerCell(ICell);
@@ -875,7 +875,7 @@ void VertCoord::computeZHeight(
 
    const auto Policy = TeamPolicy(NCellsAll, OMEGA_TEAMSIZE, 1);
    Kokkos::parallel_for(
-       "computeZHeight", Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+       "computeZHeight", Policy, KOKKOS_LAMBDA(const KokkosMember &Member) {
           const I4 ICell = Member.league_rank();
           const I4 KMin  = LocMinLayerCell(ICell);
           const I4 KMax  = LocMaxLayerCell(ICell);
@@ -916,7 +916,7 @@ void VertCoord::computeGeopotential(
 
    Kokkos::parallel_for(
        "computeGeopotential", TeamPolicy(NCellsAll, OMEGA_TEAMSIZE),
-       KOKKOS_LAMBDA(const TeamMember &Member) {
+       KOKKOS_LAMBDA(const KokkosMember &Member) {
           const I4 ICell   = Member.league_rank();
           const I4 KMin    = LocMinLayerCell(ICell);
           const I4 KMax    = LocMaxLayerCell(ICell);
@@ -956,7 +956,7 @@ void VertCoord::computeTargetThickness() {
 
    Kokkos::parallel_for(
        "computeTargetThickness", TeamPolicy(NCellsAll, OMEGA_TEAMSIZE),
-       KOKKOS_LAMBDA(const TeamMember &Member) {
+       KOKKOS_LAMBDA(const KokkosMember &Member) {
           const I4 ICell = Member.league_rank();
           const I4 KMin  = LocMinLayerCell(ICell);
           const I4 KMax  = LocMaxLayerCell(ICell);

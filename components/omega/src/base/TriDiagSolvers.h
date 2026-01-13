@@ -46,7 +46,7 @@ struct TriDiagScratch {
    TriDiagScratchArray X; // rhs on input, contains solution after calling solve
 
    // Constructor takes team member and system size
-   KOKKOS_FUNCTION TriDiagScratch(const TeamMember &Member, int NRow)
+   KOKKOS_FUNCTION TriDiagScratch(const KokkosMember &Member, int NRow)
        : DL(Member.team_scratch(0), NRow), D(Member.team_scratch(0), NRow),
          DU(Member.team_scratch(0), NRow), X(Member.team_scratch(0), NRow) {}
 };
@@ -66,7 +66,7 @@ struct ThomasSolver {
    // Solve the system defined in the scratch data argument `Scratch`
    // This a team-level function that needs to be called inside a
    // parallel loop using TeamPolicy, hence it has a team member argument
-   static void KOKKOS_FUNCTION solve(const TeamMember &Member,
+   static void KOKKOS_FUNCTION solve(const KokkosMember &Member,
                                      const TriDiagScratch &Scratch) {
       const int NRow = Scratch.X.extent_int(0);
 
@@ -103,7 +103,7 @@ struct ThomasSolver {
       TeamPolicy Policy = makeTeamPolicy(NBatch, NRow);
 
       Kokkos::parallel_for(
-          Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+          Policy, KOKKOS_LAMBDA(const KokkosMember &Member) {
              const int IStart = Member.league_rank() * VecLength;
 
              TriDiagScratch Scratch(Member, NRow);
@@ -149,7 +149,7 @@ struct PCRSolver {
    // Solve the system defined in the scratch data argument `Scratch`
    // This a team-level function that needs to be called inside a
    // parallel loop using TeamPolicy, hence it has a team member argument
-   static void KOKKOS_FUNCTION solve(const TeamMember &Member,
+   static void KOKKOS_FUNCTION solve(const KokkosMember &Member,
                                      const TriDiagScratch &Scratch) {
       const int NRow = Scratch.X.extent_int(0);
 
@@ -222,7 +222,7 @@ struct PCRSolver {
       TeamPolicy Policy = makeTeamPolicy(NBatch, NRow);
 
       Kokkos::parallel_for(
-          Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+          Policy, KOKKOS_LAMBDA(const KokkosMember &Member) {
              const int I = Member.league_rank();
              const int K = Member.team_rank();
 
@@ -253,7 +253,7 @@ struct TriDiagDiffScratch {
    TriDiagScratchArray X; // rhs on input, contains solution after calling solve
    TriDiagScratchArray Alpha; // internal workspace
 
-   KOKKOS_FUNCTION TriDiagDiffScratch(const TeamMember &Member, int NRow)
+   KOKKOS_FUNCTION TriDiagDiffScratch(const KokkosMember &Member, int NRow)
        : G(Member.team_scratch(0), NRow), H(Member.team_scratch(0), NRow),
          X(Member.team_scratch(0), NRow), Alpha(Member.team_scratch(0), NRow) {}
 };
@@ -273,7 +273,7 @@ struct ThomasDiffusionSolver {
    // Solve the system defined in the scratch data argument `Scratch`
    // This a team-level function that needs to be called inside a
    // parallel loop using TeamPolicy, hence it has a team member argument
-   static void KOKKOS_FUNCTION solve(const TeamMember &Member,
+   static void KOKKOS_FUNCTION solve(const KokkosMember &Member,
                                      const TriDiagDiffScratch &Scratch) {
       const int NRow = Scratch.X.extent_int(0);
 
@@ -329,7 +329,7 @@ struct ThomasDiffusionSolver {
       TeamPolicy Policy = makeTeamPolicy(NBatch, NRow);
 
       Kokkos::parallel_for(
-          Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+          Policy, KOKKOS_LAMBDA(const KokkosMember &Member) {
              const int IStart = Member.league_rank() * VecLength;
 
              TriDiagDiffScratch Scratch(Member, NRow);
@@ -374,7 +374,7 @@ struct PCRDiffusionSolver {
    // Solve the system defined in the scratch data argument `Scratch`
    // This a team-level function that needs to be called inside a
    // parallel loop using TeamPolicy, hence it has a team member argument
-   static void KOKKOS_FUNCTION solve(const TeamMember &Member,
+   static void KOKKOS_FUNCTION solve(const KokkosMember &Member,
                                      const TriDiagDiffScratch &Scratch) {
       const int NRow = Scratch.X.extent_int(0);
 
@@ -462,7 +462,7 @@ struct PCRDiffusionSolver {
 
       TeamPolicy Policy = makeTeamPolicy(NBatch, NRow);
       Kokkos::parallel_for(
-          Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
+          Policy, KOKKOS_LAMBDA(const KokkosMember &Member) {
              const int I = Member.league_rank();
              const int K = Member.team_rank();
 
