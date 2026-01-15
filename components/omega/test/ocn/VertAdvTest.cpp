@@ -133,7 +133,7 @@ void initVertAdvTest() {
    HorzMesh::init();
 
    // Initialize the default vertical coordinate
-   VertCoord::init(false);
+   VertCoord::init(false, 1024);
 
    // Initialize tracers
    Tracers::init();
