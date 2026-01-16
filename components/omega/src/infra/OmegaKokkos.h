@@ -85,7 +85,7 @@ using Kokkos::PerTeam;
 using Kokkos::TeamThreadRange;
 using Kokkos::ThreadVectorRange;
 
-/// team_size for hierarchical parallelism
+/// Default team and vector sizes for hierarchical parallelism
 #ifdef OMEGA_TARGET_DEVICE
 
 #ifdef KOKKOS_ENABLE_HIP
@@ -109,22 +109,70 @@ constexpr int OMEGA_TEAMSIZE   = 1;
 constexpr int OMEGA_VECTORSIZE = 1;
 #endif
 
+struct TeamConfig {
+   int TeamSize   = OMEGA_TEAMSIZE;
+   int VectorSize = OMEGA_VECTORSIZE;
+
+   TeamConfig() = default;
+   explicit TeamConfig(int TeamSize, int VectorSize)
+       : TeamSize(TeamSize), VectorSize(VectorSize) {}
+};
+
+template <class... T> struct ThreadScratch {
+   size_t BytesPerThread = 0;
+
+   ThreadScratch() = default;
+
+   template <int N> ThreadScratch(const int (&NVals)[N]) {
+      static_assert(N == sizeof...(T));
+      int I = 0;
+      ((BytesPerThread += sizeof(T) * NVals[I++]), ...);
+   }
+
+   ThreadScratch(int NVals) : ThreadScratch({{NVals}}) {}
+};
+
+template <int N> struct LaunchConfig {
+   std::array<int, N> UpperBounds;
+   TeamConfig TeamCfg;
+   size_t ScratchBytesPerThread;
+
+   template <class... T>
+   LaunchConfig(const int (&UpperBoundsIn)[N], const TeamConfig &TeamCfg,
+                const ThreadScratch<T...> &Scratch)
+       : TeamCfg(TeamCfg), ScratchBytesPerThread(Scratch.BytesPerThread) {
+      std::copy(std::begin(UpperBoundsIn), std::end(UpperBoundsIn),
+                std::begin(UpperBounds));
+   }
+
+   template <class... T>
+   LaunchConfig(const int (&UpperBounds)[N], const ThreadScratch<T...> &Scratch)
+       : LaunchConfig(UpperBounds, TeamConfig{}, Scratch) {}
+
+   LaunchConfig(const int (&UpperBounds)[N], const TeamConfig &TeamCfg)
+       : LaunchConfig(UpperBounds, TeamCfg, ThreadScratch<>{}) {}
+
+   LaunchConfig(const int (&UpperBounds)[N])
+       : LaunchConfig(UpperBounds, TeamConfig{}, ThreadScratch<>{}) {}
+};
+
 // Takes a functor that uses multidimensional indexing
 // and converts it into one that also accepts linear index
 template <class F, int Rank> struct LinearIdxWrapper : F {
    static_assert(Rank >= 1 && Rank <= 5, "LinearIdxWrapper supports ranks 1-5");
    using F::operator();
 
-   LinearIdxWrapper(F &&Functor, const int (&Bounds)[Rank])
-       : F(std::move(Functor)) {
-      computeStrides(Bounds);
+   template <class Array>
+   LinearIdxWrapper(F &&Functor, Array &&Bounds) : F(std::move(Functor)) {
+      computeStrides(std::forward<Array>(Bounds));
    }
 
-   LinearIdxWrapper(const F &Functor, const int (&Bounds)[Rank]) : F(Functor) {
-      computeStrides(Bounds);
+   template <class Array>
+   LinearIdxWrapper(const F &Functor, Array &&Bounds) : F(Functor) {
+      computeStrides(std::forward<Array>(Bounds));
    }
 
-   void computeStrides(const int (&Bounds)[Rank]) {
+   template <class Array> void computeStrides(Array &&Bounds) {
       if constexpr (Rank > 1) {
          Strides[Rank - 2] = Bounds[Rank - 1];
          for (int I = Rank - 3; I >= 0; --I) {
@@ -189,6 +237,11 @@ template <class F, int Rank> struct LinearIdxWrapper : F {
    int Strides[Rank - 1];
 #endif
 };
+
+template <class F, int Rank>
+LinearIdxWrapper(F, const int (&)[Rank]) -> LinearIdxWrapper<F, Rank>;
+template <class F, size_t Rank>
+LinearIdxWrapper(F, std::array<int, Rank>) -> LinearIdxWrapper<F, Rank>;
 
 template <typename V>
 auto createHostMirrorCopy(const V &View)
@@ -340,49 +393,60 @@ inline void parallelReduce(const int (&UpperBounds)[N], F &&Functor,
 // parallelForOuter: with label
 template <int N, class F>
 inline void parallelForOuter(const std::string &Label,
-                             const int (&UpperBounds)[N], F &&Functor) {
+                             const LaunchConfig<N> &Config, F &&Functor) {
 
-   auto LinFunctor = LinearIdxWrapper{std::forward<F>(Functor), UpperBounds};
-   int LinBound    = 1;
+   auto LinFunctor =
+       LinearIdxWrapper{std::forward<F>(Functor), Config.UpperBounds};
+   int LinBound = 1;
    for (int Rank = 0; Rank < N; ++Rank) {
-      LinBound *= UpperBounds[Rank];
+      LinBound *= Config.UpperBounds[Rank];
    }
 
-   const int NTeams = (LinBound + OMEGA_TEAMSIZE - 1) / OMEGA_TEAMSIZE;
-   auto Policy      = TeamPolicy(NTeams, OMEGA_TEAMSIZE, OMEGA_VECTORSIZE);
+   const int TeamSize   = Config.TeamCfg.TeamSize;
+   const int VectorSize = Config.TeamCfg.VectorSize;
+
+   const int NTeams = (LinBound + TeamSize - 1) / TeamSize;
+
+   auto Policy = TeamPolicy(NTeams, TeamSize, VectorSize);
+
+   if (Config.ScratchBytesPerThread > 0) {
+      Policy.set_scratch_size(0,
+                              Kokkos::PerThread(Config.ScratchBytesPerThread));
+   }
+
    Kokkos::parallel_for(
        Label, Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
           const int TeamId   = Team.league_rank();
           const int ThreadId = Team.team_rank();
-          const int Id       = TeamId * OMEGA_TEAMSIZE + ThreadId;
+          const int Id       = TeamId * TeamSize + ThreadId;
           if (Id < LinBound) {
              LinFunctor(Id, Team);
           }
        });
 }
 
-// parallelForOuter: without label
+// parallelForOuter: with label and with array bounds
 template <int N, class F>
-inline void parallelForOuter(const int (&UpperBounds)[N], F &&Functor) {
-   parallelForOuter("", UpperBounds, std::forward<F>(Functor));
+inline void parallelForOuter(const std::string &Label,
+                             const int (&UpperBounds)[N], F &&Functor) {
+   parallelForOuter(Label, LaunchConfig(UpperBounds), std::forward<F>(Functor));
 }
 
-// parallelForInner
-template <class F>
-KOKKOS_FUNCTION void parallelForInner(const TeamMember &Team, int UpperBound,
-                                      F &&Functor) {
-   if constexpr (OMEGA_VECTORSIZE == 1) {
-      const auto Policy = TeamThreadRange(Team, UpperBound);
-      Kokkos::parallel_for(Policy, std::forward<F>(Functor));
-   } else {
-      const auto Policy = ThreadVectorRange(Team, UpperBound);
-      Kokkos::parallel_for(Policy, std::forward<F>(Functor));
-   }
+// parallelForOuter: without label and with launch config
+template <int N, class F>
+inline void parallelForOuter(const LaunchConfig<N> &Config, F &&Functor) {
+   parallelForOuter("", Config, std::forward<F>(Functor));
+}
+
+// parallelForOuter: without label and with array bounds
+template <int N, class F>
+inline void parallelForOuter(const int (&UpperBounds)[N], F &&Functor) {
+   parallelForOuter("", LaunchConfig(UpperBounds), std::forward<F>(Functor));
 }
 
 template <int N, class F, class... R>
 inline void parallelReduceOuterImpl(const std::string &Label,
-                                    const int (&UpperBounds)[N], F &&Functor,
+                                    const LaunchConfig<N> &Config, F &&Functor,
                                     R &&...Reducers) {
 #ifdef KOKKOS_ENABLE_CUDA
    using cuda::std::apply;
@@ -392,14 +456,25 @@ inline void parallelReduceOuterImpl(const std::string &Label,
    using std::tuple;
 #endif
 
-   auto LinFunctor = LinearIdxWrapper{std::forward<F>(Functor), UpperBounds};
-   int LinBound    = 1;
+   auto LinFunctor =
+       LinearIdxWrapper{std::forward<F>(Functor), Config.UpperBounds};
+   int LinBound = 1;
    for (int Rank = 0; Rank < N; ++Rank) {
-      LinBound *= UpperBounds[Rank];
+      LinBound *= Config.UpperBounds[Rank];
    }
 
-   const int NTeams = (LinBound + OMEGA_TEAMSIZE - 1) / OMEGA_TEAMSIZE;
-   auto Policy      = TeamPolicy(NTeams, OMEGA_TEAMSIZE, OMEGA_VECTORSIZE);
+   const int TeamSize   = Config.TeamCfg.TeamSize;
+   const int VectorSize = Config.TeamCfg.VectorSize;
+
+   const int NTeams = (LinBound + TeamSize - 1) / TeamSize;
+
+   auto Policy = TeamPolicy(NTeams, TeamSize, VectorSize);
+
+   if (Config.ScratchBytesPerThread > 0) {
+      Policy.set_scratch_size(0,
+                              Kokkos::PerThread(Config.ScratchBytesPerThread));
+   }
+
    Kokkos::parallel_reduce(
        Label, Policy,
        KOKKOS_LAMBDA(
@@ -419,7 +494,7 @@ inline void parallelReduceOuterImpl(const std::string &Label,
           apply(
               [&](auto &...TeamReducers) {
                  Kokkos::parallel_reduce(
-                     TeamThreadRange(Team, OMEGA_TEAMSIZE),
+                     TeamThreadRange(Team, TeamSize),
                      INNER_LAMBDA(int ThreadId, auto &...ThreadAccums) {
                         const int Id = TeamId * OMEGA_TEAMSIZE + ThreadId;
 
@@ -453,21 +528,47 @@ template <class T> auto forwardReductionArg(T &&arg) {
    }
 }
 
-// parallelReduceOuter: with label
+// parallelReduceOuter: with label and with launch config
+template <int N, class F, class... R>
+inline void parallelReduceOuter(const std::string &Label,
+                                const LaunchConfig<N> &Config, F &&Functor,
+                                R &&...Reducers) {
+   parallelReduceOuterImpl(Label, Config, std::forward<F>(Functor),
+                           forwardReductionArg(Reducers)...);
+}
+
+// parallelReduceOuter: with label and with array bounds
 template <int N, class F, class... R>
 inline void parallelReduceOuter(const std::string &Label,
                                 const int (&UpperBounds)[N], F &&Functor,
                                 R &&...Reducers) {
-   parallelReduceOuterImpl(Label, UpperBounds, std::forward<F>(Functor),
+   parallelReduceOuterImpl(Label, LaunchConfig(UpperBounds),
+                           std::forward<F>(Functor),
                            forwardReductionArg(Reducers)...);
 }
 
-// parallelReduceOuter: without label
+// parallelReduceOuter: without label and with launch config
+template <int N, class F, class... R>
+inline void parallelReduceOuter(const LaunchConfig<N> &Config, F &&Functor,
+                                R &&...Reducers) {
+   parallelReduceOuter("", Config, std::forward<F>(Functor),
+                       std::forward<R>(Reducers)...);
+}
+
+// parallelReduceOuter: without label and with array bounds
 template <int N, class F, class... R>
 inline void parallelReduceOuter(const int (&UpperBounds)[N], F &&Functor,
                                 R &&...Reducers) {
    parallelReduceOuter("", UpperBounds, std::forward<F>(Functor),
                        std::forward<R>(Reducers)...);
+}
+
+// parallelForInner
+template <class F>
+KOKKOS_FUNCTION void parallelForInner(const TeamMember &Team, int UpperBound,
+                                      F &&Functor) {
+   const auto Policy = ThreadVectorRange(Team, UpperBound);
+   Kokkos::parallel_for(Policy, std::forward<F>(Functor));
 }
 
 // parallelReduceInner
