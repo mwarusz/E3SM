@@ -118,6 +118,9 @@ struct TeamConfig {
        : TeamSize(TeamSize), VectorSize(VectorSize) {}
 };
 
+TeamConfig defaultTeamConfig();
+void readKokkosConfig();
+
 template <class... T> struct ThreadScratch {
    size_t BytesPerThread = 0;
 
@@ -147,13 +150,13 @@ template <int N> struct LaunchConfig {
 
    template <class... T>
    LaunchConfig(const int (&UpperBounds)[N], const ThreadScratch<T...> &Scratch)
-       : LaunchConfig(UpperBounds, TeamConfig{}, Scratch) {}
+       : LaunchConfig(UpperBounds, defaultTeamConfig(), Scratch) {}
 
    LaunchConfig(const int (&UpperBounds)[N], const TeamConfig &TeamCfg)
        : LaunchConfig(UpperBounds, TeamCfg, ThreadScratch<>{}) {}
 
    LaunchConfig(const int (&UpperBounds)[N])
-       : LaunchConfig(UpperBounds, TeamConfig{}, ThreadScratch<>{}) {}
+       : LaunchConfig(UpperBounds, defaultTeamConfig(), ThreadScratch<>{}) {}
 };
 
 // Takes a functor that uses multidimensional indexing
@@ -496,7 +499,7 @@ inline void parallelReduceOuterImpl(const std::string &Label,
                  Kokkos::parallel_reduce(
                      TeamThreadRange(Team, Team.team_size()),
                      INNER_LAMBDA(int ThreadId, auto &...ThreadAccums) {
-                        const int Id = TeamId * OMEGA_TEAMSIZE + ThreadId;
+                        const int Id = TeamId * Team.team_size() + ThreadId;
 
                         if (Id < LinBound) {
                            LinFunctor(Id, Team, ThreadAccums...);

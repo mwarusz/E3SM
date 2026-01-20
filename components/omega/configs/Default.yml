@@ -1,4 +1,7 @@
 Omega:
+  Kokkos:
+    TeamSize: Auto
+    VectorSize: Auto
   Timing:
     Level: 2
     AutoFence: true

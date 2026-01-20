@@ -21,6 +21,7 @@
 #include "MachEnv.h"
 #include "OceanDriver.h"
 #include "OceanState.h"
+#include "OmegaKokkos.h"
 #include "Pacer.h"
 #include "Tendencies.h"
 #include "TimeMgr.h"
@@ -92,6 +93,10 @@ int ocnInit(MPI_Comm Comm ///< [in] ocean MPI communicator
    Config::readAll("omega.yml");
    Config *OmegaConfig = Config::getOmegaConfig();
 
+   // Read Kokkos team config
+   readKokkosConfig();
+
+   // Read timing configuration
    readTimingConfig();
 
    // initialize remaining Omega modules
