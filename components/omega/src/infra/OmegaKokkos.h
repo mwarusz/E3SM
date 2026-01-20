@@ -418,7 +418,7 @@ inline void parallelForOuter(const std::string &Label,
        Label, Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
           const int TeamId   = Team.league_rank();
           const int ThreadId = Team.team_rank();
-          const int Id       = TeamId * TeamSize + ThreadId;
+          const int Id       = TeamId * Team.team_size() + ThreadId;
           if (Id < LinBound) {
              LinFunctor(Id, Team);
           }
@@ -494,7 +494,7 @@ inline void parallelReduceOuterImpl(const std::string &Label,
           apply(
               [&](auto &...TeamReducers) {
                  Kokkos::parallel_reduce(
-                     TeamThreadRange(Team, TeamSize),
+                     TeamThreadRange(Team, Team.team_size()),
                      INNER_LAMBDA(int ThreadId, auto &...ThreadAccums) {
                         const int Id = TeamId * OMEGA_TEAMSIZE + ThreadId;
 
