@@ -118,7 +118,10 @@ struct TeamConfig {
        : TeamSize(TeamSize), VectorSize(VectorSize) {}
 };
 
-TeamConfig defaultTeamConfig();
+inline TeamConfig &defaultTeamConfig() {
+   static TeamConfig DefaultTeamCfg{};
+   return DefaultTeamCfg;
+}
 void readKokkosConfig();
 
 template <class... T> struct ThreadScratch {

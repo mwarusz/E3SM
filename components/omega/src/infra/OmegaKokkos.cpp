@@ -6,10 +6,6 @@
 
 namespace OMEGA {
 
-static TeamConfig DefaultTeamCfg{};
-
-TeamConfig defaultTeamConfig() { return DefaultTeamCfg; }
-
 void readKokkosConfig() {
    Error Err;
 
@@ -27,11 +23,11 @@ void readKokkosConfig() {
    CHECK_ERROR_ABORT(Err, "OmegaKokkos: VectorSize not found in KokkosConfig");
 
    if (TeamSizeStr != "Auto") {
-      DefaultTeamCfg.TeamSize = std::atoi(TeamSizeStr.c_str());
+      defaultTeamConfig().TeamSize = std::atoi(TeamSizeStr.c_str());
    }
 
    if (VectorSizeStr != "Auto") {
-      DefaultTeamCfg.VectorSize = std::atoi(VectorSizeStr.c_str());
+      defaultTeamConfig().VectorSize = std::atoi(VectorSizeStr.c_str());
    }
 }
 
