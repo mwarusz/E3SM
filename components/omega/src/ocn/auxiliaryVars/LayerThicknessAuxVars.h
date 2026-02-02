@@ -16,7 +16,7 @@ class LayerThicknessAuxVars {
  public:
    Array2DReal FluxLayerThickEdge;
    Array2DReal MeanLayerThickEdge;
-   Array2DReal SshCell;
+   Array1DReal SshCell;
 
    FluxThickEdgeOption FluxThickEdgeChoice;
 
@@ -64,17 +64,32 @@ class LayerThicknessAuxVars {
    }
 
    KOKKOS_FUNCTION void
-   computeVarsOnCells(int ICell, int KChunk,
+   computeVarsOnCells(const TeamMember &Team, int ICell,
                       const Array2DReal &LayerThickCell) const {
 
       // Temporary for stacked shallow water
-      const int KStart = chunkStart(KChunk, MinLayerCell(ICell));
-      const int KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      // const int KStart = chunkStart(KChunk, MinLayerCell(ICell));
+      // const int KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const int K       = KStart + KVec;
-         SshCell(ICell, K) = LayerThickCell(ICell, K) - BottomDepth(ICell);
-      }
+      // for (int KVec = 0; KVec < KLen; ++KVec) {
+      //    const int K       = KStart + KVec;
+      //    SshCell(ICell, K) = LayerThickCell(ICell, K) - BottomDepth(ICell);
+      // }
+
+      const int KMin   = MinLayerCell(ICell);
+      const int KMax   = MaxLayerCell(ICell);
+      const int KRange = vertRange(KMin, KMax);
+
+      Real TotalThickness;
+      parallelReduceInner(
+          Team, KRange,
+          INNER_LAMBDA(int KOff, Real &Accum) {
+             const int K = KMin + KOff;
+             Accum += LayerThickCell(ICell, K);
+          },
+          TotalThickness);
+
+      SshCell(ICell) = TotalThickness - BottomDepth(ICell);
 
       /*
       Real TotalThickness = 0.0;

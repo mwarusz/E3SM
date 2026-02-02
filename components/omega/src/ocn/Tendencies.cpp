@@ -393,7 +393,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    }
 
    // Compute sea surface height gradient
-   const Array2DReal &SSHCell = AuxState->LayerThicknessAux.SshCell;
+   const Array1DReal &SSHCell = AuxState->LayerThicknessAux.SshCell;
    if (LocSSHGrad.Enabled) {
       Pacer::start("Tend:SSHGrad", 2);
       parallelForOuter(

@@ -190,15 +190,7 @@ void AuxiliaryState::computeMomAux(const OceanState *State, int ThickTimeLevel,
    parallelForOuter(
        "cellAuxState3", {Mesh->NCellsAll},
        KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-          const int KMin   = MinLayerCell(ICell);
-          const int KMax   = MaxLayerCell(ICell);
-          const int KRange = vertRangeChunked(KMin, KMax);
-
-          parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 LocLayerThicknessAux.computeVarsOnCells(ICell, KChunk,
-                                                         LayerThickCell);
-              });
+          LocLayerThicknessAux.computeVarsOnCells(Team, ICell, LayerThickCell);
        });
    Pacer::stop("AuxState:cellAuxState3", 2);
 

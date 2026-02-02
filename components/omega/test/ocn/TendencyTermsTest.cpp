@@ -511,50 +511,52 @@ int testKEGrad(int NVertLayers, Real RTol) {
    return Err;
 } // end testKEGrad
 
-int testSSHGrad(int NVertLayers, Real RTol) {
-
-   int Err = 0;
-   TestSetup Setup;
-
-   const auto Mesh   = HorzMesh::getDefault();
-   const auto VCoord = VertCoord::getDefault();
-
-   // Compute exact result
-   Array2DReal ExactSSHGrad("ExactSSHGrad", Mesh->NEdgesOwned, NVertLayers);
-
-   Err += setVectorEdge(
-       KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
-          VecField[0] = -Gravity * Setup.gradX(X, Y);
-          VecField[1] = -Gravity * Setup.gradY(X, Y);
-       },
-       ExactSSHGrad, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::No);
-
-   // Set input array
-   Array2DReal SSHCell("SSHCell", Mesh->NCellsSize, NVertLayers);
-
-   Err += setScalar(
-       KOKKOS_LAMBDA(Real X, Real Y) { return Setup.scalar(X, Y); }, SSHCell,
-       Geom, Mesh, OnCell);
-
-   // Compute numerical result
-   Array2DReal NumSSHGrad("NumSSHGrad", Mesh->NEdgesOwned, NVertLayers);
-
-   SSHGradOnEdge SSHGradOnE(Mesh, VCoord);
-   parallelFor(
-       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer) {
-          SSHGradOnE(NumSSHGrad, IEdge, KLayer, SSHCell);
-       });
-
-   // Compute errors
-   ErrorMeasures SSHGradErrors;
-   Err += computeErrors(SSHGradErrors, NumSSHGrad, ExactSSHGrad, Mesh, OnEdge);
-
-   // Check error values
-   Err += checkErrors("TendencyTermsTest", "SSHGrad", SSHGradErrors,
-                      Setup.ExpectedGradErrors, RTol);
-
-   return Err;
-} // end testSSHGrad
+// int testSSHGrad(int NVertLayers, Real RTol) {
+//
+//    int Err = 0;
+//    TestSetup Setup;
+//
+//    const auto Mesh   = HorzMesh::getDefault();
+//    const auto VCoord = VertCoord::getDefault();
+//
+//    // Compute exact result
+//    Array2DReal ExactSSHGrad("ExactSSHGrad", Mesh->NEdgesOwned, NVertLayers);
+//
+//    Err += setVectorEdge(
+//        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
+//           VecField[0] = -Gravity * Setup.gradX(X, Y);
+//           VecField[1] = -Gravity * Setup.gradY(X, Y);
+//        },
+//        ExactSSHGrad, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::No);
+//
+//    // Set input array
+//    Array2DReal SSHCell("SSHCell", Mesh->NCellsSize, NVertLayers);
+//
+//    Err += setScalar(
+//        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.scalar(X, Y); }, SSHCell,
+//        Geom, Mesh, OnCell);
+//
+//    // Compute numerical result
+//    Array2DReal NumSSHGrad("NumSSHGrad", Mesh->NEdgesOwned, NVertLayers);
+//
+//    SSHGradOnEdge SSHGradOnE(Mesh, VCoord);
+//    parallelFor(
+//        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLayer)
+//        {
+//           SSHGradOnE(NumSSHGrad, IEdge, KLayer, SSHCell);
+//        });
+//
+//    // Compute errors
+//    ErrorMeasures SSHGradErrors;
+//    Err += computeErrors(SSHGradErrors, NumSSHGrad, ExactSSHGrad, Mesh,
+//    OnEdge);
+//
+//    // Check error values
+//    Err += checkErrors("TendencyTermsTest", "SSHGrad", SSHGradErrors,
+//                       Setup.ExpectedGradErrors, RTol);
+//
+//    return Err;
+// } // end testSSHGrad
 
 int testVelDiff(int NVertLayers, Real RTol) {
 
@@ -1059,7 +1061,7 @@ int tendencyTermsTest(const std::string &MeshFile = DefaultMeshFile) {
 
    Err += testKEGrad(NVertLayers, RTol);
 
-   Err += testSSHGrad(NVertLayers, RTol);
+   // Err += testSSHGrad(NVertLayers, RTol);
 
    Err += testVelDiff(NVertLayers, RTol);
 

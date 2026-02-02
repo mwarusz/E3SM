@@ -12,8 +12,7 @@ LayerThicknessAuxVars::LayerThicknessAuxVars(const std::string &AuxStateSuffix,
                          Mesh->NEdgesSize, VCoord->NVertLayers),
       MeanLayerThickEdge("MeanLayerThickEdge" + AuxStateSuffix,
                          Mesh->NEdgesSize, VCoord->NVertLayers),
-      SshCell("SshCell" + AuxStateSuffix, Mesh->NCellsSize,
-              VCoord->NVertLayers),
+      SshCell("SshCell" + AuxStateSuffix, Mesh->NCellsSize),
       CellsOnEdge(Mesh->CellsOnEdge), BottomDepth(Mesh->BottomDepth),
       MinLayerEdgeBot(VCoord->MinLayerEdgeBot),
       MaxLayerEdgeTop(VCoord->MaxLayerEdgeTop),
@@ -65,7 +64,6 @@ void LayerThicknessAuxVars::registerFields(const std::string &AuxGroupName,
    );
 
    // Sea surface height
-   DimNames[0]       = "NCells" + DimSuffix;
    auto SshCellField = Field::create(
        SshCell.label(),                     // field name
        "sea surface height at cell center", // long Name or description
@@ -74,8 +72,8 @@ void LayerThicknessAuxVars::registerFields(const std::string &AuxGroupName,
        0,                                   // min valid value
        std::numeric_limits<Real>::max(),    // max valid value
        FillValue,                           // scalar for undefined entries
-       NDims,                               // number of dimensions
-       DimNames                             // dimension names
+       1,                                   // number of dimensions
+       {"NCells" + DimSuffix}               // dimension names
    );
 
    // Add fields to Aux field group
@@ -86,7 +84,7 @@ void LayerThicknessAuxVars::registerFields(const std::string &AuxGroupName,
    // Attach field data
    FluxLayerThickEdgeField->attachData<Array2DReal>(FluxLayerThickEdge);
    MeanLayerThickEdgeField->attachData<Array2DReal>(MeanLayerThickEdge);
-   SshCellField->attachData<Array2DReal>(SshCell);
+   SshCellField->attachData<Array1DReal>(SshCell);
 }
 
 void LayerThicknessAuxVars::unregisterFields() const {
