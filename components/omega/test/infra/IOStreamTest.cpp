@@ -171,8 +171,7 @@ int main(int argc, char **argv) {
       // Overwrite salinity array with values associated with global cell
       // ID to test proper indexing of IO
       Array2DReal Test("Test", NCellsSize, NVertLayers);
-      Array2DReal Salt;
-      Err1 = Tracers::getByIndex(Salt, 0, Tracers::IndxSalt);
+      Array2DReal Salt = Tracers::getByIndex(0, Tracers::IndxSalt);
       TestEval("Retrieve Salinity", Err1, ErrRef, Err);
 
       parallelFor(
