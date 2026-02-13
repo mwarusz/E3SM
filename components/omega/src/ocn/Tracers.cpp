@@ -274,7 +274,7 @@ Array3DReal Tracers::getAll(const I4 TimeLevel) {
 Array2DReal Tracers::getByIndex(const I4 TimeLevel, const I4 TracerIndex) {
 
    // Check if tracer index is valid
-   OMEGA_REQUIRE(TracerIndex >= 0 || TracerIndex < NumTracers,
+   OMEGA_REQUIRE(TracerIndex >= 0 && TracerIndex < NumTracers,
                  "Tracers: Tracer index {} is out of range", TracerIndex);
 
    const I4 TimeIndex = getTimeIndex(TimeLevel);
