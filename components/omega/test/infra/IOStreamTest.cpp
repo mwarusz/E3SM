@@ -172,7 +172,6 @@ int main(int argc, char **argv) {
       // ID to test proper indexing of IO
       Array2DReal Test("Test", NCellsSize, NVertLayers);
       Array2DReal Salt = Tracers::getByIndex(0, Tracers::IndxSalt);
-      TestEval("Retrieve Salinity", Err1, ErrRef, Err);
 
       parallelFor(
           {NCellsSize, NVertLayers}, KOKKOS_LAMBDA(int Cell, int K) {
