@@ -828,16 +828,15 @@ void VertCoord::computePressure(
    OMEGA_SCOPE(LocPressInterf, PressureInterface);
    OMEGA_SCOPE(LocPressMid, PressureMid);
 
-   const auto Policy = TeamPolicy(NCellsAll, OMEGA_TEAMSIZE, 1);
-   Kokkos::parallel_for(
-       "computePressure", Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
-          const I4 ICell = Member.league_rank();
+   parallelForOuter(
+       "computePressure", {NCellsAll},
+       KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
           const I4 KMin  = LocMinLayerCell(ICell);
           const I4 KMax  = LocMaxLayerCell(ICell);
           const I4 Range = KMax - KMin + 1;
 
           LocPressInterf(ICell, KMin) = SurfacePressure(ICell);
-          Kokkos::parallel_scan(TeamThreadRange(Member, Range),
+          Kokkos::parallel_scan(TeamThreadRange(Team, Range),
                                 [=](int K, Real &Accum, bool IsFinal) {
                                    const I4 KLyr  = K + KMin;
                                    Real Increment = Gravity * LocRho0 *
@@ -873,17 +872,16 @@ void VertCoord::computeZHeight(
    OMEGA_SCOPE(LocZMid, ZMid);
    OMEGA_SCOPE(LocBotDepth, BottomDepth);
 
-   const auto Policy = TeamPolicy(NCellsAll, OMEGA_TEAMSIZE, 1);
-   Kokkos::parallel_for(
-       "computeZHeight", Policy, KOKKOS_LAMBDA(const TeamMember &Member) {
-          const I4 ICell = Member.league_rank();
+   parallelForOuter(
+       "computeZHeight", {NCellsAll},
+       KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
           const I4 KMin  = LocMinLayerCell(ICell);
           const I4 KMax  = LocMaxLayerCell(ICell);
           const I4 Range = KMax - KMin + 1;
 
           LocZInterf(ICell, KMax + 1) = -LocBotDepth(ICell);
           Kokkos::parallel_scan(
-              TeamThreadRange(Member, Range),
+              TeamThreadRange(Team, Range),
               [=](int K, Real &Accum, bool IsFinal) {
                  const I4 KLyr = KMax - K;
                  Real DZ       = LocRho0 * SpecVol(ICell, KLyr) *
@@ -914,16 +912,15 @@ void VertCoord::computeGeopotential(
    OMEGA_SCOPE(LocGeopotMid, GeopotentialMid);
    OMEGA_SCOPE(LocZMid, ZMid);
 
-   Kokkos::parallel_for(
-       "computeGeopotential", TeamPolicy(NCellsAll, OMEGA_TEAMSIZE),
-       KOKKOS_LAMBDA(const TeamMember &Member) {
-          const I4 ICell   = Member.league_rank();
+   parallelForOuter(
+       "computeGeopotential", {NCellsAll},
+       KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
           const I4 KMin    = LocMinLayerCell(ICell);
           const I4 KMax    = LocMaxLayerCell(ICell);
           const I4 KRange  = KMax - KMin + 1;
           const I4 NChunks = (KRange + VecLength - 1) / VecLength;
           Kokkos::parallel_for(
-              Kokkos::TeamThreadRange(Member, NChunks), [=](const int KChunk) {
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
                  const I4 KStart = KMin + KChunk * VecLength;
                  const I4 KEnd   = KStart + VecLength;
 
@@ -954,10 +951,9 @@ void VertCoord::computeTargetThickness() {
    OMEGA_SCOPE(LocRefLayerThick, RefLayerThickness);
    OMEGA_SCOPE(LocVertCoordMvmtWgts, VertCoordMovementWeights);
 
-   Kokkos::parallel_for(
-       "computeTargetThickness", TeamPolicy(NCellsAll, OMEGA_TEAMSIZE),
-       KOKKOS_LAMBDA(const TeamMember &Member) {
-          const I4 ICell = Member.league_rank();
+   parallelForOuter(
+       "computeTargetThickness", {NCellsAll},
+       KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
           const I4 KMin  = LocMinLayerCell(ICell);
           const I4 KMax  = LocMaxLayerCell(ICell);
 
@@ -968,7 +964,7 @@ void VertCoord::computeTargetThickness() {
           Real SumWh   = 0;
           Real SumRefH = 0;
           Kokkos::parallel_reduce(
-              Kokkos::TeamThreadRange(Member, KMin, KMax + 1),
+              Kokkos::TeamThreadRange(Team, KMin, KMax + 1),
               [=](const int K, Real &LocalWh, Real &LocalSum) {
                  const Real RefLayerThick = LocRefLayerThick(ICell, K);
                  LocalWh += LocVertCoordMvmtWgts(K) * RefLayerThick;
@@ -981,7 +977,7 @@ void VertCoord::computeTargetThickness() {
           const I4 NChunks = (KRange + VecLength - 1) / VecLength;
 
           Kokkos::parallel_for(
-              Kokkos::TeamThreadRange(Member, NChunks), [=](const int KChunk) {
+              Kokkos::TeamThreadRange(Team, NChunks), [=](const int KChunk) {
                  const I4 KStart = KMin + KChunk * VecLength;
                  const I4 KEnd   = KStart + VecLength;
 
