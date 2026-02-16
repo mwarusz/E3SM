@@ -837,7 +837,7 @@ void VertCoord::computePressure(
 
           LocPressInterf(ICell, KMin) = SurfacePressure(ICell);
           parallelScanInner(Team, Range,
-                            [=](int K, Real &Accum, bool IsFinal) {
+                            INNER_LAMBDA(int K, Real &Accum, bool IsFinal) {
                                const I4 KLyr  = K + KMin;
                                Real Increment = Gravity * LocRho0 *
                                                 LayerThickness(ICell, KLyr);
@@ -882,7 +882,7 @@ void VertCoord::computeZHeight(
           LocZInterf(ICell, KMax + 1) = -LocBotDepth(ICell);
           parallelScanInner(
               Team, Range,
-              [=](int K, Real &Accum, bool IsFinal) {
+              INNER_LAMBDA(int K, Real &Accum, bool IsFinal) {
                  const I4 KLyr = KMax - K;
                  Real DZ       = LocRho0 * SpecVol(ICell, KLyr) *
                            LayerThickness(ICell, KLyr);
@@ -919,7 +919,7 @@ void VertCoord::computeGeopotential(
           const I4 KMax    = LocMaxLayerCell(ICell);
           const I4 NChunks = vertRangeChunked(KMin, KMax);
           parallelForInner(
-              Team, NChunks, [=](const int KChunk) {
+              Team, NChunks, INNER_LAMBDA(const int KChunk) {
                  const I4 KStart = KMin + KChunk * VecLength;
                  const I4 KEnd   = KStart + VecLength;
 
@@ -964,7 +964,7 @@ void VertCoord::computeTargetThickness() {
           Real SumRefH = 0;
           parallelReduceInner(
               Team, vertRange(KMin, KMax),
-              [=](const int K, Real &LocalWh, Real &LocalSum) {
+              INNER_LAMBDA(const int K, Real &LocalWh, Real &LocalSum) {
                  const I4 KLyr            = K + KMin;
                  const Real RefLayerThick = LocRefLayerThick(ICell, KLyr);
                  LocalWh += LocVertCoordMvmtWgts(KLyr) * RefLayerThick;
@@ -976,7 +976,7 @@ void VertCoord::computeTargetThickness() {
           const I4 NChunks = vertRangeChunked(KMin, KMax);
 
           parallelForInner(
-              Team, NChunks, [=](const int KChunk) {
+              Team, NChunks, INNER_LAMBDA(const int KChunk) {
                  const I4 KStart = KMin + KChunk * VecLength;
                  const I4 KEnd   = KStart + VecLength;
 
