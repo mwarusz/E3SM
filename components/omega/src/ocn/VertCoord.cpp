@@ -920,11 +920,8 @@ void VertCoord::computeGeopotential(
           const I4 NChunks = vertRangeChunked(KMin, KMax);
           parallelForInner(
               Team, NChunks, INNER_LAMBDA(const int KChunk) {
-                 const I4 KStart = KMin + KChunk * VecLength;
-                 const I4 KEnd   = KStart + VecLength;
-
-                 const I4 KLen =
-                     KEnd > KMax + 1 ? KMax + 1 - KStart : VecLength;
+                 const I4 KStart = chunkStart(KChunk, KMin);
+                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
                  for (int KVec = 0; KVec < KLen; ++KVec) {
                     const I4 K             = KStart + KVec;
                     LocGeopotMid(ICell, K) = Gravity * LocZMid(ICell, K) +
@@ -977,11 +974,8 @@ void VertCoord::computeTargetThickness() {
 
           parallelForInner(
               Team, NChunks, INNER_LAMBDA(const int KChunk) {
-                 const I4 KStart = KMin + KChunk * VecLength;
-                 const I4 KEnd   = KStart + VecLength;
-
-                 const I4 KLen =
-                     KEnd > KMax + 1 ? KMax + 1 - KStart : VecLength;
+                 const I4 KStart = chunkStart(KChunk, KMin);
+                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
                  for (int KVec = 0; KVec < KLen; ++KVec) {
                     const I4 K = KStart + KVec;
                     LocLayerThickTarget(ICell, K) =
