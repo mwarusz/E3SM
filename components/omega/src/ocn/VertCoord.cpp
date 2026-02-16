@@ -963,7 +963,7 @@ void VertCoord::computeTargetThickness() {
           Real SumWh   = 0;
           Real SumRefH = 0;
           parallelReduceInner(
-              Team, KMax - KMin + 1,
+              Team, vertRange(KMin, KMax),
               [=](const int K, Real &LocalWh, Real &LocalSum) {
                  const I4 KLyr            = K + KMin;
                  const Real RefLayerThick = LocRefLayerThick(ICell, KLyr);
