@@ -427,7 +427,7 @@ template <class F>
 KOKKOS_FUNCTION void parallelSearchInner(const TeamMember &Team, int UpperBound,
                                          F &&Functor, int &Idx) {
    static_assert(std::is_same_v<std::invoke_result_t<F, int>, bool>,
-                 "paralleSearchInner requires a functor that takes an int and "
+                 "parallelSearchInner requires a functor that takes an int and "
                  "returns bool");
 
    // There are different implementations for host and device since the
