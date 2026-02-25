@@ -7,10 +7,12 @@
 
 #include "AuxiliaryState.h"
 #include "Decomp.h"
+#include "Eos.h"
 #include "Field.h"
 #include "Halo.h"
 #include "HorzMesh.h"
 #include "IO.h"
+#include "IOStream.h"
 #include "MachEnv.h"
 #include "OceanDriver.h"
 #include "OceanState.h"
@@ -19,8 +21,6 @@
 #include "TimeStepper.h"
 #include "Tracers.h"
 #include "VertCoord.h"
-#include "IOStream.h"
-#include "Eos.h"
 #include "VertMix.h"
 
 namespace OMEGA {
