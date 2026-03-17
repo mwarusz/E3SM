@@ -378,7 +378,8 @@ void VertAdv::computeVerticalVelocity(
 
    // Loop over all cells owned by the task
    parallelForOuter(
-       "computeVerticalVelocity", {NCellsHalo0},
+       "computeVerticalVelocity",
+       LaunchConfig({NCellsHalo0}, TeamScratch<Real>(NVertLayers)),
        KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
           ArrayScratch1DReal DivHU(Team.team_scratch(0), LocNVertLayers);
 
@@ -432,8 +433,7 @@ void VertAdv::computeVerticalVelocity(
                     LocVertVel(ICell, KRev) = Accum;
                  }
               });
-       },
-       NVertLayers);
+       });
 
    // TODO: currently assuming TotalVerticalVelocity = VerticalVelocity, i.e.
    //  purely from divergence of horizontal velocity. Need to add optional
@@ -511,7 +511,8 @@ void VertAdv::computeVelocityVAdvTend(
 
    // Loop over every owned edge
    parallelForOuter(
-       "computeVelocityVAdvTend", {NEdgesOwned},
+       "computeVelocityVAdvTend",
+       LaunchConfig({NEdgesOwned}, TeamScratch<Real>(NVertLayersP1)),
        KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
           const I4 Cell1 = LocCOnE(IEdge, 0);
           const I4 Cell2 = LocCOnE(IEdge, 1);
@@ -566,8 +567,7 @@ void VertAdv::computeVelocityVAdvTend(
                                          (WDuDzEdge(K) + WDuDzEdge(K + 1));
                  }
               });
-       },
-       NVertLayersP1);
+       });
 
 } // end computeVelocityVAdvTend
 
@@ -824,7 +824,9 @@ void VertAdv::computeFCTVAdvTend(
    OMEGA_SCOPE(LocEps, Eps);
 
    parallelForOuter(
-       "computeFCTVAdvTend", {NTracers, NCellsOwned},
+       "computeFCTVAdvTend",
+       LaunchConfig({NTracers, NCellsOwned},
+                    TeamScratch<Real>(5 * NVertLayers + 1)),
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           const I4 KMin = MinLayerCell(ICell);
           const I4 KMax = MaxLayerCell(ICell);
@@ -952,8 +954,7 @@ void VertAdv::computeFCTVAdvTend(
                  }
               });
           // TODO: Monotonicity and diagnostic checks
-       },
-       5 * NVertLayers + 1);
+       });
 
 } // end computeFTCVAdvTend
 
