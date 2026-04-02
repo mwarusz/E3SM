@@ -772,11 +772,8 @@ void VertCoord::setMasks() {
           const I4 KMax = LocMaxLyrEdgeTop(IEdge);
 
           parallelForInner(
-              Team, KMax - KMin + 1, INNER_LAMBDA(int K) {
-                 I4 KLyr = KMin + K;
-
-                 LocEdgeMask(IEdge, KLyr) = 1._Real;
-              });
+              Team, Range{KMin, KMax},
+              INNER_LAMBDA(int K) { LocEdgeMask(IEdge, K) = 1._Real; });
        });
 
    EdgeMaskH = createHostMirrorCopy(EdgeMask);
@@ -795,11 +792,8 @@ void VertCoord::setMasks() {
           const I4 KMax = LocMaxLyrCell(ICell);
 
           parallelForInner(
-              Team, KMax - KMin + 1, INNER_LAMBDA(int K) {
-                 I4 KLyr = KMin + K;
-
-                 LocCellMask(ICell, KLyr) = 1._Real;
-              });
+              Team, Range{KMin, KMax},
+              INNER_LAMBDA(int K) { LocCellMask(ICell, K) = 1._Real; });
        });
 
    CellMaskH = createHostMirrorCopy(CellMask);
@@ -819,11 +813,8 @@ void VertCoord::setMasks() {
           const I4 KMax = LocMaxLyrVrtxBot(IVertex);
 
           parallelForInner(
-              Team, KMax - KMin + 1, INNER_LAMBDA(int K) {
-                 I4 KLyr = KMin + K;
-
-                 LocVrtxMask(IVertex, KLyr) = 1._Real;
-              });
+              Team, Range{KMin, KMax},
+              INNER_LAMBDA(int K) { LocVrtxMask(IVertex, K) = 1._Real; });
        });
 
    VertexMaskH = createHostMirrorCopy(VertexMask);
@@ -872,21 +863,18 @@ void VertCoord::computePressure(
    parallelForOuter(
        "computePressure", {NCellsAll},
        KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-          const I4 KMin   = LocMinLayerCell(ICell);
-          const I4 KMax   = LocMaxLayerCell(ICell);
-          const I4 KRange = vertRange(KMin, KMax);
-
+          const I4 KMin               = LocMinLayerCell(ICell);
+          const I4 KMax               = LocMaxLayerCell(ICell);
           LocPressInterf(ICell, KMin) = SurfacePressure(ICell);
           parallelScanInner(
-              Team, KRange, INNER_LAMBDA(int K, Real &Accum, bool IsFinal) {
-                 const I4 KLyr  = K + KMin;
-                 Real Increment = Gravity * RhoSw * LayerThickness(ICell, KLyr);
+              Team, Range{KMin, KMax}, INNER_LAMBDA(int K, Real &Accum, bool IsFinal) {
+                 Real Increment = Gravity * RhoSw * LayerThickness(ICell, K);
                  Accum += Increment;
 
                  if (IsFinal) {
-                    LocPressInterf(ICell, KLyr + 1) =
+                    LocPressInterf(ICell, K + 1) =
                         SurfacePressure(ICell) + Accum;
-                    LocPressMid(ICell, KLyr) =
+                    LocPressMid(ICell, K) =
                         SurfacePressure(ICell) + Accum - 0.5 * Increment;
                  }
               });
@@ -986,10 +974,8 @@ void VertCoord::computeTargetThickness() {
    parallelForOuter(
        "computeTargetThickness", {NCellsAll},
        KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-          const I4 KMin   = LocMinLayerCell(ICell);
-          const I4 KMax   = LocMaxLayerCell(ICell);
-          const I4 KRange = vertRange(KMin, KMax);
-
+          const I4 KMin = LocMinLayerCell(ICell);
+          const I4 KMax = LocMaxLayerCell(ICell);
           Real Coeff =
               (LocPressInterf(ICell, KMax + 1) - LocPressInterf(ICell, KMin)) /
               (Gravity * RhoSw);
@@ -997,11 +983,10 @@ void VertCoord::computeTargetThickness() {
           Real SumWh   = 0;
           Real SumRefH = 0;
           parallelReduceInner(
-              Team, KRange,
+              Team, Range{KMin, KMax},
               INNER_LAMBDA(const int K, Real &LocalWh, Real &LocalSum) {
-                 const I4 KLyr            = K + KMin;
-                 const Real RefLayerThick = LocRefLayerThick(ICell, KLyr);
-                 LocalWh += LocVertCoordMvmtWgts(KLyr) * RefLayerThick;
+                 const Real RefLayerThick = LocRefLayerThick(ICell, K);
+                 LocalWh += LocVertCoordMvmtWgts(K) * RefLayerThick;
                  LocalSum += RefLayerThick;
               },
               SumWh, SumRefH);
