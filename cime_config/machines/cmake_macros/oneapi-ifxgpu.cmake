@@ -6,12 +6,12 @@ if (compile_threaded)
 endif()
 
 # 'just' -g may lead to linker internal errors and/or huge builds out of quotas
-string(APPEND CMAKE_C_FLAGS         " -fp-model precise")
+string(APPEND CMAKE_C_FLAGS         " -g -fp-model precise")
 string(APPEND CMAKE_C_FLAGS_RELEASE " -O2")
 string(APPEND CMAKE_C_FLAGS_DEBUG   " -O0 -g -fno-system-debug")
 
 # EAMxx ignores generic CMAKE_CXX_FLAGS, includes CMAKE_CXX_FLAGS_[RELEASE,DEBUG]
-string(APPEND CMAKE_CXX_FLAGS         " -fp-model precise")
+string(APPEND CMAKE_CXX_FLAGS         " -g -fp-model precise")
 string(APPEND CMAKE_CXX_FLAGS_RELEASE " -fp-model precise -O2 --offload-compress")
 string(APPEND CMAKE_CXX_FLAGS_DEBUG   " -O0 -g -fno-system-debug")
 
