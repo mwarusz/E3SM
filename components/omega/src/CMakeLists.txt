@@ -1,5 +1,10 @@
 # build Omega
 
+if (OMEGA_EXTERNAL_PROF)
+  find_library(VTUNE_LIBRARY NAME ittnotify PATHS $ENV{VTUNE_PROFILER_DIR}/lib64)
+  find_path(VTUNE_INCLUDE NAME ittnotify.h PATHS $ENV{VTUNE_PROFILER_DIR}/include)
+endif()
+
 # create library flag target for LibOmega
 add_library(OmegaLibFlags INTERFACE)
 
@@ -18,6 +23,14 @@ target_include_directories(
     ${Parmetis_INCLUDE_DIRS}
     ${OMEGA_BUILD_DIR}/external/GSW-C
 )
+if (OMEGA_EXTERNAL_PROF)
+  target_include_directories(
+      OmegaLibFlags
+      INTERFACE
+      ${VTUNE_INCLUDE}
+  )
+endif()
+
 
 target_compile_definitions(
     OmegaLibFlags
@@ -25,6 +38,13 @@ target_compile_definitions(
     OMEGA_ARCH=${OMEGA_ARCH}
     OMEGA_VECTOR_LENGTH=${OMEGA_VECTOR_LENGTH}
 )
+if (OMEGA_EXTERNAL_PROF)
+  target_compile_definitions(
+      OmegaLibFlags
+      INTERFACE
+      OMEGA_EXTERNAL_PROF=1
+  )
+endif()
 
 if(OMEGA_SINGLE_PRECISION)
   target_compile_definitions(
@@ -62,6 +82,13 @@ target_link_libraries(
     # stdc++fs
     cpptrace::cpptrace
 )
+if (OMEGA_EXTERNAL_PROF)
+  target_link_libraries(
+    OmegaLibFlags
+    INTERFACE
+    ${VTUNE_LIBRARY}
+  )
+endif()
 
 if(GKlib_FOUND)
     target_link_libraries(
