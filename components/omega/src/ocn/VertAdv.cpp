@@ -626,8 +626,8 @@ void VertAdv::computeVerticalFluxes(
    // 2nd-order centered fluxes
    case VertFluxOption::Second:
       parallelForOuter(
-          "computeVerticalFluxes-Second", {NTracers, NCellsOwned},
-          KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          "computeVerticalFluxes-Second", {NCellsOwned, NTracers},
+          KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
              const I4 KMin   = MinLayerCell(ICell);
              const I4 KMax   = MaxLayerCell(ICell);
              const I4 KRange = vertRangeChunked(KMin + 2, KMax - 1);
@@ -655,8 +655,8 @@ void VertAdv::computeVerticalFluxes(
    // 3rd-order upwind fluxes
    case VertFluxOption::Third:
       parallelForOuter(
-          "computeVerticalFluxes-Third", {NTracers, NCellsOwned},
-          KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          "computeVerticalFluxes-Third", {NCellsOwned, NTracers},
+          KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
              const I4 KMin   = MinLayerCell(ICell);
              const I4 KMax   = MaxLayerCell(ICell);
              const I4 KRange = vertRangeChunked(KMin + 2, KMax - 1);
@@ -686,8 +686,8 @@ void VertAdv::computeVerticalFluxes(
    // 4th-order centered fluxes
    case VertFluxOption::Fourth:
       parallelForOuter(
-          "computeVerticalFluxes-Fourth", {NTracers, NCellsOwned},
-          KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          "computeVerticalFluxes-Fourth", {NCellsOwned, NTracers},
+          KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
              const I4 KMin   = MinLayerCell(ICell);
              const I4 KMax   = MaxLayerCell(ICell);
              const I4 KRange = vertRangeChunked(KMin + 2, KMax - 1);
@@ -714,8 +714,8 @@ void VertAdv::computeVerticalFluxes(
    // top-most (KMin) and bottom-most (KMax + 1) interfaces, use second order
    // for fluxes on next-to-top (KMin + 1) and next-to-bottom (KMax) interfaces.
    parallelFor(
-       "computeVerticalFluxes-TopBot", {NTracers, NCellsOwned},
-       KOKKOS_LAMBDA(int L, int ICell) {
+       "computeVerticalFluxes-TopBot", {NCellsOwned, NTracers},
+       KOKKOS_LAMBDA(int ICell, int L) {
           const I4 KMin = MinLayerCell(ICell);
           const I4 KMax = MaxLayerCell(ICell);
           for (int K : {KMin, KMax + 1}) {
@@ -740,8 +740,8 @@ void VertAdv::computeVerticalFluxes(
    // remove low-order flux from high-order flux
    if (VertAdvChoice == VertAdvOption::FCT) {
       parallelForOuter(
-          "computeVerticalFluxes-LowOrder", {NTracers, NCellsOwned},
-          KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          "computeVerticalFluxes-LowOrder", {NCellsOwned, NTracers},
+          KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
              const I4 KMin   = MinLayerCell(ICell);
              const I4 KMax   = MaxLayerCell(ICell);
              const I4 KRange = vertRangeChunked(KMin + 1, KMax);
@@ -784,8 +784,8 @@ void VertAdv::computeStdVAdvTend(
    // Loop over owned cells, tracer tendency in each layer is computed from
    // difference between fluxes through bottom and top interfaces
    parallelForOuter(
-       "computeStdVAdvTend", {NTracers, NCellsOwned},
-       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+       "computeStdVAdvTend", {NCellsOwned, NTracers},
+       KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
           const I4 KMin   = MinLayerCell(ICell);
           const I4 KMax   = MaxLayerCell(ICell);
           const I4 KRange = vertRangeChunked(KMin, KMax);
@@ -823,8 +823,8 @@ void VertAdv::computeFCTVAdvTend(
    OMEGA_SCOPE(LocEps, Eps);
 
    parallelForOuter(
-       "computeFCTVAdvTend", {NTracers, NCellsOwned},
-       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+       "computeFCTVAdvTend", {NCellsOwned, NTracers},
+       KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
           const I4 KMin = MinLayerCell(ICell);
           const I4 KMax = MaxLayerCell(ICell);
           I4 KRange     = vertRangeChunked(KMin, KMax);

@@ -482,8 +482,8 @@ void TimeStepper::updateTracersByTend(const Array3DReal &NextTracers,
    Coeff.get(CoeffSeconds, TimeUnits::Seconds);
 
    parallelForOuter(
-       "updateTracersByTend", {NTracers, Mesh->NCellsAll},
-       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+       "updateTracersByTend", {Mesh->NCellsAll, NTracers},
+       KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
           const int KMin   = MinLayerCell(ICell);
           const int KMax   = MaxLayerCell(ICell);
           const int KRange = vertRange(KMin, KMax);
@@ -510,8 +510,8 @@ void TimeStepper::weightTracers(const Array3DReal &NextTracers,
    OMEGA_SCOPE(MaxLayerCell, VCoord->MaxLayerCell);
 
    parallelForOuter(
-       "weightTracers", {NTracers, Mesh->NCellsAll},
-       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+       "weightTracers", {Mesh->NCellsAll, NTracers},
+       KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
           const int KMin   = MinLayerCell(ICell);
           const int KMax   = MaxLayerCell(ICell);
           const int KRange = vertRange(KMin, KMax);
@@ -539,8 +539,8 @@ void TimeStepper::accumulateTracersUpdate(const Array3DReal &AccumTracer,
    Coeff.get(CoeffSeconds, TimeUnits::Seconds);
 
    parallelForOuter(
-       "accumulateTracersUpdate", {NTracers, Mesh->NCellsAll},
-       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+       "accumulateTracersUpdate", {Mesh->NCellsAll, NTracers},
+       KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
           const int KMin   = MinLayerCell(ICell);
           const int KMax   = MaxLayerCell(ICell);
           const int KRange = vertRange(KMin, KMax);
@@ -565,8 +565,8 @@ void TimeStepper::finalizeTracersUpdate(const Array3DReal &NextTracers,
    OMEGA_SCOPE(MaxLayerCell, VCoord->MaxLayerCell);
 
    parallelForOuter(
-       "finalizeTracersUpdate", {NTracers, Mesh->NCellsAll},
-       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+       "finalizeTracersUpdate", {Mesh->NCellsAll, NTracers},
+       KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
           const int KMin   = MinLayerCell(ICell);
           const int KMax   = MaxLayerCell(ICell);
           const int KRange = vertRange(KMin, KMax);

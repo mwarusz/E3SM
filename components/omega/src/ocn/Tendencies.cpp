@@ -717,8 +717,8 @@ void Tendencies::computeTracerTendenciesOnly(
    Pacer::start("Tend:computeTracerTendenciesOnly", 1);
 
    parallelForOuter(
-       {NTracers, Mesh->NCellsAll},
-       KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+       {Mesh->NCellsAll, NTracers},
+       KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
           const int KMin   = MinLayerCell(ICell);
           const int KMax   = MaxLayerCell(ICell);
           const int KRange = vertRange(KMin, KMax);
@@ -736,8 +736,8 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerHorzAdv.Enabled) {
       Pacer::start("Tend:tracerHorzAdv", 2);
       parallelForOuter(
-          {NTracers, Mesh->NEdgesAll},
-          KOKKOS_LAMBDA(int L, int IEdge, const TeamMember &Team) {
+          {Mesh->NEdgesAll, NTracers},
+          KOKKOS_LAMBDA(int IEdge, int L, const TeamMember &Team) {
              const int KMin   = MinLayerEdgeBot(IEdge);
              const int KMax   = MaxLayerEdgeTop(IEdge);
              const int KRange = vertRangeChunked(KMin, KMax);
@@ -748,8 +748,8 @@ void Tendencies::computeTracerTendenciesOnly(
                  });
           });
       parallelForOuter(
-          {NTracers, Mesh->NCellsAll},
-          KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          {Mesh->NCellsAll, NTracers},
+          KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
              const int KMin   = MinLayerCell(ICell);
              const int KMax   = MaxLayerCell(ICell);
              const int KRange = vertRangeChunked(KMin, KMax);
@@ -767,8 +767,8 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerDiffusion.Enabled) {
       Pacer::start("Tend:tracerDiffusion", 2);
       parallelForOuter(
-          {NTracers, Mesh->NCellsAll},
-          KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          {Mesh->NCellsAll, NTracers},
+          KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
              const int KMin   = MinLayerCell(ICell);
              const int KMax   = MaxLayerCell(ICell);
              const int KRange = vertRangeChunked(KMin, KMax);
@@ -787,8 +787,8 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerHyperDiff.Enabled) {
       Pacer::start("Tend:tracerHyperDiff", 2);
       parallelForOuter(
-          {NTracers, Mesh->NCellsAll},
-          KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          {Mesh->NCellsAll, NTracers},
+          KOKKOS_LAMBDA(int ICell, int L, const TeamMember &Team) {
              const int KMin   = MinLayerCell(ICell);
              const int KMax   = MaxLayerCell(ICell);
              const int KRange = vertRangeChunked(KMin, KMax);
@@ -823,8 +823,8 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocSurfaceTracerRestoring.Enabled && NTracersToRestore > 0) {
       Pacer::start("Tend:surfaceTracerRestoring", 2);
       parallelFor(
-          {NTracersToRestore, Mesh->NCellsAll},
-          KOKKOS_LAMBDA(int R, int ICell) {
+          {Mesh->NCellsAll, NTracersToRestore},
+          KOKKOS_LAMBDA(int ICell, int R) {
              const int KMin = MinLayerCell(ICell);
              const int L    = TracerIdsToRestore(R);
              LocSurfaceTracerRestoring(LocTracerTend, L, ICell, KMin,
@@ -916,8 +916,8 @@ void Tendencies::computeTracerTendencies(
        AuxState->LayerThicknessAux.MeanLayerThickEdge;
    Pacer::start("Tend:computeTracerAuxCell", 2);
    parallelForOuter(
-       "computeTracerAuxCell", {NTracers, Mesh->NCellsAll},
-       KOKKOS_LAMBDA(int LTracer, int ICell, const TeamMember &Team) {
+       "computeTracerAuxCell", {Mesh->NCellsAll, NTracers},
+       KOKKOS_LAMBDA(int ICell, int LTracer, const TeamMember &Team) {
           const int KMin   = MinLayerCell(ICell);
           const int KMax   = MaxLayerCell(ICell);
           const int KRange = vertRangeChunked(KMin, KMax);

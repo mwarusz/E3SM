@@ -264,8 +264,8 @@ void AuxiliaryState::computeAll(const OceanState *State,
 
    Pacer::start("AuxState:cellAuxState4", 2);
    parallelForOuter(
-       "cellAuxState4", {NTracers, Mesh->NCellsAll},
-       KOKKOS_LAMBDA(int LTracer, int ICell, const TeamMember &Team) {
+       "cellAuxState4", {Mesh->NCellsAll, NTracers},
+       KOKKOS_LAMBDA(int ICell, int LTracer, const TeamMember &Team) {
           const int KMin   = MinLayerCell(ICell);
           const int KMax   = MaxLayerCell(ICell);
           const int KRange = vertRangeChunked(KMin, KMax);
