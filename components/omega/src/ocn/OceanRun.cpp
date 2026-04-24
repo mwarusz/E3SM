@@ -11,6 +11,11 @@
 #include "TimeMgr.h"
 #include "TimeStepper.h"
 
+#include <cstdlib>
+#ifdef OMEGA_EXTERNAL_PROF
+#include <ittnotify.h>
+#endif
+
 namespace OMEGA {
 
 int ocnRun(TimeInstant &CurrTime ///< [inout] current sim time
@@ -52,6 +57,12 @@ int ocnRun(TimeInstant &CurrTime ///< [inout] current sim time
          Pacer::enableTiming();
          Pacer::stop("Stepper:firstDoStep", 1);
       } else {
+
+         setenv("PTI_ENABLE_COLLECTION", "1", 1);
+#ifdef OMEGA_EXTERNAL_PROF
+         __itt_resume();
+#endif
+
          Pacer::start("Stepper:doStep", 1);
          DefTimeStepper->doStep(DefOceanState, SimTime);
          Pacer::stop("Stepper:doStep", 1);
@@ -64,6 +75,11 @@ int ocnRun(TimeInstant &CurrTime ///< [inout] current sim time
       LOG_INFO("ocnRun: Time step {} complete, clock time: {}", IStep,
                SimTime.getString(4, 4, "-"));
    }
+
+   setenv("PTI_ENABLE_COLLECTION", "0", 1);
+#ifdef OMEGA_EXTERNAL_PROF
+   __itt_pause();
+#endif
 
    return Err;
 
