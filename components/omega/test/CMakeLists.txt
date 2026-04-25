@@ -516,3 +516,10 @@ add_omega_test(
     ocn/VertAdvTest.cpp
     "-n;1"
 )
+
+add_omega_test(
+    TRDIFF_BENCH
+    benchTracerDiff.exe
+    ocn/TracerDiffBench.cpp
+    "-n;1"
+)
