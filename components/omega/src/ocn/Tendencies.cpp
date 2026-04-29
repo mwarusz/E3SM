@@ -955,12 +955,14 @@ void Tendencies::computeAllTendencies(
 ) {
    AuxState->computeAll(State, TracerArray, ThickTimeLevel, VelTimeLevel);
 
+   Pacer::start("Tend:computeAll", 1);
    computeThicknessTendenciesOnly(State, AuxState, ThickTimeLevel, VelTimeLevel,
                                   Time);
    computeVelocityTendenciesOnly(State, AuxState, TracerArray, ThickTimeLevel,
                                  VelTimeLevel, TracerTimeLevel, Time);
    computeTracerTendenciesOnly(State, AuxState, TracerArray, ThickTimeLevel,
                                VelTimeLevel, Time);
+   Pacer::stop("Tend:computeAll", 1);
 } // end all tendency compute
 
 } // end namespace OMEGA
