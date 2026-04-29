@@ -829,8 +829,6 @@ void VertAdv::computeFCTVAdvTend(
           const I4 KMax = MaxLayerCell(ICell);
           I4 KRange     = vertRangeChunked(KMin, KMax);
 
-          RealScratchArray InvNewProvThick(Team.team_scratch(0),
-                                           LocNVertLayers);
           RealScratchArray WorkTend(Team.team_scratch(0), LocNVertLayers);
           RealScratchArray FlxIn(Team.team_scratch(0), LocNVertLayers);
           RealScratchArray FlxOut(Team.team_scratch(0), LocNVertLayers);
@@ -844,34 +842,24 @@ void VertAdv::computeFCTVAdvTend(
 
                  for (int KVec = 0; KVec < KLen; ++KVec) {
                     const I4 K = KStart + KVec;
-                    InvNewProvThick(K) =
+                    const Real InvNewProvThick =
                         1._Real / (ProvThickness(ICell, K) +
                                    Dt * (LocTotVertVel(ICell, K + 1) -
                                          LocTotVertVel(ICell, K)));
-                    Real TracerMax;
-                    Real TracerMin;
+
+                    const int Km1 = Kokkos::max(K - 1, KMin);
+                    const int Kp1 = Kokkos::min(K + 1, KMax);
+
                     // Determine bounds on tracer from neighbor values for
                     // limiting
-                    if (K == KMin) {
-                       TracerMax = Kokkos::max(Tracers(L, ICell, K),
-                                               Tracers(L, ICell, K + 1));
-                       TracerMin = Kokkos::min(Tracers(L, ICell, K),
-                                               Tracers(L, ICell, K + 1));
-                    } else if (K == KMax) {
-                       TracerMax = Kokkos::max(Tracers(L, ICell, K - 1),
-                                               Tracers(L, ICell, K));
-                       TracerMin = Kokkos::min(Tracers(L, ICell, K - 1),
-                                               Tracers(L, ICell, K));
-                    } else {
-                       TracerMax =
-                           Kokkos::max(Tracers(L, ICell, K - 1),
-                                       Kokkos::max(Tracers(L, ICell, K),
-                                                   Tracers(L, ICell, K + 1)));
-                       TracerMin =
-                           Kokkos::min(Tracers(L, ICell, K - 1),
-                                       Kokkos::min(Tracers(L, ICell, K),
-                                                   Tracers(L, ICell, K + 1)));
-                    }
+                    const Real TracerMax =
+                        Kokkos::max(Tracers(L, ICell, Km1),
+                                    Kokkos::max(Tracers(L, ICell, K),
+                                                Tracers(L, ICell, Kp1)));
+                    const Real TracerMin =
+                        Kokkos::min(Tracers(L, ICell, Km1),
+                                    Kokkos::min(Tracers(L, ICell, K),
+                                                Tracers(L, ICell, Kp1)));
 
                     // Accumulate upwind flux in WorkTend
                     WorkTend(K) = LocLowOrderVertFlux(L, ICell, K + 1) -
@@ -891,15 +879,15 @@ void VertAdv::computeFCTVAdvTend(
                     Real TracerMinNew =
                         (Tracers(L, ICell, K) * ProvThickness(ICell, K) +
                          Dt * (WorkTend(K) + FlxOut(K))) *
-                        InvNewProvThick(K);
+                        InvNewProvThick;
                     Real TracerMaxNew =
                         (Tracers(L, ICell, K) * ProvThickness(ICell, K) +
                          Dt * (WorkTend(K) + FlxIn(K))) *
-                        InvNewProvThick(K);
+                        InvNewProvThick;
                     Real TracerUpwindNew =
                         (Tracers(L, ICell, K) * ProvThickness(ICell, K) +
                          Dt * WorkTend(K)) *
-                        InvNewProvThick(K);
+                        InvNewProvThick;
                     Real ScaleFactor =
                         (TracerMax - TracerUpwindNew) /
                         (TracerMaxNew - TracerUpwindNew + LocEps);
@@ -952,7 +940,7 @@ void VertAdv::computeFCTVAdvTend(
               });
           // TODO: Monotonicity and diagnostic checks
        },
-       5 * NVertLayers + 1);
+       4 * NVertLayers + 1);
 
 } // end computeFTCVAdvTend
 
