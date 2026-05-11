@@ -46,8 +46,8 @@ Eos::Eos(const std::string &Name, ///< [in] Name for eos object
    SpecVol = Array2DReal("SpecVol", Mesh->NCellsSize, VCoord->NVertLayers);
    SpecVolDisplaced =
        Array2DReal("SpecVolDisplaced", Mesh->NCellsSize, VCoord->NVertLayers);
-   BruntVaisalaFreqSq =
-       Array2DReal("BruntVaisalaFreqSq", Mesh->NCellsSize, VCoord->NVertLayers);
+   BruntVaisalaFreqSq = Array2DReal("BruntVaisalaFreqSq", Mesh->NCellsSize,
+                                    VCoord->NVertLayersP1);
 
    deepCopy(SpecVol, 1.0_Real / RhoSw);
    deepCopy(SpecVolDisplaced, 1.0_Real / RhoSw);
@@ -282,13 +282,27 @@ void Eos::computeBruntVaisalaFreqSq(const Array2DReal &ConservTemp,
       parallelForOuter(
           "bvf-linear", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
+             // Compute Brunt-Vaisala frequency at interior vertical interfaces
+             const int KMin   = MinLayerCell(ICell) + 1;
              const int KMax   = MaxLayerCell(ICell);
              const int KRange = vertRangeChunked(KMin, KMax);
              parallelForInner(
                  Team, KRange, INNER_LAMBDA(int KChunk) {
                     LocComputeBruntVaisalaFreqSqLinear(LocBruntVaisalaFreqSq,
                                                        ICell, KChunk, SpecVol);
+                 });
+
+             teamBarrier(Team);
+
+             // Fill Brunt-Vaisala frequency at vertical boundaries using the
+             // closest valid value. This is equivalent to doing one-sided
+             // differencing at the boundary.
+             Kokkos::single(
+                 PerTeam(Team), INNER_LAMBDA() {
+                    LocBruntVaisalaFreqSq(ICell, MinLayerCell(ICell)) =
+                        LocBruntVaisalaFreqSq(ICell, KMin);
+                    LocBruntVaisalaFreqSq(ICell, MaxLayerCell(ICell) + 1) =
+                        LocBruntVaisalaFreqSq(ICell, KMax);
                  });
           });
    } else if (EosChoice == EosType::Teos10Eos) {
@@ -297,7 +311,8 @@ void Eos::computeBruntVaisalaFreqSq(const Array2DReal &ConservTemp,
       parallelForOuter(
           "bvf-teos10", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
+             // Compute Brunt-Vaisala frequency at interior vertical interfaces
+             const int KMin   = MinLayerCell(ICell) + 1;
              const int KMax   = MaxLayerCell(ICell);
              const int KRange = vertRangeChunked(KMin, KMax);
              parallelForInner(
@@ -305,6 +320,19 @@ void Eos::computeBruntVaisalaFreqSq(const Array2DReal &ConservTemp,
                     LocComputeBruntVaisalaFreqSqTeos10(
                         LocBruntVaisalaFreqSq, ICell, KChunk, ConservTemp,
                         AbsSalinity, Pressure, SpecVol);
+                 });
+
+             teamBarrier(Team);
+
+             // Fill Brunt-Vaisala frequency at vertical boundaries using the
+             // closest valid value. This is equivalent to doing one-sided
+             // differencing at the boundary.
+             Kokkos::single(
+                 PerTeam(Team), INNER_LAMBDA() {
+                    LocBruntVaisalaFreqSq(ICell, MinLayerCell(ICell)) =
+                        LocBruntVaisalaFreqSq(ICell, KMin);
+                    LocBruntVaisalaFreqSq(ICell, MaxLayerCell(ICell) + 1) =
+                        LocBruntVaisalaFreqSq(ICell, KMax);
                  });
           });
    }
@@ -355,6 +383,10 @@ void Eos::defineFields() {
                      NDims,     // Number of dimensions
                      DimNames   // Dimension names
        );
+
+   // Brunt-Vaisala frequency is located at interfaces
+   DimNames[1] = "NVertLayersP1";
+
    /// Create and register the BruntVaisalaFreqSq field
    auto BruntVaisalaFreqSqField =
        Field::create(BruntVaisalaFreqSqFldName,                   // Field name
