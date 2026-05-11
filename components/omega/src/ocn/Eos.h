@@ -324,33 +324,27 @@ class Teos10BruntVaisalaFreqSq {
                                    const Array2DReal &Pressure,
                                    const Array2DReal &SpecVol) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell));
+      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell) + 1);
       const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
 
       for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
-         if (K == 0) {
-            // No Brunt-Vaisala frequency at surface
-            BruntVaisalaFreqSq(ICell, K) = 0.0_Real;
-         } else {
-            // Calculate squared Brunt-Vaisala frequency
-            Real CtInt =
-                0.5_Real * (ConservTemp(ICell, K) + ConservTemp(ICell, K - 1));
-            Real SaInt =
-                0.5_Real * (AbsSalinity(ICell, K) + AbsSalinity(ICell, K - 1));
-            Real PInt =
-                0.5_Real * (Pressure(ICell, K) + Pressure(ICell, K - 1));
-            Real SpInt = 0.5_Real * (SpecVol(ICell, K) + SpecVol(ICell, K - 1));
-            Real AlphaInt = calcAlpha(SaInt, CtInt, PInt * Pa2Db, SpInt);
-            Real BetaInt  = calcBeta(SaInt, CtInt, PInt * Pa2Db, SpInt);
-            Real DSa      = AbsSalinity(ICell, K) - AbsSalinity(ICell, K - 1);
-            Real DCt      = ConservTemp(ICell, K) - ConservTemp(ICell, K - 1);
-            Real DP       = Pressure(ICell, K) - Pressure(ICell, K - 1);
+         // Calculate squared Brunt-Vaisala frequency
+         Real CtInt =
+             0.5_Real * (ConservTemp(ICell, K) + ConservTemp(ICell, K - 1));
+         Real SaInt =
+             0.5_Real * (AbsSalinity(ICell, K) + AbsSalinity(ICell, K - 1));
+         Real PInt  = 0.5_Real * (Pressure(ICell, K) + Pressure(ICell, K - 1));
+         Real SpInt = 0.5_Real * (SpecVol(ICell, K) + SpecVol(ICell, K - 1));
+         Real AlphaInt = calcAlpha(SaInt, CtInt, PInt * Pa2Db, SpInt);
+         Real BetaInt  = calcBeta(SaInt, CtInt, PInt * Pa2Db, SpInt);
+         Real DSa      = AbsSalinity(ICell, K) - AbsSalinity(ICell, K - 1);
+         Real DCt      = ConservTemp(ICell, K) - ConservTemp(ICell, K - 1);
+         Real DP       = Pressure(ICell, K) - Pressure(ICell, K - 1);
 
-            BruntVaisalaFreqSq(ICell, K) = Gravity * Gravity *
-                                           (BetaInt * DSa - AlphaInt * DCt) /
-                                           (SpInt * DP);
-         }
+         BruntVaisalaFreqSq(ICell, K) = Gravity * Gravity *
+                                        (BetaInt * DSa - AlphaInt * DCt) /
+                                        (SpInt * DP);
       }
    }
 
@@ -533,24 +527,19 @@ class LinearBruntVaisalaFreqSq {
                                    I4 KChunk,
                                    const Array2DReal &SpecVol) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell));
+      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell) + 1);
       const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
 
       for (int KVec = 0; KVec < KLen; ++KVec) {
          const I4 K = KStart + KVec;
-         if (K == 0) {
-            /// No Brunt-Vaisala frequency at the top level
-            BruntVaisalaFreqSq(ICell, K) = 0.0_Real;
-         } else {
-            /// Calculate squared Brunt-Vaisala frequency at mid-point between
-            /// K-1 and K Do not need to use displaced specific volume here
-            /// since only the linear EOS is used with this BVF formulation.
-            BruntVaisalaFreqSq(ICell, K) =
-                -(Gravity / RhoT0S0) *
-                ((1.0_Real / SpecVol(ICell, K - 1)) -
-                 (1.0_Real / SpecVol(ICell, K))) /
-                (GeomZMid(ICell, K - 1) - GeomZMid(ICell, K));
-         }
+         /// Calculate squared Brunt-Vaisala frequency at mid-point between
+         /// K-1 and K Do not need to use displaced specific volume here
+         /// since only the linear EOS is used with this BVF formulation.
+         BruntVaisalaFreqSq(ICell, K) =
+             -(Gravity / RhoT0S0) *
+             ((1.0_Real / SpecVol(ICell, K - 1)) -
+              (1.0_Real / SpecVol(ICell, K))) /
+             (GeomZMid(ICell, K - 1) - GeomZMid(ICell, K));
       }
    }
 
