@@ -504,6 +504,23 @@ void Tendencies::computeVelocityTendenciesOnly(
 
    Pacer::start("Tend:computeVelocityTendenciesOnly", 1);
 
+   const Array2DReal &FluxLayerThickEdge =
+       AuxState->LayerThicknessAux.FluxLayerThickEdge;
+   const Array2DReal &NormRVortEdge = AuxState->VorticityAux.NormRelVortEdge;
+   const Array2DReal &NormFEdge     = AuxState->VorticityAux.NormPlanetVortEdge;
+   Array2DReal NormVelEdge          = State->getNormalVelocity(VelTimeLevel);
+
+   const Array2DReal &KECell = AuxState->KineticAux.KineticEnergyCell;
+
+   const Array2DReal &SSHCell = AuxState->LayerThicknessAux.SshCell;
+
+   const Array2DReal &DivCell     = AuxState->KineticAux.VelocityDivCell;
+   const Array2DReal &RVortVertex = AuxState->VorticityAux.RelVortVertex;
+
+   const Array2DReal &Del2DivCell = AuxState->VelocityDel2Aux.Del2DivCell;
+   const Array2DReal &Del2RVortVertex =
+       AuxState->VelocityDel2Aux.Del2RelVortVertex;
+
    parallelForOuter(
        {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
           const int KMin = MinLayerEdgeBot(IEdge);
@@ -512,73 +529,31 @@ void Tendencies::computeVelocityTendenciesOnly(
           parallelForInner(
               Team, Range{KMin, KMax},
               INNER_LAMBDA(int K) { LocNormalVelocityTend(IEdge, K) = 0; });
-       });
 
-   // Compute potential vorticity horizontal advection
-   const Array2DReal &FluxLayerThickEdge =
-       AuxState->LayerThicknessAux.FluxLayerThickEdge;
-   const Array2DReal &NormRVortEdge = AuxState->VorticityAux.NormRelVortEdge;
-   const Array2DReal &NormFEdge     = AuxState->VorticityAux.NormPlanetVortEdge;
-   Array2DReal NormVelEdge          = State->getNormalVelocity(VelTimeLevel);
-   if (LocPotentialVortHAdv.Enabled) {
-      Pacer::start("Tend:PotentialVortHAdv", 2);
-      parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          if (LocPotentialVortHAdv.Enabled) {
              LocPotentialVortHAdv(Team, LocNormalVelocityTend, IEdge,
                                   NormRVortEdge, NormFEdge, FluxLayerThickEdge,
                                   NormVelEdge);
-          });
-      Pacer::stop("Tend:PotentialVortHAdv", 2);
-   }
+          }
 
-   // Compute kinetic energy gradient
-   const Array2DReal &KECell = AuxState->KineticAux.KineticEnergyCell;
-   if (LocKEGrad.Enabled) {
-      Pacer::start("Tend:KEGrad", 2);
-      parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          if (LocKEGrad.Enabled) {
              LocKEGrad(Team, LocNormalVelocityTend, IEdge, KECell);
-          });
-      Pacer::stop("Tend:KEGrad", 2);
-   }
+          }
 
-   // Compute sea surface height gradient
-   const Array2DReal &SSHCell = AuxState->LayerThicknessAux.SshCell;
-   if (LocSSHGrad.Enabled) {
-      Pacer::start("Tend:SSHGrad", 2);
-      parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          if (LocSSHGrad.Enabled) {
              LocSSHGrad(Team, LocNormalVelocityTend, IEdge, SSHCell);
-          });
-      Pacer::stop("Tend:SSHGrad", 2);
-   }
+          }
 
-   // Compute del2 horizontal diffusion
-   const Array2DReal &DivCell     = AuxState->KineticAux.VelocityDivCell;
-   const Array2DReal &RVortVertex = AuxState->VorticityAux.RelVortVertex;
-   if (LocVelocityDiffusion.Enabled) {
-      Pacer::start("Tend:velocityDiffusion", 2);
-      parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          if (LocVelocityDiffusion.Enabled) {
              LocVelocityDiffusion(Team, LocNormalVelocityTend, IEdge, DivCell,
                                   RVortVertex);
-          });
-      Pacer::stop("Tend:velocityDiffusion", 2);
-   }
+          }
 
-   // Compute del4 horizontal diffusion
-   const Array2DReal &Del2DivCell = AuxState->VelocityDel2Aux.Del2DivCell;
-   const Array2DReal &Del2RVortVertex =
-       AuxState->VelocityDel2Aux.Del2RelVortVertex;
-   if (LocVelocityHyperDiff.Enabled) {
-      Pacer::start("Tend:velocityHyperDiff", 2);
-      parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          if (LocVelocityHyperDiff.Enabled) {
              LocVelocityHyperDiff(Team, LocNormalVelocityTend, IEdge,
                                   Del2DivCell, Del2RVortVertex);
-          });
-      Pacer::stop("Tend:velocityHyperDiff", 2);
-   }
+          }
+       });
 
    Pacer::start("Tend:computeVelocityVAdvTend", 2);
    // Compute velocity tendency from vertical advection
