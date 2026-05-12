@@ -118,6 +118,33 @@ class PotentialVortHAdvOnEdge {
       }
    }
 
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
+                                   const Array2DReal &Tend, I4 IEdge,
+                                   const Array2DReal &NormRVortEdge,
+                                   const Array2DReal &NormFEdge,
+                                   const Array2DReal &FluxLayerThickEdge,
+                                   const Array2DReal &NormVelEdge) const {
+
+      const I4 KMin = MinLayerEdgeBot(IEdge);
+      const I4 KMax = MaxLayerEdgeTop(IEdge);
+
+      for (int J = 0; J < NEdgesOnEdge(IEdge); ++J) {
+         const I4 JEdge = EdgesOnEdge(IEdge, J);
+
+         parallelForInner(
+             Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                const Real NormVort =
+                    (NormRVortEdge(IEdge, K) + NormFEdge(IEdge, K) +
+                     NormRVortEdge(JEdge, K) + NormFEdge(JEdge, K)) *
+                    0.5_Real;
+
+                Tend(IEdge, K) += WeightsOnEdge(IEdge, J) *
+                                  FluxLayerThickEdge(JEdge, K) *
+                                  NormVelEdge(JEdge, K) * NormVort;
+             });
+      }
+   }
+
  private:
    Array1DI4 NEdgesOnEdge;
    Array2DI4 EdgesOnEdge;
@@ -151,6 +178,24 @@ class KEGradOnEdge {
          Tend(IEdge, K) -= EdgeMask(IEdge, K) *
                            (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
       }
+   }
+
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
+                                   const Array2DReal &Tend, I4 IEdge,
+                                   const Array2DReal &KECell) const {
+
+      const I4 JCell0      = CellsOnEdge(IEdge, 0);
+      const I4 JCell1      = CellsOnEdge(IEdge, 1);
+      const Real InvDcEdge = 1._Real / DcEdge(IEdge);
+
+      const int KMin = MinLayerEdgeBot(IEdge);
+      const int KMax = MaxLayerEdgeTop(IEdge);
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             Tend(IEdge, K) -= EdgeMask(IEdge, K) *
+                               (KECell(JCell1, K) - KECell(JCell0, K)) *
+                               InvDcEdge;
+          });
    }
 
  private:
@@ -187,6 +232,25 @@ class SSHGradOnEdge {
                            (SshCell(ICell1, K) - SshCell(ICell0, K)) *
                            InvDcEdge;
       }
+   }
+
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
+                                   const Array2DReal &Tend, I4 IEdge,
+                                   const Array2DReal &SshCell) const {
+
+      const I4 ICell0      = CellsOnEdge(IEdge, 0);
+      const I4 ICell1      = CellsOnEdge(IEdge, 1);
+      const Real InvDcEdge = 1._Real / DcEdge(IEdge);
+
+      const int KMin = MinLayerEdgeBot(IEdge);
+      const int KMax = MaxLayerEdgeTop(IEdge);
+
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             Tend(IEdge, K) -= EdgeMask(IEdge, K) * Gravity *
+                               (SshCell(ICell1, K) - SshCell(ICell0, K)) *
+                               InvDcEdge;
+          });
    }
 
  private:
@@ -235,6 +299,35 @@ class VelocityDiffusionOnEdge {
          Tend(IEdge, K) +=
              EdgeMask(IEdge, K) * ViscDel2 * MeshScalingDel2(IEdge) * Del2U;
       }
+   }
+
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
+                                   const Array2DReal &Tend, I4 IEdge,
+                                   const Array2DReal &DivCell,
+                                   const Array2DReal &RVortVertex) const {
+
+      const I4 ICell0 = CellsOnEdge(IEdge, 0);
+      const I4 ICell1 = CellsOnEdge(IEdge, 1);
+
+      const I4 IVertex0 = VerticesOnEdge(IEdge, 0);
+      const I4 IVertex1 = VerticesOnEdge(IEdge, 1);
+
+      const Real DcEdgeInv = 1._Real / DcEdge(IEdge);
+      const Real DvEdgeInv = 1._Real / DvEdge(IEdge);
+
+      const int KMin = MinLayerEdgeBot(IEdge);
+      const int KMax = MaxLayerEdgeTop(IEdge);
+
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             const Real Del2U =
+                 ((DivCell(ICell1, K) - DivCell(ICell0, K)) * DcEdgeInv -
+                  (RVortVertex(IVertex1, K) - RVortVertex(IVertex0, K)) *
+                      DvEdgeInv);
+
+             Tend(IEdge, K) +=
+                 EdgeMask(IEdge, K) * ViscDel2 * MeshScalingDel2(IEdge) * Del2U;
+          });
    }
 
  private:
@@ -288,6 +381,38 @@ class VelocityHyperDiffOnEdge {
          Tend(IEdge, K) -=
              EdgeMask(IEdge, K) * ViscDel4 * MeshScalingDel4(IEdge) * Del2U;
       }
+   }
+
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
+                                   const Array2DReal &Tend, I4 IEdge,
+                                   const Array2DReal &Del2DivCell,
+                                   const Array2DReal &Del2RVortVertex) const {
+
+      const I4 ICell0 = CellsOnEdge(IEdge, 0);
+      const I4 ICell1 = CellsOnEdge(IEdge, 1);
+
+      const I4 IVertex0 = VerticesOnEdge(IEdge, 0);
+      const I4 IVertex1 = VerticesOnEdge(IEdge, 1);
+
+      const Real DcEdgeInv = 1._Real / DcEdge(IEdge);
+      const Real DvEdgeInv = 1._Real / DvEdge(IEdge);
+
+      const int KMin = MinLayerEdgeBot(IEdge);
+      const int KMax = MaxLayerEdgeTop(IEdge);
+
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             const Real Del2U =
+                 (DivFactor *
+                      (Del2DivCell(ICell1, K) - Del2DivCell(ICell0, K)) *
+                      DcEdgeInv -
+                  (Del2RVortVertex(IVertex1, K) -
+                   Del2RVortVertex(IVertex0, K)) *
+                      DvEdgeInv);
+
+             Tend(IEdge, K) -=
+                 EdgeMask(IEdge, K) * ViscDel4 * MeshScalingDel4(IEdge) * Del2U;
+          });
    }
 
  private:
@@ -379,8 +504,10 @@ class TracerHorzAdvOnCell {
                                    const Array2DReal &NormVelEdge) const {
       const I4 KStart = KChunk * VecLength;
       const I4 KEnd   = KStart + VecLength;
+
       for (int K = KStart; K < KEnd; ++K)
          HighOrderFlxHorz(L, IEdge, K) = 0;
+
       if (!ForceLowOrder && AdvMaskHighOrder(IEdge)) {
          for (int I = 0; I < NAdvCellsForEdge(IEdge); ++I) {
             const I4 ICell = AdvCellsForEdge(IEdge, I);

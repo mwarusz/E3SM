@@ -524,16 +524,9 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::start("Tend:PotentialVortHAdv", 2);
       parallelForOuter(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = MinLayerEdgeBot(IEdge);
-             const int KMax   = MaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocPotentialVortHAdv(LocNormalVelocityTend, IEdge, KChunk,
-                                         NormRVortEdge, NormFEdge,
-                                         FluxLayerThickEdge, NormVelEdge);
-                 });
+             LocPotentialVortHAdv(Team, LocNormalVelocityTend, IEdge,
+                                  NormRVortEdge, NormFEdge, FluxLayerThickEdge,
+                                  NormVelEdge);
           });
       Pacer::stop("Tend:PotentialVortHAdv", 2);
    }
@@ -544,13 +537,7 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::start("Tend:KEGrad", 2);
       parallelForOuter(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = MinLayerEdgeBot(IEdge);
-             const int KMax   = MaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocKEGrad(LocNormalVelocityTend, IEdge, KChunk, KECell);
-                 });
+             LocKEGrad(Team, LocNormalVelocityTend, IEdge, KECell);
           });
       Pacer::stop("Tend:KEGrad", 2);
    }
@@ -561,13 +548,7 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::start("Tend:SSHGrad", 2);
       parallelForOuter(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = MinLayerEdgeBot(IEdge);
-             const int KMax   = MaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocSSHGrad(LocNormalVelocityTend, IEdge, KChunk, SSHCell);
-                 });
+             LocSSHGrad(Team, LocNormalVelocityTend, IEdge, SSHCell);
           });
       Pacer::stop("Tend:SSHGrad", 2);
    }
@@ -579,14 +560,8 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::start("Tend:velocityDiffusion", 2);
       parallelForOuter(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = MinLayerEdgeBot(IEdge);
-             const int KMax   = MaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocVelocityDiffusion(LocNormalVelocityTend, IEdge, KChunk,
-                                         DivCell, RVortVertex);
-                 });
+             LocVelocityDiffusion(Team, LocNormalVelocityTend, IEdge, DivCell,
+                                  RVortVertex);
           });
       Pacer::stop("Tend:velocityDiffusion", 2);
    }
@@ -599,14 +574,8 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::start("Tend:velocityHyperDiff", 2);
       parallelForOuter(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = MinLayerEdgeBot(IEdge);
-             const int KMax   = MaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocVelocityHyperDiff(LocNormalVelocityTend, IEdge, KChunk,
-                                         Del2DivCell, Del2RVortVertex);
-                 });
+             LocVelocityHyperDiff(Team, LocNormalVelocityTend, IEdge,
+                                  Del2DivCell, Del2RVortVertex);
           });
       Pacer::stop("Tend:velocityHyperDiff", 2);
    }
