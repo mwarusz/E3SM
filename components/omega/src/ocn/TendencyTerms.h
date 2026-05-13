@@ -119,7 +119,7 @@ class PotentialVortHAdvOnEdge {
    }
 
    KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
+                                   const ArrayScratch1DReal &Tend, I4 IEdge,
                                    const Array2DReal &NormRVortEdge,
                                    const Array2DReal &NormFEdge,
                                    const Array2DReal &FluxLayerThickEdge,
@@ -138,9 +138,9 @@ class PotentialVortHAdvOnEdge {
                      NormRVortEdge(JEdge, K) + NormFEdge(JEdge, K)) *
                     0.5_Real;
 
-                Tend(IEdge, K) += WeightsOnEdge(IEdge, J) *
-                                  FluxLayerThickEdge(JEdge, K) *
-                                  NormVelEdge(JEdge, K) * NormVort;
+                Tend(K) += WeightsOnEdge(IEdge, J) *
+                           FluxLayerThickEdge(JEdge, K) *
+                           NormVelEdge(JEdge, K) * NormVort;
              });
       }
    }
@@ -181,7 +181,7 @@ class KEGradOnEdge {
    }
 
    KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
+                                   const ArrayScratch1DReal &Tend, I4 IEdge,
                                    const Array2DReal &KECell) const {
 
       const I4 JCell0      = CellsOnEdge(IEdge, 0);
@@ -192,9 +192,8 @@ class KEGradOnEdge {
       const int KMax = MaxLayerEdgeTop(IEdge);
       parallelForInner(
           Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-             Tend(IEdge, K) -= EdgeMask(IEdge, K) *
-                               (KECell(JCell1, K) - KECell(JCell0, K)) *
-                               InvDcEdge;
+             Tend(K) -= EdgeMask(IEdge, K) *
+                        (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
           });
    }
 
@@ -235,7 +234,7 @@ class SSHGradOnEdge {
    }
 
    KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
+                                   const ArrayScratch1DReal &Tend, I4 IEdge,
                                    const Array2DReal &SshCell) const {
 
       const I4 ICell0      = CellsOnEdge(IEdge, 0);
@@ -247,9 +246,8 @@ class SSHGradOnEdge {
 
       parallelForInner(
           Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-             Tend(IEdge, K) -= EdgeMask(IEdge, K) * Gravity *
-                               (SshCell(ICell1, K) - SshCell(ICell0, K)) *
-                               InvDcEdge;
+             Tend(K) -= EdgeMask(IEdge, K) * Gravity *
+                        (SshCell(ICell1, K) - SshCell(ICell0, K)) * InvDcEdge;
           });
    }
 
@@ -302,7 +300,7 @@ class VelocityDiffusionOnEdge {
    }
 
    KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
+                                   const ArrayScratch1DReal &Tend, I4 IEdge,
                                    const Array2DReal &DivCell,
                                    const Array2DReal &RVortVertex) const {
 
@@ -325,7 +323,7 @@ class VelocityDiffusionOnEdge {
                   (RVortVertex(IVertex1, K) - RVortVertex(IVertex0, K)) *
                       DvEdgeInv);
 
-             Tend(IEdge, K) +=
+             Tend(K) +=
                  EdgeMask(IEdge, K) * ViscDel2 * MeshScalingDel2(IEdge) * Del2U;
           });
    }
@@ -384,7 +382,7 @@ class VelocityHyperDiffOnEdge {
    }
 
    KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
+                                   const ArrayScratch1DReal &Tend, I4 IEdge,
                                    const Array2DReal &Del2DivCell,
                                    const Array2DReal &Del2RVortVertex) const {
 
@@ -410,7 +408,7 @@ class VelocityHyperDiffOnEdge {
                    Del2RVortVertex(IVertex0, K)) *
                       DvEdgeInv);
 
-             Tend(IEdge, K) -=
+             Tend(K) -=
                  EdgeMask(IEdge, K) * ViscDel4 * MeshScalingDel4(IEdge) * Del2U;
           });
    }

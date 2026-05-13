@@ -501,6 +501,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    OMEGA_SCOPE(LocBottomDrag, BottomDrag);
    OMEGA_SCOPE(MinLayerEdgeBot, VCoord->MinLayerEdgeBot);
    OMEGA_SCOPE(MaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
+   OMEGA_SCOPE(NVertLayers, VCoord->NVertLayers);
 
    Pacer::start("Tend:computeVelocityTendenciesOnly", 1);
 
@@ -522,37 +523,44 @@ void Tendencies::computeVelocityTendenciesOnly(
        AuxState->VelocityDel2Aux.Del2RelVortVertex;
 
    parallelForOuter(
-       {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+       LaunchConfig({Mesh->NEdgesAll}, TeamScratch<Real>(NVertLayers)),
+       KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          ArrayScratch1DReal VelTendScratch(teamScratch(Team), NVertLayers);
+
           const int KMin = MinLayerEdgeBot(IEdge);
           const int KMax = MaxLayerEdgeTop(IEdge);
 
           parallelForInner(
               Team, Range{KMin, KMax},
-              INNER_LAMBDA(int K) { LocNormalVelocityTend(IEdge, K) = 0; });
+              INNER_LAMBDA(int K) { VelTendScratch(K) = 0; });
 
           if (LocPotentialVortHAdv.Enabled) {
-             LocPotentialVortHAdv(Team, LocNormalVelocityTend, IEdge,
-                                  NormRVortEdge, NormFEdge, FluxLayerThickEdge,
-                                  NormVelEdge);
+             LocPotentialVortHAdv(Team, VelTendScratch, IEdge, NormRVortEdge,
+                                  NormFEdge, FluxLayerThickEdge, NormVelEdge);
           }
 
           if (LocKEGrad.Enabled) {
-             LocKEGrad(Team, LocNormalVelocityTend, IEdge, KECell);
+             LocKEGrad(Team, VelTendScratch, IEdge, KECell);
           }
 
           if (LocSSHGrad.Enabled) {
-             LocSSHGrad(Team, LocNormalVelocityTend, IEdge, SSHCell);
+             LocSSHGrad(Team, VelTendScratch, IEdge, SSHCell);
           }
 
           if (LocVelocityDiffusion.Enabled) {
-             LocVelocityDiffusion(Team, LocNormalVelocityTend, IEdge, DivCell,
+             LocVelocityDiffusion(Team, VelTendScratch, IEdge, DivCell,
                                   RVortVertex);
           }
 
           if (LocVelocityHyperDiff.Enabled) {
-             LocVelocityHyperDiff(Team, LocNormalVelocityTend, IEdge,
-                                  Del2DivCell, Del2RVortVertex);
+             LocVelocityHyperDiff(Team, VelTendScratch, IEdge, Del2DivCell,
+                                  Del2RVortVertex);
           }
+
+          parallelForInner(
+              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                 LocNormalVelocityTend(IEdge, K) = VelTendScratch(K);
+              });
        });
 
    Pacer::start("Tend:computeVelocityVAdvTend", 2);
