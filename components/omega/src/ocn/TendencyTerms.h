@@ -131,7 +131,7 @@ class PotentialVortHAdvOnEdge {
       for (int J = 0; J < NEdgesOnEdge(IEdge); ++J) {
          const I4 JEdge = EdgesOnEdge(IEdge, J);
 
-         parallelForInner(
+         parallelForInnerOpt(
              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
                 const Real NormVort =
                     (NormRVortEdge(IEdge, K) + NormFEdge(IEdge, K) +
@@ -190,7 +190,7 @@ class KEGradOnEdge {
 
       const int KMin = MinLayerEdgeBot(IEdge);
       const int KMax = MaxLayerEdgeTop(IEdge);
-      parallelForInner(
+      parallelForInnerOpt(
           Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
              Tend(K) -= EdgeMask(IEdge, K) *
                         (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
@@ -244,7 +244,7 @@ class SSHGradOnEdge {
       const int KMin = MinLayerEdgeBot(IEdge);
       const int KMax = MaxLayerEdgeTop(IEdge);
 
-      parallelForInner(
+      parallelForInnerOpt(
           Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
              Tend(K) -= EdgeMask(IEdge, K) * Gravity *
                         (SshCell(ICell1, K) - SshCell(ICell0, K)) * InvDcEdge;
@@ -316,7 +316,7 @@ class VelocityDiffusionOnEdge {
       const int KMin = MinLayerEdgeBot(IEdge);
       const int KMax = MaxLayerEdgeTop(IEdge);
 
-      parallelForInner(
+      parallelForInnerOpt(
           Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
              const Real Del2U =
                  ((DivCell(ICell1, K) - DivCell(ICell0, K)) * DcEdgeInv -
@@ -398,7 +398,7 @@ class VelocityHyperDiffOnEdge {
       const int KMin = MinLayerEdgeBot(IEdge);
       const int KMax = MaxLayerEdgeTop(IEdge);
 
-      parallelForInner(
+      parallelForInnerOpt(
           Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
              const Real Del2U =
                  (DivFactor *

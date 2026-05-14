@@ -212,6 +212,20 @@ KOKKOS_FUNCTION void parallelForInner(const TeamMember &Team, Range Rng,
 }
 
 template <class F>
+KOKKOS_FUNCTION void parallelForInnerOpt(const TeamMember &Team, Range Rng,
+                                         F &&Functor) {
+#ifdef OMEGA_TARGET_DEVICE
+   const int I = Rng.First + Team.team_rank();
+   if (I <= Rng.Last) {
+      Functor(I);
+   }
+#else
+   const auto Policy = Kokkos::TeamThreadRange(Team, Rng.First, Rng.Last + 1);
+   Kokkos::parallel_for(Policy, std::forward<F>(Functor));
+#endif
+}
+
+template <class F>
 KOKKOS_FUNCTION void parallelForInner(const TeamMember &Team, int UpperBound,
                                       F &&Functor) {
    parallelForInner(Team, Range{0, UpperBound - 1}, std::forward<F>(Functor));

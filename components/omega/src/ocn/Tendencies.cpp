@@ -531,7 +531,7 @@ void Tendencies::computeVelocityTendenciesOnly(
           const int KMin = MinLayerEdgeBot(IEdge);
           const int KMax = MaxLayerEdgeTop(IEdge);
 
-          parallelForInner(
+          parallelForInnerOpt(
               Team, Range{KMin, KMax},
               INNER_LAMBDA(int K) { VelTendScratch(K) = 0; });
 
@@ -558,7 +558,7 @@ void Tendencies::computeVelocityTendenciesOnly(
                                   Del2RVortVertex);
           }
 
-          parallelForInner(
+          parallelForInnerOpt(
               Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
                  LocNormalVelocityTend(IEdge, K) = VelTendScratch(K);
               });
