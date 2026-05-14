@@ -522,9 +522,10 @@ void Tendencies::computeVelocityTendenciesOnly(
    const Array2DReal &Del2RVortVertex =
        AuxState->VelocityDel2Aux.Del2RelVortVertex;
 
+   const auto LConfig = LaunchConfig({Mesh->NEdgesAll}, NVertLayers,
+                                     TeamScratch<Real>(NVertLayers));
    parallelForOuter(
-       LaunchConfig({Mesh->NEdgesAll}, TeamScratch<Real>(NVertLayers)),
-       KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+       LConfig, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
           ArrayScratch1DReal VelTendScratch(teamScratch(Team), NVertLayers);
 
           const int KMin = MinLayerEdgeBot(IEdge);
