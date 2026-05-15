@@ -520,6 +520,6 @@ add_omega_test(
 add_omega_test(
     VTEND_BENCH
     benchVelTend.exe
-    ocn/VelTendBench.cpp
+    "ocn/VelTendBench.cpp;ocn/VelTend.cpp"
     "-n;1"
 )
