@@ -128,19 +128,20 @@ class PotentialVortHAdvOnEdge {
       const I4 KMin = MinLayerEdgeBot(IEdge);
       const I4 KMax = MaxLayerEdgeTop(IEdge);
 
+#pragma unroll
       for (int J = 0; J < NEdgesOnEdge(IEdge); ++J) {
-         const I4 JEdge = EdgesOnEdge(IEdge, J);
 
          parallelForInnerOpt(
              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-                const Real NormVort =
-                    (NormRVortEdge(IEdge, K) + NormFEdge(IEdge, K) +
-                     NormRVortEdge(JEdge, K) + NormFEdge(JEdge, K)) *
-                    0.5_Real;
+                const Real VortIEdge =
+                    NormRVortEdge(IEdge, K) + NormFEdge(IEdge, K);
+                const I4 JEdge = EdgesOnEdge(IEdge, J);
+                const Real VortJEdge =
+                    NormRVortEdge(JEdge, K) + NormFEdge(JEdge, K);
 
-                Tend(K) += WeightsOnEdge(IEdge, J) *
-                           FluxLayerThickEdge(JEdge, K) *
-                           NormVelEdge(JEdge, K) * NormVort;
+                Tend(K) +=
+                    WeightsOnEdge(IEdge, J) * FluxLayerThickEdge(JEdge, K) *
+                    NormVelEdge(JEdge, K) * 0.5_Real * (VortIEdge + VortJEdge);
              });
       }
    }

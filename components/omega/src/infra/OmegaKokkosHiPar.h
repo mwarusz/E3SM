@@ -12,7 +12,7 @@
 
 namespace OMEGA {
 
-using TeamPolicy      = Kokkos::TeamPolicy<ExecSpace>;
+using TeamPolicy      = Kokkos::TeamPolicy<ExecSpace, Kokkos::IndexType<int>>;
 using TeamMember      = TeamPolicy::member_type;
 using ScratchMemSpace = ExecSpace::scratch_memory_space;
 using Kokkos::PerTeam;
