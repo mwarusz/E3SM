@@ -154,11 +154,11 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
              if (Geom == Geometry::Planar) {
                 const Real X            = XElement(IElement);
                 const Real Y            = YElement(IElement);
-                ScalarElement(IElement) = Fun(X, Y);
+                ScalarElement(IElement) = Fun(IElement, X, Y);
              } else {
                 const Real Lon          = LonElement(IElement);
                 const Real Lat          = LatElement(IElement);
-                ScalarElement(IElement) = Fun(Lon, Lat);
+                ScalarElement(IElement) = Fun(IElement, Lon, Lat);
              }
           });
    }
@@ -184,10 +184,10 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
                        Y = LatElement(IElement);
                     }
                     if constexpr (ZCoordNull) {
-                       ScalarElement(IElement, K) = Fun(X, Y);
+                       ScalarElement(IElement, K) = Fun(IElement, X, Y);
                     } else {
                        const Real Z               = ZElement(IElement, K);
-                       ScalarElement(IElement, K) = Fun(X, Y, Z);
+                       ScalarElement(IElement, K) = Fun(IElement, K, X, Y, Z);
                     }
                  });
           });
@@ -214,10 +214,11 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
                        Y = LatElement(IElement);
                     }
                     if constexpr (ZCoordNull) {
-                       ScalarElement(L, IElement, K) = Fun(X, Y);
+                       ScalarElement(L, IElement, K) = Fun(IElement, X, Y);
                     } else {
-                       const Real Z                  = ZElement(IElement, K);
-                       ScalarElement(L, IElement, K) = Fun(X, Y, Z);
+                       const Real Z = ZElement(IElement, K);
+                       ScalarElement(L, IElement, K) =
+                           Fun(IElement, K, X, Y, Z);
                     }
                  });
           });
@@ -294,10 +295,10 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
 
          Real VecField[2];
          if constexpr (ZCoordNull) {
-            Fun(VecField, XE, YE);
+            Fun(VecField, IEdge, XE, YE);
          } else {
             const Real ZE = ZElement(IEdge, K);
-            Fun(VecField, XE, YE, ZE);
+            Fun(VecField, IEdge, K, XE, YE, ZE);
          }
 
          if (EdgeComp == EdgeComponent::Normal) {
@@ -319,10 +320,10 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
 
          Real VecField[2];
          if constexpr (ZCoordNull) {
-            Fun(VecField, LonE, LatE);
+            Fun(VecField, IEdge, LonE, LatE);
          } else {
             const Real ZE = ZElement(IEdge, K);
-            Fun(VecField, LonE, LatE, ZE);
+            Fun(VecField, IEdge, K, LonE, LatE, ZE);
          }
 
          if (CartProjectionOpt == CartProjection::Yes) {
