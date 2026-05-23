@@ -24,74 +24,78 @@ class PseudoThicknessAuxVars {
                           const HorzMesh *Mesh, const VertCoord *VCoord);
 
    KOKKOS_FUNCTION void
-   computeVarsOnEdge(int IEdge, int KChunk, const Array2DReal &PseudoThickCell,
+   computeVarsOnEdge(const TeamMember &Team, int IEdge,
+                     const Array2DReal &PseudoThickCell,
                      const Array2DReal &NormalVelEdge) const {
-      const int KStart = chunkStart(KChunk, MinLayerEdgeBot(IEdge));
-      const int KLen   = chunkLength(KChunk, KStart, MaxLayerEdgeTop(IEdge));
 
       const int JCell0 = CellsOnEdge(IEdge, 0);
       const int JCell1 = CellsOnEdge(IEdge, 1);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const int K = KStart + KVec;
-         MeanPseudoThickEdge(IEdge, K) =
-             0.5_Real *
-             (PseudoThickCell(JCell0, K) + PseudoThickCell(JCell1, K));
-      }
+      const int KMin = MinLayerEdgeBot(IEdge);
+      const int KMax = MaxLayerEdgeTop(IEdge);
+
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             MeanPseudoThickEdge(IEdge, K) =
+                 0.5_Real *
+                 (PseudoThickCell(JCell0, K) + PseudoThickCell(JCell1, K));
+          });
 
       switch (FluxThickEdgeChoice) {
       case FluxThickEdgeOption::Center:
-         for (int KVec = 0; KVec < KLen; ++KVec) {
-            const int K = KStart + KVec;
-            FluxPseudoThickEdge(IEdge, K) =
-                0.5_Real *
-                (PseudoThickCell(JCell0, K) + PseudoThickCell(JCell1, K));
-         }
+         parallelForInner(
+             Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                FluxPseudoThickEdge(IEdge, K) =
+                    0.5_Real *
+                    (PseudoThickCell(JCell0, K) + PseudoThickCell(JCell1, K));
+             });
          break;
       case FluxThickEdgeOption::Upwind:
-         for (int KVec = 0; KVec < KLen; ++KVec) {
-            const int K = KStart + KVec;
-            if (NormalVelEdge(IEdge, K) > 0) {
-               FluxPseudoThickEdge(IEdge, K) = PseudoThickCell(JCell0, K);
-            } else if (NormalVelEdge(IEdge, K) < 0) {
-               FluxPseudoThickEdge(IEdge, K) = PseudoThickCell(JCell1, K);
-            } else {
-               FluxPseudoThickEdge(IEdge, K) = Kokkos::max(
-                   PseudoThickCell(JCell0, K), PseudoThickCell(JCell1, K));
-            }
-         }
+         parallelForInner(
+             Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                if (NormalVelEdge(IEdge, K) > 0) {
+                   FluxPseudoThickEdge(IEdge, K) = PseudoThickCell(JCell0, K);
+                } else if (NormalVelEdge(IEdge, K) < 0) {
+                   FluxPseudoThickEdge(IEdge, K) = PseudoThickCell(JCell1, K);
+                } else {
+                   FluxPseudoThickEdge(IEdge, K) = Kokkos::max(
+                       PseudoThickCell(JCell0, K), PseudoThickCell(JCell1, K));
+                }
+             });
          break;
       }
    }
 
-   KOKKOS_FUNCTION void computeVarsOnCells(int ICell, int KChunk,
+   KOKKOS_FUNCTION void computeVarsOnCells(const TeamMember &Team, int ICell,
                                            const Array2DReal &PseudoThickCell,
                                            const Array2DReal &NormalVelEdge,
                                            const Real Dt) const {
 
       // Temporary for stacked shallow water
-      const int KStart = chunkStart(KChunk, MinLayerCell(ICell));
-      const int KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const int KMin = MinLayerCell(ICell);
+      const int KMax = MaxLayerCell(ICell);
 
-      Real TmpProv[VecLength] = {0.};
+      ScratchArray1DReal TmpProv(teamScratch(Team), NVertLayers);
+      parallelForInner(
+          Team, NVertLayers, INNER_LAMBDA(int K) { TmpProv(K) = 0; });
 
       Real DtInvAreaCell = Dt / AreaCell(ICell);
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
          const Real Factor =
              DtInvAreaCell * DvEdge(JEdge) * EdgeSignOnCell(ICell, J);
-         for (int KVec = 0; KVec < KLen; ++KVec) {
-            const int K = KStart + KVec;
-            TmpProv[KVec] += Factor * FluxPseudoThickEdge(JEdge, K) *
-                             NormalVelEdge(JEdge, K);
-         }
+         parallelForInner(
+             Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                TmpProv(K) += Factor * FluxPseudoThickEdge(JEdge, K) *
+                              NormalVelEdge(JEdge, K);
+             });
       }
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const int K = KStart + KVec;
-         ProvPseudoThickness(ICell, K) =
-             PseudoThickCell(ICell, K) + TmpProv[KVec];
-      }
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             ProvPseudoThickness(ICell, K) =
+                 PseudoThickCell(ICell, K) + TmpProv(K);
+          });
    }
 
    void registerFields(const std::string &AuxGroupName,
@@ -105,6 +109,7 @@ class PseudoThicknessAuxVars {
    Array2DI4 EdgesOnCell;
    Array2DReal EdgeSignOnCell;
    Array2DI4 CellsOnEdge;
+   I4 NVertLayers;
    Array1DI4 MinLayerEdgeBot;
    Array1DI4 MaxLayerEdgeTop;
    Array1DI4 MinLayerCell;
