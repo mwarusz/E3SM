@@ -450,7 +450,9 @@ void Tendencies::computePseudoThicknessTendenciesOnly(
    if (LocThicknessFluxDiv.Enabled) {
       Pacer::start("Tend:thicknessFluxDiv", 2);
       parallelForOuter(
-          {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
+          LaunchConfig({Mesh->NCellsAll},
+                       TeamScratch<Real>(VCoord->NVertLayers)),
+          KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
              LocThicknessFluxDiv(Team, LocPseudoThicknessTend, ICell,
                                  ThickFluxEdge, NormalVelEdge);
           });
@@ -518,7 +520,9 @@ void Tendencies::computeVelocityTendenciesOnly(
    if (LocPotentialVortHAdv.Enabled) {
       Pacer::start("Tend:PotentialVortHAdv", 2);
       parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          LaunchConfig({Mesh->NEdgesAll},
+                       TeamScratch<Real>(VCoord->NVertLayers)),
+          KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
              LocPotentialVortHAdv(Team, LocNormalVelocityTend, IEdge,
                                   NormRVortEdge, NormFEdge, FluxPseudoThickEdge,
                                   NormVelEdge);
@@ -669,13 +673,15 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerHorzAdv.Enabled) {
       Pacer::start("Tend:tracerHorzAdv", 2);
       parallelForOuter(
-          {NTracers, Mesh->NEdgesAll},
+          LaunchConfig({NTracers, Mesh->NEdgesAll},
+                       TeamScratch<Real>(VCoord->NVertLayers)),
           KOKKOS_LAMBDA(int L, int IEdge, const TeamMember &Team) {
              LocTracerHorzAdv(Team, L, IEdge, TracerArray, FluxPseudoThickEdge,
                               NormalVelEdge);
           });
       parallelForOuter(
-          {NTracers, Mesh->NCellsAll},
+          LaunchConfig({NTracers, Mesh->NCellsAll},
+                       TeamScratch<Real>(VCoord->NVertLayers)),
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
              LocTracerHorzAdv(Team, LocTracerTend, L, ICell);
           });
@@ -688,7 +694,8 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerDiffusion.Enabled) {
       Pacer::start("Tend:tracerDiffusion", 2);
       parallelForOuter(
-          {NTracers, Mesh->NCellsAll},
+          LaunchConfig({NTracers, Mesh->NCellsAll},
+                       TeamScratch<Real>(VCoord->NVertLayers)),
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
              LocTracerDiffusion(Team, LocTracerTend, L, ICell, TracerArray,
                                 MeanPseudoThickEdge);
@@ -701,7 +708,8 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerHyperDiff.Enabled) {
       Pacer::start("Tend:tracerHyperDiff", 2);
       parallelForOuter(
-          {NTracers, Mesh->NCellsAll},
+          LaunchConfig({NTracers, Mesh->NCellsAll},
+                       TeamScratch<Real>(VCoord->NVertLayers)),
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
              LocTracerHyperDiff(Team, LocTracerTend, L, ICell, Del2TracersCell);
           });

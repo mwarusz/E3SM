@@ -39,19 +39,30 @@ class PseudoThicknessFluxDivOnCell {
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
+      ScratchArray1DReal DivTmp(teamScratch(Team), NVertLayers);
+      parallelForInner(
+          Team, NVertLayers, INNER_LAMBDA(int K) { DivTmp(K) = 0; });
+
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
 
-         const int KMin = MinLayerEdgeBot(JEdge);
-         const int KMax = MaxLayerEdgeTop(JEdge);
+         const int MinLyrEdgeBot = MinLayerEdgeBot(JEdge);
+         const int MaxLyrEdgeTop = MaxLayerEdgeTop(JEdge);
 
          parallelForInner(
-             Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-                Tend(ICell, K) += DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
-                                  PseudoThicknessFlux(JEdge, K) *
-                                  NormalVelEdge(JEdge, K) * InvAreaCell;
+             Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop}, INNER_LAMBDA(int K) {
+                DivTmp(K) -= DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
+                             PseudoThicknessFlux(JEdge, K) *
+                             NormalVelEdge(JEdge, K) * InvAreaCell;
              });
       }
+
+      const int MinLyrCell = MinLayerCell(ICell);
+      const int MaxLyrCell = MaxLayerCell(ICell);
+
+      parallelForInner(
+          Team, Range{MinLyrCell, MaxLyrCell},
+          INNER_LAMBDA(int K) { Tend(ICell, K) -= DivTmp(K); });
    }
 
  private:
@@ -60,6 +71,7 @@ class PseudoThicknessFluxDivOnCell {
    Array1DReal DvEdge;
    Array1DReal AreaCell;
    Array2DReal EdgeSignOnCell;
+   I4 NVertLayers;
    Array1DI4 MinLayerCell;
    Array1DI4 MaxLayerCell;
    Array1DI4 MinLayerEdgeBot;
@@ -86,8 +98,13 @@ class PotentialVortHAdvOnEdge {
                                    const Array2DReal &FluxPseudoThickEdge,
                                    const Array2DReal &NormVelEdge) const {
 
+      ScratchArray1DReal VortTmp(teamScratch(Team), NVertLayers);
+
       const int KMin = MinLayerEdgeBot(IEdge);
       const int KMax = MaxLayerEdgeTop(IEdge);
+
+      parallelForInner(
+          Team, NVertLayers, INNER_LAMBDA(int K) { VortTmp(K) = 0; });
 
       for (int J = 0; J < NEdgesOnEdge(IEdge); ++J) {
          I4 JEdge = EdgesOnEdge(IEdge, J);
@@ -98,17 +115,23 @@ class PotentialVortHAdvOnEdge {
                      NormRVortEdge(JEdge, K) + NormFEdge(JEdge, K)) *
                     0.5_Real;
 
-                Tend(IEdge, K) += EdgeMask(IEdge, K) * WeightsOnEdge(IEdge, J) *
-                                  FluxPseudoThickEdge(JEdge, K) *
-                                  NormVelEdge(JEdge, K) * NormVort;
+                VortTmp(K) += WeightsOnEdge(IEdge, J) *
+                              FluxPseudoThickEdge(JEdge, K) *
+                              NormVelEdge(JEdge, K) * NormVort;
              });
       }
+
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             Tend(IEdge, K) += EdgeMask(IEdge, K) * VortTmp(K);
+          });
    }
 
  private:
    Array1DI4 NEdgesOnEdge;
    Array2DI4 EdgesOnEdge;
    Array2DReal WeightsOnEdge;
+   I4 NVertLayers;
    Array2DReal EdgeMask;
    Array1DI4 MinLayerEdgeBot;
    Array1DI4 MaxLayerEdgeTop;
@@ -377,12 +400,13 @@ class TracerHorzAdvOnCell {
                                    const Array2DReal &FluxPseudoThickEdge,
                                    const Array2DReal &NormVelEdge) const {
 
+      ScratchArray1DReal FlxTmp(teamScratch(Team), NVertLayers);
+
       const int KMin = MinLayerEdgeBot(IEdge);
       const int KMax = MaxLayerEdgeTop(IEdge);
 
       parallelForInner(
-          Team, Range{KMin, KMax},
-          INNER_LAMBDA(int K) { HighOrderFlxHorz(L, IEdge, K) = 0; });
+          Team, NVertLayers, INNER_LAMBDA(int K) { FlxTmp(K) = 0; });
 
       if (!ForceLowOrder && AdvMaskHighOrder(IEdge)) {
          for (int I = 0; I < NAdvCellsForEdge(IEdge); ++I) {
@@ -397,8 +421,7 @@ class TracerHorzAdvOnCell {
                             std::copysign(1._Real, NormalPseudoThicknessFlux) *
                             AdvCoefs3rd(I, IEdge)) *
                        NormalPseudoThicknessFlux;
-                   HighOrderFlxHorz(L, IEdge, K) +=
-                       TracerWgt * TracerCell(L, ICell, K);
+                   FlxTmp(K) += TracerWgt * TracerCell(L, ICell, K);
                 });
          }
       } else {
@@ -411,11 +434,14 @@ class TracerHorzAdvOnCell {
                     FluxPseudoThickEdge(IEdge, K) * NormVelEdge(IEdge, K);
                 const Real TracerWgt =
                     DvEdge(IEdge) * 0.5_Real * NormalPseudoThicknessFlux;
-                HighOrderFlxHorz(L, IEdge, K) +=
-                    TracerWgt *
-                    (TracerCell(L, JCell1, K) + TracerCell(L, JCell0, K));
+                FlxTmp(K) += TracerWgt * (TracerCell(L, JCell1, K) +
+                                          TracerCell(L, JCell0, K));
              });
       }
+
+      parallelForInner(
+          Team, Range{KMin, KMax},
+          INNER_LAMBDA(int K) { HighOrderFlxHorz(L, IEdge, K) = FlxTmp(K); });
    }
 
    KOKKOS_FUNCTION void operator()(const TeamMember &Team,
@@ -423,22 +449,25 @@ class TracerHorzAdvOnCell {
                                    const I4 ICell) const {
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
+      ScratchArray1DReal TendTmp(teamScratch(Team), NVertLayers);
+      parallelForInner(
+          Team, NVertLayers, INNER_LAMBDA(int K) { TendTmp(K) = 0; });
+
       const int KMin = MinLayerCell(ICell);
       const int KMax = MaxLayerCell(ICell);
-
-      parallelForInner(
-          Team, Range{KMin, KMax},
-          INNER_LAMBDA(int K) { Tend(L, ICell, K) = 0; });
 
       for (int I = 0; I < NEdgesOnCell(ICell); ++I) {
          const I4 IEdge = EdgesOnCell(ICell, I);
          parallelForInner(
              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-                Tend(L, ICell, K) += EdgeSignOnCell(ICell, I) *
-                                     HighOrderFlxHorz(L, IEdge, K) *
-                                     InvAreaCell;
+                TendTmp(K) += EdgeSignOnCell(ICell, I) *
+                              HighOrderFlxHorz(L, IEdge, K) * InvAreaCell;
              });
       }
+
+      parallelForInner(
+          Team, Range{KMin, KMax},
+          INNER_LAMBDA(int K) { Tend(L, ICell, K) += TendTmp(K); });
    }
 
  private:
@@ -457,6 +486,7 @@ class TracerHorzAdvOnCell {
    Array1DReal DvEdge;
    Array1DReal AreaCell;
 
+   I4 NVertLayers;
    Array1DI4 MinLayerCell;
    Array1DI4 MaxLayerCell;
    Array1DI4 MinLayerEdgeBot;
@@ -479,7 +509,9 @@ class TracerDiffOnCell {
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
-      Real DiffTmp[VecLength] = {0};
+      ScratchArray1DReal DiffTmp(teamScratch(Team), NVertLayers);
+      parallelForInner(
+          Team, NVertLayers, INNER_LAMBDA(int K) { DiffTmp(K) = 0; });
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
@@ -490,20 +522,26 @@ class TracerDiffOnCell {
          const Real RTemp =
              MeshScalingDel2(JEdge) * DvEdge(JEdge) / DcEdge(JEdge);
 
-         const int KMin = MinLayerEdgeBot(JEdge);
-         const int KMax = MaxLayerEdgeTop(JEdge);
+         const int MinLyrEdgeBot = MinLayerEdgeBot(JEdge);
+         const int MaxLyrEdgeTop = MaxLayerEdgeTop(JEdge);
 
          parallelForInner(
-             Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop}, INNER_LAMBDA(int K) {
                 const Real TracerGrad =
                     (TracerCell(L, JCell1, K) - TracerCell(L, JCell0, K));
 
-                Tend(L, ICell, K) -= EddyDiff2 * EdgeMask(JEdge, K) *
-                                     EdgeSignOnCell(ICell, J) * RTemp *
-                                     MeanPseudoThickEdge(JEdge, K) *
-                                     TracerGrad * InvAreaCell;
+                DiffTmp(K) -= EddyDiff2 * EdgeMask(JEdge, K) *
+                              EdgeSignOnCell(ICell, J) * RTemp *
+                              MeanPseudoThickEdge(JEdge, K) * TracerGrad;
              });
       }
+      const int MinLyrCell = MinLayerCell(ICell);
+      const int MaxLyrCell = MaxLayerCell(ICell);
+
+      parallelForInner(
+          Team, Range{MinLyrCell, MaxLyrCell}, INNER_LAMBDA(int K) {
+             Tend(L, ICell, K) += EddyDiff2 * DiffTmp(K) * InvAreaCell;
+          });
    }
 
  private:
@@ -515,6 +553,7 @@ class TracerDiffOnCell {
    Array1DReal DcEdge;
    Array1DReal AreaCell;
    Array1DReal MeshScalingDel2;
+   I4 NVertLayers;
    Array2DReal EdgeMask;
    Array1DI4 MinLayerCell;
    Array1DI4 MaxLayerCell;
@@ -537,7 +576,9 @@ class TracerHyperDiffOnCell {
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
-      Real HypTmp[VecLength] = {0};
+      ScratchArray1DReal HypTmp(teamScratch(Team), NVertLayers);
+      parallelForInner(
+          Team, NVertLayers, INNER_LAMBDA(int K) { HypTmp(K) = 0; });
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
@@ -548,19 +589,25 @@ class TracerHyperDiffOnCell {
          const Real RTemp =
              MeshScalingDel4(JEdge) * DvEdge(JEdge) / DcEdge(JEdge);
 
-         const int KMin = MinLayerEdgeBot(JEdge);
-         const int KMax = MaxLayerEdgeTop(JEdge);
+         const int MinLyrEdgeBot = MinLayerEdgeBot(JEdge);
+         const int MaxLyrEdgeTop = MaxLayerEdgeTop(JEdge);
 
          parallelForInner(
-             Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop}, INNER_LAMBDA(int K) {
                 const Real Del2TrGrad =
                     (TrDel2Cell(L, JCell1, K) - TrDel2Cell(L, JCell0, K));
 
-                Tend(L, ICell, K) += EddyDiff4 * EdgeMask(JEdge, K) *
-                                     EdgeSignOnCell(ICell, J) * RTemp *
-                                     Del2TrGrad * InvAreaCell;
+                HypTmp(K) -= EdgeMask(JEdge, K) * EdgeSignOnCell(ICell, J) *
+                             RTemp * Del2TrGrad;
              });
       }
+      const int MinLyrCell = MinLayerCell(ICell);
+      const int MaxLyrCell = MaxLayerCell(ICell);
+
+      parallelForInner(
+          Team, Range{MinLyrCell, MaxLyrCell}, INNER_LAMBDA(int K) {
+             Tend(L, ICell, K) -= EddyDiff4 * HypTmp(K) * InvAreaCell;
+          });
    }
 
  private:
@@ -572,6 +619,7 @@ class TracerHyperDiffOnCell {
    Array1DReal DcEdge;
    Array1DReal AreaCell;
    Array1DReal MeshScalingDel4;
+   I4 NVertLayers;
    Array2DReal EdgeMask;
    Array1DI4 MinLayerCell;
    Array1DI4 MaxLayerCell;

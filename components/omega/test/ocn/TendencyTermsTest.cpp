@@ -368,7 +368,8 @@ int testThickFluxDiv(int NVertLayers, Real RTol) {
                                NVertLayers);
    PseudoThicknessFluxDivOnCell ThickFluxDivOnC(Mesh, VCoord);
    parallelForOuter(
-       {Mesh->NCellsOwned}, KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
+       LaunchConfig({Mesh->NCellsOwned}, TeamScratch<Real>(NVertLayers)),
+       KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
           ThickFluxDivOnC(Team, NumThickFluxDiv, ICell, OnesEdge,
                           ThickFluxEdge);
        });
@@ -446,7 +447,8 @@ int testPotVortHAdv(int NVertLayers, Real RTol) {
 
    PotentialVortHAdvOnEdge PotVortHAdvOnE(Mesh, VCoord);
    parallelForOuter(
-       {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+       LaunchConfig({Mesh->NEdgesOwned}, TeamScratch<Real>(NVertLayers)),
+       KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
           PotVortHAdvOnE(Team, NumPotVortHAdv, IEdge, NormRelVortEdge,
                          NormPlanetVortEdge, PseudoThickEdge, NormVelEdge);
        });
@@ -886,13 +888,15 @@ int testTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
    TrHorzAdvOnC.ForceLowOrder = true;
 
    parallelForOuter(
-       {NTracers, Mesh->NEdgesAll},
+       LaunchConfig({NTracers, Mesh->NEdgesAll},
+                    TeamScratch<Real>(NVertLayers)),
        KOKKOS_LAMBDA(int L, int IEdge, const TeamMember &Team) {
           TrHorzAdvOnC(Team, L, IEdge, TrCell, ThickEdge, NormalVelocity);
        });
 
    parallelForOuter(
-       {NTracers, Mesh->NCellsOwned},
+       LaunchConfig({NTracers, Mesh->NCellsOwned},
+                    TeamScratch<Real>(NVertLayers)),
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           TrHorzAdvOnC(Team, NumTrFluxDiv, L, ICell);
        });
@@ -949,7 +953,8 @@ int testTracerDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
    TrDiffOnC.EddyDiff2 = 1._Real;
 
    parallelForOuter(
-       {NTracers, Mesh->NCellsOwned},
+       LaunchConfig({NTracers, Mesh->NCellsOwned},
+                    TeamScratch<Real>(NVertLayers)),
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           TrDiffOnC(Team, NumTracerDiff, L, ICell, TracerCell, PseudoThickEdge);
        });
@@ -998,7 +1003,8 @@ int testTracerHyperDiffOnCell(int NVertLayers, int NTracers, Real RTol) {
    TracerHyperDiffOnCell TrHypDiffOnC(Mesh, VCoord);
    TrHypDiffOnC.EddyDiff4 = 1._Real;
    parallelForOuter(
-       {NTracers, Mesh->NCellsOwned},
+       LaunchConfig({NTracers, Mesh->NCellsOwned},
+                    TeamScratch<Real>(NVertLayers)),
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           TrHypDiffOnC(Team, NumTracerHyperDiff, L, ICell, TrDel2Cell);
        });
