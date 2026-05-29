@@ -1019,19 +1019,13 @@ void VertCoord::computeGeopotential(
    parallelForOuter(
        "computeGeopotential", {NCellsAll},
        KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-          const I4 KMin    = LocMinLayerCell(ICell);
-          const I4 KMax    = LocMaxLayerCell(ICell);
-          const I4 NChunks = vertRangeChunked(KMin, KMax);
+          const I4 KMin = LocMinLayerCell(ICell);
+          const I4 KMax = LocMaxLayerCell(ICell);
           parallelForInner(
-              Team, NChunks, INNER_LAMBDA(const int KChunk) {
-                 const I4 KStart = chunkStart(KChunk, KMin);
-                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const I4 K             = KStart + KVec;
-                    LocGeopotMid(ICell, K) = Gravity * LocZMid(ICell, K) +
-                                             TidalPotential(ICell) +
-                                             SelfAttractionLoading(ICell);
-                 }
+              Team, Range{KMin, KMax}, INNER_LAMBDA(const int K) {
+                 LocGeopotMid(ICell, K) = Gravity * LocZMid(ICell, K) +
+                                          TidalPotential(ICell) +
+                                          SelfAttractionLoading(ICell);
               });
        });
 } // end compute Geopotential
@@ -1071,18 +1065,11 @@ void VertCoord::computeTargetThickness() {
               SumWh, SumRefH);
           Coeff -= SumRefH;
 
-          const I4 NChunks = vertRangeChunked(KMin, KMax);
-
           parallelForInner(
-              Team, NChunks, INNER_LAMBDA(const int KChunk) {
-                 const I4 KStart = chunkStart(KChunk, KMin);
-                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const I4 K = KStart + KVec;
-                    LocPseudoThickTarget(ICell, K) =
-                        LocRefPseudoThick(ICell, K) *
-                        (1._Real + Coeff * LocVertCoordMvmtWgts(K) / SumWh);
-                 }
+              Team, Range{KMin, KMax}, INNER_LAMBDA(const int K) {
+                 LocPseudoThickTarget(ICell, K) =
+                     LocRefPseudoThick(ICell, K) *
+                     (1._Real + Coeff * LocVertCoordMvmtWgts(K) / SumWh);
               });
        });
 }
