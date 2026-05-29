@@ -552,10 +552,10 @@ void testConvVertMix() {
 
    /// Compute only convective vertical viscosity and diffusivity
    OMEGA_SCOPE(ComputeVertMixConv, TestVertMix->ComputeVertMixConv);
-   parallelFor(
-       "ApplyVertMixConv", {Mesh->NCellsAll, NChunks},
-       KOKKOS_LAMBDA(I4 ICell, I4 KChunk) {
-          ComputeVertMixConv(VertDiffOut, VertViscOut, ICell, KChunk,
+   parallelForOuter(
+       "ApplyVertMixConv", {Mesh->NCellsAll},
+       KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
+          ComputeVertMixConv(Team, VertDiffOut, VertViscOut, ICell,
                              BruntVaisalaFreqSqIn);
        });
 
@@ -686,10 +686,10 @@ void testShearVertMix() {
    /// Compute only shear vertical viscosity and diffusivity
    OMEGA_SCOPE(ComputeVertMixShear, TestVertMix->ComputeVertMixShear);
    ComputeVertMixShear.ShearExponent = 3.0;
-   parallelFor(
-       "ApplyVertMixShear", {Mesh->NCellsAll, NChunks},
-       KOKKOS_LAMBDA(I4 ICell, I4 KChunk) {
-          ComputeVertMixShear(VertDiffOut, VertViscOut, ICell, KChunk,
+   parallelForOuter(
+       "ApplyVertMixShear", {Mesh->NCellsAll},
+       KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
+          ComputeVertMixShear(Team, VertDiffOut, VertViscOut, ICell,
                               GradRichNumSmoothedIn);
        });
 

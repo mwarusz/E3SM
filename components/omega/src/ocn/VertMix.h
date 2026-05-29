@@ -35,20 +35,25 @@ class ConvectiveMix {
    ConvectiveMix(const VertCoord *VCoord);
 
    KOKKOS_FUNCTION void
-   operator()(Array2DReal VertDiff, Array2DReal VertVisc, I4 ICell, I4 KChunk,
+   operator()(const TeamMember &Team, Array2DReal VertDiff,
+              Array2DReal VertVisc, I4 ICell,
               const Array2DReal &BruntVaisalaFreqSq) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell) + 1);
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const I4 KMin = MinLayerCell(ICell) + 1;
+      const I4 KMax = MaxLayerCell(ICell);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
-
-         if (BruntVaisalaFreqSq(ICell, K) < ConvTriggerBVF) {
-            VertDiff(ICell, K) += ConvDiff;
-            VertVisc(ICell, K) += ConvDiff;
-         }
-      }
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             if (K == 0) {
+                VertVisc(ICell, K) = 0.0_Real;
+                VertDiff(ICell, K) = 0.0_Real;
+             } else {
+                if (BruntVaisalaFreqSq(ICell, K) < ConvTriggerBVF) {
+                   VertDiff(ICell, K) += ConvDiff;
+                   VertVisc(ICell, K) += ConvDiff;
+                }
+             }
+          });
    }
 
  private:
@@ -72,36 +77,36 @@ class ShearMix {
    ShearMix(const VertCoord *VCoord);
 
    KOKKOS_FUNCTION void
-   operator()(Array2DReal VertDiff, Array2DReal VertVisc, I4 ICell, I4 KChunk,
+   operator()(const TeamMember &Team, Array2DReal VertDiff,
+              Array2DReal VertVisc, I4 ICell,
               const Array2DReal &GradRichNumSmoothed) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell) + 1);
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const I4 KMin = MinLayerCell(ICell) + 1;
+      const I4 KMax = MaxLayerCell(ICell);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
-
-         if (GradRichNumSmoothed(ICell, K) <= 0.0_Real) {
-            VertDiff(ICell, K) += BaseShearValue;
-            VertVisc(ICell, K) += BaseShearValue;
-         } else if (GradRichNumSmoothed(ICell, K) > 0.0_Real &&
-                    GradRichNumSmoothed(ICell, K) < ShearRiCrit) {
-            VertDiff(ICell, K) +=
-                Kokkos::pow(
-                    1.0_Real -
-                        (GradRichNumSmoothed(ICell, K) / ShearRiCrit) *
-                            (GradRichNumSmoothed(ICell, K) / ShearRiCrit),
-                    ShearExponent) *
-                BaseShearValue;
-            VertVisc(ICell, K) +=
-                Kokkos::pow(
-                    1.0_Real -
-                        (GradRichNumSmoothed(ICell, K) / ShearRiCrit) *
-                            (GradRichNumSmoothed(ICell, K) / ShearRiCrit),
-                    ShearExponent) *
-                BaseShearValue;
-         }
-      }
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             if (GradRichNumSmoothed(ICell, K) <= 0.0_Real) {
+                VertDiff(ICell, K) += BaseShearValue;
+                VertVisc(ICell, K) += BaseShearValue;
+             } else if (GradRichNumSmoothed(ICell, K) > 0.0_Real &&
+                        GradRichNumSmoothed(ICell, K) < ShearRiCrit) {
+                VertDiff(ICell, K) +=
+                    Kokkos::pow(
+                        1.0_Real -
+                            (GradRichNumSmoothed(ICell, K) / ShearRiCrit) *
+                                (GradRichNumSmoothed(ICell, K) / ShearRiCrit),
+                        ShearExponent) *
+                    BaseShearValue;
+                VertVisc(ICell, K) +=
+                    Kokkos::pow(
+                        1.0_Real -
+                            (GradRichNumSmoothed(ICell, K) / ShearRiCrit) *
+                                (GradRichNumSmoothed(ICell, K) / ShearRiCrit),
+                        ShearExponent) *
+                    BaseShearValue;
+             }
+          });
    }
 
  private:
@@ -121,61 +126,61 @@ class GradRichardsonNum {
    //   the index ICell, and normal and tangential velocities as inputs,
    //   and outputs the Richardson number.
    KOKKOS_FUNCTION void
-   operator()(Array2DReal GradRichNum, I4 ICell, I4 KChunk,
+   operator()(const TeamMember &Team, Array2DReal GradRichNum, I4 ICell,
               const Array2DReal &NormalVelocity,
               const Array2DReal &TangentialVelocity,
               const Array2DReal &BruntVaisalaFreqSq) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell) + 1);
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const I4 KMin = MinLayerCell(ICell) + 1;
+      const I4 KMax = MaxLayerCell(ICell);
 
-      Real GradRichNumNorm[VecLength];
-      Real GradRichNumTmp[VecLength];
+      ScratchArray1DReal GradRichNumNorm(teamScratch(Team), NVertLayers);
+      ScratchArray1DReal GradRichNumTmp(teamScratch(Team), NVertLayers);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         GradRichNumNorm[KVec] = 1.0e-12_Real;
-         GradRichNumTmp[KVec]  = RiInitValue;
-      }
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             GradRichNumNorm(K) = 1.0e-12_Real;
+             GradRichNumTmp(K)  = RiInitValue;
+          });
 
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          I4 JEdge = EdgesOnCell(ICell, J);
          I4 JCell = CellsOnCell(ICell, J);
 
-         for (int KVec = 0; KVec < KLen; ++KVec) {
-            const I4 K = KStart + KVec;
-            I4 K1      = K - 1;
-            I4 K2      = K;
+         const I4 MinLyrEdgeBot = MinLayerEdgeBot(JEdge);
+         const I4 MaxLyrEdgeTop = MaxLayerEdgeTop(JEdge);
 
-            // Skip this edge contribution if it would access
-            // invalid edge velocity levels.
-            if (K > MaxLayerEdgeTop(JEdge))
-               continue;
+         parallelForInner(
+             Team, Range{MinLyrEdgeBot + 1, MaxLyrEdgeTop},
+             INNER_LAMBDA(int K) {
+                I4 K1 = K - 1;
+                I4 K2 = K;
 
-            Real DNormVel =
-                NormalVelocity(JEdge, K1) - NormalVelocity(JEdge, K2);
-            Real DTanVel =
-                TangentialVelocity(JEdge, K1) - TangentialVelocity(JEdge, K2);
-            Real DzEdge =
-                0.5_Real * (GeomZMid(ICell, K1) + GeomZMid(JCell, K1) -
-                            (GeomZMid(ICell, K2) + GeomZMid(JCell, K2)));
-            Real ShearSquared =
-                (DNormVel * DNormVel + DTanVel * DTanVel) / (DzEdge * DzEdge);
-            Real RiEdge =
-                Kokkos::max(0.0_Real,
-                            0.5_Real * (BruntVaisalaFreqSq(ICell, K2) +
-                                        BruntVaisalaFreqSq(JCell, K2))) /
-                (ShearSquared + 1.0e-12_Real);
+                Real DNormVel =
+                    NormalVelocity(JEdge, K1) - NormalVelocity(JEdge, K2);
+                Real DTanVel = TangentialVelocity(JEdge, K1) -
+                               TangentialVelocity(JEdge, K2);
+                Real DzEdge =
+                    0.5_Real * (GeomZMid(ICell, K1) + GeomZMid(JCell, K1) -
+                                (GeomZMid(ICell, K2) + GeomZMid(JCell, K2)));
+                Real ShearSquared = (DNormVel * DNormVel + DTanVel * DTanVel) /
+                                    (DzEdge * DzEdge);
+                Real RiEdge =
+                    Kokkos::max(0.0_Real,
+                                0.5_Real * (BruntVaisalaFreqSq(ICell, K2) +
+                                            BruntVaisalaFreqSq(JCell, K2))) /
+                    (ShearSquared + 1.0e-12_Real);
 
-            Real Weight = 0.25_Real * DcEdge(JEdge) * DvEdge(JEdge);
-            GradRichNumNorm[KVec] += Weight;
-            GradRichNumTmp[KVec] += Weight * RiEdge;
-         }
+                Real Weight = 0.25_Real * DcEdge(JEdge) * DvEdge(JEdge);
+                GradRichNumNorm(K) += Weight;
+                GradRichNumTmp(K) += Weight * RiEdge;
+             });
       }
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K            = KStart + KVec;
-         GradRichNum(ICell, K) = GradRichNumTmp[KVec] / GradRichNumNorm[KVec];
-      }
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             GradRichNum(ICell, K) = GradRichNumTmp(K) / GradRichNumNorm(K);
+          });
    }
 
  private:
