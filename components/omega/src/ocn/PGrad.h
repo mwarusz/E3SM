@@ -48,16 +48,14 @@ class PressureGradCentered {
 
    // Compute centered pressure gradient contribution for given edge and
    // vertical chunk. This appends results into the Tend array (in-place).
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
+                                   const Array2DReal &Tend, I4 IEdge,
                                    const Array2DReal &PressureMid,
                                    const Array2DReal &PressureInterface,
                                    const Array2DReal &GeomZInterface,
                                    const Array1DReal &TidalPotential,
                                    const Array1DReal &SelfAttractionLoading,
                                    const Array2DReal &SpecVol) const {
-
-      const I4 KStart = chunkStart(KChunk, MinLayerEdgeBot(IEdge));
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerEdgeTop(IEdge));
 
       const I4 ICell0      = CellsOnEdge(IEdge, 0);
       const I4 ICell1      = CellsOnEdge(IEdge, 1);
@@ -68,31 +66,35 @@ class PressureGradCentered {
           (SelfAttractionLoading(ICell1) - SelfAttractionLoading(ICell0)) *
               InvDcEdge;
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
-         Real MontPotCell0K =
-             PressureInterface(ICell0, K) * SpecVol(ICell0, K) +
-             Gravity * GeomZInterface(ICell0, K);
-         Real MontPotCell1K =
-             PressureInterface(ICell1, K) * SpecVol(ICell1, K) +
-             Gravity * GeomZInterface(ICell1, K);
-         Real GradMontPotK = (MontPotCell1K - MontPotCell0K) * InvDcEdge;
+      const I4 KMin = MinLayerEdgeBot(IEdge);
+      const I4 KMax = MaxLayerEdgeTop(IEdge);
 
-         Real MontPotCell0Kp1 =
-             PressureInterface(ICell0, K + 1) * SpecVol(ICell0, K) +
-             Gravity * GeomZInterface(ICell0, K + 1);
-         Real MontPotCell1Kp1 =
-             PressureInterface(ICell1, K + 1) * SpecVol(ICell1, K) +
-             Gravity * GeomZInterface(ICell1, K + 1);
-         Real GradMontPotKp1 = (MontPotCell1Kp1 - MontPotCell0Kp1) * InvDcEdge;
-         Real GradMontPot    = 0.5_Real * (GradMontPotK + GradMontPotKp1);
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             Real MontPotCell0K =
+                 PressureInterface(ICell0, K) * SpecVol(ICell0, K) +
+                 Gravity * GeomZInterface(ICell0, K);
+             Real MontPotCell1K =
+                 PressureInterface(ICell1, K) * SpecVol(ICell1, K) +
+                 Gravity * GeomZInterface(ICell1, K);
+             Real GradMontPotK = (MontPotCell1K - MontPotCell0K) * InvDcEdge;
 
-         Real PGradAlpha =
-             0.5_Real * (PressureMid(ICell1, K) + PressureMid(ICell0, K)) *
-             (SpecVol(ICell1, K) - SpecVol(ICell0, K)) * InvDcEdge;
-         Tend(IEdge, K) +=
-             EdgeMask(IEdge, K) * (-GradMontPot + PGradAlpha - GradGeoPot);
-      }
+             Real MontPotCell0Kp1 =
+                 PressureInterface(ICell0, K + 1) * SpecVol(ICell0, K) +
+                 Gravity * GeomZInterface(ICell0, K + 1);
+             Real MontPotCell1Kp1 =
+                 PressureInterface(ICell1, K + 1) * SpecVol(ICell1, K) +
+                 Gravity * GeomZInterface(ICell1, K + 1);
+             Real GradMontPotKp1 =
+                 (MontPotCell1Kp1 - MontPotCell0Kp1) * InvDcEdge;
+             Real GradMontPot = 0.5_Real * (GradMontPotK + GradMontPotKp1);
+
+             Real PGradAlpha =
+                 0.5_Real * (PressureMid(ICell1, K) + PressureMid(ICell0, K)) *
+                 (SpecVol(ICell1, K) - SpecVol(ICell0, K)) * InvDcEdge;
+             Tend(IEdge, K) +=
+                 EdgeMask(IEdge, K) * (-GradMontPot + PGradAlpha - GradGeoPot);
+          });
    }
 
  private:
@@ -140,14 +142,14 @@ class PressureGradFiniteVolume {
    // temperature, salinity and specific volume derivatives here would mean
    // evaluating the integrand a second time.
    KOKKOS_FUNCTION void
-   operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+   operator()(const TeamMember &Team, const Array2DReal &Tend, I4 IEdge,
               const Array2DReal &PressureInterface,
               const Array2DReal &DeltaZFixedP, const Array2DReal &DeltaZMoment,
               const Array1DReal &TidalPotential,
               const Array1DReal &SelfAttractionLoading) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerEdgeBot(IEdge));
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerEdgeTop(IEdge));
+      const I4 KMin = MinLayerEdgeBot(IEdge);
+      const I4 KMax = MaxLayerEdgeTop(IEdge);
 
       const I4 ICell0      = CellsOnEdge(IEdge, 0);
       const I4 ICell1      = CellsOnEdge(IEdge, 1);
@@ -158,26 +160,26 @@ class PressureGradFiniteVolume {
           (SelfAttractionLoading(ICell1) - SelfAttractionLoading(ICell0)) *
               InvDcEdge;
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             // the edge control volume's pressure thickness is exactly the edge
+             // average of the two columns' own
+             const Real DeltaPress =
+                 0.5_Real * ((PressureInterface(ICell0, K + 1) -
+                              PressureInterface(ICell0, K)) +
+                             (PressureInterface(ICell1, K + 1) -
+                              PressureInterface(ICell1, K)));
 
-         // the edge control volume's pressure thickness is exactly the edge
-         // average of the two columns' own
-         const Real DeltaPress = 0.5_Real * ((PressureInterface(ICell0, K + 1) -
-                                              PressureInterface(ICell0, K)) +
-                                             (PressureInterface(ICell1, K + 1) -
-                                              PressureInterface(ICell1, K)));
+             // The layer mean of the fixed-pressure height difference, from its
+             // value at the layer's bottom interface and the first moment of
+             // the integrand over the layer. Both come from the column scan.
+             Real LayerMean = DeltaZFixedP(IEdge, K + 1);
+             if (DeltaPress > 0.0_Real)
+                LayerMean += DeltaZMoment(IEdge, K) / DeltaPress;
 
-         // The layer mean of the fixed-pressure height difference, from its
-         // value at the layer's bottom interface and the first moment of the
-         // integrand over the layer. Both come from the column scan.
-         Real LayerMean = DeltaZFixedP(IEdge, K + 1);
-         if (DeltaPress > 0.0_Real)
-            LayerMean += DeltaZMoment(IEdge, K) / DeltaPress;
-
-         Tend(IEdge, K) += EdgeMask(IEdge, K) *
-                           (-Gravity * InvDcEdge * LayerMean - GradGeoPot);
-      }
+             Tend(IEdge, K) += EdgeMask(IEdge, K) *
+                               (-Gravity * InvDcEdge * LayerMean - GradGeoPot);
+          });
    }
 
  private:
@@ -197,16 +199,17 @@ class BarotropicPressureGradOnEdge {
        const VertCoord *VCoord ///< [in] Vertical coordinate
    );
 
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge, I4 KChunk,
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
+                                   const Array2DReal &Tend, I4 IEdge,
                                    const Array1DReal &BtrPressAnomaly,
                                    const Array1DReal &DepthMeanSpecVol) const {
 
       // Computing the depth-mean specific volume times the barotropic pressure
       // anomaly gradient on edges and adding it to every active vertical layer
-      const I4 KStart = chunkStart(KChunk, MinLayerEdgeBot(IEdge));
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerEdgeTop(IEdge));
-      const I4 ICell0 = CellsOnEdge(IEdge, 0);
-      const I4 ICell1 = CellsOnEdge(IEdge, 1);
+      const I4 KMin        = MinLayerEdgeBot(IEdge);
+      const I4 KMax        = MaxLayerEdgeTop(IEdge);
+      const I4 ICell0      = CellsOnEdge(IEdge, 0);
+      const I4 ICell1      = CellsOnEdge(IEdge, 1);
       const Real InvDcEdge = 1._Real / DcEdge(IEdge);
       const Real MeanSpecVol =
           0.5_Real * (DepthMeanSpecVol(ICell0) + DepthMeanSpecVol(ICell1));
@@ -214,10 +217,10 @@ class BarotropicPressureGradOnEdge {
           MeanSpecVol * (BtrPressAnomaly(ICell1) - BtrPressAnomaly(ICell0)) *
           InvDcEdge;
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
-         Tend(IEdge, K) += EdgeMask(IEdge, K) * BtrPressGradTend;
-      }
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             Tend(IEdge, K) += EdgeMask(IEdge, K) * BtrPressGradTend;
+          });
    }
 
  private:
