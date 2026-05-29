@@ -151,44 +151,22 @@ void Eos::computeSpecVol(const Array2DReal &ConservTemp,
       parallelForOuter(
           "eos-linear", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolLinear(LocSpecVol, ICell, KChunk,
-                                            ConservTemp, AbsSalinity);
-                 });
+             LocComputeSpecVolLinear(Team, LocSpecVol, ICell, ConservTemp,
+                                     AbsSalinity);
           });
    } else if (EosChoice == EosType::Teos10Eos) {
       parallelForOuter(
           "eos-teos10", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolTeos10(LocSpecVol, ICell, KChunk,
-                                            ConservTemp, AbsSalinity, Pressure,
-                                            KDisp);
-                 });
+             LocComputeSpecVolTeos10(Team, LocSpecVol, ICell, ConservTemp,
+                                     AbsSalinity, Pressure, KDisp);
           });
    } else if (EosChoice == EosType::ConstantEos) {
       parallelForOuter(
           "eos-constant", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolConstant(LocSpecVol, ICell, KChunk,
-                                              ConservTemp, AbsSalinity);
-                 });
+             LocComputeSpecVolConstant(Team, LocSpecVol, ICell, ConservTemp,
+                                       AbsSalinity);
           });
    }
 }
@@ -218,41 +196,22 @@ void Eos::computeSpecVolDisp(const Array2DReal &ConservTemp,
       parallelForOuter(
           "eos-linear", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolLinear(LocSpecVolDisplaced, ICell, KChunk,
-                                            ConservTemp, AbsSalinity);
-                 });
+             LocComputeSpecVolLinear(Team, LocSpecVolDisplaced, ICell,
+                                     ConservTemp, AbsSalinity);
           });
    } else if (EosChoice == EosType::Teos10Eos) {
       parallelForOuter(
           "eos-teos10", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolTeos10(LocSpecVolDisplaced, ICell, KChunk,
-                                            ConservTemp, AbsSalinity, Pressure,
-                                            KDisp);
-                 });
+             LocComputeSpecVolTeos10(Team, LocSpecVolDisplaced, ICell,
+                                     ConservTemp, AbsSalinity, Pressure, KDisp);
           });
    } else if (EosChoice == EosType::ConstantEos) {
       parallelForOuter(
           "eos-constant", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolConstant(LocSpecVolDisplaced, ICell,
-                                              KChunk, ConservTemp, AbsSalinity);
-                 });
+             LocComputeSpecVolConstant(Team, LocSpecVolDisplaced, ICell,
+                                       ConservTemp, AbsSalinity);
           });
    }
 }
@@ -282,14 +241,8 @@ void Eos::computeBruntVaisalaFreqSq(const Array2DReal &ConservTemp,
       parallelForOuter(
           "bvf-linear", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeBruntVaisalaFreqSqLinear(LocBruntVaisalaFreqSq,
-                                                       ICell, KChunk, SpecVol);
-                 });
+             LocComputeBruntVaisalaFreqSqLinear(Team, LocBruntVaisalaFreqSq,
+                                                ICell, SpecVol);
           });
    } else if (EosChoice == EosType::Teos10Eos) {
       /// If TEOS-10 EOS, use TEOS-10 squared Brunt-Vaisala frequency
@@ -297,15 +250,9 @@ void Eos::computeBruntVaisalaFreqSq(const Array2DReal &ConservTemp,
       parallelForOuter(
           "bvf-teos10", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeBruntVaisalaFreqSqTeos10(
-                        LocBruntVaisalaFreqSq, ICell, KChunk, ConservTemp,
-                        AbsSalinity, Pressure, SpecVol);
-                 });
+             LocComputeBruntVaisalaFreqSqTeos10(Team, LocBruntVaisalaFreqSq,
+                                                ICell, ConservTemp, AbsSalinity,
+                                                Pressure, SpecVol);
           });
    }
 }

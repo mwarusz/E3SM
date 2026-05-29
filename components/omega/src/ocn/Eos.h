@@ -38,48 +38,48 @@ class Teos10Eos {
    //   the indices ICell and KChunk, and the ocean tracers (conservative)
    //   temperature, and (absolute) salinity as inputs, and outputs the
    //   specific volume according to the Roquet et al. 2015 75 term expansion.
-   KOKKOS_FUNCTION void operator()(Array2DReal SpecVol, I4 ICell, I4 KChunk,
-                                   const Array2DReal &ConservTemp,
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team, Array2DReal SpecVol,
+                                   I4 ICell, const Array2DReal &ConservTemp,
                                    const Array2DReal &AbsSalinity,
                                    const Array2DReal &Pressure,
                                    I4 KDisp) const {
 
-      Real SpecVolPCoeffs[6 * VecLength];
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell));
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const I4 KMin = MinLayerCell(ICell);
+      const I4 KMax = MaxLayerCell(ICell);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
-         /// Calculate the local specific volume polynomial pressure
-         /// coefficients with cell center values
-         calcPCoeffs(SpecVolPCoeffs, KVec, ConservTemp(ICell, K),
-                     AbsSalinity(ICell, K));
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             Real SpecVolPCoeffs[6];
 
-         /// Calculate the specific volume at the given pressure
-         /// If KDisp is 0, we use the current pressure, otherwise
-         /// we use the displaced pressure (K + KDisp)
-         /// Note: KDisp is only used for TEOS-10, for Linear EOS it
-         /// is always 0.
-         if (KDisp == 0) {
-            // No displacement
-            SpecVol(ICell, K) =
-                calcRefProfile(Pressure(ICell, K) * Pa2Db) +
-                calcDelta(SpecVolPCoeffs, KVec, Pressure(ICell, K) * Pa2Db);
-         } else {
-            // Displacement, use the displaced pressure
-            I4 KTmp = Kokkos::min(K + KDisp, MaxLayerCell(ICell));
-            KTmp    = Kokkos::max(MinLayerCell(ICell), KTmp);
-            SpecVol(ICell, K) =
-                calcRefProfile(Pressure(ICell, KTmp) * Pa2Db) +
-                calcDelta(SpecVolPCoeffs, KVec, Pressure(ICell, KTmp) * Pa2Db);
-         }
-      }
+             /// Calculate the local specific volume polynomial pressure
+             /// coefficients with cell center values
+             calcPCoeffs(SpecVolPCoeffs, ConservTemp(ICell, K),
+                         AbsSalinity(ICell, K));
+
+             /// Calculate the specific volume at the given pressure
+             /// If KDisp is 0, we use the current pressure, otherwise
+             /// we use the displaced pressure (K + KDisp)
+             /// Note: KDisp is only used for TEOS-10, for Linear EOS it
+             /// is always 0.
+             if (KDisp == 0) {
+                // No displacement
+                SpecVol(ICell, K) =
+                    calcRefProfile(Pressure(ICell, K) * Pa2Db) +
+                    calcDelta(SpecVolPCoeffs, Pressure(ICell, K) * Pa2Db);
+             } else {
+                // Displacement, use the displaced pressure
+                I4 KTmp = Kokkos::min(K + KDisp, MaxLayerCell(ICell));
+                KTmp    = Kokkos::max(MinLayerCell(ICell), KTmp);
+                SpecVol(ICell, K) =
+                    calcRefProfile(Pressure(ICell, KTmp) * Pa2Db) +
+                    calcDelta(SpecVolPCoeffs, Pressure(ICell, KTmp) * Pa2Db);
+             }
+          });
    }
 
    /// TEOS-10 helpers
    /// Calculate pressure polynomial coefficients for TEOS-10
-   KOKKOS_FUNCTION void calcPCoeffs(Real (&SpecVolPCoeffs)[6 * VecLength],
-                                    const I4 KVec, const Real Ct,
+   KOKKOS_FUNCTION void calcPCoeffs(Real (&SpecVolPCoeffs)[6], const Real Ct,
                                     const Real Sa) const {
       constexpr Real SaNorm = 40.0 * 35.16504 / 35.0;
       constexpr Real CtNorm = 40.0;
@@ -163,18 +163,18 @@ class Teos10Eos {
       constexpr Real V014 = 3.1454099902e-07;
       constexpr Real V005 = 4.2369007180e-09;
 
-      SpecVolPCoeffs[5 + 6 * KVec] = V005;
-      SpecVolPCoeffs[4 + 6 * KVec] = V014 * Tt + V104 * Ss + V004;
-      SpecVolPCoeffs[3 + 6 * KVec] =
+      SpecVolPCoeffs[5] = V005;
+      SpecVolPCoeffs[4] = V014 * Tt + V104 * Ss + V004;
+      SpecVolPCoeffs[3] =
           (V023 * Tt + V113 * Ss + V013) * Tt + (V203 * Ss + V103) * Ss + V003;
-      SpecVolPCoeffs[2 + 6 * KVec] =
-          (((V042 * Tt + V132 * Ss + V032) * Tt + (V222 * Ss + V122) * Ss +
-            V022) *
-               Tt +
-           ((V312 * Ss + V212) * Ss + V112) * Ss + V012) *
-              Tt +
-          (((V402 * Ss + V302) * Ss + V202) * Ss + V102) * Ss + V002;
-      SpecVolPCoeffs[1 + 6 * KVec] =
+      SpecVolPCoeffs[2] = (((V042 * Tt + V132 * Ss + V032) * Tt +
+                            (V222 * Ss + V122) * Ss + V022) *
+                               Tt +
+                           ((V312 * Ss + V212) * Ss + V112) * Ss + V012) *
+                              Tt +
+                          (((V402 * Ss + V302) * Ss + V202) * Ss + V102) * Ss +
+                          V002;
+      SpecVolPCoeffs[1] =
           ((((V051 * Tt + V141 * Ss + V041) * Tt + (V231 * Ss + V131) * Ss +
              V031) *
                 Tt +
@@ -184,7 +184,7 @@ class Teos10Eos {
               Tt +
           ((((V501 * Ss + V401) * Ss + V301) * Ss + V201) * Ss + V101) * Ss +
           V001;
-      SpecVolPCoeffs[0 + 6 * KVec] =
+      SpecVolPCoeffs[0] =
           (((((V060 * Tt + V150 * Ss + V050) * Tt + (V240 * Ss + V140) * Ss +
               V040) *
                  Tt +
@@ -202,22 +202,20 @@ class Teos10Eos {
    }
 
    /// Evaluate pressure polynomial delta for TEOS-10
-   KOKKOS_FUNCTION Real calcDelta(const Real (&SpecVolPCoeffs)[6 * VecLength],
-                                  const I4 KVec, const Real P) const {
+   KOKKOS_FUNCTION Real calcDelta(const Real (&SpecVolPCoeffs)[6],
+                                  const Real P) const {
 
       constexpr Real PNorm = 1e-4;
       Real Pp              = P * PNorm;
 
-      Real Delta = ((((SpecVolPCoeffs[5 + 6 * KVec] * Pp +
-                       SpecVolPCoeffs[4 + 6 * KVec]) *
-                          Pp +
-                      SpecVolPCoeffs[3 + 6 * KVec]) *
+      Real Delta = ((((SpecVolPCoeffs[5] * Pp + SpecVolPCoeffs[4]) * Pp +
+                      SpecVolPCoeffs[3]) *
                          Pp +
-                     SpecVolPCoeffs[2 + 6 * KVec]) *
+                     SpecVolPCoeffs[2]) *
                         Pp +
-                    SpecVolPCoeffs[1 + 6 * KVec]) *
+                    SpecVolPCoeffs[1]) *
                        Pp +
-                   SpecVolPCoeffs[0 + 6 * KVec];
+                   SpecVolPCoeffs[0];
 
       return Delta;
    }
@@ -259,19 +257,19 @@ class LinearEos {
    //   the indices ICell and KChunk, and the ocean tracers (conservative)
    //   temperature, and (absolute) salinity as inputs, and outputs the
    //   linear specific volume.
-   KOKKOS_FUNCTION void operator()(Array2DReal SpecVol, I4 ICell, I4 KChunk,
-                                   const Array2DReal &ConservTemp,
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team, Array2DReal SpecVol,
+                                   I4 ICell, const Array2DReal &ConservTemp,
                                    const Array2DReal &AbsSalinity) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell));
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const I4 KMin = MinLayerCell(ICell);
+      const I4 KMax = MaxLayerCell(ICell);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
-         SpecVol(ICell, K) =
-             1.0_Real / (RhoT0S0 + (DRhodT * ConservTemp(ICell, K) +
-                                    DRhodS * AbsSalinity(ICell, K)));
-      }
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             SpecVol(ICell, K) =
+                 1.0_Real / (RhoT0S0 + (DRhodT * ConservTemp(ICell, K) +
+                                        DRhodS * AbsSalinity(ICell, K)));
+          });
    }
 
  private:
@@ -288,19 +286,19 @@ class ConstantEos {
    //   The functor takes the full arrays of specific volume (inout),
    //   the indices ICell and KChunk, and returns a constant specific volume
    //   value for all active layers.
-   KOKKOS_FUNCTION void operator()(Array2DReal SpecVol, I4 ICell, I4 KChunk,
-                                   const Array2DReal &ConservTemp,
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team, Array2DReal SpecVol,
+                                   I4 ICell, const Array2DReal &ConservTemp,
                                    const Array2DReal &AbsSalinity) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell));
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
       (void)ConservTemp;
       (void)AbsSalinity;
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K        = KStart + KVec;
-         SpecVol(ICell, K) = 1.0_Real / RhoSw;
-      }
+      const I4 KMin = MinLayerCell(ICell);
+      const I4 KMax = MaxLayerCell(ICell);
+
+      parallelForInner(
+          Team, Range{KMin, KMax},
+          INNER_LAMBDA(int K) { SpecVol(ICell, K) = 1.0_Real / RhoSw; });
    }
 
  private:
@@ -318,40 +316,40 @@ class Teos10BruntVaisalaFreqSq {
    //   (inout) the index ICell, and the ocean tracers (conservative)
    //   temperature, (absolute) salinity, pressure, specific volume as inputs,
    //   and outputs the squared Brunt-Vaisala frequency.
-   KOKKOS_FUNCTION void operator()(Array2DReal BruntVaisalaFreqSq, I4 ICell,
-                                   I4 KChunk, const Array2DReal &ConservTemp,
-                                   const Array2DReal &AbsSalinity,
-                                   const Array2DReal &Pressure,
-                                   const Array2DReal &SpecVol) const {
+   KOKKOS_FUNCTION void
+   operator()(const TeamMember &Team, Array2DReal BruntVaisalaFreqSq, I4 ICell,
+              const Array2DReal &ConservTemp, const Array2DReal &AbsSalinity,
+              const Array2DReal &Pressure, const Array2DReal &SpecVol) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell));
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const I4 KMin = MinLayerCell(ICell);
+      const I4 KMax = MaxLayerCell(ICell);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
-         if (K == 0) {
-            // No Brunt-Vaisala frequency at surface
-            BruntVaisalaFreqSq(ICell, K) = 0.0_Real;
-         } else {
-            // Calculate squared Brunt-Vaisala frequency
-            Real CtInt =
-                0.5_Real * (ConservTemp(ICell, K) + ConservTemp(ICell, K - 1));
-            Real SaInt =
-                0.5_Real * (AbsSalinity(ICell, K) + AbsSalinity(ICell, K - 1));
-            Real PInt =
-                0.5_Real * (Pressure(ICell, K) + Pressure(ICell, K - 1));
-            Real SpInt = 0.5_Real * (SpecVol(ICell, K) + SpecVol(ICell, K - 1));
-            Real AlphaInt = calcAlpha(SaInt, CtInt, PInt * Pa2Db, SpInt);
-            Real BetaInt  = calcBeta(SaInt, CtInt, PInt * Pa2Db, SpInt);
-            Real DSa      = AbsSalinity(ICell, K) - AbsSalinity(ICell, K - 1);
-            Real DCt      = ConservTemp(ICell, K) - ConservTemp(ICell, K - 1);
-            Real DP       = Pressure(ICell, K) - Pressure(ICell, K - 1);
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             if (K == 0) {
+                // No Brunt-Vaisala frequency at surface
+                BruntVaisalaFreqSq(ICell, K) = 0.0_Real;
+             } else {
+                // Calculate squared Brunt-Vaisala frequency
+                Real CtInt = 0.5_Real * (ConservTemp(ICell, K) +
+                                         ConservTemp(ICell, K - 1));
+                Real SaInt = 0.5_Real * (AbsSalinity(ICell, K) +
+                                         AbsSalinity(ICell, K - 1));
+                Real PInt =
+                    0.5_Real * (Pressure(ICell, K) + Pressure(ICell, K - 1));
+                Real SpInt =
+                    0.5_Real * (SpecVol(ICell, K) + SpecVol(ICell, K - 1));
+                Real AlphaInt = calcAlpha(SaInt, CtInt, PInt * Pa2Db, SpInt);
+                Real BetaInt  = calcBeta(SaInt, CtInt, PInt * Pa2Db, SpInt);
+                Real DSa = AbsSalinity(ICell, K) - AbsSalinity(ICell, K - 1);
+                Real DCt = ConservTemp(ICell, K) - ConservTemp(ICell, K - 1);
+                Real DP  = Pressure(ICell, K) - Pressure(ICell, K - 1);
 
-            BruntVaisalaFreqSq(ICell, K) = Gravity * Gravity *
-                                           (BetaInt * DSa - AlphaInt * DCt) /
-                                           (SpInt * DP);
-         }
-      }
+                BruntVaisalaFreqSq(ICell, K) =
+                    Gravity * Gravity * (BetaInt * DSa - AlphaInt * DCt) /
+                    (SpInt * DP);
+             }
+          });
    }
 
    /// Calculate alpha values for the squared Brunt-Vaisala frequency
@@ -529,29 +527,30 @@ class LinearBruntVaisalaFreqSq {
    //   The functor takes the full arrays of squared Brunt-Vaisala frequency
    //   (inout), the index ICell, and the specific volume and pseudo-thickness
    //   as inputs, and outputs the squared Brunt-Vaisala frequency.
-   KOKKOS_FUNCTION void operator()(Array2DReal BruntVaisalaFreqSq, I4 ICell,
-                                   I4 KChunk,
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
+                                   Array2DReal BruntVaisalaFreqSq, I4 ICell,
                                    const Array2DReal &SpecVol) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell));
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const I4 KMin = MinLayerCell(ICell);
+      const I4 KMax = MaxLayerCell(ICell);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
-         if (K == 0) {
-            /// No Brunt-Vaisala frequency at the top level
-            BruntVaisalaFreqSq(ICell, K) = 0.0_Real;
-         } else {
-            /// Calculate squared Brunt-Vaisala frequency at mid-point between
-            /// K-1 and K Do not need to use displaced specific volume here
-            /// since only the linear EOS is used with this BVF formulation.
-            BruntVaisalaFreqSq(ICell, K) =
-                -(Gravity / RhoT0S0) *
-                ((1.0_Real / SpecVol(ICell, K - 1)) -
-                 (1.0_Real / SpecVol(ICell, K))) /
-                (GeomZMid(ICell, K - 1) - GeomZMid(ICell, K));
-         }
-      }
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             if (K == 0) {
+                /// No Brunt-Vaisala frequency at the top level
+                BruntVaisalaFreqSq(ICell, K) = 0.0_Real;
+             } else {
+                /// Calculate squared Brunt-Vaisala frequency at mid-point
+                /// between K-1 and K Do not need to use displaced specific
+                /// volume here since only the linear EOS is used with this BVF
+                /// formulation.
+                BruntVaisalaFreqSq(ICell, K) =
+                    -(Gravity / RhoT0S0) *
+                    ((1.0_Real / SpecVol(ICell, K - 1)) -
+                     (1.0_Real / SpecVol(ICell, K))) /
+                    (GeomZMid(ICell, K - 1) - GeomZMid(ICell, K));
+             }
+          });
    }
 
  private:
