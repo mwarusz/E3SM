@@ -180,17 +180,9 @@ void PressureGrad::computePressureGrad(Array2DReal &Tend,
       parallelForOuter(
           "pgrad-centered", {NEdgesAll},
           KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
-             const int KMin   = LocMinLayerEdgeBot(IEdge);
-             const int KMax   = LocMaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocCenteredPGrad(Tend, IEdge, KChunk, PressureMid,
-                                     PressureInterface, GeomZInterface,
-                                     LocTidalPotential,
-                                     LocSelfAttractionLoading, SpecVol);
-                 });
+             LocCenteredPGrad(Team, Tend, IEdge, PressureMid, PressureInterface,
+                              GeomZInterface, LocTidalPotential,
+                              LocSelfAttractionLoading, SpecVol);
           });
 
    } else {
@@ -199,17 +191,10 @@ void PressureGrad::computePressureGrad(Array2DReal &Tend,
       parallelForOuter(
           "pgrad-highorder", {NEdgesAll},
           KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
-             const int KMin   = LocMinLayerEdgeBot(IEdge);
-             const int KMax   = LocMaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocHighOrderPGrad(Tend, IEdge, KChunk, PressureMid,
-                                      PressureInterface, GeomZInterface,
-                                      LocTidalPotential,
-                                      LocSelfAttractionLoading, SpecVol);
-                 });
+             LocHighOrderPGrad(Team, Tend, IEdge, PressureMid,
+                               PressureInterface, GeomZInterface,
+                               LocTidalPotential, LocSelfAttractionLoading,
+                               SpecVol);
           });
    }
 } // end compute pressure gradient
