@@ -35,24 +35,25 @@ class ConvectiveMix {
    ConvectiveMix(const VertCoord *VCoord);
 
    KOKKOS_FUNCTION void
-   operator()(Array2DReal VertDiff, Array2DReal VertVisc, I4 ICell, I4 KChunk,
+   operator()(const TeamMember &Team, Array2DReal VertDiff,
+              Array2DReal VertVisc, I4 ICell,
               const Array2DReal &BruntVaisalaFreqSq) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell));
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const I4 KMin = MinLayerCell(ICell);
+      const I4 KMax = MaxLayerCell(ICell);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
-         if (K == 0) {
-            VertVisc(ICell, K) = 0.0_Real;
-            VertDiff(ICell, K) = 0.0_Real;
-         } else {
-            if (BruntVaisalaFreqSq(ICell, K) < ConvTriggerBVF) {
-               VertDiff(ICell, K) += ConvDiff;
-               VertVisc(ICell, K) += ConvDiff;
-            }
-         }
-      }
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             if (K == 0) {
+                VertVisc(ICell, K) = 0.0_Real;
+                VertDiff(ICell, K) = 0.0_Real;
+             } else {
+                if (BruntVaisalaFreqSq(ICell, K) < ConvTriggerBVF) {
+                   VertDiff(ICell, K) += ConvDiff;
+                   VertVisc(ICell, K) += ConvDiff;
+                }
+             }
+          });
    }
 
  private:
@@ -76,48 +77,50 @@ class ShearMix {
    ShearMix(const HorzMesh *Mesh, const VertCoord *VCoord);
 
    KOKKOS_FUNCTION void
-   operator()(Array2DReal VertDiff, Array2DReal VertVisc, I4 ICell, I4 KChunk,
-              const Array2DReal &NormalVelocity,
+   operator()(const TeamMember &Team, Array2DReal VertDiff,
+              Array2DReal VertVisc, I4 ICell, const Array2DReal &NormalVelocity,
               const Array2DReal &TangentialVelocity,
               const Array2DReal &BruntVaisalaFreqSq) const {
 
-      const I4 KStart = chunkStart(KChunk, MinLayerCell(ICell));
-      const I4 KLen   = chunkLength(KChunk, KStart, MaxLayerCell(ICell));
+      const I4 KMin = MinLayerCell(ICell);
+      const I4 KMax = MaxLayerCell(ICell);
 
-      for (int KVec = 0; KVec < KLen; ++KVec) {
-         const I4 K = KStart + KVec;
-         if (K == 0) {
-            VertVisc(ICell, K) = 0.0_Real;
-            VertDiff(ICell, K) = 0.0_Real;
-         } else {
-            Real ShearViscVal = 0.0;
-            Real InvAreaCell  = 1.0_Real / AreaCell(ICell);
-            Real ShearSquared = 0.0;
-            for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
-               I4 JEdge = EdgesOnCell(ICell, J);
-               Real Factor =
-                   0.5_Real * DcEdge(JEdge) * DvEdge(JEdge) * InvAreaCell;
-               Real DelNormVel =
-                   NormalVelocity(JEdge, K - 1) - NormalVelocity(JEdge, K);
-               Real DelTangVel = TangentialVelocity(JEdge, K - 1) -
-                                 TangentialVelocity(JEdge, K);
-               ShearSquared = ShearSquared + Factor * (DelNormVel * DelNormVel +
-                                                       DelTangVel * DelTangVel);
-            }
-            Real DelZMid = GeomZMid(ICell, K - 1) - GeomZMid(ICell, K);
-            ShearSquared = ShearSquared / (DelZMid * DelZMid);
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             if (K == 0) {
+                VertVisc(ICell, K) = 0.0_Real;
+                VertDiff(ICell, K) = 0.0_Real;
+             } else {
+                Real ShearViscVal = 0.0;
+                Real InvAreaCell  = 1.0_Real / AreaCell(ICell);
+                Real ShearSquared = 0.0;
+                for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
+                   I4 JEdge = EdgesOnCell(ICell, J);
+                   Real Factor =
+                       0.5_Real * DcEdge(JEdge) * DvEdge(JEdge) * InvAreaCell;
+                   Real DelNormVel =
+                       NormalVelocity(JEdge, K - 1) - NormalVelocity(JEdge, K);
+                   Real DelTangVel = TangentialVelocity(JEdge, K - 1) -
+                                     TangentialVelocity(JEdge, K);
+                   ShearSquared =
+                       ShearSquared + Factor * (DelNormVel * DelNormVel +
+                                                DelTangVel * DelTangVel);
+                }
+                Real DelZMid = GeomZMid(ICell, K - 1) - GeomZMid(ICell, K);
+                ShearSquared = ShearSquared / (DelZMid * DelZMid);
 
-            Real RichardsonNum = BruntVaisalaFreqSq(ICell, K) /
-                                 Kokkos::max(1.0e-12_Real, ShearSquared);
+                Real RichardsonNum = BruntVaisalaFreqSq(ICell, K) /
+                                     Kokkos::max(1.0e-12_Real, ShearSquared);
 
-            ShearViscVal =
-                ShearNuZero / Kokkos::pow(1.0_Real + ShearAlpha * RichardsonNum,
-                                          ShearExponent);
-            VertVisc(ICell, K) += ShearViscVal;
-            VertDiff(ICell, K) +=
-                VertVisc(ICell, K) / (1.0_Real + ShearAlpha * RichardsonNum);
-         }
-      }
+                ShearViscVal =
+                    ShearNuZero /
+                    Kokkos::pow(1.0_Real + ShearAlpha * RichardsonNum,
+                                ShearExponent);
+                VertVisc(ICell, K) += ShearViscVal;
+                VertDiff(ICell, K) += VertVisc(ICell, K) /
+                                      (1.0_Real + ShearAlpha * RichardsonNum);
+             }
+          });
    }
 
  private:
