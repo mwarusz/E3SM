@@ -279,41 +279,30 @@ void VertMix::computeVertMix(const Array2DReal &NormalVelocity,
    parallelForOuter(
        "VertMix-BackAndRich", {Mesh->NCellsAll},
        KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-          const int KMin   = MinLayerCell(ICell);
-          const int KMax   = MaxLayerCell(ICell) + 1;
-          const int KRange = vertRangeChunked(KMin, KMax);
+          const int KMin = MinLayerCell(ICell);
+          const int KMax = MaxLayerCell(ICell) + 1;
 
           parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 const int KStart = chunkStart(KChunk, KMin);
-                 const int KLen   = chunkLength(KChunk, KStart, KMax);
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const int K           = KStart + KVec;
-                    LocVertDiff(ICell, K) = LocBackDiff;
-                    LocVertVisc(ICell, K) = LocBackVisc;
-                    LocGradRichNum(ICell, K) =
-                        LocComputeGradRichardsonNum.RiInitValue;
-                    LocGradRichNumSmoothed(ICell, K) =
-                        LocComputeGradRichardsonNum.RiInitValue;
-                 }
+              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                 LocVertDiff(ICell, K) = LocBackDiff;
+                 LocVertVisc(ICell, K) = LocBackVisc;
+                 LocGradRichNum(ICell, K) =
+                     LocComputeGradRichardsonNum.RiInitValue;
+                 LocGradRichNumSmoothed(ICell, K) =
+                     LocComputeGradRichardsonNum.RiInitValue;
               });
        });
    /// Second, compute shear mixing if enabled
    if (LocComputeVertMixShear.Enabled) {
       /// Compute Richardson number
       parallelForOuter(
-          "VertMix-ComputeRi", {Mesh->NCellsAll},
+          "VertMix-ComputeRi",
+          LaunchConfig({Mesh->NCellsAll},
+                       TeamScratch<Real>(2 * VCoord->NVertLayers)),
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell) + 1;
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeGradRichardsonNum(
-                        LocGradRichNum, ICell, KChunk, NormalVelocity,
-                        TangentialVelocity, BruntVaisalaFreqSq);
-                 });
+             LocComputeGradRichardsonNum(Team, LocGradRichNum, ICell,
+                                         NormalVelocity, TangentialVelocity,
+                                         BruntVaisalaFreqSq);
 
              teamBarrier(Team);
 
@@ -323,9 +312,9 @@ void VertMix::computeVertMix(const Array2DReal &NormalVelocity,
              Kokkos::single(
                  PerTeam(Team), INNER_LAMBDA() {
                     LocGradRichNum(ICell, MinLayerCell(ICell)) =
-                        LocGradRichNum(ICell, KMin);
+                        LocGradRichNum(ICell, MinLayerCell(ICell) + 1);
                     LocGradRichNum(ICell, MaxLayerCell(ICell) + 1) =
-                        LocGradRichNum(ICell, KMax);
+                        LocGradRichNum(ICell, MaxLayerCell(ICell));
                  });
           });
       /// Smooth Richardson number with 1-2-1 filter the number of times
@@ -342,15 +331,8 @@ void VertMix::computeVertMix(const Array2DReal &NormalVelocity,
       parallelForOuter(
           "VertMix-Shear", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell) + 1;
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeVertMixShear(LocVertDiff, LocVertVisc, ICell,
-                                           KChunk, LocGradRichNumSmoothed);
-                 });
+             LocComputeVertMixShear(Team, LocVertDiff, LocVertVisc, ICell,
+                                    LocGradRichNumSmoothed);
           });
    }
 
@@ -395,16 +377,8 @@ void VertMix::computeVertMix(const Array2DReal &NormalVelocity,
       parallelForOuter(
           "VertMix-Conv", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell) + 1;
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeVertMixConv(LocVertDiff, LocVertVisc, ICell,
-                                          KChunk, BruntVaisalaFreqSq,
-                                          KPPBoundaryLayerIndex);
-                 });
+             LocComputeVertMixConv(Team, LocVertDiff, LocVertVisc, ICell,
+                                   BruntVaisalaFreqSq, KPPBoundaryLayerIndex);
           });
    }
    /// Finally, zero viscosity/diffusivity at surface and bottom boundaries
