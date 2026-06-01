@@ -160,3 +160,5 @@ if(OMEGA_BUILD_EXECUTABLE)
   set_target_properties(${OMEGA_EXE_NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 endif()
+
+add_subdirectory(asm)
