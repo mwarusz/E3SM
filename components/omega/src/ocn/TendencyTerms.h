@@ -400,6 +400,11 @@ class TracerHorzAdvOnCell {
                                    const Array2DReal &FluxPseudoThickEdge,
                                    const Array2DReal &NormVelEdge) const {
 
+      const auto LTracerCell =
+          Kokkos::subview(TracerCell, L, Kokkos::ALL, Kokkos::ALL);
+      const auto LHighOrderFlxHorz =
+          Kokkos::subview(HighOrderFlxHorz, L, Kokkos::ALL, Kokkos::ALL);
+
       ScratchArray1DReal FlxTmp(teamScratch(Team), NVertLayers);
 
       const int KMin = MinLayerEdgeBot(IEdge);
@@ -421,7 +426,7 @@ class TracerHorzAdvOnCell {
                             std::copysign(1._Real, NormalPseudoThicknessFlux) *
                             AdvCoefs3rd(I, IEdge)) *
                        NormalPseudoThicknessFlux;
-                   FlxTmp(K) += TracerWgt * TracerCell(L, ICell, K);
+                   FlxTmp(K) += TracerWgt * LTracerCell(ICell, K);
                 });
          }
       } else {
@@ -434,19 +439,24 @@ class TracerHorzAdvOnCell {
                     FluxPseudoThickEdge(IEdge, K) * NormVelEdge(IEdge, K);
                 const Real TracerWgt =
                     DvEdge(IEdge) * 0.5_Real * NormalPseudoThicknessFlux;
-                FlxTmp(K) += TracerWgt * (TracerCell(L, JCell1, K) +
-                                          TracerCell(L, JCell0, K));
+                FlxTmp(K) += TracerWgt *
+                             (LTracerCell(JCell1, K) + LTracerCell(JCell0, K));
              });
       }
 
       parallelForInner(
           Team, Range{KMin, KMax},
-          INNER_LAMBDA(int K) { HighOrderFlxHorz(L, IEdge, K) = FlxTmp(K); });
+          INNER_LAMBDA(int K) { LHighOrderFlxHorz(IEdge, K) = FlxTmp(K); });
    }
 
    KOKKOS_FUNCTION void operator()(const TeamMember &Team,
                                    const Array3DReal &Tend, const I4 L,
                                    const I4 ICell) const {
+
+      const auto LTend = Kokkos::subview(Tend, L, Kokkos::ALL, Kokkos::ALL);
+      const auto LHighOrderFlxHorz =
+          Kokkos::subview(HighOrderFlxHorz, L, Kokkos::ALL, Kokkos::ALL);
+
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       ScratchArray1DReal TendTmp(teamScratch(Team), NVertLayers);
@@ -461,13 +471,13 @@ class TracerHorzAdvOnCell {
          parallelForInner(
              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
                 TendTmp(K) += EdgeSignOnCell(ICell, I) *
-                              HighOrderFlxHorz(L, IEdge, K) * InvAreaCell;
+                              LHighOrderFlxHorz(IEdge, K) * InvAreaCell;
              });
       }
 
       parallelForInner(
           Team, Range{KMin, KMax},
-          INNER_LAMBDA(int K) { Tend(L, ICell, K) += TendTmp(K); });
+          INNER_LAMBDA(int K) { LTend(ICell, K) += TendTmp(K); });
    }
 
  private:
@@ -507,6 +517,10 @@ class TracerDiffOnCell {
               const Array3DReal &TracerCell,
               const Array2DReal &MeanPseudoThickEdge) const {
 
+      const auto LTend = Kokkos::subview(Tend, L, Kokkos::ALL, Kokkos::ALL);
+      const auto LTracerCell =
+          Kokkos::subview(TracerCell, L, Kokkos::ALL, Kokkos::ALL);
+
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       ScratchArray1DReal DiffTmp(teamScratch(Team), NVertLayers);
@@ -528,7 +542,7 @@ class TracerDiffOnCell {
          parallelForInner(
              Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop}, INNER_LAMBDA(int K) {
                 const Real TracerGrad =
-                    (TracerCell(L, JCell1, K) - TracerCell(L, JCell0, K));
+                    (LTracerCell(JCell1, K) - LTracerCell(JCell0, K));
 
                 DiffTmp(K) -= EddyDiff2 * EdgeMask(JEdge, K) *
                               EdgeSignOnCell(ICell, J) * RTemp *
@@ -540,7 +554,7 @@ class TracerDiffOnCell {
 
       parallelForInner(
           Team, Range{MinLyrCell, MaxLyrCell}, INNER_LAMBDA(int K) {
-             Tend(L, ICell, K) += EddyDiff2 * DiffTmp(K) * InvAreaCell;
+             LTend(ICell, K) += EddyDiff2 * DiffTmp(K) * InvAreaCell;
           });
    }
 
@@ -574,6 +588,10 @@ class TracerHyperDiffOnCell {
                                    const Array3DReal &Tend, I4 L, I4 ICell,
                                    const Array3DReal &TrDel2Cell) const {
 
+      const auto LTend = Kokkos::subview(Tend, L, Kokkos::ALL, Kokkos::ALL);
+      const auto LTrDel2Cell =
+          Kokkos::subview(TrDel2Cell, L, Kokkos::ALL, Kokkos::ALL);
+
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       ScratchArray1DReal HypTmp(teamScratch(Team), NVertLayers);
@@ -595,7 +613,7 @@ class TracerHyperDiffOnCell {
          parallelForInner(
              Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop}, INNER_LAMBDA(int K) {
                 const Real Del2TrGrad =
-                    (TrDel2Cell(L, JCell1, K) - TrDel2Cell(L, JCell0, K));
+                    (LTrDel2Cell(JCell1, K) - LTrDel2Cell(JCell0, K));
 
                 HypTmp(K) -= EdgeMask(JEdge, K) * EdgeSignOnCell(ICell, J) *
                              RTemp * Del2TrGrad;
@@ -606,7 +624,7 @@ class TracerHyperDiffOnCell {
 
       parallelForInner(
           Team, Range{MinLyrCell, MaxLyrCell}, INNER_LAMBDA(int K) {
-             Tend(L, ICell, K) -= EddyDiff4 * HypTmp(K) * InvAreaCell;
+             LTend(ICell, K) -= EddyDiff4 * HypTmp(K) * InvAreaCell;
           });
    }
 
