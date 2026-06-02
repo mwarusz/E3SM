@@ -23,6 +23,10 @@ class TracerAuxVars {
                       const Array2DReal &MeanPseudoThickEdge,
                       const Array3DReal &TrCell) const {
 
+      const auto LTrCell = Kokkos::subview(TrCell, L, Kokkos::ALL, Kokkos::ALL);
+      const auto LDel2TracersCell =
+          Kokkos::subview(Del2TracersCell, L, Kokkos::ALL, Kokkos::ALL);
+
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
       ScratchArray1DReal Del2TrCellTmp(teamScratch(Team), NVertLayers);
@@ -43,8 +47,7 @@ class TracerAuxVars {
 
          parallelForInner(
              Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop}, INNER_LAMBDA(int K) {
-                const Real TracerGrad =
-                    TrCell(L, JCell1, K) - TrCell(L, JCell0, K);
+                const Real TracerGrad = LTrCell(JCell1, K) - LTrCell(JCell0, K);
                 Del2TrCellTmp(K) -= EdgeMask(JEdge, K) *
                                     EdgeSignOnCell(ICell, J) * DvDcEdge *
                                     MeanPseudoThickEdge(JEdge, K) * TracerGrad;
@@ -56,7 +59,7 @@ class TracerAuxVars {
 
       parallelForInner(
           Team, Range{MinLyrCell, MaxLyrCell}, INNER_LAMBDA(int K) {
-             Del2TracersCell(L, ICell, K) = Del2TrCellTmp(K) * InvAreaCell;
+             LDel2TracersCell(ICell, K) = Del2TrCellTmp(K) * InvAreaCell;
           });
    }
 
