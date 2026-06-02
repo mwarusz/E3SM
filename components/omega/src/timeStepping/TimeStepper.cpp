@@ -698,11 +698,17 @@ void TimeStepper::updateTracersByTend(const Array3DReal &NextTracers,
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           const int KMin = MinLayerCell(ICell);
           const int KMax = MaxLayerCell(ICell);
+          const auto LCurTracers =
+              Kokkos::subview(CurTracers, L, Kokkos::ALL, Kokkos::ALL);
+          const auto LNextTracers =
+              Kokkos::subview(NextTracers, L, Kokkos::ALL, Kokkos::ALL);
+          const auto LTracerTend =
+              Kokkos::subview(TracerTend, L, Kokkos::ALL, Kokkos::ALL);
           parallelForInner(
               Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-                 NextTracers(L, ICell, K) =
-                     (CurTracers(L, ICell, K) * PseudoThick2(ICell, K) +
-                      CoeffSeconds * TracerTend(L, ICell, K)) /
+                 LNextTracers(ICell, K) =
+                     (LCurTracers(ICell, K) * PseudoThick2(ICell, K) +
+                      CoeffSeconds * LTracerTend(ICell, K)) /
                      PseudoThick1(ICell, K);
               });
        });
@@ -724,10 +730,14 @@ void TimeStepper::weightTracers(const Array3DReal &NextTracers,
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           const int KMin = MinLayerCell(ICell);
           const int KMax = MaxLayerCell(ICell);
+          const auto LCurTracers =
+              Kokkos::subview(CurTracers, L, Kokkos::ALL, Kokkos::ALL);
+          const auto LNextTracers =
+              Kokkos::subview(NextTracers, L, Kokkos::ALL, Kokkos::ALL);
           parallelForInner(
               Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-                 NextTracers(L, ICell, K) =
-                     CurTracers(L, ICell, K) * CurThickness(ICell, K);
+                 LNextTracers(ICell, K) =
+                     LCurTracers(ICell, K) * CurThickness(ICell, K);
               });
        });
 }
@@ -751,10 +761,13 @@ void TimeStepper::accumulateTracersUpdate(const Array3DReal &AccumTracer,
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           const int KMin = MinLayerCell(ICell);
           const int KMax = MaxLayerCell(ICell);
+          const auto LAccumTracer =
+              Kokkos::subview(AccumTracer, L, Kokkos::ALL, Kokkos::ALL);
+          const auto LTracerTend =
+              Kokkos::subview(TracerTend, L, Kokkos::ALL, Kokkos::ALL);
           parallelForInner(
               Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-                 AccumTracer(L, ICell, K) +=
-                     CoeffSeconds * TracerTend(L, ICell, K);
+                 LAccumTracer(ICell, K) += CoeffSeconds * LTracerTend(ICell, K);
               });
        });
 }
@@ -773,11 +786,13 @@ void TimeStepper::finalizeTracersUpdate(const Array3DReal &NextTracers,
    parallelForOuter(
        "finalizeTracersUpdate", {NTracers, Mesh->NCellsAll},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+          const auto LNextTracers =
+              Kokkos::subview(NextTracers, L, Kokkos::ALL, Kokkos::ALL);
           const int KMin = MinLayerCell(ICell);
           const int KMax = MaxLayerCell(ICell);
           parallelForInner(
               Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-                 NextTracers(L, ICell, K) /= NextThick(ICell, K);
+                 LNextTracers(ICell, K) /= NextThick(ICell, K);
               });
        });
 }
