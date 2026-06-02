@@ -12,10 +12,10 @@
 
 module mpas_forcing
 
-#define COMMA ,
-#define FORCING_DEBUG_WRITE(M) !call mpas_log_write( M )
-#define FORCING_WARNING_WRITE(M) call mpas_log_write( M , messageType=MPAS_LOG_WARN)
-#define FORCING_ERROR_WRITE(M) call mpas_log_write( M , messageType=MPAS_LOG_ERR)
+#define COMMA 
+#define FORCING_DEBUG_WRITE(M)
+#define FORCING_WARNING_WRITE(M)
+#define FORCING_ERROR_WRITE(M)
 
   use mpas_derived_types
   use mpas_field_routines

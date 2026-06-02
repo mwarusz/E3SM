@@ -16,17 +16,17 @@
 !>  This module contains a general definition of particles which can be
 !>  used in implementation of Lagrangian Particles Tracking.
 !-----------------------------------------------------------------------
-#define COMMA ,
+#define COMMA
 #ifdef MPAS_DEBUG
-#define LIGHT_DEBUG_WRITE(Z) ! print *, Z
-#define LIGHT_DEBUG_ALL_WRITE(Z) ! print *, Z
+#define LIGHT_DEBUG_WRITE(Z)
+#define LIGHT_DEBUG_ALL_WRITE(Z)
 #else
-#define LIGHT_DEBUG_WRITE(Z)  ! print *, Z
-#define LIGHT_DEBUG_ALL_WRITE(Z) ! print *, Z
+#define LIGHT_DEBUG_WRITE(Z)
+#define LIGHT_DEBUG_ALL_WRITE(Z)
 #endif
 
-#define LIGHT_ERROR_WRITE(Z)  print *, Z
-#define LIGHT_WARNING_WRITE(Z)  print *, Z
+#define LIGHT_ERROR_WRITE(Z)
+#define LIGHT_WARNING_WRITE(Z)
 
 module ocn_particle_list
 
@@ -2577,7 +2577,7 @@ end subroutine empty_list_particlelists!}}}
       end do
 
       ! now we have a complete, unique list so store it
-      if(associated(uniqueList)) LIGHT_ERROR_WRITE('Trying to allocate uniqueList, which is already allocated!')
+      !if(associated(uniqueList)) LIGHT_ERROR_WRITE('Trying to allocate uniqueList, which is already allocated!')
       allocate(uniqueList(nlist))
 
       currlist => listhead
@@ -2789,7 +2789,7 @@ end subroutine empty_list_particlelists!}}}
             ! get index for array and place particle in list at that index location
             !call mpas_log_write( 'get array index')
             arrayIndex = find_index(procNeighs, particleProc)
-            if(arrayIndex == -1) LIGHT_ERROR_WRITE('Found processor is not on list of "halo" processors!')
+            !if(arrayIndex == -1) LIGHT_ERROR_WRITE('Found processor is not on list of "halo" processors!')
             LIGHT_DEBUG_WRITE('ammending particle to processor index  ' COMMA  arrayIndex)
             call append_particle_to_particlelist(particle, interProcPLArray(arrayIndex)%list)
             write(message, *) 'added particle ', loc(particle), ' on link ', loc(particlelist), ' to list'

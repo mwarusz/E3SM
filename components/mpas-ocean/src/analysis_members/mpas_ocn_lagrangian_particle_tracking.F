@@ -17,17 +17,17 @@
 !>  module computes Lagrangian particle trajectories and associated
 !>  diagnostics
 !-----------------------------------------------------------------------
-#define COMMA ,
+#define COMMA
 #ifdef MPAS_DEBUG
-#define LIGHT_DEBUG_WRITE(Z) !  print *, Z
-#define LIGHT_DEBUG_ALL_WRITE(Z) ! print *, Z
+#define LIGHT_DEBUG_WRITE(Z)
+#define LIGHT_DEBUG_ALL_WRITE(Z)
 #else
-#define LIGHT_DEBUG_WRITE(Z)  ! print *, Z
-#define LIGHT_DEBUG_ALL_WRITE(Z) ! print *, Z
+#define LIGHT_DEBUG_WRITE(Z)
+#define LIGHT_DEBUG_ALL_WRITE(Z)
 #endif
 
-#define LIGHT_ERROR_WRITE(Z)  print *, Z
-#define LIGHT_WARNING_WRITE(Z)  print *, Z
+#define LIGHT_ERROR_WRITE(Z)
+#define LIGHT_WARNING_WRITE(Z)
 
 module ocn_lagrangian_particle_tracking
 

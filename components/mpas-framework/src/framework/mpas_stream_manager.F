@@ -1,9 +1,9 @@
 module mpas_stream_manager
 
-#define COMMA ,
-#define STREAM_DEBUG_WRITE(M) ! call mpas_log_write(M)
-#define STREAM_WARNING_WRITE(M) call mpas_log_write( M , messageType=MPAS_LOG_WARN)
-#define STREAM_ERROR_WRITE(M) call mpas_log_write( M , messageType=MPAS_LOG_ERR)
+#define COMMA 
+#define STREAM_DEBUG_WRITE(M)
+#define STREAM_WARNING_WRITE(M)
+#define STREAM_ERROR_WRITE(M)
 
     use mpas_kind_types
     use mpas_derived_types

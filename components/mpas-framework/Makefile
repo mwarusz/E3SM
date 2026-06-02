@@ -284,6 +284,35 @@ intel-mpi:
 	"USE_SHTNS = $(USE_SHTNS)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
+intel-oneapi:
+	( $(MAKE) all \
+	"FC_PARALLEL = mpifort" \
+	"CC_PARALLEL = mpicc" \
+	"CXX_PARALLEL = mpicxx" \
+	"FC_SERIAL = ifx" \
+	"CC_SERIAL = icx" \
+	"CXX_SERIAL = icpx" \
+	"FFLAGS_FPIEEE = -fp-model=precise" \
+	"FFLAGS_PROMOTION = -real-size 64" \
+	"FFLAGS_OPT = -O2 -convert big_endian -free -align array64byte -march=native" \
+	"CFLAGS_OPT = -O2" \
+	"CXXFLAGS_OPT = -O2" \
+	"LDFLAGS_OPT = -O2" \
+	"FFLAGS_DEBUG = -g -convert big_endian -free -CU -CB -check all -fpe0 -traceback" \
+	"CFLAGS_DEBUG = -g -traceback" \
+	"CXXFLAGS_DEBUG = -g -traceback" \
+	"LDFLAGS_DEBUG = -g -fpe0 -traceback" \
+	"FFLAGS_OMP = -qopenmp" \
+	"CFLAGS_OMP = -qopenmp" \
+	"PICFLAG = -fpic" \
+	"BUILD_TARGET = $(@)" \
+	"CORE = $(CORE)" \
+	"DEBUG = $(DEBUG)" \
+	"USE_PAPI = $(USE_PAPI)" \
+	"OPENMP = $(OPENMP)" \
+	"USE_SHTNS = $(USE_SHTNS)" \
+	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
+
 gfortran:
 	GFORTRAN_GTE_10=$$(expr `gfortran -dumpversion | cut -f1 -d.` \>= 10) ;\
 	if [ "$${GFORTRAN_GTE_10}" = "1" ]; then \
