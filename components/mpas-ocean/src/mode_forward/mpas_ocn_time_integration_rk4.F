@@ -612,28 +612,28 @@ module ocn_time_integration_rk4
         block => block % next
       end do
 
-      call mpas_timer_start("RK4-implicit vert mix")
-      ! Update halo on u and tracers, which were just updated for implicit vertical mixing.  If not done,
-      ! this leads to lack of volume conservation.  It is required because halo updates in RK4 are only
-      ! conducted on tendencies, not on the velocity and tracer fields.  So this update is required to
-      ! communicate the change due to implicit vertical mixing across the boundary.
-      call mpas_timer_start("RK4-implicit vert mix halos")
+      !call mpas_timer_start("RK4-implicit vert mix")
+      !! Update halo on u and tracers, which were just updated for implicit vertical mixing.  If not done,
+      !! this leads to lack of volume conservation.  It is required because halo updates in RK4 are only
+      !! conducted on tendencies, not on the velocity and tracer fields.  So this update is required to
+      !! communicate the change due to implicit vertical mixing across the boundary.
+      !call mpas_timer_start("RK4-implicit vert mix halos")
 
-      call mpas_pool_get_subpool(domain % blocklist % structs, 'state', statePool)
-      call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
+      !call mpas_pool_get_subpool(domain % blocklist % structs, 'state', statePool)
+      !call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
 
-      call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=2)
+      !call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=2)
 
-      call mpas_pool_begin_iteration(tracersPool)
-      do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
-         if ( groupItr % memberType == MPAS_POOL_FIELD ) then
-            call mpas_dmpar_field_halo_exch(domain, groupItr % memberName, timeLevel=2)
-         end if
-      end do
+      !call mpas_pool_begin_iteration(tracersPool)
+      !do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
+      !   if ( groupItr % memberType == MPAS_POOL_FIELD ) then
+      !      call mpas_dmpar_field_halo_exch(domain, groupItr % memberName, timeLevel=2)
+      !   end if
+      !end do
 
-      call mpas_timer_stop("RK4-implicit vert mix halos")
+      !call mpas_timer_stop("RK4-implicit vert mix halos")
 
-      call mpas_timer_stop("RK4-implicit vert mix")
+      !call mpas_timer_stop("RK4-implicit vert mix")
 
       block => domain % blocklist
       do while (associated(block))
@@ -1707,7 +1707,7 @@ module ocn_time_integration_rk4
       !$acc             surfaceFluxAttenuationCoefficientRunoff)
 #endif
 
-      call ocn_vmix_implicit(dt, meshPool, statePool, forcingPool, scratchPool, err, 2)
+      !call ocn_vmix_implicit(dt, meshPool, statePool, forcingPool, scratchPool, err, 2)
 
    end subroutine ocn_time_integrator_rk4_cleanup!}}}
 
