@@ -997,35 +997,15 @@ void Tendencies::computeTracerTendencies(
     const Array3DReal &TracerArray, ///< [in] Tracer array
     int ThickTimeLevel,             ///< [in] Time level
     int VelTimeLevel,               ///< [in] Time level
-    TimeInstant Time                ///< [in] Time
+    TimeInstant Time,               ///< [in] Time
+    TimeInterval ProjDt ///< [in] Time interval for projection over the current
+                        ///< time stepper stage
 ) {
-   Array2DReal PseudoThickCell = State->getPseudoThickness(ThickTimeLevel);
-   Array2DReal NormalVelEdge   = State->getNormalVelocity(VelTimeLevel);
-   OMEGA_SCOPE(TracerAux, AuxState->TracerAux);
-   OMEGA_SCOPE(MinLayerCell, VCoord->MinLayerCell);
-   OMEGA_SCOPE(MaxLayerCell, VCoord->MaxLayerCell);
-   OMEGA_SCOPE(MinLayerEdgeBot, VCoord->MinLayerEdgeBot);
-   OMEGA_SCOPE(MaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
 
    Pacer::start("Tend:computeTracerTendencies", 1);
 
-   const auto &MeanPseudoThickEdge =
-       AuxState->PseudoThicknessAux.MeanPseudoThickEdge;
-   Pacer::start("Tend:computeTracerAuxCell", 2);
-   parallelForOuter(
-       "computeTracerAuxCell", {NTracers, Mesh->NCellsAll},
-       KOKKOS_LAMBDA(int LTracer, int ICell, const TeamMember &Team) {
-          const int KMin   = MinLayerCell(ICell);
-          const int KMax   = MaxLayerCell(ICell);
-          const int KRange = vertRangeChunked(KMin, KMax);
-
-          parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 TracerAux.computeVarsOnCells(LTracer, ICell, KChunk,
-                                              MeanPseudoThickEdge, TracerArray);
-              });
-       });
-   Pacer::stop("Tend:computeTracerAuxCell", 2);
+   AuxState->computeTracerAux(State, TracerArray, ThickTimeLevel, VelTimeLevel,
+                              ProjDt);
 
    computeTracerTendenciesOnly(State, AuxState, TracerArray, ThickTimeLevel,
                                VelTimeLevel, Time);
