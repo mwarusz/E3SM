@@ -123,7 +123,7 @@ void AuxiliaryState::computeTransportVelocity(const OceanState *State,
 
    const auto &NormalTransportVelocity = TransportAux.NormalTransportVelocity;
 
-   deep_copy(NormalTransportVelocity, NormalVel);
+   deepCopy(NormalTransportVelocity, NormalVel);
 
    auto *SubEddies = SubmesoEddies::getInstance();
 
