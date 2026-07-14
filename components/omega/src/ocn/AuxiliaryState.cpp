@@ -135,6 +135,8 @@ void AuxiliaryState::computeTransportVelocity(const OceanState *State,
       const auto &SpecVol             = EosInstance->SpecVol;
       const auto &BVFreqSq            = EosInstance->BruntVaisalaFreqSq;
       const auto &GeomZMid            = VCoord->GeomZMid;
+      const auto &MinLayerEdgeBot     = VCoord->MinLayerEdgeBot;
+      const auto &MaxLayerEdgeTop     = VCoord->MaxLayerEdgeTop;
 
       SubEddies->computeDenMixLayerDepth(SpecVol);
       SubEddies->computeBuoyGrad(SpecVol, MeanPseudoThickEdge, GeomZMid,
@@ -143,10 +145,16 @@ void AuxiliaryState::computeTransportVelocity(const OceanState *State,
 
       const auto &EddyVelocity = SubEddies->EddyVelocity;
 
-      parallelFor(
-          {Mesh->NEdgesAll, VCoord->NVertLayers},
-          KOKKOS_LAMBDA(int IEdge, int K) {
-             NormalTransportVelocity(IEdge, K) += EddyVelocity(IEdge, K);
+      parallelForOuter(
+          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+             const int MinLyrEdgeBot = MinLayerEdgeBot(IEdge);
+             const int MaxLyrEdgeTop = MaxLayerEdgeTop(IEdge);
+
+             parallelForInner(
+                 Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop},
+                 INNER_LAMBDA(int K) {
+                    NormalTransportVelocity(IEdge, K) += EddyVelocity(IEdge, K);
+                 });
           });
    }
 
