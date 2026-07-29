@@ -66,26 +66,26 @@ struct TestSetupPlane {
 #endif
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsT      = {0.00, 0.00};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsMin    = {4.000000000000000,
-                                                         3.127593628050678};
+                                                         3.1273853748885485};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsMax    = {3.989322101820906,
-                                                         2.6469928725241645};
+                                                         2.6397002508968472};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsLFlx   = {0.036084391824351,
                                                          0.093369312248885};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsHFlx   = {0.000000000000000,
                                                          0.000000000000000};
-   ErrorMeasures ExpectedFCTHighAndLowOrderFlux_High  = {0.016527960593997713,
-                                                         0.012259644776516256};
+   ErrorMeasures ExpectedFCTHighAndLowOrderFlux_High  = {0.0165253009242944,
+                                                         0.012337271857415571};
    ErrorMeasures ExpectedFCTHighAndLowOrderFlux_Low   = {0.036084391824351,
                                                          0.092303444396272};
-   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxIn  = {1, 0.7781506592302189};
-   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxOut = {1, 0.7149062908830371};
+   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxIn  = {1, 0.7829782033185549};
+   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxOut = {1, 0.7040759846240653};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxInOut = {1,
-                                                           1.482326186109267};
+                                                           1.5053819233225736};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsescaleHighOrderFlux = {
-       1.0015935810601664, 0.9997539278774402};
+       1.001623430330361, 0.9996778602155226};
    ErrorMeasures ExpectedFCTTracerHorAccumulateHighOrderFlux[2] = {
-       {0.010816143360235815, 0.053996074237257684},
-       {0.010816143360235815, 0.05358218031742743}};
+       {0.01045387513810018, 0.05774265725842573},
+       {0.01045387513810018, 0.05627743044712789}};
    ErrorMeasures ExpectedTrDel2Errors           = {0.00334357193650093847,
                                                    0.00290978146207349032};
    ErrorMeasures ExpectedTrDel4Errors           = {0.00508833446725232875,
@@ -228,29 +228,29 @@ struct TestSetupSphere {
                                                     0.004094907022292395};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsH = {1.018132e-05, 5.731925e-06};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsT = {0, 0};
-   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsMin    = {3.999579401557967,
-                                                         3.083728106631308};
-   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsMax    = {3.981396615813379,
-                                                         2.704215495794009};
-   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsLFlx   = {0.013961840219332,
-                                                         0.010140955894313};
-   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsHFlx   = {0.000000000000000,
-                                                         0.000000000000000};
-   ErrorMeasures ExpectedFCTHighAndLowOrderFlux_High  = {434426.80465762527,
-                                                         6625002849252.9530};
-   ErrorMeasures ExpectedFCTHighAndLowOrderFlux_Low   = {952854.2803370472,
-                                                         52005531508915.62};
-   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxIn  = {0.000000000000000,
-                                                         0.000000000000000};
-   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxOut = {1.000000000000000,
-                                                         0.045511721691151495};
-   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxInOut = {
-       1.000000000000000, 0.045511721691151495};
+   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsMin      = {3.999579401557967,
+                                                           3.0836281234295635};
+   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsMax      = {3.9868502555946823,
+                                                           2.712542674500614};
+   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsLFlx     = {0.013961840219332,
+                                                           0.010140955894313};
+   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsHFlx     = {0.000000000000000,
+                                                           0.000000000000000};
+   ErrorMeasures ExpectedFCTHighAndLowOrderFlux_High    = {426256.39661430614,
+                                                           6532904825455.0130};
+   ErrorMeasures ExpectedFCTHighAndLowOrderFlux_Low     = {952854.2803370472,
+                                                           52005531508915.62};
+   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxIn    = {0.9999999991127118,
+                                                           0.020062237037249};
+   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxOut   = {1.000000000000000,
+                                                           0.04471474159043722};
+   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxInOut = {1.000000000000000,
+                                                           0.04901906373124676};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsescaleHighOrderFlux = {
-       434425.80465762527, 68311.97198829101};
+       426255.39661430614, 68192.88195155785};
    ErrorMeasures ExpectedFCTTracerHorAccumulateHighOrderFlux[2] = {
-       {111602.23404252343, 178633.1036466855},
-       {110269.41019734027, 177133.16504939157}};
+       {111602.23404252343, 178627.1237154654},
+       {111606.20044738495, 177587.373552468}};
    ErrorMeasures ExpectedTrDel2Errors           = {0.04865718541236144,
                                                    0.005105510870642706};
    ErrorMeasures ExpectedTrDel4Errors           = {0.0008646345116716073,
