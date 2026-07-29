@@ -521,8 +521,10 @@ class TracerHorzAdvOnCell {
       const I4 KMin = MinLayerEdgeBot(IEdge);
       const I4 KMax = MaxLayerEdgeTop(IEdge);
       parallelForInner(
-          Team, Range(KMin, KMax),
-          INNER_LAMBDA(int K) { HighOrderFlx(IEdge, K) = 0; });
+          Team, Range(KMin, KMax), INNER_LAMBDA(int K) {
+             HighOrderFlx(IEdge, K) = 0;
+             LowOrderFlx(IEdge, K)  = 0;
+          });
       // Compute 3rd or 4th fluxes where requested.
       for (int I = 0; I < NAdvCellsForEdge(IEdge); ++I) {
          const I4 ICell   = AdvCellsForEdge(IEdge, I);
