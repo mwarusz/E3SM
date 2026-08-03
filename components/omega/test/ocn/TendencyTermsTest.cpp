@@ -383,9 +383,9 @@ constexpr Geometry Geom          = Geometry::Planar;
 constexpr char DefaultMeshFile[] = "OmegaPlanarMesh.nc";
 using TestSetup                  = TestSetupPlane;
 #else
-constexpr Geometry Geom = Geometry::Spherical;
+constexpr Geometry Geom          = Geometry::Spherical;
 constexpr char DefaultMeshFile[] = "OmegaSphereMesh.nc";
-using TestSetup = TestSetupSphere;
+using TestSetup                  = TestSetupSphere;
 #endif
 
 int setupBottomDragTestFields(const int NVertLayers, const Real Coeff,
@@ -1205,7 +1205,7 @@ class TracerHorzAdvOnCellTest : public TracerHorzAdvOnCell {
  public:
    TracerHorzAdvOnCellTest(const HorzMesh *Mesh, const VertCoord *VCoord,
                            const VertAdv *VAdv)
-       : TracerHorzAdvOnCell(Mesh, VCoord, VAdv){};
+       : TracerHorzAdvOnCell(Mesh, VCoord, VAdv) {};
    Array2DReal GetHProvInv() const { return HProvInv; };
    Array2DReal GetHProv() const { return HProv; };
    Array2DReal GetHNewInv() const { return HNewInv; };
