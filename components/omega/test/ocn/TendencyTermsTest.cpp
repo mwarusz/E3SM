@@ -79,8 +79,8 @@ struct TestSetupPlane {
                                                          0.092303444396272};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxIn  = {1, 0.7829782033185549};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxOut = {1, 0.7040759846240653};
-   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxInOut = {1,
-                                                           1.5053819233225736};
+   ErrorMeasures ExpectedFCTTracerHorzAdvErrorsFlxInOut            = {1,
+                                                                      1.5053819233225736};
    ErrorMeasures ExpectedFCTTracerHorzAdvErrorsescaleHighOrderFlux = {
        1.001623430330361, 0.9996778602155226};
    ErrorMeasures ExpectedFCTTracerHorAccumulateHighOrderFlux[2] = {
@@ -383,9 +383,9 @@ constexpr Geometry Geom          = Geometry::Planar;
 constexpr char DefaultMeshFile[] = "OmegaPlanarMesh.nc";
 using TestSetup                  = TestSetupPlane;
 #else
-constexpr Geometry Geom          = Geometry::Spherical;
+constexpr Geometry Geom = Geometry::Spherical;
 constexpr char DefaultMeshFile[] = "OmegaSphereMesh.nc";
-using TestSetup                  = TestSetupSphere;
+using TestSetup = TestSetupSphere;
 #endif
 
 int setupBottomDragTestFields(const int NVertLayers, const Real Coeff,
@@ -1205,7 +1205,7 @@ class TracerHorzAdvOnCellTest : public TracerHorzAdvOnCell {
  public:
    TracerHorzAdvOnCellTest(const HorzMesh *Mesh, const VertCoord *VCoord,
                            const VertAdv *VAdv)
-       : TracerHorzAdvOnCell(Mesh, VCoord, VAdv) {};
+       : TracerHorzAdvOnCell(Mesh, VCoord, VAdv){};
    Array2DReal GetHProvInv() const { return HProvInv; };
    Array2DReal GetHProv() const { return HProv; };
    Array2DReal GetHNewInv() const { return HNewInv; };
