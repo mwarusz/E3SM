@@ -797,7 +797,7 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::start("Tend:explicitBottomDrag", 2);
       parallelFor(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
-             LocExplicitBottomDrag(LocNormalVelocityTend, IEdge, NormVelEdge,
+             LocExplicitBottomDrag(LocNormalVelocityTend, IEdge, NormalVelEdge,
                                    KECell, MeanPseudoThickEdge);
           });
       Pacer::stop("Tend:explicitBottomDrag", 2);
