@@ -242,6 +242,11 @@ void Tendencies::readConfig(Config *OmegaConfig ///< [in] Omega config
          this->TracerHorzAdv.Coef3rdOrder = 0;
       }
       Err += AdvectConfig.get("HorzTracerFluxLimiterEnable", TracerHorzAdv.FCT);
+      OMEGA_REQUIRE(
+          !TracerHorzAdv.FCT || 2 < Order,
+          "HorzTracerFluxOrder: Since HorzTracerFluxLimiterEnable is true, "
+          "HorzTracerFluxOrder must be greater than 2. Found Order={}",
+          Order);
       CHECK_ERROR_ABORT(
           Err,
           "Tendencies: HorzTracerFluxLimiterEnable not found in AdvectConfig");
@@ -860,7 +865,7 @@ void Tendencies::computeTracerTendenciesOnly(
    Pacer::start("Tend:computeTracerTendenciesOnly", 1);
 
    parallelForOuter(
-       {NTracers, Mesh->NCellsAll},
+       "Tend:LocTracerTend.init", {NTracers, Mesh->NCellsAll},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           const int KMin = LocMinLayerCell(ICell);
           const int KMax = LocMaxLayerCell(ICell);
@@ -875,7 +880,7 @@ void Tendencies::computeTracerTendenciesOnly(
       Pacer::start("Tend:tracerHorzAdv", 2);
       if (LocTracerHorzAdv.FCT) {
          parallelForOuter(
-             {Mesh->NCellsAll},
+             "Tend:FCTProvisionaLayerThicknesses", {Mesh->NCellsAll},
              KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
                 LocTracerHorzAdv.FCTProvisionaLayerThicknesses(
                     Team, ICell, Dt, LocFluxPseudoThickEdge, LocPseudoThickCell,
@@ -884,40 +889,40 @@ void Tendencies::computeTracerTendenciesOnly(
          Kokkos::fence();
          for (int L = 0; L < NTracers; ++L) {
             parallelForOuter(
-                {Mesh->NCellsAll},
+                "Tend:FCTTracerCurFill", {Mesh->NCellsAll},
                 KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
                    LocTracerHorzAdv.FCTTracerCurFill(Team, L, ICell,
                                                      LocTracerArray);
                 });
             Kokkos::fence();
             parallelForOuter(
-                {Mesh->NCellsAll},
+                "Tend:FCTTracerCurFill", {Mesh->NCellsAll},
                 KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
                    LocTracerHorzAdv.FCTTracerMinMax(Team, ICell);
                 });
             Kokkos::fence();
             parallelForOuter(
-                {Mesh->NEdgesHaloH(1)},
+                "Tend:FCTHighAndLowOrderFlux", {Mesh->NEdgesHaloH(1)},
                 KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
                    LocTracerHorzAdv.FCTHighAndLowOrderFlux(
                        Team, IEdge, LocFluxPseudoThickEdge, LocNormalVelEdge);
                 });
             Kokkos::fence();
             parallelForOuter(
-                {Mesh->NCellsHaloH(0)},
+                "Tend:FCTFluxInOut", {Mesh->NCellsHaloH(0)},
                 KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
                    LocTracerHorzAdv.FCTFluxInOut(Team, ICell, Dt,
                                                  LocPseudoThickCell);
                 });
             Kokkos::fence();
             parallelForOuter(
-                {Mesh->NEdgesHaloH(0)},
+                "Tend:FCTRescaleHighOrderFlux", {Mesh->NEdgesHaloH(0)},
                 KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
                    LocTracerHorzAdv.FCTRescaleHighOrderFlux(Team, IEdge);
                 });
             Kokkos::fence();
             parallelForOuter(
-                {Mesh->NCellsOwned},
+                "Tend:FCTAccumulateHighOrderFlux", {Mesh->NCellsOwned},
                 KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
                    const Array2DReal Tend = Kokkos::subview(
                        LocTracerTend, L, Kokkos::ALL, Kokkos::ALL);
@@ -927,12 +932,14 @@ void Tendencies::computeTracerTendenciesOnly(
             Kokkos::fence();
             if (LocTracerHorzAdv.ComputeBudgets) {
                parallelForOuter(
+                   "Tend:FCTComputeBudgetAdvectionEdgeFlux",
                    {Mesh->NEdgesHaloH(1)},
                    KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
                       LocTracerHorzAdv.FCTComputeBudgetAdvectionEdgeFlux(
                           Team, L, IEdge);
                    });
                parallelForOuter(
+                   "Tend:FCTComputeBudgetAdvectionTendency",
                    {Mesh->NCellsOwned},
                    KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
                       LocTracerHorzAdv.FCTComputeBudgetAdvectionTendency(
@@ -940,8 +947,9 @@ void Tendencies::computeTracerTendenciesOnly(
                    });
             }
             if (LocTracerHorzAdv.MonotonicityCheck) {
+               const I4 NCellsOwned = Mesh->NCellsOwned;
                parallelForOuter(
-                   {Mesh->NCellsOwned},
+                   "Tend:FCTMonotonicityCheck", {Mesh->NCellsOwned},
                    KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
                       LocTracerHorzAdv.FCTMonotonicityCheck(Team, ICell);
                    });
@@ -949,7 +957,7 @@ void Tendencies::computeTracerTendenciesOnly(
          }
       } else {
          parallelForOuter(
-             {NTracers, Mesh->NEdgesAll},
+             "Tend:TracerHorzAdv.init", {NTracers, Mesh->NEdgesAll},
              KOKKOS_LAMBDA(int L, int IEdge, const TeamMember &Team) {
                 const int KMin = LocMinLayerEdgeBot(IEdge);
                 const int KMax = LocMaxLayerEdgeTop(IEdge);
@@ -961,7 +969,7 @@ void Tendencies::computeTracerTendenciesOnly(
                     });
              });
          parallelForOuter(
-             {NTracers, Mesh->NCellsAll},
+             "Tend:TracerHorzAdv.exec", {NTracers, Mesh->NCellsAll},
              KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
                 const int KMin = LocMinLayerCell(ICell);
                 const int KMax = LocMaxLayerCell(ICell);
@@ -980,7 +988,7 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerDiffusion.Enabled) {
       Pacer::start("Tend:tracerDiffusion", 2);
       parallelForOuter(
-          {NTracers, Mesh->NCellsAll},
+          "Tend::TracerDiffusion", {NTracers, Mesh->NCellsAll},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
              const int KMin   = LocMinLayerCell(ICell);
              const int KMax   = LocMaxLayerCell(ICell);
