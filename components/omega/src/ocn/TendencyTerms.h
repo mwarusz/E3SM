@@ -731,13 +731,15 @@ class TracerHorzAdvOnCell {
       // non-monotone values and write warning if found
       if (TracerCur(ICell, K) < TracerMin(ICell, K) - Eps) {
          printf("Horizontal minimum out of bounds on cell %d, level %d "
-	     "new tracer value %lg is smaller than previous tracer minimum %lg\n",
+                "new tracer value %lg is smaller than previous tracer minimum "
+                "%lg\n",
                 ICell, K, TracerCur(ICell, K), TracerMin(ICell, K));
       }
       if (TracerCur(ICell, K) > TracerMax(ICell, K) + Eps) {
          printf("Horizontal maximum out of bounds on cell %d, level %d "
-	     "new tracer value %lg is larger than previous tracer maximum %lg\n",
-                TracerCur(ICell, K), TracerMax(ICell, K));
+                "new tracer value %lg is larger than previous tracer maximum "
+                "%lg\n",
+                ICell, K, TracerCur(ICell, K), TracerMax(ICell, K));
       }
    }
 
