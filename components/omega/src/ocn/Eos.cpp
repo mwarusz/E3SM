@@ -229,7 +229,7 @@ void Eos::computeSpecVolAndDerivs(const Array2DReal &ConservTemp,
       parallelForOuter(
           "eos-derivs-linear", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             LocComputeSpecVolLinear.calcSpecVolAndDerivsInChunk(
+             LocComputeSpecVolLinear.calcSpecVolAndDerivsOnCells(
                  LocSpecVol, LocSpecVolDCt, LocSpecVolDSa, LocSpecVolDP, Team,
                  ICell, ConservTemp, AbsSalinity);
           });
@@ -237,7 +237,7 @@ void Eos::computeSpecVolAndDerivs(const Array2DReal &ConservTemp,
       parallelForOuter(
           "eos-derivs-teos10", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             LocComputeSpecVolTeos10.calcSpecVolAndDerivsInChunk(
+             LocComputeSpecVolTeos10.calcSpecVolAndDerivsOnCells(
                  LocSpecVol, LocSpecVolDCt, LocSpecVolDSa, LocSpecVolDP, Team,
                  ICell, ConservTemp, AbsSalinity, Pressure);
           });
@@ -245,7 +245,7 @@ void Eos::computeSpecVolAndDerivs(const Array2DReal &ConservTemp,
       parallelForOuter(
           "eos-derivs-constant", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             LocComputeSpecVolConstant.calcSpecVolAndDerivsInChunk(
+             LocComputeSpecVolConstant.calcSpecVolAndDerivsOnCells(
                  LocSpecVol, LocSpecVolDCt, LocSpecVolDSa, LocSpecVolDP, Team,
                  ICell, ConservTemp, AbsSalinity);
           });
