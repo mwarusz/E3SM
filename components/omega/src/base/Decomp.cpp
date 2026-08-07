@@ -408,6 +408,7 @@ void Decomp::init(const std::string &InMeshFileName) {
 
    // Retrieve options from Config
    Config *OmegaConfig = Config::getOmegaConfig();
+   OMEGA_REQUIRE(OmegaConfig, "Null OmegaConfig pointer in Decomp::init");
 
    Config DecompConfig("Decomp");
    Err = OmegaConfig->get(DecompConfig);
@@ -443,6 +444,7 @@ void Decomp::init(const std::string &InMeshFileName) {
 
    // Retrieve the default machine environment
    MachEnv *DefEnv = MachEnv::getDefault();
+   OMEGA_REQUIRE(DefEnv, "Null default MachEnv pointer in Decomp::init");
 
    // Use one partition per MPI task as the default
    I4 NParts = DefEnv->getNumTasks();
@@ -778,6 +780,9 @@ Decomp *Decomp::create(
 ) {
 
    bool TimerFlag = Pacer::start("Decomp create", 1);
+   OMEGA_REQUIRE(Env,
+                 "Null MachEnv pointer in Decomp::create with Name = {}", Name);
+
    // Check to see if a decomposition of the same name already exists and
    // if so, exit with an error
    if (AllDecomps.find(Name) != AllDecomps.end()) {
