@@ -82,7 +82,11 @@ The create method will take the same arguments as the constructor, use it to
 create a new tendencies instance, and put it in the static map of all tendencies.
 It will return a pointer to the newly created object.
 ```c++
-Tendencies* Tendencies::create(const std::string &Name, const HorzMesh *Mesh, int NVertLayers, Config *Options);
+Tendencies* Tendencies::create(const std::string &Name, const HorzMesh *Mesh,
+                                VertCoord *VCoord, VertAdv *VAdv,
+                                PressureGrad *PGrad, Eos *EqState,
+                                VertMix *VMix, int NTracers,
+                                TimeInterval TimeStep, Config *Options);
 ```
 
 #### 4.2.2 Initialization
