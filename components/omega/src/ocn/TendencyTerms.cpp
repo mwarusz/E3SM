@@ -134,6 +134,8 @@ void TracerHorzAdvOnCell::init() {
    const auto MaxEdges2    = Mesh->MaxEdges2;
    const auto NEdgesAll    = Mesh->NEdgesAll;
    const auto NCellsAll    = Mesh->NCellsAll;
+   const auto NEdgesSize   = Mesh->NEdgesSize;
+   const auto NCellsSize   = Mesh->NCellsSize;
    // Allocate Kokkos arrays in member data
 
    if (ForceLowOrder) {
@@ -158,22 +160,19 @@ void TracerHorzAdvOnCell::init() {
        {NEdgesAll}, KOKKOS_LAMBDA(int IEdge) { masksAndCoefficients(IEdge); });
    Kokkos::fence();
    if (FCT) {
-      HProvInv = Array2DReal("FCTProvesionalLayerThickness", Mesh->NEdgesAll,
+      HProvInv = Array2DReal("FCTProvesionalLayerThickness", Mesh->NEdgesSize,
                              NVertLayers);
-      HNewInv = Array2DReal("FCTProvesionalNewInverse", NEdgesAll, NVertLayers);
-      HProv   = Array2DReal("FCTProvesionalThickness", NCellsAll, NVertLayers);
-      TracerCur = Array2DReal("TracerCur", NCellsAll + 1, NVertLayers),
-      TracerMax = Array2DReal("FCTTracerMax", NCellsAll, NVertLayers);
-      TracerMin = Array2DReal("FCTTracerMin", NCellsAll, NVertLayers);
-      HighOrderFlx =
-          Array2DReal("FCTHighOrderFlx", std::max(NEdgesAll, NCellsAll) + 1,
-                      NVertLayers + 1);
-      LowOrderFlx =
-          Array2DReal("FCTLowOrderFlx", std::max(NEdgesAll, NCellsAll) + 1,
-                      NVertLayers + 1);
-      WorkTend = Array2DReal("WorkTend", NCellsAll + 1, NVertLayers);
-      FlxIn    = Array2DReal("FlxIn", NCellsAll + 1, NVertLayers);
-      FlxOut   = Array2DReal("FlxOut", NCellsAll + 1, NVertLayers);
+      HNewInv =
+          Array2DReal("FCTProvesionalNewInverse", NEdgesSize, NVertLayers);
+      HProv = Array2DReal("FCTProvesionalThickness", NCellsSize, NVertLayers);
+      TracerCur    = Array2DReal("TracerCur", NCellsSize, NVertLayers),
+      TracerMax    = Array2DReal("FCTTracerMax", NCellsSize, NVertLayers);
+      TracerMin    = Array2DReal("FCTTracerMin", NCellsSize, NVertLayers);
+      HighOrderFlx = Array2DReal("FCTHighOrderFlx", NEdgesSize, NVertLayers);
+      LowOrderFlx  = Array2DReal("FCTLowOrderFlx", NEdgesSize, NVertLayers);
+      WorkTend     = Array2DReal("WorkTend", NCellsSize, NVertLayers);
+      FlxIn        = Array2DReal("FlxIn", NCellsSize, NVertLayers);
+      FlxOut       = Array2DReal("FlxOut", NCellsSize, NVertLayers);
       deepCopy(HProvInv, 0.0);
       deepCopy(HNewInv, 0.0);
       deepCopy(HProv, 0.0);
