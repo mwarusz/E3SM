@@ -218,10 +218,11 @@ int initTimeStepperTest(const std::string &mesh) {
       LOG_ERROR("TimeStepperTest: error creating test state");
    }
 
-   TimeInterval ZeroTimeStep; // Zero-length time step placeholder
+   TimeInterval PosTimeStep(
+       1, TimeUnits::Seconds); // Arbitrary positive time step (unused)
    auto *TestAuxState =
        AuxiliaryState::create("TestAuxState", DefMesh, DefHalo, DefVertCoord,
-                              DefVAdv, NTracers, ZeroTimeStep);
+                              DefVAdv, NTracers, PosTimeStep);
 
    Config *OmegaConfig = Config::getOmegaConfig();
    TestAuxState->readConfigOptions(OmegaConfig);
@@ -236,7 +237,7 @@ int initTimeStepperTest(const std::string &mesh) {
    // Creating non-default tendencies with custom velocity tendencies
    auto *TestTendencies = Tendencies::create(
        "TestTendencies", DefMesh, DefVertCoord, DefVAdv, DefPGrad, DefEos,
-       DefVMix, NTracers, ZeroTimeStep, &Options,
+       DefVMix, NTracers, PosTimeStep, &Options,
        Tendencies::CustomTendencyType{}, DecayVelocityTendency{});
    if (!TestTendencies) {
       Err++;
@@ -255,7 +256,7 @@ int initTimeStepperTest(const std::string &mesh) {
    TestTendencies->TracerHyperDiff.Enabled        = false;
    TestTendencies->SfcStressForcing.Enabled       = false;
    TestTendencies->SurfaceTracerRestoring.Enabled = false;
-   TestTendencies->BottomDrag.Enabled             = false;
+   TestTendencies->ExplicitBottomDrag.Enabled     = false;
    DefVAdv->ThickVertAdvEnabled                   = false;
    DefVAdv->VelVertAdvEnabled                     = false;
    DefVAdv->TracerVertAdvEnabled                  = false;
@@ -424,6 +425,13 @@ int testOptionalStopTime(const std::string &Name, TimeStepperType Type) {
                 Name);
    }
 
+   if (Stepper->getStepCount() != 0) {
+      Err++;
+      LOG_ERROR("TimeStepperTest: {}: getStepCount() should be 0 before any "
+                "doStep calls",
+                Name);
+   }
+
    // Verify doStep works without an EndAlarm (coupled run loop never uses it)
    Stepper->attachData(TestTendencies, TestAuxState, DefMesh, DefVCoord,
                        DefHalo);
@@ -431,7 +439,25 @@ int testOptionalStopTime(const std::string &Name, TimeStepperType Type) {
    initState();
    TimeInstant CurTime = TimeStart;
    Stepper->doStep(State, CurTime);
+
+   if (Stepper->getStepCount() != 1) {
+      Err++;
+      LOG_ERROR("TimeStepperTest: {}: getStepCount() should be 1 after one "
+                "doStep call",
+                Name);
+   }
+
+   // Coupled driver calls doStep repeatedly across separate ocnRun
+   // invocations, so StepCount must persist and keep incrementing rather
+   // than reset
    Stepper->doStep(State, CurTime);
+
+   if (Stepper->getStepCount() != 2) {
+      Err++;
+      LOG_ERROR("TimeStepperTest: {}: getStepCount() should be 2 after two "
+                "doStep calls",
+                Name);
+   }
 
    TimeStepper::erase("CoupledTestStepper");
 
@@ -492,6 +518,7 @@ int main(int argc, char *argv[]) {
 
    Pacer::finalize();
    Kokkos::finalize();
+   MPI_Barrier(MPI_COMM_WORLD);
    MPI_Finalize();
 
    if (RetVal >= 256)

@@ -1,5 +1,6 @@
 #include "AuxiliaryState.h"
 #include "Config.h"
+#include "Error.h"
 #include "Field.h"
 #include "Logging.h"
 #include "Pacer.h"
@@ -28,7 +29,8 @@ AuxiliaryState::AuxiliaryState(const std::string &Name, const HorzMesh *Mesh,
       VorticityAux(stripDefault(Name), Mesh, VCoord),
       VelocityDel2Aux(stripDefault(Name), Mesh, VCoord),
       SurfTracerRestAux(stripDefault(Name), Mesh, NTracers),
-      TracerAux(stripDefault(Name), Mesh, VCoord, NTracers) {
+      TracerAux(stripDefault(Name), Mesh, VCoord, NTracers),
+      TimeStep(TimeStep) {
 
    GroupName = "AuxiliaryState";
    if (Name != "Default") {
@@ -128,6 +130,10 @@ void AuxiliaryState::computeMomAux(const OceanState *State,
    TimeStep.get(TimeStepSeconds, TimeUnits::Seconds);
    R8 ProjDtSeconds;
    ProjDt.get(ProjDtSeconds, TimeUnits::Seconds);
+
+   // Sanity checks for the time steps
+   OMEGA_REQUIRE(TimeStepSeconds > 0, "TimeStepSeconds has to be positive");
+   OMEGA_REQUIRE(ProjDtSeconds > 0, "ProjDtSeconds has to be positive");
 
    Pacer::start("AuxState:computeMomAux", 1);
 
@@ -323,6 +329,19 @@ AuxiliaryState *AuxiliaryState::create(const std::string &Name,
                                        VertCoord *VCoord, VertAdv *VAdv,
                                        const int NTracers,
                                        TimeInterval TimeStep) {
+   OMEGA_REQUIRE(
+       Mesh, "Null HorzMesh pointer in AuxiliaryState::create with Name = {}",
+       Name);
+   OMEGA_REQUIRE(MeshHalo,
+                 "Null Halo pointer in AuxiliaryState::create with Name = {}",
+                 Name);
+   OMEGA_REQUIRE(
+       VCoord,
+       "Null VertCoord pointer in AuxiliaryState::create with Name = {}", Name);
+   OMEGA_REQUIRE(
+       VAdv, "Null VertAdv pointer in AuxiliaryState::create with Name = {}",
+       Name);
+
    if (AllAuxStates.find(Name) != AllAuxStates.end()) {
       LOG_ERROR("Attempted to create a new AuxiliaryState with name {} but it "
                 "already exists",
@@ -340,11 +359,20 @@ AuxiliaryState *AuxiliaryState::create(const std::string &Name,
 // Create the default auxiliary state. Assumes that HorzMesh, VertCoord,
 // VertAdv, and Halo have been initialized.
 void AuxiliaryState::init() {
-   const HorzMesh *DefMesh           = HorzMesh::getDefault();
-   Halo *DefHalo                     = Halo::getDefault();
-   VertCoord *DefVCoord              = VertCoord::getDefault();
-   VertAdv *DefVAdv                  = VertAdv::getDefault();
+   const HorzMesh *DefMesh = HorzMesh::getDefault();
+   OMEGA_REQUIRE(DefMesh,
+                 "Null default HorzMesh pointer in AuxiliaryState::init");
+   Halo *DefHalo = Halo::getDefault();
+   OMEGA_REQUIRE(DefHalo, "Null default Halo pointer in AuxiliaryState::init");
+   VertCoord *DefVCoord = VertCoord::getDefault();
+   OMEGA_REQUIRE(DefVCoord,
+                 "Null default VertCoord pointer in AuxiliaryState::init");
+   VertAdv *DefVAdv = VertAdv::getDefault();
+   OMEGA_REQUIRE(DefVAdv,
+                 "Null default VertAdv pointer in AuxiliaryState::init");
    const TimeStepper *DefTimeStepper = TimeStepper::getDefault();
+   OMEGA_REQUIRE(DefTimeStepper,
+                 "Null default TimeStepper pointer in AuxiliaryState::init");
 
    int NTracers          = Tracers::getNumTracers();
    TimeInterval TimeStep = DefTimeStepper->getTimeStep();
@@ -353,6 +381,8 @@ void AuxiliaryState::init() {
        "Default", DefMesh, DefHalo, DefVCoord, DefVAdv, NTracers, TimeStep);
 
    Config *OmegaConfig = Config::getOmegaConfig();
+   OMEGA_REQUIRE(OmegaConfig,
+                 "Null OmegaConfig pointer in AuxiliaryState::init");
    DefaultAuxState->readConfigOptions(OmegaConfig);
 }
 

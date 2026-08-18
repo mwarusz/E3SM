@@ -9,6 +9,7 @@
 
 #include "Eos.h"
 #include "DataTypes.h"
+#include "Error.h"
 #include "HorzMesh.h"
 
 namespace OMEGA {
@@ -48,6 +49,11 @@ Eos::Eos(const std::string &Name, ///< [in] Name for eos object
        Array2DReal("SpecVolDisplaced", Mesh->NCellsSize, VCoord->NVertLayers);
    BruntVaisalaFreqSq = Array2DReal("BruntVaisalaFreqSq", Mesh->NCellsSize,
                                     VCoord->NVertLayersP1);
+   SpecVolDCt =
+       Array2DReal("SpecVolDCt", Mesh->NCellsSize, VCoord->NVertLayers);
+   SpecVolDSa =
+       Array2DReal("SpecVolDSa", Mesh->NCellsSize, VCoord->NVertLayers);
+   SpecVolDP = Array2DReal("SpecVolDP", Mesh->NCellsSize, VCoord->NVertLayers);
 
    defineFields();
 }
@@ -73,9 +79,13 @@ void Eos::destroyInstance() {
 /// for either a Linear or TEOS-10 equation.
 void Eos::init() {
 
+   HorzMesh *DefMesh = HorzMesh::getDefault();
+   OMEGA_REQUIRE(DefMesh, "Null default HorzMesh pointer in Eos::init");
+   VertCoord *DefVCoord = VertCoord::getDefault();
+   OMEGA_REQUIRE(DefVCoord, "Null default VertCoord pointer in Eos::init");
+
    if (!Instance) {
-      Instance =
-          new Eos("Default", HorzMesh::getDefault(), VertCoord::getDefault());
+      Instance = new Eos("Default", DefMesh, DefVCoord);
    }
 
    Error Err; // error code
@@ -85,6 +95,7 @@ void Eos::init() {
 
    /// Get EosConfig group from Omega config
    Config *OmegaConfig = Config::getOmegaConfig();
+   OMEGA_REQUIRE(OmegaConfig, "Null OmegaConfig pointer in Eos::init");
    Config EosConfig("Eos");
    Err += OmegaConfig->get(EosConfig);
    CHECK_ERROR_ABORT(Err, "Eos::init: Eos group not found in Config");
@@ -136,8 +147,6 @@ void Eos::computeSpecVol(const Array2DReal &ConservTemp,
                ComputeSpecVolTeos10); /// Local view for TEOS-10 computation
    OMEGA_SCOPE(LocComputeSpecVolConstant,
                ComputeSpecVolConstant); /// Local view for constant computation
-   OMEGA_SCOPE(MinLayerCell, VCoord->MinLayerCell);
-   OMEGA_SCOPE(MaxLayerCell, VCoord->MaxLayerCell);
 
    I4 KDisp = 0; /// No displacement in this case
 
@@ -146,44 +155,22 @@ void Eos::computeSpecVol(const Array2DReal &ConservTemp,
       parallelForOuter(
           "eos-linear", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolLinear(LocSpecVol, ICell, KChunk,
-                                            ConservTemp, AbsSalinity);
-                 });
+             LocComputeSpecVolLinear(LocSpecVol, Team, ICell, ConservTemp,
+                                     AbsSalinity);
           });
    } else if (EosChoice == EosType::Teos10Eos) {
       parallelForOuter(
           "eos-teos10", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolTeos10(LocSpecVol, ICell, KChunk,
-                                            ConservTemp, AbsSalinity, Pressure,
-                                            KDisp);
-                 });
+             LocComputeSpecVolTeos10(LocSpecVol, Team, ICell, ConservTemp,
+                                     AbsSalinity, Pressure, KDisp);
           });
    } else if (EosChoice == EosType::ConstantEos) {
       parallelForOuter(
           "eos-constant", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolConstant(LocSpecVol, ICell, KChunk,
-                                              ConservTemp, AbsSalinity);
-                 });
+             LocComputeSpecVolConstant(LocSpecVol, Team, ICell, ConservTemp,
+                                       AbsSalinity);
           });
    }
 }
@@ -200,8 +187,6 @@ void Eos::computeSpecVolDisp(const Array2DReal &ConservTemp,
                ComputeSpecVolTeos10); /// Local view for TEOS-10 computation
    OMEGA_SCOPE(LocComputeSpecVolConstant,
                ComputeSpecVolConstant); /// Local view for constant computation
-   OMEGA_SCOPE(MinLayerCell, VCoord->MinLayerCell);
-   OMEGA_SCOPE(MaxLayerCell, VCoord->MaxLayerCell);
 
    /// Dispatch to the correct EOS calculation
    /// If EosChoice is Linear, the displaced specific
@@ -210,41 +195,65 @@ void Eos::computeSpecVolDisp(const Array2DReal &ConservTemp,
       parallelForOuter(
           "eos-linear", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolLinear(LocSpecVolDisplaced, ICell, KChunk,
-                                            ConservTemp, AbsSalinity);
-                 });
+             LocComputeSpecVolLinear(LocSpecVolDisplaced, Team, ICell,
+                                     ConservTemp, AbsSalinity);
           });
    } else if (EosChoice == EosType::Teos10Eos) {
       parallelForOuter(
           "eos-teos10", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolTeos10(LocSpecVolDisplaced, ICell, KChunk,
-                                            ConservTemp, AbsSalinity, Pressure,
-                                            KDisp);
-                 });
+             LocComputeSpecVolTeos10(LocSpecVolDisplaced, Team, ICell,
+                                     ConservTemp, AbsSalinity, Pressure, KDisp);
           });
    } else if (EosChoice == EosType::ConstantEos) {
       parallelForOuter(
           "eos-constant", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell);
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeSpecVolConstant(LocSpecVolDisplaced, ICell,
-                                              KChunk, ConservTemp, AbsSalinity);
-                 });
+             LocComputeSpecVolConstant(LocSpecVolDisplaced, Team, ICell,
+                                       ConservTemp, AbsSalinity);
+          });
+   }
+}
+
+/// Compute specific volume and its first derivatives for all cells/layers
+void Eos::computeSpecVolAndDerivs(const Array2DReal &ConservTemp,
+                                  const Array2DReal &AbsSalinity,
+                                  const Array2DReal &Pressure) {
+   OMEGA_SCOPE(LocSpecVol, SpecVol);       /// Local views for computation
+   OMEGA_SCOPE(LocSpecVolDCt, SpecVolDCt); /// Temperature derivative
+   OMEGA_SCOPE(LocSpecVolDSa, SpecVolDSa); /// Salinity derivative
+   OMEGA_SCOPE(LocSpecVolDP, SpecVolDP);   /// Pressure derivative
+   OMEGA_SCOPE(LocComputeSpecVolLinear,
+               ComputeSpecVolLinear); /// Local view for linear EOS computation
+   OMEGA_SCOPE(LocComputeSpecVolTeos10,
+               ComputeSpecVolTeos10); /// Local view for TEOS-10 computation
+   OMEGA_SCOPE(LocComputeSpecVolConstant,
+               ComputeSpecVolConstant); /// Local view for constant computation
+
+   /// Dispatch to the correct EOS calculation
+   if (EosChoice == EosType::LinearEos) {
+      parallelForOuter(
+          "eos-derivs-linear", {Mesh->NCellsAll},
+          KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
+             LocComputeSpecVolLinear.calcSpecVolAndDerivsOnCells(
+                 LocSpecVol, LocSpecVolDCt, LocSpecVolDSa, LocSpecVolDP, Team,
+                 ICell, ConservTemp, AbsSalinity);
+          });
+   } else if (EosChoice == EosType::Teos10Eos) {
+      parallelForOuter(
+          "eos-derivs-teos10", {Mesh->NCellsAll},
+          KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
+             LocComputeSpecVolTeos10.calcSpecVolAndDerivsOnCells(
+                 LocSpecVol, LocSpecVolDCt, LocSpecVolDSa, LocSpecVolDP, Team,
+                 ICell, ConservTemp, AbsSalinity, Pressure);
+          });
+   } else if (EosChoice == EosType::ConstantEos) {
+      parallelForOuter(
+          "eos-derivs-constant", {Mesh->NCellsAll},
+          KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
+             LocComputeSpecVolConstant.calcSpecVolAndDerivsOnCells(
+                 LocSpecVol, LocSpecVolDCt, LocSpecVolDSa, LocSpecVolDP, Team,
+                 ICell, ConservTemp, AbsSalinity);
           });
    }
 }
@@ -272,14 +281,11 @@ void Eos::computeBruntVaisalaFreqSq(const Array2DReal &ConservTemp,
           "bvf-linear", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
              // Compute Brunt-Vaisala frequency at interior vertical interfaces
-             const int KMin   = MinLayerCell(ICell) + 1;
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeBruntVaisalaFreqSqLinear(LocBruntVaisalaFreqSq,
-                                                       ICell, KChunk, SpecVol);
-                 });
+             const int KMin = MinLayerCell(ICell) + 1;
+             const int KMax = MaxLayerCell(ICell);
+
+             LocComputeBruntVaisalaFreqSqLinear(LocBruntVaisalaFreqSq, Team,
+                                                ICell, SpecVol);
 
              teamBarrier(Team);
 
@@ -301,15 +307,12 @@ void Eos::computeBruntVaisalaFreqSq(const Array2DReal &ConservTemp,
           "bvf-teos10", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
              // Compute Brunt-Vaisala frequency at interior vertical interfaces
-             const int KMin   = MinLayerCell(ICell) + 1;
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeBruntVaisalaFreqSqTeos10(
-                        LocBruntVaisalaFreqSq, ICell, KChunk, ConservTemp,
-                        AbsSalinity, Pressure, SpecVol);
-                 });
+             const int KMin = MinLayerCell(ICell) + 1;
+             const int KMax = MaxLayerCell(ICell);
+
+             LocComputeBruntVaisalaFreqSqTeos10(LocBruntVaisalaFreqSq, Team,
+                                                ICell, ConservTemp, AbsSalinity,
+                                                Pressure, SpecVol);
 
              teamBarrier(Team);
 
@@ -350,10 +353,16 @@ void Eos::defineFields() {
    SpecVolFldName            = "SpecVol";
    SpecVolDisplacedFldName   = "SpecVolDisplaced";
    BruntVaisalaFreqSqFldName = "BruntVaisalaFreqSq";
+   SpecVolDCtFldName         = "SpecVolDCt";
+   SpecVolDSaFldName         = "SpecVolDSa";
+   SpecVolDPFldName          = "SpecVolDP";
    if (Name != "Default") {
       SpecVolFldName.append(Name);
       SpecVolDisplacedFldName.append(Name);
       BruntVaisalaFreqSqFldName.append(Name);
+      SpecVolDCtFldName.append(Name);
+      SpecVolDSaFldName.append(Name);
+      SpecVolDPFldName.append(Name);
    }
 
    /// Create fields for state variables
@@ -386,6 +395,45 @@ void Eos::defineFields() {
                      DimNames // Dimension names
        );
 
+   /// The specific volume derivatives are legitimately negative, so their
+   /// valid range spans the full range of Real rather than starting at zero
+   auto SpecVolDCtField = Field::create(
+       SpecVolDCtFldName, // Field name
+       "Derivative of specific volume with respect to conservative "
+       "temperature",    // Long Name
+       "m3 kg-1 degC-1", // Units
+       // CF-ish Name
+       "sea_water_specific_volume_derivative_wrt_conservative_temperature",
+       std::numeric_limits<Real>::lowest(), // Min valid value
+       std::numeric_limits<Real>::max(),    // Max valid value
+       NDims,                               // Number of dimensions
+       DimNames                             // Dimension names
+   );
+
+   auto SpecVolDSaField = Field::create(
+       SpecVolDSaFldName, // Field name
+       "Derivative of specific volume with respect to absolute "
+       "salinity", // Long Name
+       "m3 g-1",   // Units
+       // CF-ish Name
+       "sea_water_specific_volume_derivative_wrt_absolute_salinity",
+       std::numeric_limits<Real>::lowest(), // Min valid value
+       std::numeric_limits<Real>::max(),    // Max valid value
+       NDims,                               // Number of dimensions
+       DimNames                             // Dimension names
+   );
+
+   auto SpecVolDPField = Field::create(
+       SpecVolDPFldName,                                         // Field name
+       "Derivative of specific volume with respect to pressure", // Long Name
+       "m3 kg-1 Pa-1",                                           // Units
+       "sea_water_specific_volume_derivative_wrt_pressure",      // CF-ish Name
+       std::numeric_limits<Real>::lowest(), // Min valid value
+       std::numeric_limits<Real>::max(),    // Max valid value
+       NDims,                               // Num dimensions
+       DimNames                             // Dimension names
+   );
+
    // Brunt-Vaisala frequency is located at interfaces
    DimNames[1] = "NVertLayersP1";
 
@@ -412,11 +460,17 @@ void Eos::defineFields() {
    EosGroup->addField(SpecVolDisplacedFldName);
    EosGroup->addField(SpecVolFldName);
    EosGroup->addField(BruntVaisalaFreqSqFldName);
+   EosGroup->addField(SpecVolDCtFldName);
+   EosGroup->addField(SpecVolDSaFldName);
+   EosGroup->addField(SpecVolDPFldName);
 
    // Attach Kokkos views to the fields
    SpecVolDisplacedField->attachData<Array2DReal>(SpecVolDisplaced);
    SpecVolField->attachData<Array2DReal>(SpecVol);
    BruntVaisalaFreqSqField->attachData<Array2DReal>(BruntVaisalaFreqSq);
+   SpecVolDCtField->attachData<Array2DReal>(SpecVolDCt);
+   SpecVolDSaField->attachData<Array2DReal>(SpecVolDSa);
+   SpecVolDPField->attachData<Array2DReal>(SpecVolDP);
 
 } // end defineIOFields
 

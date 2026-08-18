@@ -1,5 +1,6 @@
 #include "SfcCoupling.h"
 #include "Eos.h"
+#include "Error.h"
 #include "GlobalConstants.h"
 #include "Logging.h"
 #include "OceanState.h"
@@ -21,7 +22,11 @@ int SfcCoupling::init(const CouplingInitParams &CouplingInitParams) {
 
    // Retrieve the default horizontal mesh and timestepper
    HorzMesh *DefHorzMesh = HorzMesh::getDefault();
-   auto *DefTimeStepper  = TimeStepper::getDefault();
+   OMEGA_REQUIRE(DefHorzMesh,
+                 "Null default HorzMesh pointer in SfcCoupling::init");
+   auto *DefTimeStepper = TimeStepper::getDefault();
+   OMEGA_REQUIRE(DefTimeStepper,
+                 "Null default TimeStepper pointer in SfcCoupling::init");
 
    TimeInterval OcnTimeStep = DefTimeStepper->getTimeStep();
    TimeInterval CplTimeStep = CouplingInitParams.CouplingTimeStep;
@@ -92,6 +97,13 @@ SfcCoupling *SfcCoupling::create(
     const std::map<std::string, int> &ExportIdxMap, TimeStepper *Stepper,
     const TimeInterval &CouplingTimeStep, const CouplingLayout &Layout) {
 
+   OMEGA_REQUIRE(Mesh,
+                 "Null HorzMesh pointer in SfcCoupling::create with Name = {}",
+                 Name);
+   OMEGA_REQUIRE(
+       Stepper,
+       "Null TimeStepper pointer in SfcCoupling::create with Name = {}", Name);
+
    // Check to see if a surface coupling of the same name already exists
    if (AllSfcCoupling.find(Name) != AllSfcCoupling.end()) {
       LOG_ERROR("Attempted to create a SfcCoupling with name {}, but a "
@@ -147,6 +159,9 @@ void SfcCoupling::clear() {
 
 // Getter for private member NAccumSteps
 I4 SfcCoupling::getNAccumSteps() const { return NAccumSteps; }
+
+// Getter for private member CouplingAlarm
+Alarm *SfcCoupling::getCouplingAlarm() { return &CouplingAlarm; }
 
 // Create views of the raw coupling data arrays
 void SfcCoupling::attachData(const Real *CplToOcnData, Real *OcnToCplData) {
@@ -228,6 +243,9 @@ void SfcCoupling::exportToCoupler() {
    auto AvgSfcVelocityZonal_ = OcnToCpl.AvgSfcVelocityZonalH;
    auto AvgSfcVelocityMerid_ = OcnToCpl.AvgSfcVelocityMeridH;
    auto InstSshCellH_        = OcnToCpl.InstSshCellH;
+
+   // Initalize all o2x fields to 0.0 for next coupling interval
+   deepCopy(OcnToCplView_, 0.0_Real);
 
    /// TODO: Shouldn't be making direct calls to Kokkos here.
    auto Policy = Kokkos::RangePolicy<HostExecSpace, Kokkos::IndexType<int>>(

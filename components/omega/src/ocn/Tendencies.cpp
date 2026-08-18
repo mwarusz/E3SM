@@ -34,18 +34,32 @@ std::map<std::string, std::unique_ptr<Tendencies>> Tendencies::AllTendencies;
 void Tendencies::init() {
    Error Err; // error code
 
-   HorzMesh *DefHorzMesh       = HorzMesh::getDefault();
-   VertCoord *DefVertCoord     = VertCoord::getDefault();
-   VertAdv *DefVertAdv         = VertAdv::getDefault();
+   HorzMesh *DefHorzMesh = HorzMesh::getDefault();
+   OMEGA_REQUIRE(DefHorzMesh,
+                 "Null default HorzMesh pointer in Tendencies::init");
+   VertCoord *DefVertCoord = VertCoord::getDefault();
+   OMEGA_REQUIRE(DefVertCoord,
+                 "Null default VertCoord pointer in Tendencies::init");
+   VertAdv *DefVertAdv = VertAdv::getDefault();
+   OMEGA_REQUIRE(DefVertAdv,
+                 "Null default VertAdv pointer in Tendencies::init");
    TimeStepper *DefTimeStepper = TimeStepper::getDefault();
-   Eos *DefEos                 = Eos::getInstance();
-   PressureGrad *DefPGrad      = PressureGrad::getDefault();
-   VertMix *DefVertMix         = VertMix::getInstance();
+   OMEGA_REQUIRE(DefTimeStepper,
+                 "Null default TimeStepper pointer in Tendencies::init");
+   Eos *DefEos = Eos::getInstance();
+   OMEGA_REQUIRE(DefEos, "Null default Eos pointer in Tendencies::init");
+   PressureGrad *DefPGrad = PressureGrad::getDefault();
+   OMEGA_REQUIRE(DefPGrad,
+                 "Null default PressureGrad pointer in Tendencies::init");
+   VertMix *DefVertMix = VertMix::getInstance();
+   OMEGA_REQUIRE(DefVertMix,
+                 "Null default VertMix pointer in Tendencies::init");
 
    I4 NTracers = Tracers::getNumTracers();
 
    // Get TendConfig group
    Config *OmegaConfig = Config::getOmegaConfig();
+   OMEGA_REQUIRE(OmegaConfig, "Null OmegaConfig pointer in Tendencies::init");
    Config TendConfig("Tendencies");
    Err += OmegaConfig->get(TendConfig);
    CHECK_ERROR_ABORT(Err, "Tendencies: Tendencies group not found in Config");
@@ -238,13 +252,50 @@ void Tendencies::readConfig(Config *OmegaConfig ///< [in] Omega config
        Err,
        "Tendencies: SfcStressForcingTendencyEnable not found in TendConfig");
 
-   Err += TendConfig.get("BottomDragTendencyEnable", this->BottomDrag.Enabled);
+   Config BottomDragConfig("BottomDragTendency");
+   Err += TendConfig.get(BottomDragConfig);
    CHECK_ERROR_ABORT(
-       Err, "Tendencies: BottomDragTendencyEnable not found in TendConfig");
+       Err, "Tendencies: BottomDragTendency group not found in TendConfig");
 
-   Err += TendConfig.get("BottomDragCoeff", this->BottomDrag.Coeff);
-   CHECK_ERROR_ABORT(Err,
-                     "Tendencies: BottomDragCoeff not found in TendConfig");
+   bool BottomDragTendencyEnabled = false;
+   Err += BottomDragConfig.get("Enable", BottomDragTendencyEnabled);
+   CHECK_ERROR_ABORT(
+       Err, "Tendencies: BottomDragTendency Enable not found in TendConfig");
+
+   std::string BottomDragMode;
+   Err += BottomDragConfig.get("Mode", BottomDragMode);
+   CHECK_ERROR_ABORT(
+       Err, "Tendencies: BottomDragTendency Mode not found in TendConfig");
+
+   std::string BottomDragType;
+   Err += BottomDragConfig.get("Type", BottomDragType);
+   CHECK_ERROR_ABORT(
+       Err, "Tendencies: BottomDragTendency Type not found in TendConfig");
+
+   Real BottomDragCoeff = 0.0_Real;
+   Err += BottomDragConfig.get("BottomDragCoeff", BottomDragCoeff);
+   CHECK_ERROR_ABORT(Err, "Tendencies: BottomDragTendency BottomDragCoeff not "
+                          "found in TendConfig");
+
+   if (BottomDragType != "Constant" && BottomDragType != "constant") {
+      ABORT_ERROR("Tendencies: BottomDragTendency Type should be one of "
+                  " 'Constant' but got {}:",
+                  BottomDragType);
+   }
+
+   this->ExplicitBottomDrag.Coeff              = BottomDragCoeff;
+   this->VMix->VelVertMixSetup.BottomDragCoeff = BottomDragCoeff;
+
+   if (BottomDragTendencyEnabled) {
+      if (BottomDragMode == "Explicit" || BottomDragMode == "explicit") {
+         this->ExplicitBottomDrag.Enabled = true;
+      } else if (BottomDragMode == "Implicit" || BottomDragMode == "implicit") {
+         this->VMix->VelVertMixSetup.ImplicitBottomDragEnabled = true;
+      } else {
+         ABORT_ERROR("Tendencies: BottomDragTendency Mode must be Explicit or "
+                     "Implicit");
+      }
+   }
 
    if (this->TracerDiffusion.Enabled) {
       Err += TendConfig.get("EddyDiff2", this->TracerDiffusion.EddyDiff2);
@@ -326,6 +377,12 @@ void Tendencies::readConfig(Config *OmegaConfig ///< [in] Omega config
                          this->VMix->VelVertMixSetup.Enabled);
    CHECK_ERROR_ABORT(
        Err, "Tendencies: VelVertMixTendencyEnable not found in TendConfig");
+
+   if (this->VMix->VelVertMixSetup.ImplicitBottomDragEnabled &&
+       !this->VMix->VelVertMixSetup.Enabled) {
+      ABORT_ERROR("Tendencies: BottomDragTendency Mode Implicit requires "
+                  "VelVertMixTendencyEnable to be true");
+   }
 
    Err += TendConfig.get("TracerVertMixTendencyEnable",
                          this->VMix->TracerVertMixSetup.Enabled);
@@ -417,7 +474,7 @@ Tendencies::Tendencies(const std::string &Name_, ///< [in] Name for tendencies
       PseudoThicknessFluxDiv(Mesh, VCoord), PotentialVortHAdv(Mesh, VCoord),
       KEGrad(Mesh, VCoord), SSHGrad(Mesh, VCoord),
       VelocityDiffusion(Mesh, VCoord), VelocityHyperDiff(Mesh, VCoord),
-      SfcStressForcing(Mesh, VCoord), BottomDrag(Mesh, VCoord),
+      SfcStressForcing(Mesh, VCoord), ExplicitBottomDrag(Mesh, VCoord),
       TracerDiffusion(Mesh, VCoord), TracerHyperDiff(Mesh, VCoord),
       TracerHorzAdv(Mesh, VCoord), SurfaceTracerRestoring(Mesh),
       CustomThicknessTend(InCustomThicknessTend),
@@ -441,19 +498,58 @@ Tendencies::Tendencies(const std::string &Name_, ///< [in] Name for tendencies
 
 } // end constructor
 
-Tendencies::Tendencies(const std::string &Name_, ///< [in] Name for tendencies
-                       const HorzMesh *Mesh,     ///< [in] Horizontal mesh
-                       VertCoord *VCoord,        ///< [in] Vertical coordinate
-                       VertAdv *VAdv,            ///< [in] Vertical advection
-                       PressureGrad *PGrad,      ///< [in] Pressure gradient
-                       Eos *EqState,             ///< [in] Equation of state
-                       VertMix *VMix,            ///< [in] Vertical mixing
-                       int NTracersIn,           ///< [in] Number of tracers
-                       TimeInterval TimeStepIn,  ///< [in] Time step
-                       Config *Options)          ///< [in] Configuration options
-    : Tendencies(Name_, Mesh, VCoord, VAdv, PGrad, EqState, VMix, NTracersIn,
-                 TimeStepIn, Options, CustomTendencyType{},
-                 CustomTendencyType{}) {}
+// Create a non-default group of tendencies
+Tendencies *Tendencies::create(const std::string &Name,
+                               const HorzMesh *Mesh, ///< [in] Horizontal mesh
+                               VertCoord *VCoord, ///< [in] Vertical coordinate
+                               VertAdv *VAdv,     ///< [in] Vertical advection
+                               PressureGrad *PGrad, ///< [in] Pressure gradient
+                               Eos *EqState,        ///< [in] Equation of state
+                               VertMix *VMix,       ///< [in] Vertical mixing
+                               int NTracersIn,      ///< [in] Number of tracers
+                               TimeInterval TimeStep, ///< [in] Time step
+                               Config *Options, ///< [in] Configuration options
+                               CustomTendencyType CustomThicknessTend,
+                               CustomTendencyType CustomVelocityTend) {
+
+   OMEGA_REQUIRE(Mesh,
+                 "Null HorzMesh pointer in Tendencies::create with Name = {}",
+                 Name);
+   OMEGA_REQUIRE(VCoord,
+                 "Null VCoord pointer in Tendencies::create with Name = {}",
+                 Name);
+   OMEGA_REQUIRE(
+       VAdv, "Null VertAdv pointer in Tendencies::create with Name = {}", Name);
+   OMEGA_REQUIRE(
+       PGrad, "Null PressureGrad pointer in Tendencies::create with Name = {}",
+       Name);
+   OMEGA_REQUIRE(EqState,
+                 "Null Eos pointer in Tendencies::create with Name = {}", Name);
+   OMEGA_REQUIRE(
+       VMix, "Null VertMix pointer in Tendencies::create with Name = {}", Name);
+   OMEGA_REQUIRE(Options,
+                 "Null Config pointer in Tendencies::create with Name = {}",
+                 Name);
+
+   // Check to see if tendencies of the same name already exist and
+   // if so, exit with an error
+   if (AllTendencies.find(Name) != AllTendencies.end()) {
+      LOG_ERROR("Attempted to create Tendencies with name {} but Tendencies of "
+                "that name already exists",
+                Name);
+      return nullptr;
+   }
+
+   // create new tendencies on the heap and put it in a map of
+   // unique_ptrs, which will manage its lifetime
+   auto *NewTendencies = new Tendencies(
+       Name, Mesh, VCoord, VAdv, PGrad, EqState, VMix, NTracersIn, TimeStep,
+       Options, CustomThicknessTend, CustomVelocityTend);
+
+   AllTendencies.emplace(Name, NewTendencies);
+
+   return get(Name);
+}
 
 //------------------------------------------------------------------------------
 // Compute tendencies for the pseudo-thickness equation
@@ -540,7 +636,7 @@ void Tendencies::computeVelocityTendenciesOnly(
    OMEGA_SCOPE(LocVelocityDiffusion, VelocityDiffusion);
    OMEGA_SCOPE(LocVelocityHyperDiff, VelocityHyperDiff);
    OMEGA_SCOPE(LocSfcStressForcing, SfcStressForcing);
-   OMEGA_SCOPE(LocBottomDrag, BottomDrag);
+   OMEGA_SCOPE(LocExplicitBottomDrag, ExplicitBottomDrag);
    OMEGA_SCOPE(MinLayerEdgeBot, VCoord->MinLayerEdgeBot);
    OMEGA_SCOPE(MaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
    OMEGA_SCOPE(LocSshCell, VCoord->SshCell);
@@ -679,15 +775,15 @@ void Tendencies::computeVelocityTendenciesOnly(
       Pacer::stop("Tend:sfcStressForcing", 2);
    }
 
-   // Compute bottom drag
-   if (LocBottomDrag.Enabled) {
-      Pacer::start("Tend:bottomDrag", 2);
+   // Compute explicit bottom drag
+   if (LocExplicitBottomDrag.Enabled) {
+      Pacer::start("Tend:explicitBottomDrag", 2);
       parallelFor(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
-             LocBottomDrag(LocNormalVelocityTend, IEdge, NormVelEdge, KECell,
-                           MeanPseudoThickEdge);
+             LocExplicitBottomDrag(LocNormalVelocityTend, IEdge, NormVelEdge,
+                                   KECell, MeanPseudoThickEdge);
           });
-      Pacer::stop("Tend:bottomDrag", 2);
+      Pacer::stop("Tend:explicitBottomDrag", 2);
    }
 
    if (CustomVelocityTend) {

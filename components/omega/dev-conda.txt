@@ -19,10 +19,13 @@ include-what-you-use
 fprettify
 
 # python linting
-isort
+ruff
 flynt
-flake8
 mypy
+
+# omega_buildnml testing
+pytest
+pyyaml
 
 # documentation
 sphinx

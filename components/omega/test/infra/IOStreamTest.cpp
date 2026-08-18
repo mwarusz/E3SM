@@ -32,10 +32,14 @@
 #include "TimeMgr.h"
 #include "TimeStepper.h"
 #include "Tracers.h"
+#include "VertAdv.h"
 #include "VertCoord.h"
 #include "VertMix.h"
 #include "mpi.h"
+#include "yaml-cpp/yaml.h"
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <thread>
 #include <vector>
 
@@ -50,6 +54,36 @@ void TestEval(const std::string &TestName, T TestVal, T ExpectVal, Error &Err) {
       Err += Error(ErrorCode::Fail, ErrMsg);
    }
 }
+
+//------------------------------------------------------------------------------
+// Clones RestartWrite into a new "RestartWriteOnDemand" stream (FreqUnits:
+// OnDemand) inside a copy of the input config file, then returns the new
+// file name. This mirrors how the coupled driver's buildnml assembles the
+// config file before Omega ever reads it, so it exercises Config::readAll
+// rather than mutating the already-parsed in-memory config. Only task 0
+// writes the file; all tasks then read the same copy.
+std::string addOnDemandStreamConfig(const std::string &InFile, MachEnv *Env) {
+
+   std::string OutFile = "omega.ondemand.yml";
+
+   if (Env->getMyTask() == 0) {
+      YAML::Node Root                 = YAML::LoadFile(InFile);
+      YAML::Node Streams              = Root["Omega"]["IOStreams"];
+      YAML::Node OnDemand             = YAML::Clone(Streams["RestartWrite"]);
+      OnDemand["UsePointerFile"]      = false;
+      OnDemand["Filename"]            = "ocn.restart.ondemand.nc";
+      OnDemand["FreqUnits"]           = "OnDemand";
+      Streams["RestartWriteOnDemand"] = OnDemand;
+
+      std::ofstream OutStream(OutFile);
+      OutStream << Root;
+   }
+   MPI_Barrier(Env->getComm());
+
+   return OutFile;
+
+} // End addOnDemandStreamConfig
+
 //------------------------------------------------------------------------------
 // Initialization routine to create reference Fields
 void initIOStreamTest(Clock *&ModelClock // Model clock
@@ -65,10 +99,10 @@ void initIOStreamTest(Clock *&ModelClock // Model clock
    initLogging(DefEnv);
    LOG_INFO("------ IOStream Unit Tests ------");
 
-   // Read the model configuration
+   // Read the model configuration, adding a cloned OnDemand stream
    Config("Omega");
-   Config::readAll("omega.yml");
-   Config *OmegaConfig = Config::getOmegaConfig();
+   std::string ConfigFile = addOnDemandStreamConfig("omega.yml", DefEnv);
+   Config::readAll(ConfigFile);
 
    // Initialize the default time stepper (phase 1) that includes the
    // num time levels, calendar, model clock and start/stop times and alarms
@@ -103,6 +137,9 @@ void initIOStreamTest(Clock *&ModelClock // Model clock
 
    // Initialize the vertical coordinate
    VertCoord::init();
+
+   // Initialize VertAdv
+   VertAdv::init();
 
    // Initialize State
    TmpErr = OceanState::init();
@@ -246,6 +283,16 @@ int main(int argc, char **argv) {
          IOStream::writeAll(ModelClock);
       }
 
+      // FreqUnits: OnDemand streams must never fire via writeAll
+      bool NotWritten = !std::filesystem::exists("ocn.restart.ondemand.nc");
+      TestEval("OnDemand not written by writeAll ", NotWritten, true, Err);
+
+      // A forced write is the only way an OnDemand stream is written
+      IOStream::write("RestartWriteOnDemand", ModelClock, true);
+      std::this_thread::sleep_for(std::chrono::seconds(5));
+      bool NowWritten = std::filesystem::exists("ocn.restart.ondemand.nc");
+      TestEval("OnDemand forced write ", NowWritten, true, Err);
+
       // Force read the latest restart and check the results
       // A delay is needed here to make sure the restart file is completely
       // written before we read.
@@ -279,6 +326,7 @@ int main(int argc, char **argv) {
    OceanState::clear();
    AuxiliaryState::clear();
    Forcing::clear();
+   VertAdv::clear();
    HorzMesh::clear();
    VertCoord::clear();
    Field::clear();
@@ -287,10 +335,12 @@ int main(int argc, char **argv) {
    Decomp::clear();
    Pacer::finalize();
    Kokkos::finalize();
-   MPI_Finalize();
 
    CHECK_ERROR_ABORT(Err, "IOStream Unit Tests: FAIL");
    LOG_INFO("------ IOStream Unit Tests successful ------");
+
+   MPI_Barrier(MPI_COMM_WORLD);
+   MPI_Finalize();
 
    // End of testing
    return 0;

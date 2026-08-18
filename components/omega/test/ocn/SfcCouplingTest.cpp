@@ -271,7 +271,7 @@ int testUpdateExportFields(const I4 NSteps) {
    Tracers::getIndex(TempIdx, "Temperature");
    Tracers::getIndex(SalinIdx, "Salinity");
 
-   while (!DefCoupling->CouplingAlarm.isRinging()) {
+   while (!DefCoupling->getCouplingAlarm()->isRinging()) {
       Real CurrStep = static_cast<Real>(DefCoupling->getNAccumSteps());
 
       HostArray2DReal TempH  = Tracers::getHostByIndex(0, TempIdx);
@@ -580,6 +580,7 @@ int main(int argc, char *argv[]) {
 
    Pacer::finalize();
    Kokkos::finalize();
+   MPI_Barrier(MPI_COMM_WORLD);
    MPI_Finalize();
 
    if (RetVal >= 256)

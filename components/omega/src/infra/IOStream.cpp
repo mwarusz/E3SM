@@ -45,8 +45,11 @@ void IOStream::init(Clock *&ModelClock //< [inout] Omega model clock
 
    Error Err;
 
+   OMEGA_REQUIRE(ModelClock, "Null ModelClock pointer in IOStream::init");
+
    // Retrieve the model configuration and get the streams sub-config
    Config *OmegaConfig = Config::getOmegaConfig();
+   OMEGA_REQUIRE(OmegaConfig, "Null OmegaConfig pointer in IOStream::init");
    Config StreamsCfgAll("IOStreams");
    Err = OmegaConfig->get(StreamsCfgAll);
    CHECK_ERROR_ABORT(
@@ -389,6 +392,10 @@ void IOStream::create(const std::string &StreamName, //< [in] name of stream
 
    Error Err; // internal error code
 
+   OMEGA_REQUIRE(ModelClock,
+                 "Null ModelClock pointer in IOStream::create with Name = {}",
+                 StreamName);
+
    // Check whether the stream already exists
    if (AllStreams.find(StreamName) != AllStreams.end())
       ABORT_ERROR("IOStream: Attempt to create stream {} that already exists",
@@ -528,6 +535,10 @@ void IOStream::create(const std::string &StreamName, //< [in] name of stream
                      "not provided",
                      StreamName);
       }
+
+   } else if (IOFreqUnits == "ondemand") { // registered, manual-write only
+
+      // No alarm, no OnStartup/OnShutdown - only fires via forced write/read
 
    } else if (IOFreqUnits == "never") { // special never case
 
@@ -1690,7 +1701,14 @@ Error IOStream::readFieldData(
    // The IO routines require a pointer to a contiguous memory on the host
    // so we first read into a vector. Only one of the vectors below will
    // be used and resized appropriately.
+   // The IO data type is set alongside the buffer so that it always describes
+   // the buffer actually allocated, which need not be the type the variable
+   // has in the file. Distributed reads take this from the decomposition,
+   // but non-distributed reads must be told directly or PIO fills the buffer
+   // using the file's type, overrunning it whenever that type is the wider
+   // of the two.
    void *DataPtr;
+   IO::IODataType MyIOType;
    std::vector<I4> DataI4(1);
    std::vector<I8> DataI8(1);
    std::vector<R4> DataR4(1);
@@ -1699,19 +1717,23 @@ Error IOStream::readFieldData(
    switch (MyType) {
    case ArrayDataType::I4:
       DataI4.resize(LocSize);
-      DataPtr = DataI4.data();
+      DataPtr  = DataI4.data();
+      MyIOType = IO::IOTypeI4;
       break;
    case ArrayDataType::I8:
       DataI8.resize(LocSize);
-      DataPtr = DataI8.data();
+      DataPtr  = DataI8.data();
+      MyIOType = IO::IOTypeI8;
       break;
    case ArrayDataType::R4:
       DataR4.resize(LocSize);
-      DataPtr = DataR4.data();
+      DataPtr  = DataR4.data();
+      MyIOType = IO::IOTypeR4;
       break;
    case ArrayDataType::R8:
       DataR8.resize(LocSize);
-      DataPtr = DataR8.data();
+      DataPtr  = DataR8.data();
+      MyIOType = IO::IOTypeR8;
       break;
    case ArrayDataType::Unknown:
       ABORT_ERROR("IOStream readFieldData: Unknown data array type");
@@ -1724,7 +1746,7 @@ Error IOStream::readFieldData(
       Err =
           IO::readArray(DataPtr, LocSize, FieldName, FileID, DecompID, FieldID);
    } else {
-      Err = IO::readNDVar(DataPtr, FieldName, FileID, FieldID);
+      Err = IO::readNDVar(DataPtr, MyIOType, FieldName, FileID, FieldID);
    }
    // For back compatibility, try to read again with old field name
    if (Err.isFail()) {
@@ -1732,7 +1754,7 @@ Error IOStream::readFieldData(
          Err = IO::readArray(DataPtr, LocSize, OldFieldName, FileID, DecompID,
                              FieldID);
       } else {
-         Err = IO::readNDVar(DataPtr, OldFieldName, FileID, FieldID);
+         Err = IO::readNDVar(DataPtr, MyIOType, OldFieldName, FileID, FieldID);
       }
       if (Err.isFail()) {
          // If the field is optional, a missing variable is not an error. Leave
@@ -2582,8 +2604,8 @@ void IOStream::writeStream(
             int TmpID;
             std::vector<int> TmpDimLengths; // empty dim length for scalar time
             for (int IFrame = 0; IFrame < NFrames; ++IFrame) {
-               Err = IO::readNDVar(&FrameTime, "time", OutFileID, TmpID, IFrame,
-                                   &TmpDimLengths);
+               Err = IO::readNDVar(&FrameTime, IO::IOTypeR8, "time", OutFileID,
+                                   TmpID, IFrame, &TmpDimLengths);
                CHECK_ERROR_ABORT(Err, "Error reading frame time in {}",
                                  OutFileName);
                if (std::abs(ElapsedTimeR8 - FrameTime) < 1.e-5) { // overwrite

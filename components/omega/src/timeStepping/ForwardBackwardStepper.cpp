@@ -45,6 +45,8 @@ void ForwardBackwardStepper::doStep(
 
    VertMix *VMix = VertMix::getInstance();
 
+   const MPI_Comm Comm = MeshHalo->getComm();
+
    if (State == nullptr)
       LOG_CRITICAL("Invalid State");
    if (AuxState == nullptr)
@@ -60,10 +62,15 @@ void ForwardBackwardStepper::doStep(
    // u^{n+1} = u^{n} + R_u^{n}
    updateVelocityByTend(State, VelNextLevel, State, VelCurLevel, TimeStep);
 
-   updateVelocityByTend(State, VelNextLevel, State, VelCurLevel, TimeStep);
-
    prescribeVelocity(State, VelNextLevel, State, VelCurLevel,
                      SimTime + TimeStep);
+
+   // Exchange halo of u^{n+1} before it is used below
+   Array2DReal NextNormalVelocity = State->getNormalVelocity(VelNextLevel);
+   Pacer::timingBarrier("ForwardBackward:velHaloExchBarrier", 3, Comm);
+   Pacer::start("ForwardBackward:velHaloExch", 3);
+   MeshHalo->exchangeFullArrayHalo(NextNormalVelocity, OnEdge);
+   Pacer::stop("ForwardBackward:velHaloExch", 3);
 
    // R_h^{n} = RHS_h(u^{n+1}, h^{n}, t^{n})
    Tend->computePseudoThicknessTendencies(State, AuxState, ThickCurLevel,
@@ -84,7 +91,6 @@ void ForwardBackwardStepper::doStep(
 
    // Update time levels (New -> Old) of prognostic variables with halo
    // exchanges
-   const MPI_Comm Comm = MeshHalo->getComm();
    Pacer::timingBarrier("ForwardBackward:haloExchBarrier", 3, Comm);
    Pacer::start("ForwardBackward:haloExch", 3);
    State->updateTimeLevels();
@@ -95,7 +101,14 @@ void ForwardBackwardStepper::doStep(
    CurTracerArray = Tracers::getAll(VelCurLevel);
    if (VMix->VelVertMixSetup.Enabled or VMix->TracerVertMixSetup.Enabled) {
       VMix->VertMixImplicit(State, AuxState, CurTracerArray, NTracers,
-                            State->CurTimeIndex);
+                            VelCurLevel);
+
+      // Re-exchange halos after vertical mixing
+      Pacer::timingBarrier("ForwardBackward:vMixHaloExchBarrier", 3, Comm);
+      Pacer::start("ForwardBackward:vMixHaloExch", 3);
+      State->exchangeHalo(VelCurLevel);
+      Tracers::exchangeHalo(VelCurLevel);
+      Pacer::stop("ForwardBackward:vMixHaloExch", 3);
    }
 
    validateOceanState(State, AuxState, VertCoord::getDefault(), 0);
@@ -103,6 +116,7 @@ void ForwardBackwardStepper::doStep(
    // Advance the clock and update the simulation time
    StepClock->advance();
    SimTime = StepClock->getCurrentTime();
+   ++StepCount;
 }
 
 } // namespace OMEGA
