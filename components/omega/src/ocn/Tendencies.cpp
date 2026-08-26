@@ -583,6 +583,8 @@ void Tendencies::computePseudoThicknessTendenciesOnly(
    // Compute pseudo-thickness flux divergence
    const Array2DReal &ThickFluxEdge =
        AuxState->PseudoThicknessAux.FluxPseudoThickEdge;
+   const auto &NormalTransportVelocity =
+       AuxState->TransportAux.NormalTransportVelocity;
 
    if (LocThicknessFluxDiv.Enabled) {
       Pacer::start("Tend:thicknessFluxDiv", 2);
@@ -591,7 +593,7 @@ void Tendencies::computePseudoThicknessTendenciesOnly(
                        TeamScratch<Real>(VCoord->NVertLayers)),
           KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
              LocThicknessFluxDiv(Team, LocPseudoThicknessTend, ICell,
-                                 ThickFluxEdge, NormalVelEdge);
+                                 ThickFluxEdge, NormalTransportVelocity);
           });
       Pacer::stop("Tend:thicknessFluxDiv", 2);
    }
@@ -803,7 +805,8 @@ void Tendencies::computeTracerTendenciesOnly(
        });
 
    // compute tracer horizotal advection
-   Array2DReal NormalVelEdge = State->getNormalVelocity(VelTimeLevel);
+   const auto &NormalTransportVelocity =
+       AuxState->TransportAux.NormalTransportVelocity;
    const Array2DReal &FluxPseudoThickEdge =
        AuxState->PseudoThicknessAux.FluxPseudoThickEdge;
    if (LocTracerHorzAdv.Enabled) {
@@ -813,7 +816,7 @@ void Tendencies::computeTracerTendenciesOnly(
                        TeamScratch<Real>(VCoord->NVertLayers)),
           KOKKOS_LAMBDA(int L, int IEdge, const TeamMember &Team) {
              LocTracerHorzAdv(Team, L, IEdge, TracerArray, FluxPseudoThickEdge,
-                              NormalVelEdge);
+                              NormalTransportVelocity);
           });
       parallelForOuter(
           LaunchConfig({NTracers, Mesh->NCellsAll},
