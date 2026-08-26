@@ -154,9 +154,9 @@ void AuxiliaryState::computePseudoThicknessAux(
 
    const auto &FluxPseudoThickEdge     = PseudoThicknessAux.FluxPseudoThickEdge;
    const auto &NormalTransportVelocity = TransportAux.NormalTransportVelocity;
-   VAdv->computeVerticalPseudoVelocity(NormalTransportVelocity,
-                                       FluxPseudoThickEdge, PseudoThickCell,
-                                       ProjDtSeconds);
+   VAdv->computeVerticalTransportPseudoVelocity(NormalTransportVelocity,
+                                                FluxPseudoThickEdge,
+                                                PseudoThickCell, ProjDtSeconds);
 
    Pacer::stop("AuxState:computeVerticalPseudoVelocity", 2);
 }
@@ -372,9 +372,9 @@ void AuxiliaryState::computeTracerAux(const OceanState *State,
 
    const auto &FluxPseudoThickEdge     = PseudoThicknessAux.FluxPseudoThickEdge;
    const auto &NormalTransportVelocity = TransportAux.NormalTransportVelocity;
-   VAdv->computeVerticalPseudoVelocity(NormalTransportVelocity,
-                                       FluxPseudoThickEdge, PseudoThickCell,
-                                       ProjDtSeconds);
+   VAdv->computeVerticalTransportPseudoVelocity(NormalTransportVelocity,
+                                                FluxPseudoThickEdge,
+                                                PseudoThickCell, ProjDtSeconds);
 
    Pacer::stop("AuxState:computeVerticalPseudoVelocity", 2);
 }
@@ -398,6 +398,8 @@ void AuxiliaryState::computeAll(const OceanState *State,
 
    R8 TimeStepSeconds;
    TimeStep.get(TimeStepSeconds, TimeUnits::Seconds);
+   R8 ProjDtSeconds;
+   ProjDt.get(ProjDtSeconds, TimeUnits::Seconds);
 
    Pacer::start("AuxState:computeAll", 1);
 
@@ -439,6 +441,13 @@ void AuxiliaryState::computeAll(const OceanState *State,
    Pacer::stop("AuxState:cellAuxState4", 2);
 
    computeTransportVelocity(State, VelTimeLevel);
+
+   const auto &FluxPseudoThickEdge     = PseudoThicknessAux.FluxPseudoThickEdge;
+   const auto &NormalTransportVelocity = TransportAux.NormalTransportVelocity;
+
+   VAdv->computeVerticalTransportPseudoVelocity(NormalTransportVelocity,
+                                                FluxPseudoThickEdge,
+                                                PseudoThickCell, ProjDtSeconds);
 
    Pacer::stop("AuxState:computeAll", 1);
 }
