@@ -148,11 +148,15 @@ void AuxiliaryState::computePseudoThicknessAux(
        });
    Pacer::stop("AuxState:computePseudoThickAux", 2);
 
+   computeTransportVelocity(State, VelTimeLevel);
+
    Pacer::start("AuxState:computeVerticalPseudoVelocity", 2);
 
-   const auto &FluxPseudoThickEdge = PseudoThicknessAux.FluxPseudoThickEdge;
-   VAdv->computeVerticalPseudoVelocity(NormalVelEdge, FluxPseudoThickEdge,
-                                       PseudoThickCell, ProjDtSeconds);
+   const auto &FluxPseudoThickEdge     = PseudoThicknessAux.FluxPseudoThickEdge;
+   const auto &NormalTransportVelocity = TransportAux.NormalTransportVelocity;
+   VAdv->computeVerticalPseudoVelocity(NormalTransportVelocity,
+                                       FluxPseudoThickEdge, PseudoThickCell,
+                                       ProjDtSeconds);
 
    Pacer::stop("AuxState:computeVerticalPseudoVelocity", 2);
 }
@@ -362,11 +366,15 @@ void AuxiliaryState::computeTracerAux(const OceanState *State,
        });
    Pacer::stop("AuxState:computeTracerAuxCell", 2);
 
+   computeTransportVelocity(State, VelTimeLevel);
+
    Pacer::start("AuxState:computeVerticalPseudoVelocity", 2);
 
-   const auto &FluxPseudoThickEdge = PseudoThicknessAux.FluxPseudoThickEdge;
-   VAdv->computeVerticalPseudoVelocity(NormalVelEdge, FluxPseudoThickEdge,
-                                       PseudoThickCell, ProjDtSeconds);
+   const auto &FluxPseudoThickEdge     = PseudoThicknessAux.FluxPseudoThickEdge;
+   const auto &NormalTransportVelocity = TransportAux.NormalTransportVelocity;
+   VAdv->computeVerticalPseudoVelocity(NormalTransportVelocity,
+                                       FluxPseudoThickEdge, PseudoThickCell,
+                                       ProjDtSeconds);
 
    Pacer::stop("AuxState:computeVerticalPseudoVelocity", 2);
 }
@@ -429,6 +437,8 @@ void AuxiliaryState::computeAll(const OceanState *State,
               });
        });
    Pacer::stop("AuxState:cellAuxState4", 2);
+
+   computeTransportVelocity(State, VelTimeLevel);
 
    Pacer::stop("AuxState:computeAll", 1);
 }
