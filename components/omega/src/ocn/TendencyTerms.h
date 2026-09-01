@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AuxiliaryState.h"
+#include "Eos.h"
 #include "GlobalConstants.h"
 #include "HorzMesh.h"
 #include "MachEnv.h"
@@ -399,6 +400,115 @@ class BottomDragOnEdge {
    Array2DI4 CellsOnEdge;
    Array2DReal EdgeMask;
    Array1DI4 MaxLayerEdgeTop;
+};
+
+/// Coupled freshwater flux forcing for thickness equation.
+class SfcThicknessForcingOnCell {
+ public:
+   bool Enabled = false;
+
+   SfcThicknessForcingOnCell(const HorzMesh *Mesh, const VertCoord *VCoord);
+
+   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 ICell,
+                                   const Array1DReal &SnowFlux,
+                                   const Array1DReal &RainFlux,
+                                   const Array1DReal &EvaporationFlux,
+                                   const Array1DReal &SeaIceFreshWaterFlux,
+                                   const Array1DReal &IceRunoffFlux,
+                                   const Array1DReal &RiverRunoffFlux,
+                                   const Array1DReal &SeaIceSaltFlux) const {
+
+      const I4 KTop = MinLayerCell(ICell);
+      if (KTop > MaxLayerCell(ICell)) {
+         return;
+      }
+
+      const Real FreshWaterFlux = SnowFlux(ICell) + RainFlux(ICell) +
+                                  EvaporationFlux(ICell) +
+                                  SeaIceFreshWaterFlux(ICell) +
+                                  IceRunoffFlux(ICell) + RiverRunoffFlux(ICell);
+
+      Tend(ICell, KTop) += (FreshWaterFlux + SeaIceSaltFlux(ICell)) / RhoSw;
+   }
+
+ private:
+   Array1DI4 MinLayerCell;
+   Array1DI4 MaxLayerCell;
+};
+
+/// Coupled surface flux forcing for active tracers.
+class SfcTracerForcingOnCell {
+ public:
+   bool Enabled = false;
+
+   SfcTracerForcingOnCell(const HorzMesh *Mesh, const VertCoord *VCoord,
+                          I4 TempTracerIndex, I4 SaltTracerIndex,
+                          const Eos *EosInst);
+
+   KOKKOS_FUNCTION void operator()(
+       const Array3DReal &Tend, I4 ICell, const Array3DReal &TracerCell,
+       const Array2DReal &PressureMid, const Array1DReal &LatentHeatFluxEvap,
+       const Array1DReal &SensibleHeatFlux,
+       const Array1DReal &LongWaveHeatFluxUp,
+       const Array1DReal &LongWaveHeatFluxDown,
+       const Array1DReal &SeaIceHeatFlux, const Array1DReal &ShortWaveHeatFlux,
+       const Array1DReal &SnowFlux, const Array1DReal &RainFlux,
+       const Array1DReal &IceRunoffFlux, const Array1DReal &RiverRunoffFlux,
+       const Array1DReal &EvaporationFlux,
+       const Array1DReal &SeaIceSaltFlux) const {
+
+      const I4 KTop = MinLayerCell(ICell);
+      if (KTop > MaxLayerCell(ICell)) {
+         return;
+      }
+
+      if (TempIndex >= 0) {
+
+         const Real CtTop = TracerCell(TempIndex, ICell, KTop);
+
+         // CT tendencies are due to direct heat fluxes + pot enthalpy fluxes
+         // Each mass flux has an associated potential enthalpy flux.
+         // Levels of simplification can be done here. For now:
+         // - We approximate PotEnthalpyIce(Tinsitu, P=0) ~ -LatIce (constant);
+         // Altrntively, we could use cnst PotEnthalpyIce(0, 0) ​= −333360
+         // J/kg a 0.1% / 340 J/kg difference with the LatIce value from pcd.
+         // The full expression is gsw_pot_enthalpy_ice(T, P).
+         const Real PotEnthalpyIce = -LatIce;
+         // - We assume dry snow and use the same PotEnthalpyIce for snow.
+         // - We assume liquid water comes in at the specific enthalpy as the
+         // top ocean layer, (i.e. mass flux is CT-neutral). The enthalpy is
+         // capped by a lower bound of pot enthalpy of freshwater at 0.0 C.
+         // Another choice would be to add it at the same in situ temp as ocean
+         // i.e. CT(Sa=0, max(0, T)).
+         //- We assume evaporation removes the same specific enthalpy as the
+         // top ocean layer; not capped, to keep the mass flux CT-neutral.
+         const Real CtLim =
+             (EosChoice == EosType::Teos10Eos) ? Ct0Fw : 0.0_Real;
+         const Real PotEnthalpyFwIn  = Cp0Sw * Kokkos::max(CtLim, CtTop);
+         const Real PotEnthalpyFwOut = Cp0Sw * CtTop;
+         const Real HeatFlux =
+             LongWaveHeatFluxUp(ICell) + LongWaveHeatFluxDown(ICell) +
+             ShortWaveHeatFlux(ICell) + SensibleHeatFlux(ICell) +
+             SeaIceHeatFlux(ICell) + // includes enthalpy of meltwater already
+             (RainFlux(ICell) + RiverRunoffFlux(ICell)) * PotEnthalpyFwIn +
+             LatentHeatFluxEvap(ICell) +
+             EvaporationFlux(ICell) * PotEnthalpyFwOut +
+             (SnowFlux(ICell) + IceRunoffFlux(ICell)) * PotEnthalpyIce;
+
+         Tend(TempIndex, ICell, KTop) += HeatFlux * HFluxFac;
+      }
+
+      if (SaltIndex >= 0) {
+         Tend(SaltIndex, ICell, KTop) += SeaIceSaltFlux(ICell) * SFluxFac;
+      }
+   }
+
+ private:
+   I4 TempIndex;
+   I4 SaltIndex;
+   Array1DI4 MinLayerCell;
+   Array1DI4 MaxLayerCell;
+   EosType EosChoice;
 };
 
 // Tracer horizontal advection term

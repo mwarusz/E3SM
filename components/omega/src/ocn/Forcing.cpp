@@ -30,18 +30,30 @@ static std::string stripDefault(const std::string &Name) {
 // mesh/halo.
 Forcing::Forcing(const std::string &Name, const HorzMesh *Mesh, Halo *MeshHalo)
     : Name(stripDefault(Name)), SfcStressForcing(stripDefault(Name), Mesh),
-      Mesh(Mesh), MeshHalo(MeshHalo) {}
+      TracerForcing(stripDefault(Name), Mesh), Mesh(Mesh), MeshHalo(MeshHalo) {}
 
 // Destructor. Unregisters fields from IO streams.
 Forcing::~Forcing() { unregisterFields(); }
 
 // Register surface stress fields with IO streams for a given mesh.
 void Forcing::registerFields(const std::string &MeshName) const {
-   SfcStressForcing.registerFields(MeshName);
+   if (SfcStressFieldsEnabled) {
+      SfcStressForcing.registerFields(MeshName);
+   }
+   if (TracerForcingFieldsEnabled) {
+      TracerForcing.registerFields(MeshName);
+   }
 }
 
 // Unregister surface stress fields from IO streams.
-void Forcing::unregisterFields() const { SfcStressForcing.unregisterFields(); }
+void Forcing::unregisterFields() const {
+   if (SfcStressFieldsEnabled) {
+      SfcStressForcing.unregisterFields();
+   }
+   if (TracerForcingFieldsEnabled) {
+      TracerForcing.unregisterFields();
+   }
+}
 
 // Create and register a non-default forcing instance.
 Forcing *Forcing::create(const std::string &Name, const HorzMesh *Mesh,
@@ -84,11 +96,10 @@ void Forcing::init() {
       ABORT_ERROR("Forcing: failed to initialize default forcing state");
    }
 
-   DefaultForcing->registerFields(DefMesh->MeshName);
-
    Config *OmegaConfig = Config::getOmegaConfig();
    OMEGA_REQUIRE(OmegaConfig, "Null OmegaConfig pointer in Forcing::init");
    DefaultForcing->readConfigOptions(OmegaConfig);
+   DefaultForcing->registerFields(DefMesh->MeshName);
    // for now, forcing fields are read at start-up only.
    // to be extended to include switch from standalone to coupled.
    // to be moved to a Forcing->prepareForStep(SimTime) method later.
@@ -145,10 +156,62 @@ void Forcing::readConfigOptions(Config *OmegaConfig) {
    } else {
       ABORT_ERROR("Forcing: Unknown InterpType requested");
    }
+
+   Config TendConfig("Tendencies");
+   Err += OmegaConfig->get(TendConfig);
+   CHECK_ERROR_ABORT(Err, "Forcing: Tendencies group not found in Config");
+
+   Err +=
+       TendConfig.get("SfcStressForcingTendencyEnable", SfcStressFieldsEnabled);
+   CHECK_ERROR_ABORT(Err, "Forcing: SfcStressForcingTendencyEnable not found "
+                          "in Tendencies config");
+
+   bool SfcThicknessForcingEnabled = false;
+   Err += TendConfig.get("SfcThicknessForcingTendencyEnable",
+                         SfcThicknessForcingEnabled);
+   CHECK_ERROR_ABORT(Err, "Forcing: SfcThicknessForcingTendencyEnable not "
+                          "found in Tendencies config");
+
+   bool SfcTracerForcingEnabled = false;
+   Err += TendConfig.get("SfcTracerForcingTendencyEnable",
+                         SfcTracerForcingEnabled);
+   CHECK_ERROR_ABORT(Err, "Forcing: SfcTracerForcingTendencyEnable not found "
+                          "in Tendencies config");
+
+   TracerForcingFieldsEnabled =
+       SfcThicknessForcingEnabled || SfcTracerForcingEnabled;
 }
 
 // Compute all forcing variables (dispatches to specific computations).
-void Forcing::computeAll() const { computeSfcStressForcingOnEdge(); }
+void Forcing::computeAll() const {
+   exchangeHalo();
+   computeSfcStressForcingOnEdge();
+}
+
+// Reset forcing arrays so omitted optional fields remain zero after read.
+void Forcing::resetArrays() {
+   if (SfcStressFieldsEnabled) {
+      deepCopy(SfcStressForcing.NormalStressEdge, 0.0_Real);
+      deepCopy(SfcStressForcing.ZonalStressCell, 0.0_Real);
+      deepCopy(SfcStressForcing.MeridStressCell, 0.0_Real);
+   }
+
+   if (TracerForcingFieldsEnabled) {
+      deepCopy(TracerForcing.SnowFluxCell, 0.0_Real);
+      deepCopy(TracerForcing.RainFluxCell, 0.0_Real);
+      deepCopy(TracerForcing.EvaporationFluxCell, 0.0_Real);
+      deepCopy(TracerForcing.SeaIceFreshWaterFluxCell, 0.0_Real);
+      deepCopy(TracerForcing.IceRunoffFluxCell, 0.0_Real);
+      deepCopy(TracerForcing.RiverRunoffFluxCell, 0.0_Real);
+      deepCopy(TracerForcing.LatentHeatFluxEvapCell, 0.0_Real);
+      deepCopy(TracerForcing.SensibleHeatFluxCell, 0.0_Real);
+      deepCopy(TracerForcing.LongWaveHeatFluxUpCell, 0.0_Real);
+      deepCopy(TracerForcing.LongWaveHeatFluxDownCell, 0.0_Real);
+      deepCopy(TracerForcing.SeaIceHeatFluxCell, 0.0_Real);
+      deepCopy(TracerForcing.ShortWaveHeatFluxCell, 0.0_Real);
+      deepCopy(TracerForcing.SeaIceSaltFluxCell, 0.0_Real);
+   }
+}
 
 // Compute edge-normal stress from cell-center zonal and meridional components.
 void Forcing::computeSfcStressForcingOnEdge() const {
@@ -162,14 +225,17 @@ void Forcing::computeSfcStressForcingOnEdge() const {
    Pacer::stop("Forcing:edge1", 2);
 }
 
-// Exchange halo for surface stress cell fields.
+// Exchange halo for surface stress cell fields. Only needed for variables that
+// need information beyond cell-centered values.
 I4 Forcing::exchangeHalo() const {
    I4 Err = 0;
 
-   Err += MeshHalo->exchangeFullArrayHalo(SfcStressForcing.ZonalStressCell,
-                                          OnCell);
-   Err += MeshHalo->exchangeFullArrayHalo(SfcStressForcing.MeridStressCell,
-                                          OnCell);
+   if (SfcStressFieldsEnabled) {
+      Err += MeshHalo->exchangeFullArrayHalo(SfcStressForcing.ZonalStressCell,
+                                             OnCell);
+      Err += MeshHalo->exchangeFullArrayHalo(SfcStressForcing.MeridStressCell,
+                                             OnCell);
+   }
 
    return Err;
 }
@@ -181,13 +247,20 @@ void Forcing::readStreamIntoArrays() {
 
    std::string StreamName = "Forcing";
 
+   resetArrays();
+
+   // Nothing to read if neither stress nor tracer forcing tendencies are
+   // enabled.
+   if (!SfcStressFieldsEnabled && !TracerForcingFieldsEnabled) {
+      return;
+   }
+
    // Attempt to read stream; if unavailable, log and fall back to zero forcing.
    Err = IOStream::read(StreamName);
    if (Err.isFail()) {
       LOG_INFO("Forcing: Error while reading {} stream, using zero forcing",
                StreamName);
-      deepCopy(SfcStressForcing.ZonalStressCell, 0._Real);
-      deepCopy(SfcStressForcing.MeridStressCell, 0._Real);
+      resetArrays();
    }
 
    I4 HaloErr = exchangeHalo();
