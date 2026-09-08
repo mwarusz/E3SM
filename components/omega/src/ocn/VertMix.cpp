@@ -235,23 +235,17 @@ void VertMix::computeVertMix(const Array2DReal &NormalVelocity,
    parallelForOuter(
        "VertMix-BackAndRich", {Mesh->NCellsAll},
        KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-          const int KMin   = MinLayerCell(ICell);
-          const int KMax   = MaxLayerCell(ICell) + 1;
-          const int KRange = vertRangeChunked(KMin, KMax);
+          const int KMin = MinLayerCell(ICell);
+          const int KMax = MaxLayerCell(ICell) + 1;
 
           parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 const int KStart = chunkStart(KChunk, KMin);
-                 const int KLen   = chunkLength(KChunk, KStart, KMax);
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const int K           = KStart + KVec;
-                    LocVertDiff(ICell, K) = LocBackDiff;
-                    LocVertVisc(ICell, K) = LocBackVisc;
-                    LocGradRichNum(ICell, K) =
-                        LocComputeGradRichardsonNum.RiInitValue;
-                    LocGradRichNumSmoothed(ICell, K) =
-                        LocComputeGradRichardsonNum.RiInitValue;
-                 }
+              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                 LocVertDiff(ICell, K) = LocBackDiff;
+                 LocVertVisc(ICell, K) = LocBackVisc;
+                 LocGradRichNum(ICell, K) =
+                     LocComputeGradRichardsonNum.RiInitValue;
+                 LocGradRichNumSmoothed(ICell, K) =
+                     LocComputeGradRichardsonNum.RiInitValue;
               });
        });
    /// Second, compute shear mixing if enabled
@@ -287,14 +281,8 @@ void VertMix::computeVertMix(const Array2DReal &NormalVelocity,
          parallelForOuter(
              "VertMix-RiSmooth", {Mesh->NCellsAll},
              KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-                const int KMin   = MinLayerCell(ICell);
-                const int KMax   = MaxLayerCell(ICell);
-                const int KRange = vertRangeChunked(KMin, KMax);
-                parallelForInner(
-                    Team, KRange, INNER_LAMBDA(int KChunk) {
-                       LocOneTwoOneFilter(LocGradRichNumSmoothed, ICell, KChunk,
-                                          LocGradRichNumSmoothed);
-                    });
+                LocOneTwoOneFilter(Team, LocGradRichNumSmoothed, ICell,
+                                   LocGradRichNumSmoothed);
              });
       }
       /// Compute shear mixing using smoothed Richardson number
