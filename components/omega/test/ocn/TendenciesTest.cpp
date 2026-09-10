@@ -80,9 +80,7 @@ int initState() {
    deepCopy(TracersCell, NAN);
 
    Err += setScalar(
-       KOKKOS_LAMBDA(int ICell, Real X, Real Y) {
-          return Setup.pseudoThickness(X, Y);
-       },
+       KOKKOS_LAMBDA(Real X, Real Y) { return Setup.pseudoThickness(X, Y); },
        PseudoThickCell, Geom, Mesh, OnCell, VCoord->MinLayerCell,
        VCoord->MaxLayerCell, nullptr, ExchangeHalos::Yes, SetBoundary::Yes);
 
