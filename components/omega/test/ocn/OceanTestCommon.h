@@ -107,6 +107,13 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
 
    constexpr bool ZCoordNull = std::is_same_v<VertArr, std::nullptr_t>;
 
+   // introspect lambda to see if it expect indices and coordinates or just
+   // coordinates
+   constexpr bool WantsIndices =
+       (ZCoordNull || Array::rank == 1)
+           ? std::is_invocable_v<Functor, I4, Real, Real>
+           : std::is_invocable_v<Functor, I4, I4, Real, Real, Real>;
+
    if constexpr (!ZCoordNull) {
       ZElement = ZCoord;
    }
@@ -152,13 +159,21 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
              }
 
              if (Geom == Geometry::Planar) {
-                const Real X            = XElement(IElement);
-                const Real Y            = YElement(IElement);
-                ScalarElement(IElement) = Fun(X, Y);
+                const Real X = XElement(IElement);
+                const Real Y = YElement(IElement);
+                if constexpr (WantsIndices) {
+                   ScalarElement(IElement) = Fun(IElement, X, Y);
+                } else {
+                   ScalarElement(IElement) = Fun(X, Y);
+                }
              } else {
-                const Real Lon          = LonElement(IElement);
-                const Real Lat          = LatElement(IElement);
-                ScalarElement(IElement) = Fun(Lon, Lat);
+                const Real Lon = LonElement(IElement);
+                const Real Lat = LatElement(IElement);
+                if constexpr (WantsIndices) {
+                   ScalarElement(IElement) = Fun(IElement, Lon, Lat);
+                } else {
+                   ScalarElement(IElement) = Fun(Lon, Lat);
+                }
              }
           });
    }
@@ -182,12 +197,30 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
                        X = LonElement(IElement);
                        Y = LatElement(IElement);
                     }
-                    if constexpr (ZCoordNull) {
-                       ScalarElement(IElement, K) = Fun(X, Y);
+
+                    // Workaround for a CUDA issue with capturing variables
+                    // inside `if constexpr`
+                    const auto &LocZElement      = ZElement;
+                    const auto &LocFun           = Fun;
+                    constexpr auto LocZCoordNull = ZCoordNull;
+
+                    Real ScalarValue;
+                    if constexpr (LocZCoordNull) {
+                       if constexpr (WantsIndices) {
+                          ScalarValue = LocFun(IElement, X, Y);
+                       } else {
+                          ScalarValue = LocFun(X, Y);
+                       }
                     } else {
-                       const Real Z               = ZElement(IElement, K);
-                       ScalarElement(IElement, K) = Fun(X, Y, Z);
+                       const Real Z = LocZElement(IElement, K);
+                       if constexpr (WantsIndices) {
+                          ScalarValue = LocFun(IElement, K, X, Y, Z);
+                       } else {
+                          ScalarValue = LocFun(X, Y, Z);
+                       }
                     }
+
+                    ScalarElement(IElement, K) = ScalarValue;
                  });
           });
    }
@@ -212,12 +245,30 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
                        X = LonElement(IElement);
                        Y = LatElement(IElement);
                     }
-                    if constexpr (ZCoordNull) {
-                       ScalarElement(L, IElement, K) = Fun(X, Y);
+
+                    // Workaround for a CUDA issue with capturing variables
+                    // inside `if constexpr`
+                    const auto &LocZElement      = ZElement;
+                    const auto &LocFun           = Fun;
+                    constexpr auto LocZCoordNull = ZCoordNull;
+
+                    Real ScalarValue;
+                    if constexpr (LocZCoordNull) {
+                       if constexpr (WantsIndices) {
+                          ScalarValue = LocFun(IElement, X, Y);
+                       } else {
+                          ScalarValue = LocFun(X, Y);
+                       }
                     } else {
-                       const Real Z                  = ZElement(IElement, K);
-                       ScalarElement(L, IElement, K) = Fun(X, Y, Z);
+                       const Real Z = LocZElement(IElement, K);
+                       if constexpr (WantsIndices) {
+                          ScalarValue = LocFun(IElement, K, X, Y, Z);
+                       } else {
+                          ScalarValue = LocFun(X, Y, Z);
+                       }
                     }
+
+                    ScalarElement(L, IElement, K) = ScalarValue;
                  });
           });
    }
@@ -280,6 +331,13 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
 
    constexpr bool ZCoordNull = std::is_same_v<VertArr, std::nullptr_t>;
 
+   // introspect lambda to see if it expect indices and coordinates or just
+   // coordinates
+   constexpr bool WantsIndices =
+       (ZCoordNull || Array::rank == 1)
+           ? std::is_invocable_v<Functor, Real(&)[2], I4, Real, Real>
+           : std::is_invocable_v<Functor, Real(&)[2], I4, I4, Real, Real, Real>;
+
    Array2DReal ZElement;
    if constexpr (!ZCoordNull) {
       ZElement = ZCoord;
@@ -287,16 +345,32 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
 
    auto ProjectVector = KOKKOS_LAMBDA(int IEdge, int K) {
       Real VecFieldEdge;
+
+      // Workaround for a CUDA issue with capturing variables inside `if
+      // constexpr`
+      const auto &LocZElement      = ZElement;
+      const auto &LocFun           = Fun;
+      constexpr auto LocZCoordNull = ZCoordNull;
+
       if (Geom == Geometry::Planar) {
          const Real XE = XEdge(IEdge);
          const Real YE = YEdge(IEdge);
 
          Real VecField[2];
-         if constexpr (ZCoordNull) {
-            Fun(VecField, XE, YE);
+
+         if constexpr (LocZCoordNull) {
+            if constexpr (WantsIndices) {
+               LocFun(VecField, IEdge, XE, YE);
+            } else {
+               LocFun(VecField, XE, YE);
+            }
          } else {
-            const Real ZE = ZElement(IEdge, K);
-            Fun(VecField, XE, YE, ZE);
+            const Real ZE = LocZElement(IEdge, K);
+            if constexpr (WantsIndices) {
+               LocFun(VecField, IEdge, K, XE, YE, ZE);
+            } else {
+               LocFun(VecField, XE, YE, ZE);
+            }
          }
 
          if (EdgeComp == EdgeComponent::Normal) {
@@ -317,11 +391,19 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
          const Real LatE = LatEdge(IEdge);
 
          Real VecField[2];
-         if constexpr (ZCoordNull) {
-            Fun(VecField, LonE, LatE);
+         if constexpr (LocZCoordNull) {
+            if constexpr (WantsIndices) {
+               LocFun(VecField, IEdge, LonE, LatE);
+            } else {
+               LocFun(VecField, LonE, LatE);
+            }
          } else {
-            const Real ZE = ZElement(IEdge, K);
-            Fun(VecField, LonE, LatE, ZE);
+            const Real ZE = LocZElement(IEdge, K);
+            if constexpr (WantsIndices) {
+               LocFun(VecField, IEdge, K, LonE, LatE, ZE);
+            } else {
+               LocFun(VecField, LonE, LatE, ZE);
+            }
          }
 
          if (CartProjectionOpt == CartProjection::Yes) {
