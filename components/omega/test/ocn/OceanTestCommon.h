@@ -86,6 +86,37 @@ template <class T> KOKKOS_FUNCTION int getVertBound(const T &VertBound, int I) {
    }
 }
 
+template <class F> struct CanonicalScalarLambda : F {
+
+   CanonicalScalarLambda(F &&Functor) : F(std::move(Functor)) {}
+   CanonicalScalarLambda(const F &Functor) : F(Functor) {}
+
+   constexpr static bool ArgsRR   = std::is_invocable_v<F, Real, Real>;
+   constexpr static bool ArgsIRR  = std::is_invocable_v<F, I4, Real, Real>;
+   constexpr static bool ArgsIIRR = std::is_invocable_v<F, I4, I4, Real, Real>;
+   constexpr static bool ArgsIIRRR =
+       std::is_invocable_v<F, I4, I4, Real, Real, Real>;
+
+   KOKKOS_FORCEINLINE_FUNCTION auto operator()(int IElement, int K, Real X,
+                                               Real Y, Real Z) const {
+      if constexpr (ArgsRR) {
+         return F::operator()(X, Y);
+      }
+
+      if constexpr (ArgsIRR) {
+         return F::operator()(IElement, X, Y);
+      }
+
+      if constexpr (ArgsIIRR) {
+         return F::operator()(IElement, K, X, Y);
+      }
+
+      if constexpr (ArgsIIRRR) {
+         return F::operator()(IElement, K, X, Y, Z);
+      }
+   }
+};
+
 // set scalar field on chosen elements (cells/vertices/edges) based on
 // analytical formula and optionally exchange halos
 template <class Functor, class Array, class VertMin, class VertMax,
@@ -105,6 +136,8 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
    Array2DReal ZElement;
    Array1DReal LonElement, LatElement;
 
+   auto CanonicalFun = CanonicalScalarLambda{Fun};
+
    constexpr bool ZCoordNull = std::is_same_v<VertArr, std::nullptr_t>;
 
    // introspect lambda to see if it expect indices and coordinates or just
@@ -122,26 +155,35 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
    case OnCell:
       NElementsOwned = Mesh->NCellsOwned;
       NElementsSize  = Mesh->NCellsSize;
-      XElement       = createDeviceMirrorCopy(Mesh->XCellH);
-      YElement       = createDeviceMirrorCopy(Mesh->YCellH);
-      LonElement     = createDeviceMirrorCopy(Mesh->LonCellH);
-      LatElement     = createDeviceMirrorCopy(Mesh->LatCellH);
+      if (Geom == Geometry::Planar) {
+         XElement = createDeviceMirrorCopy(Mesh->XCellH);
+         YElement = createDeviceMirrorCopy(Mesh->YCellH);
+      } else {
+         XElement = createDeviceMirrorCopy(Mesh->LonCellH);
+         YElement = createDeviceMirrorCopy(Mesh->LatCellH);
+      }
       break;
    case OnVertex:
       NElementsOwned = Mesh->NVerticesOwned;
       NElementsSize  = Mesh->NVerticesSize;
-      XElement       = createDeviceMirrorCopy(Mesh->XVertexH);
-      YElement       = createDeviceMirrorCopy(Mesh->YVertexH);
-      LonElement     = createDeviceMirrorCopy(Mesh->LonVertexH);
-      LatElement     = createDeviceMirrorCopy(Mesh->LatVertexH);
+      if (Geom == Geometry::Planar) {
+         XElement = createDeviceMirrorCopy(Mesh->XVertexH);
+         YElement = createDeviceMirrorCopy(Mesh->YVertexH);
+      } else {
+         XElement = createDeviceMirrorCopy(Mesh->LonVertexH);
+         YElement = createDeviceMirrorCopy(Mesh->LatVertexH);
+      }
       break;
    case OnEdge:
       NElementsOwned = Mesh->NEdgesOwned;
       NElementsSize  = Mesh->NEdgesSize;
-      XElement       = createDeviceMirrorCopy(Mesh->XEdgeH);
-      YElement       = createDeviceMirrorCopy(Mesh->YEdgeH);
-      LonElement     = createDeviceMirrorCopy(Mesh->LonEdgeH);
-      LatElement     = createDeviceMirrorCopy(Mesh->LatEdgeH);
+      if (Geom == Geometry::Planar) {
+         XElement = createDeviceMirrorCopy(Mesh->XEdgeH);
+         YElement = createDeviceMirrorCopy(Mesh->YEdgeH);
+      } else {
+         XElement = createDeviceMirrorCopy(Mesh->LonEdgeH);
+         YElement = createDeviceMirrorCopy(Mesh->LatEdgeH);
+      }
       break;
    default:
       LOG_ERROR("setScalar: element needs to be one of (OnCell, OnVertex, "
@@ -158,23 +200,9 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
                 IElement = IElement == 0 ? (NElementsSize - 1) : (IElement - 1);
              }
 
-             if (Geom == Geometry::Planar) {
-                const Real X = XElement(IElement);
-                const Real Y = YElement(IElement);
-                if constexpr (WantsIndices) {
-                   ScalarElement(IElement) = Fun(IElement, X, Y);
-                } else {
-                   ScalarElement(IElement) = Fun(X, Y);
-                }
-             } else {
-                const Real Lon = LonElement(IElement);
-                const Real Lat = LatElement(IElement);
-                if constexpr (WantsIndices) {
-                   ScalarElement(IElement) = Fun(IElement, Lon, Lat);
-                } else {
-                   ScalarElement(IElement) = Fun(Lon, Lat);
-                }
-             }
+             const Real X            = XElement(IElement);
+             const Real Y            = YElement(IElement);
+             ScalarElement(IElement) = CanonicalFun(IElement, 0, X, Y, 0);
           });
    }
 
@@ -189,38 +217,15 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
              const int KMax = getVertBound(VMax, IElement);
              parallelForInner(
                  Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-                    Real X, Y;
-                    if (Geom == Geometry::Planar) {
-                       X = XElement(IElement);
-                       Y = YElement(IElement);
-                    } else {
-                       X = LonElement(IElement);
-                       Y = LatElement(IElement);
+                    const Real X = XElement(IElement);
+                    const Real Y = YElement(IElement);
+                    Real Z       = 0;
+                    if (ZElement.data()) {
+                       Z = ZElement(IElement, K);
                     }
 
-                    // Workaround for a CUDA issue with capturing variables
-                    // inside `if constexpr`
-                    const auto &LocZElement      = ZElement;
-                    const auto &LocFun           = Fun;
-                    constexpr auto LocZCoordNull = ZCoordNull;
-
-                    Real ScalarValue;
-                    if constexpr (LocZCoordNull) {
-                       if constexpr (WantsIndices) {
-                          ScalarValue = LocFun(IElement, X, Y);
-                       } else {
-                          ScalarValue = LocFun(X, Y);
-                       }
-                    } else {
-                       const Real Z = LocZElement(IElement, K);
-                       if constexpr (WantsIndices) {
-                          ScalarValue = LocFun(IElement, K, X, Y, Z);
-                       } else {
-                          ScalarValue = LocFun(X, Y, Z);
-                       }
-                    }
-
-                    ScalarElement(IElement, K) = ScalarValue;
+                    ScalarElement(IElement, K) =
+                        CanonicalFun(IElement, K, X, Y, Z);
                  });
           });
    }
@@ -237,38 +242,15 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
              const int KMax = getVertBound(VMax, IElement);
              parallelForInner(
                  Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-                    Real X, Y;
-                    if (Geom == Geometry::Planar) {
-                       X = XElement(IElement);
-                       Y = YElement(IElement);
-                    } else {
-                       X = LonElement(IElement);
-                       Y = LatElement(IElement);
+                    const Real X = XElement(IElement);
+                    const Real Y = YElement(IElement);
+                    Real Z       = 0;
+                    if (ZElement.data()) {
+                       Z = ZElement(IElement, K);
                     }
 
-                    // Workaround for a CUDA issue with capturing variables
-                    // inside `if constexpr`
-                    const auto &LocZElement      = ZElement;
-                    const auto &LocFun           = Fun;
-                    constexpr auto LocZCoordNull = ZCoordNull;
-
-                    Real ScalarValue;
-                    if constexpr (LocZCoordNull) {
-                       if constexpr (WantsIndices) {
-                          ScalarValue = LocFun(IElement, X, Y);
-                       } else {
-                          ScalarValue = LocFun(X, Y);
-                       }
-                    } else {
-                       const Real Z = LocZElement(IElement, K);
-                       if constexpr (WantsIndices) {
-                          ScalarValue = LocFun(IElement, K, X, Y, Z);
-                       } else {
-                          ScalarValue = LocFun(X, Y, Z);
-                       }
-                    }
-
-                    ScalarElement(L, IElement, K) = ScalarValue;
+                    ScalarElement(L, IElement, K) =
+                        CanonicalFun(IElement, K, X, Y, Z);
                  });
           });
    }
