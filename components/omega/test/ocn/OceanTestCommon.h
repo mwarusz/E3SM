@@ -119,12 +119,10 @@ template <class F> struct CanonicalScalarLambda : F {
 
 // set scalar field on chosen elements (cells/vertices/edges) based on
 // analytical formula and optionally exchange halos
-template <class Functor, class Array, class VertMin, class VertMax,
-          class VertArr>
+template <class Functor, class Array, class VertMin, class VertMax>
 int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
               const HorzMesh *Mesh, MeshElement Element, const VertMin &VMin,
-              const VertMax &VMax,
-              VertArr ZCoord, // either array or nullptr to indicate 2D
+              const VertMax &VMax, const Array2DReal &ZCoord,
               ExchangeHalos ExchangeHalosOpt = ExchangeHalos::Yes,
               SetBoundary SetBndOpt          = SetBoundary::No) {
 
@@ -133,15 +131,9 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
    int NElementsOwned;
    int NElementsSize;
    Array1DReal XElement, YElement;
-   Array2DReal ZElement;
    Array1DReal LonElement, LatElement;
 
    auto CanonicalFun = CanonicalScalarLambda{Fun};
-
-   constexpr bool ZCoordNull = std::is_same_v<VertArr, std::nullptr_t>;
-   if constexpr (!ZCoordNull) {
-      ZElement = ZCoord;
-   }
 
    switch (Element) {
    case OnCell:
@@ -191,7 +183,6 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
              if (SetBndOpt == SetBoundary::Yes) {
                 IElement = IElement == 0 ? (NElementsSize - 1) : (IElement - 1);
              }
-
              const Real X            = XElement(IElement);
              const Real Y            = YElement(IElement);
              ScalarElement(IElement) = CanonicalFun(IElement, 0, X, Y, 0);
@@ -212,8 +203,8 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
                     const Real X = XElement(IElement);
                     const Real Y = YElement(IElement);
                     Real Z       = 0;
-                    if (ZElement.data()) {
-                       Z = ZElement(IElement, K);
+                    if (ZCoord.data()) {
+                       Z = ZCoord(IElement, K);
                     }
 
                     ScalarElement(IElement, K) =
@@ -237,8 +228,8 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
                     const Real X = XElement(IElement);
                     const Real Y = YElement(IElement);
                     Real Z       = 0;
-                    if (ZElement.data()) {
-                       Z = ZElement(IElement, K);
+                    if (ZCoord.data()) {
+                       Z = ZCoord(IElement, K);
                     }
 
                     ScalarElement(L, IElement, K) =
@@ -257,14 +248,29 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
 }
 
 // This overload calls setScalar with vertical bounds based on the array size
+// and uses null ZCoord
 template <class Functor, class Array>
 int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
               const HorzMesh *Mesh, MeshElement Element,
               ExchangeHalos ExchangeHalosOpt = ExchangeHalos::Yes) {
    const int VMin = 0;
    const int VMax = ScalarElement.extent_int(Array::rank - 1) - 1;
-   return setScalar(Fun, ScalarElement, Geom, Mesh, Element, VMin, VMax,
-                    nullptr, ExchangeHalosOpt);
+   Array2DReal ZCoord;
+   return setScalar(Fun, ScalarElement, Geom, Mesh, Element, VMin, VMax, ZCoord,
+                    ExchangeHalosOpt);
+}
+
+// This overload calls setScalar with null ZCoord
+template <class Functor, class Array, class VertMin, class VertMax>
+int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
+              const HorzMesh *Mesh, MeshElement Element, const VertMin &VMin,
+              const VertMax &VMax,
+              ExchangeHalos ExchangeHalosOpt = ExchangeHalos::Yes,
+              SetBoundary SetBndOpt          = SetBoundary::No) {
+
+   Array2DReal ZCoord;
+   return setScalar(Fun, ScalarElement, Geom, Mesh, Element, VMin, VMax, ZCoord,
+                    ExchangeHalosOpt);
 }
 
 template <class F> struct CanonicalVectorLambda : F {
@@ -306,11 +312,11 @@ enum class CartProjection { Yes, No };
 
 // set vector field on edges based on analytical formula and optionally
 // exchange halos
-template <class Functor, class Array, class VertMin, class VertMax,
-          class VertArr>
+template <class Functor, class Array, class VertMin, class VertMax>
 int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
                   EdgeComponent EdgeComp, Geometry Geom, const HorzMesh *Mesh,
-                  const VertMin &VMin, const VertMax &VMax, VertArr ZCoord,
+                  const VertMin &VMin, const VertMax &VMax,
+                  const Array2DReal &ZCoord,
                   ExchangeHalos ExchangeHalosOpt   = ExchangeHalos::Yes,
                   CartProjection CartProjectionOpt = CartProjection::Yes,
                   SetBoundary SetBndOpt            = SetBoundary::No) {
@@ -340,20 +346,6 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
    const int NEdgesSize = Mesh->NEdgesSize;
    const int NEdgesSet  = Mesh->NEdgesOwned + static_cast<int>(SetBndOpt);
 
-   constexpr bool ZCoordNull = std::is_same_v<VertArr, std::nullptr_t>;
-
-   // introspect lambda to see if it expect indices and coordinates or just
-   // coordinates
-   constexpr bool WantsIndices =
-       (ZCoordNull || Array::rank == 1)
-           ? std::is_invocable_v<Functor, Real(&)[2], I4, Real, Real>
-           : std::is_invocable_v<Functor, Real(&)[2], I4, I4, Real, Real, Real>;
-
-   Array2DReal ZElement;
-   if constexpr (!ZCoordNull) {
-      ZElement = ZCoord;
-   }
-
    auto ProjectVector = KOKKOS_LAMBDA(int IEdge, int K) {
       Real VecFieldEdge;
 
@@ -362,8 +354,8 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
          const Real YE = YEdge(IEdge);
 
          Real ZE = 0;
-         if (ZElement.data()) {
-            ZE = ZElement(IEdge, K);
+         if (ZCoord.data()) {
+            ZE = ZCoord(IEdge, K);
          }
 
          Real VecField[2];
@@ -387,8 +379,8 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
          const Real LatE = LatEdge(IEdge);
 
          Real ZE = 0;
-         if (ZElement.data()) {
-            ZE = ZElement(IEdge, K);
+         if (ZCoord.data()) {
+            ZE = ZCoord(IEdge, K);
          }
 
          Real VecField[2];
@@ -478,7 +470,7 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
 }
 
 // This overload calls setVectorEdge with vertical bounds based on the array
-// size
+// size and null ZCoord
 template <class Functor, class Array>
 int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
                   EdgeComponent EdgeComp, Geometry Geom, const HorzMesh *Mesh,
@@ -487,8 +479,25 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
 
    const int VMin = 0;
    const int VMax = VectorFieldEdge.extent_int(Array::rank - 1) - 1;
+   Array2DReal ZCoord;
+
    return setVectorEdge(Fun, VectorFieldEdge, EdgeComp, Geom, Mesh, VMin, VMax,
-                        nullptr, ExchangeHalosOpt, CartProjectionOpt);
+                        ZCoord, ExchangeHalosOpt, CartProjectionOpt);
+}
+
+// This overload calls setVectorEdge with null ZCoord
+template <class Functor, class Array, class VertMin, class VertMax>
+int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
+                  EdgeComponent EdgeComp, Geometry Geom, const HorzMesh *Mesh,
+                  const VertMin &VMin, const VertMax &VMax,
+                  ExchangeHalos ExchangeHalosOpt   = ExchangeHalos::Yes,
+                  CartProjection CartProjectionOpt = CartProjection::Yes,
+                  SetBoundary SetBndOpt            = SetBoundary::No) {
+
+   Array2DReal ZCoord;
+
+   return setVectorEdge(Fun, VectorFieldEdge, EdgeComp, Geom, Mesh, VMin, VMax,
+                        ZCoord, ExchangeHalosOpt, CartProjectionOpt);
 }
 
 template <class Reducer> Real reduceArray(const Array1DReal &Arr, int Extent0) {
