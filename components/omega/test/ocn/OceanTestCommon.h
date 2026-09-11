@@ -139,14 +139,6 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
    auto CanonicalFun = CanonicalScalarLambda{Fun};
 
    constexpr bool ZCoordNull = std::is_same_v<VertArr, std::nullptr_t>;
-
-   // introspect lambda to see if it expect indices and coordinates or just
-   // coordinates
-   constexpr bool WantsIndices =
-       (ZCoordNull || Array::rank == 1)
-           ? std::is_invocable_v<Functor, I4, Real, Real>
-           : std::is_invocable_v<Functor, I4, I4, Real, Real, Real>;
-
    if constexpr (!ZCoordNull) {
       ZElement = ZCoord;
    }
@@ -275,6 +267,41 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
                     nullptr, ExchangeHalosOpt);
 }
 
+template <class F> struct CanonicalVectorLambda : F {
+
+   CanonicalVectorLambda(F &&Functor) : F(std::move(Functor)) {}
+   CanonicalVectorLambda(const F &Functor) : F(Functor) {}
+
+   constexpr static bool ArgsVRR =
+       std::is_invocable_v<F, Real (&)[2], Real, Real>;
+   constexpr static bool ArgsVIRR =
+       std::is_invocable_v<F, Real (&)[2], I4, Real, Real>;
+   constexpr static bool ArgsVIIRR =
+       std::is_invocable_v<F, Real (&)[2], I4, I4, Real, Real>;
+   constexpr static bool ArgsVIIRRR =
+       std::is_invocable_v<F, Real (&)[2], I4, I4, Real, Real, Real>;
+
+   KOKKOS_FORCEINLINE_FUNCTION void operator()(Real (&VecField)[2],
+                                               int IElement, int K, Real X,
+                                               Real Y, Real Z) const {
+      if constexpr (ArgsVRR) {
+         F::operator()(VecField, X, Y);
+      }
+
+      if constexpr (ArgsVIRR) {
+         F::operator()(VecField, IElement, X, Y);
+      }
+
+      if constexpr (ArgsVIIRR) {
+         F::operator()(VecField, IElement, K, X, Y);
+      }
+
+      if constexpr (ArgsVIIRRR) {
+         F::operator()(VecField, IElement, K, X, Y, Z);
+      }
+   }
+};
+
 enum class CartProjection { Yes, No };
 
 // set vector field on edges based on analytical formula and optionally
@@ -289,6 +316,8 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
                   SetBoundary SetBndOpt            = SetBoundary::No) {
 
    int Err = 0;
+
+   auto CanonicalFun = CanonicalVectorLambda{Fun};
 
    auto XEdge = createDeviceMirrorCopy(Mesh->XEdgeH);
    auto YEdge = createDeviceMirrorCopy(Mesh->YEdgeH);
@@ -328,32 +357,17 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
    auto ProjectVector = KOKKOS_LAMBDA(int IEdge, int K) {
       Real VecFieldEdge;
 
-      // Workaround for a CUDA issue with capturing variables inside `if
-      // constexpr`
-      const auto &LocZElement      = ZElement;
-      const auto &LocFun           = Fun;
-      constexpr auto LocZCoordNull = ZCoordNull;
-
       if (Geom == Geometry::Planar) {
          const Real XE = XEdge(IEdge);
          const Real YE = YEdge(IEdge);
 
-         Real VecField[2];
-
-         if constexpr (LocZCoordNull) {
-            if constexpr (WantsIndices) {
-               LocFun(VecField, IEdge, XE, YE);
-            } else {
-               LocFun(VecField, XE, YE);
-            }
-         } else {
-            const Real ZE = LocZElement(IEdge, K);
-            if constexpr (WantsIndices) {
-               LocFun(VecField, IEdge, K, XE, YE, ZE);
-            } else {
-               LocFun(VecField, XE, YE, ZE);
-            }
+         Real ZE = 0;
+         if (ZElement.data()) {
+            ZE = ZElement(IEdge, K);
          }
+
+         Real VecField[2];
+         CanonicalFun(VecField, IEdge, K, XE, YE, ZE);
 
          if (EdgeComp == EdgeComponent::Normal) {
             const Real EdgeNormalX = std::cos(AngleEdge(IEdge));
@@ -372,21 +386,13 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
          const Real LonE = LonEdge(IEdge);
          const Real LatE = LatEdge(IEdge);
 
-         Real VecField[2];
-         if constexpr (LocZCoordNull) {
-            if constexpr (WantsIndices) {
-               LocFun(VecField, IEdge, LonE, LatE);
-            } else {
-               LocFun(VecField, LonE, LatE);
-            }
-         } else {
-            const Real ZE = LocZElement(IEdge, K);
-            if constexpr (WantsIndices) {
-               LocFun(VecField, IEdge, K, LonE, LatE, ZE);
-            } else {
-               LocFun(VecField, LonE, LatE, ZE);
-            }
+         Real ZE = 0;
+         if (ZElement.data()) {
+            ZE = ZElement(IEdge, K);
          }
+
+         Real VecField[2];
+         CanonicalFun(VecField, IEdge, K, LonE, LatE, ZE);
 
          if (CartProjectionOpt == CartProjection::Yes) {
             Real VecFieldCart[3];
