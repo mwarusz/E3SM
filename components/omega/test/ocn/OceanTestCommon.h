@@ -248,7 +248,7 @@ int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
 }
 
 // This overload calls setScalar with vertical bounds based on the array size
-// and uses null ZCoord
+// and null ZCoord
 template <class Functor, class Array>
 int setScalar(const Functor &Fun, const Array &ScalarElement, Geometry Geom,
               const HorzMesh *Mesh, MeshElement Element,
@@ -337,8 +337,14 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
    auto YVertex = createDeviceMirrorCopy(Mesh->YVertexH);
    auto ZVertex = createDeviceMirrorCopy(Mesh->ZVertexH);
 
-   auto LonEdge = createDeviceMirrorCopy(Mesh->LonEdgeH);
-   auto LatEdge = createDeviceMirrorCopy(Mesh->LatEdgeH);
+   Array1DReal XCoord, YCoord;
+   if (Geom == Geometry::Planar) {
+      XCoord = XEdge;
+      YCoord = YEdge;
+   } else {
+      XCoord = createDeviceMirrorCopy(Mesh->LonEdgeH);
+      YCoord = createDeviceMirrorCopy(Mesh->LatEdgeH);
+   }
 
    auto &AngleEdge      = Mesh->AngleEdge;
    auto &CellsOnEdge    = Mesh->CellsOnEdge;
@@ -347,19 +353,23 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
    const int NEdgesSet  = Mesh->NEdgesOwned + static_cast<int>(SetBndOpt);
 
    auto ProjectVector = KOKKOS_LAMBDA(int IEdge, int K) {
+
+      const Real X = XCoord(IEdge);
+      const Real Y = YCoord(IEdge);
+
+      Real Z = 0;
+      if (ZCoord.data()) {
+         Z = ZCoord(IEdge, K);
+      }
+
+      Real VecField[2];
+      CanonicalFun(VecField, IEdge, K, X, Y, Z);
+
       Real VecFieldEdge;
 
-      if (Geom == Geometry::Planar) {
-         const Real XE = XEdge(IEdge);
-         const Real YE = YEdge(IEdge);
-
-         Real ZE = 0;
-         if (ZCoord.data()) {
-            ZE = ZCoord(IEdge, K);
-         }
-
-         Real VecField[2];
-         CanonicalFun(VecField, IEdge, K, XE, YE, ZE);
+      if (Geom == Geometry::Planar ||
+          (Geom == Geometry::Spherical &&
+           CartProjectionOpt == CartProjection::No)) {
 
          if (EdgeComp == EdgeComponent::Normal) {
             const Real EdgeNormalX = std::cos(AngleEdge(IEdge));
@@ -375,61 +385,33 @@ int setVectorEdge(const Functor &Fun, const Array &VectorFieldEdge,
                 EdgeTangentX * VecField[0] + EdgeTangentY * VecField[1];
          }
       } else {
-         const Real LonE = LonEdge(IEdge);
-         const Real LatE = LatEdge(IEdge);
+         Real VecFieldCart[3];
+         sphereToCartVec(VecFieldCart, VecField, X, Y);
 
-         Real ZE = 0;
-         if (ZCoord.data()) {
-            ZE = ZCoord(IEdge, K);
+         const Real EdgeCoords[3] = {XEdge[IEdge], YEdge[IEdge], ZEdge[IEdge]};
+
+         if (EdgeComp == EdgeComponent::Normal) {
+            const int JCell1         = CellsOnEdge(IEdge, 1);
+            const Real CellCoords[3] = {XCell(JCell1), YCell(JCell1),
+                                        ZCell(JCell1)};
+
+            Real EdgeNormal[3];
+            tangentVector(EdgeNormal, EdgeCoords, CellCoords);
+            VecFieldEdge = EdgeNormal[0] * VecFieldCart[0] +
+                           EdgeNormal[1] * VecFieldCart[1] +
+                           EdgeNormal[2] * VecFieldCart[2];
          }
 
-         Real VecField[2];
-         CanonicalFun(VecField, IEdge, K, LonE, LatE, ZE);
+         if (EdgeComp == EdgeComponent::Tangential) {
+            const int JVertex1         = VerticesOnEdge(IEdge, 1);
+            const Real VertexCoords[3] = {XVertex(JVertex1), YVertex(JVertex1),
+                                          ZVertex(JVertex1)};
 
-         if (CartProjectionOpt == CartProjection::Yes) {
-            Real VecFieldCart[3];
-            sphereToCartVec(VecFieldCart, VecField, LonE, LatE);
-
-            const Real EdgeCoords[3] = {XEdge[IEdge], YEdge[IEdge],
-                                        ZEdge[IEdge]};
-
-            if (EdgeComp == EdgeComponent::Normal) {
-               const int JCell1         = CellsOnEdge(IEdge, 1);
-               const Real CellCoords[3] = {XCell(JCell1), YCell(JCell1),
-                                           ZCell(JCell1)};
-
-               Real EdgeNormal[3];
-               tangentVector(EdgeNormal, EdgeCoords, CellCoords);
-               VecFieldEdge = EdgeNormal[0] * VecFieldCart[0] +
-                              EdgeNormal[1] * VecFieldCart[1] +
-                              EdgeNormal[2] * VecFieldCart[2];
-            }
-
-            if (EdgeComp == EdgeComponent::Tangential) {
-               const int JVertex1         = VerticesOnEdge(IEdge, 1);
-               const Real VertexCoords[3] = {
-                   XVertex(JVertex1), YVertex(JVertex1), ZVertex(JVertex1)};
-
-               Real EdgeTangent[3];
-               tangentVector(EdgeTangent, EdgeCoords, VertexCoords);
-               VecFieldEdge = EdgeTangent[0] * VecFieldCart[0] +
-                              EdgeTangent[1] * VecFieldCart[1] +
-                              EdgeTangent[2] * VecFieldCart[2];
-            }
-         } else {
-            if (EdgeComp == EdgeComponent::Normal) {
-               const Real EdgeNormalX = std::cos(AngleEdge(IEdge));
-               const Real EdgeNormalY = std::sin(AngleEdge(IEdge));
-               VecFieldEdge =
-                   EdgeNormalX * VecField[0] + EdgeNormalY * VecField[1];
-            }
-
-            if (EdgeComp == EdgeComponent::Tangential) {
-               const Real EdgeTangentX = -std::sin(AngleEdge(IEdge));
-               const Real EdgeTangentY = std::cos(AngleEdge(IEdge));
-               VecFieldEdge =
-                   EdgeTangentX * VecField[0] + EdgeTangentY * VecField[1];
-            }
+            Real EdgeTangent[3];
+            tangentVector(EdgeTangent, EdgeCoords, VertexCoords);
+            VecFieldEdge = EdgeTangent[0] * VecFieldCart[0] +
+                           EdgeTangent[1] * VecFieldCart[1] +
+                           EdgeTangent[2] * VecFieldCart[2];
          }
       }
       return VecFieldEdge;
