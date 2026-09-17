@@ -124,6 +124,7 @@ contains
             write (fileID,'(i5,a)') i,'. time, in days'; i=i+1
             write (fileID,'(i5,a)') i,'. layerThickness'; i=i+1
             write (fileID,'(i5,a)') i,'. normalVelocity'; i=i+1
+            write (fileID,'(i5,a)') i,'. normalMLEvelocity'; i=i+1
             write (fileID,'(i5,a)') i,'. tangentialVelocity'; i=i+1
             write (fileID,'(i5,a)') i,'. layerThicknessEdgeMean'; i=i+1
             write (fileID,'(i5,a)') i,'. relativeVorticity'; i=i+1
@@ -426,6 +427,32 @@ contains
          maxes(variableIndex) = max(maxes(variableIndex), maxes_tmp(variableIndex))
          verticalSumMins(variableIndex) = min(verticalSumMins(variableIndex), verticalSumMins_tmp(variableIndex))
          verticalSumMaxes(variableIndex) = max(verticalSumMaxes(variableIndex), verticalSumMaxes_tmp(variableIndex))
+         
+         ! normalMLEvelocity
+         variableIndex = variableIndex + 1
+         if ( associated(normalMLEvelocity) ) then
+           call ocn_compute_field_volume_weighted_local_stats_max_level(dminfo, nVertLevels, nEdgesSolve, &
+                                minLevelEdgeBot(1:nEdgesSolve), maxLevelEdgeTop(1:nEdgesSolve), areaEdge(1:nEdgesSolve), &
+                                layerThickEdgeMean(:,1:nEdgesSolve), &
+                                normalMLEvelocity(:,1:nEdgesSolve), sums_tmp(variableIndex), &
+                                sumSquares_tmp(variableIndex), mins_tmp(variableIndex), &
+                                maxes_tmp(variableIndex), &
+                                verticalSumMins_tmp(variableIndex), &
+                                verticalSumMaxes_tmp(variableIndex))
+           sums(variableIndex) = sums(variableIndex) + sums_tmp(variableIndex)
+           sumSquares(variableIndex) = sumSquares(variableIndex) + sumSquares_tmp(variableIndex)
+           mins(variableIndex) = min(mins(variableIndex), mins_tmp(variableIndex))
+           maxes(variableIndex) = max(maxes(variableIndex), maxes_tmp(variableIndex))
+           verticalSumMins(variableIndex) = min(verticalSumMins(variableIndex), verticalSumMins_tmp(variableIndex))
+           verticalSumMaxes(variableIndex) = max(verticalSumMaxes(variableIndex), verticalSumMaxes_tmp(variableIndex))
+         else
+            sums_tmp(variableIndex) = 0.0_RKIND
+            sumSquares_tmp(variableIndex) = 0.0_RKIND
+            mins_tmp(variableIndex) = 0.0_RKIND
+            maxes_tmp(variableIndex) = 0.0_RKIND
+            verticalSumMins_tmp(variableIndex) = 0.0_RKIND
+            verticalSumMaxes_tmp(variableIndex) = 0.0_RKIND
+         endif
 
          ! tangentialVelocity
          variableIndex = variableIndex + 1
@@ -744,6 +771,28 @@ contains
          maxes(variableIndex) = max(maxes(variableIndex), maxes_tmp(variableIndex))
          verticalSumMins(variableIndex) = mins(variableIndex)
          verticalSumMaxes(variableIndex) = maxes(variableIndex)
+         
+         ! dThreshMLD
+         variableIndex = variableIndex + 1
+         if ( associated(dThreshMLD) ) then
+            call ocn_compute_field_area_weighted_local_stats_surface(dminfo, nCellsSolve, &
+                         areaCell(1:nCellsSolve), &
+                         dThreshMLD(1:nCellsSolve), sums_tmp(variableIndex), &
+                         sumSquares_tmp(variableIndex), mins_tmp(variableIndex), &
+                         maxes_tmp(variableIndex))
+         else
+            sums_tmp(variableIndex) = 0.0_RKIND
+            sumSquares_tmp(variableIndex) = 0.0_RKIND
+            mins_tmp(variableIndex) = 0.0_RKIND
+            maxes_tmp(variableIndex) = 0.0_RKIND
+         end if
+         sums(variableIndex) = sums(variableIndex) + sums_tmp(variableIndex)
+         sumSquares(variableIndex) = sumSquares(variableIndex) + sumSquares_tmp(variableIndex)
+         mins(variableIndex) = min(mins(variableIndex), mins_tmp(variableIndex))
+         maxes(variableIndex) = max(maxes(variableIndex), maxes_tmp(variableIndex))
+         verticalSumMins(variableIndex) = mins(variableIndex)
+         verticalSumMaxes(variableIndex) = maxes(variableIndex)
+
 
 
          ! rainFlux
@@ -1157,6 +1206,16 @@ contains
       variableIndex = variableIndex + 1
       averages(variableIndex) = sums(variableIndex)/volumeEdgeGlobal
       rms(variableIndex) = sqrt(sumSquares(variableIndex)/volumeEdgeGlobal)
+      
+      ! normalMLEvelocity
+      variableIndex = variableIndex + 1
+      if ( associated(normalMLEvelocity) ) then
+        averages(variableIndex) = sums(variableIndex)/volumeEdgeGlobal
+        rms(variableIndex) = sqrt(sumSquares(variableIndex)/volumeEdgeGlobal)
+      else
+         averages(variableIndex) = 0.0_RKIND
+         rms(variableIndex) = 0.0_RKIND
+      endif
 
       ! tangentialVelocity
       variableIndex = variableIndex + 1
@@ -1254,6 +1313,11 @@ contains
       netFreshwaterInput = dt * sums(variableIndex)
 
       ! evaporationFlux
+      variableIndex = variableIndex + 1
+      averages(variableIndex) = sums(variableIndex)/(areaCellGlobal)
+      rms(variableIndex) = sqrt(sumSquares(variableIndex)/(areaCellGlobal))
+      
+      ! dThreshMLD
       variableIndex = variableIndex + 1
       averages(variableIndex) = sums(variableIndex)/(areaCellGlobal)
       rms(variableIndex) = sqrt(sumSquares(variableIndex)/(areaCellGlobal))
