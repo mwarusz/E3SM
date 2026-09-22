@@ -13,6 +13,7 @@
 #include "Config.h"
 #include "DataTypes.h"
 #include "Decomp.h"
+#include "FloatExcept.h"
 #include "Logging.h"
 #include "MachEnv.h"
 #include "Pacer.h"
@@ -66,6 +67,7 @@ int main(int argc, char *argv[]) {
    Kokkos::initialize();
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
+   enableFloatExceptionsInTests();
    {
       // Call initialization routine to create the default decomposition
       // and initialize the parallel IO library
@@ -791,6 +793,7 @@ int main(int argc, char *argv[]) {
 
       LOG_INFO("IOTest: Successful completion");
    }
+   disableFloatExceptions();
    Pacer::finalize();
    Kokkos::finalize();
    MPI_Barrier(MPI_COMM_WORLD);

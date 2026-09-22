@@ -13,6 +13,7 @@
 #include "DataTypes.h"
 #include "Decomp.h"
 #include "Error.h"
+#include "FloatExcept.h"
 #include "IO.h"
 #include "Logging.h"
 #include "MachEnv.h"
@@ -97,6 +98,7 @@ int main(int argc, char **argv) {
    MPI_Init(&argc, &argv);
    Kokkos::initialize();
 
+   enableFloatExceptionsInTests();
    {
       // Call initialization to create sample dimensions
       initDimensionTest();
@@ -265,6 +267,7 @@ int main(int argc, char **argv) {
       if (NDims > 0)
          ABORT_ERROR("DimensionTest: remove all test - FAIL");
    }
+   disableFloatExceptions();
 
    LOG_INFO("------ Dimension unit tests successful ------");
    // Clean up environments

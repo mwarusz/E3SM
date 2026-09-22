@@ -14,6 +14,7 @@
 #include <mpi.h>
 
 #include "Error.h"
+#include "FloatExcept.h"
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OmegaKokkos.h"
@@ -1650,6 +1651,7 @@ int main(int argc, char *argv[]) {
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
    OMEGA::initLogging(DefEnv);
+   enableFloatExceptionsInTests();
    LOG_INFO("------ Global Reductions Unit Tests ------");
 
    // For reproducibility across tasks, create a smaller sub-environment
@@ -1664,6 +1666,7 @@ int main(int argc, char *argv[]) {
    testArrayReductions();
 
    LOG_INFO("------ Global Reductions Unit Tests Sucessful ------");
+   disableFloatExceptions();
 
    // clean up
    MachEnv::removeAll();
