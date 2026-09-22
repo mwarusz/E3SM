@@ -18,6 +18,7 @@
 #include "Config.h"
 #include "DataTypes.h"
 #include "Decomp.h"
+#include "FloatExcept.h"
 #include "IO.h"
 #include "Logging.h"
 #include "MachEnv.h"
@@ -140,6 +141,7 @@ int main(int argc, char *argv[]) {
    Kokkos::initialize();
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
+   enableFloatExceptionsInTests();
    {
 
       // Call Halo test initialization routine
@@ -567,6 +569,7 @@ int main(int argc, char *argv[]) {
          LOG_INFO("HaloTest: Failed");
       }
    }
+   disableFloatExceptions();
    Pacer::finalize();
    Kokkos::finalize();
    MPI_Barrier(MPI_COMM_WORLD);

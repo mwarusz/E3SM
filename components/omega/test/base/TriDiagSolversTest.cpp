@@ -1,5 +1,6 @@
 #include "TriDiagSolvers.h"
 #include "../ocn/OceanTestCommon.h"
+#include "FloatExcept.h"
 
 using namespace OMEGA;
 
@@ -446,8 +447,16 @@ int testDiffusionStability() {
    const Real LargeDiffValue = 1e14;
 
    UseGeneralSolver = true;
+
+   // This is expected to produce NaNs so disable floating-point exceptions for
+   // this test
+   FloatExceptStatus Status = disableFloatExceptions();
    const Real NormGeneralLargeDiff =
        runDiffusionStability(UseGeneralSolver, LargeDiffValue);
+   // Re-enable exceptions
+   if (Status.Err.isSuccess()) {
+      enableFloatExceptionsInTests(Status.OldExceptions);
+   }
 
    if (!std::isnan(NormGeneralLargeDiff)) {
       Err += 1;
@@ -598,11 +607,13 @@ int main(int argc, char *argv[]) {
    MPI_Init(&argc, &argv);
    Kokkos::initialize(argc, argv);
 
+   enableFloatExceptionsInTests();
    if (argc > 1 && std::string(argv[1]) == std::string("--perf")) {
       RetVal += tridiagonalPerfTest();
    } else {
       RetVal += tridiagonalTest();
    }
+   disableFloatExceptions();
 
    Kokkos::finalize();
    MPI_Barrier(MPI_COMM_WORLD);

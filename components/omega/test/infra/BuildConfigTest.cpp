@@ -18,6 +18,7 @@
 
 #include "DataTypes.h"
 #include "Error.h"
+#include "FloatExcept.h"
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OmegaKokkos.h"
@@ -74,6 +75,7 @@ int main(int argc, char *argv[]) {
    initLogging(DefEnv);
    LOG_INFO("----- Build Configuration Unit Testing -----");
 
+   enableFloatExceptionsInTests();
    {
       const std::string ArchName = OMEGA_STR(OMEGA_ARCH);
       const std::string KokkosName{Kokkos::DefaultExecutionSpace::name()};
@@ -144,6 +146,7 @@ int main(int argc, char *argv[]) {
       LOG_INFO("BuildConfigTest: OMEGA_TARGET_DEVICE = {}",
                OmegaIsDevice ? "defined" : "not defined");
    }
+   disableFloatExceptions();
 
    LOG_INFO("----- Build Configuration Unit Tests Successful -----");
    Pacer::finalize();

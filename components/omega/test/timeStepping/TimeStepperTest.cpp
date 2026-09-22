@@ -22,6 +22,7 @@
 #include "Eos.h"
 #include "Error.h"
 #include "Field.h"
+#include "FloatExcept.h"
 #include "Forcing.h"
 #include "Halo.h"
 #include "HorzMesh.h"
@@ -554,7 +555,9 @@ int main(int argc, char *argv[]) {
 
    LOG_INFO("----- Time Stepper Unit Test -----");
 
+   enableFloatExceptionsInTests();
    RetVal += timeStepperTest("OmegaSphereMesh.nc");
+   disableFloatExceptions();
 
    Pacer::finalize();
    Kokkos::finalize();

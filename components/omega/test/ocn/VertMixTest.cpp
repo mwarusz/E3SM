@@ -15,6 +15,7 @@
 #include "Dimension.h"
 #include "Field.h"
 #include "FillValues.h"
+#include "FloatExcept.h"
 #include "HorzMesh.h"
 #include "IO.h"
 #include "IOStream.h"
@@ -1089,7 +1090,9 @@ int main(int argc, char *argv[]) {
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
 
+   enableFloatExceptionsInTests();
    vertMixTest();
+   disableFloatExceptions();
 
    LOG_INFO("------ Vertical Mixing Unit Tests Successful ------");
    Kokkos::finalize();

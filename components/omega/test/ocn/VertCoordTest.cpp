@@ -13,6 +13,7 @@
 #include "Dimension.h"
 #include "Error.h"
 #include "Field.h"
+#include "FloatExcept.h"
 #include "GlobalConstants.h"
 #include "Halo.h"
 #include "HorzMesh.h"
@@ -89,6 +90,7 @@ int main(int argc, char *argv[]) {
    Kokkos::initialize();
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
+   enableFloatExceptionsInTests();
    {
       int Err = initVertCoordTest();
       if (Err != 0)
@@ -742,6 +744,7 @@ int main(int argc, char *argv[]) {
       Decomp::clear();
       MachEnv::removeAll();
    }
+   disableFloatExceptions();
    Pacer::finalize();
    Kokkos::finalize();
 

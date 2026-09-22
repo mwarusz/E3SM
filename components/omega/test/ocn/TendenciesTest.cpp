@@ -8,6 +8,7 @@
 #include "Eos.h"
 #include "Error.h"
 #include "Field.h"
+#include "FloatExcept.h"
 #include "Forcing.h"
 #include "GlobalConstants.h"
 #include "Halo.h"
@@ -765,7 +766,9 @@ int main(int argc, char *argv[]) {
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
 
+   enableFloatExceptionsInTests();
    RetVal += tendenciesTest();
+   disableFloatExceptions();
 
    Pacer::finalize();
    Kokkos::finalize();
