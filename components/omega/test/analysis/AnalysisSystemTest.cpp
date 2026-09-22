@@ -11,6 +11,7 @@
 #include "Decomp.h"
 #include "Eos.h"
 #include "Field.h"
+#include "FloatExcept.h"
 #include "Forcing.h"
 #include "Halo.h"
 #include "HorzMesh.h"
@@ -772,6 +773,7 @@ int main(int argc, char *argv[]) {
    int ErrCode = 0;
 
    MPI_Init(&argc, &argv);
+   enableFloatExceptionsInTests();
    Kokkos::initialize();
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
@@ -820,6 +822,7 @@ int main(int argc, char *argv[]) {
 
       finalizeAnalysisSystemTest();
    }
+   disableFloatExceptions();
    Pacer::finalize();
    Kokkos::finalize();
    MPI_Barrier(MPI_COMM_WORLD);
