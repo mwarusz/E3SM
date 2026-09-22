@@ -83,6 +83,8 @@ int initState() {
        VCoord->MinLayerEdgeTop, VCoord->MaxLayerEdgeBot, ExchangeHalos::Yes,
        CartProjection::No);
 
+   deepCopy(VCoord->SurfacePressure, 0);
+
    return Err;
 }
 
