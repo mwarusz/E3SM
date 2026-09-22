@@ -1365,7 +1365,7 @@ int testFCTTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
    VertAdv::init();
    const auto VAdv = VertAdv::getDefault();
    deepCopy(VAdv->VerticalPseudoVelocity, 10._Real);
-   deepCopy(VAdv->TotalVerticalPseudoVelocity, 10._Real);
+   deepCopy(VAdv->TotalVerticalTransportPseudoVelocity, 10._Real);
 
    TracerHorzAdvOnCellTest TrHorzAdvOnC(Mesh, VCoord, VAdv);
    TrHorzAdvOnC.ForceLowOrder = false;
