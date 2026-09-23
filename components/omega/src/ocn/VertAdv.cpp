@@ -478,7 +478,7 @@ void VertAdv::computeVerticalPseudoVelocityImpl(
    // Loop over all cells owned by the task
    parallelForOuter(
        "computeVerticalPseudoVelocity",
-       LaunchConfig({NCellsHalo0}, TeamScratch<Real>(NVertLayers)),
+       LaunchConfig({NCellsAll}, TeamScratch<Real>(NVertLayers)),
        KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
           ScratchArray1DReal DivHU(teamScratch(Team), LocNVertLayers);
 
