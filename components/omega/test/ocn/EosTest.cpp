@@ -15,6 +15,7 @@
 #include "Decomp.h"
 #include "Dimension.h"
 #include "Field.h"
+#include "FloatExcept.h"
 #include "IO.h"
 #include "IOStream.h"
 #include "Logging.h"
@@ -1594,7 +1595,9 @@ int main(int argc, char *argv[]) {
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
 
+   enableFloatExceptionsInTests();
    eosTest();
+   disableFloatExceptions();
 
    LOG_INFO("------ EOS Unit Tests Successful ------");
 

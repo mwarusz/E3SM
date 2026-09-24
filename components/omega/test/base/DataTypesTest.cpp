@@ -14,6 +14,7 @@
 
 #include "DataTypes.h"
 #include "Error.h"
+#include "FloatExcept.h"
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OmegaKokkos.h"
@@ -34,6 +35,7 @@ int main(int argc, char *argv[]) {
    MachEnv::init(MPI_COMM_WORLD);
    MachEnv *DefEnv = MachEnv::getDefault();
    initLogging(DefEnv);
+   enableFloatExceptionsInTests();
    LOG_INFO("------ DataTypes Unit Tests ------");
 
    {
@@ -955,6 +957,7 @@ int main(int argc, char *argv[]) {
       // MPI_Status status;
    }
    LOG_INFO("------ DataTypes Unit Tests Successful ------");
+   disableFloatExceptions();
    Pacer::finalize();
    Kokkos::finalize();
    MPI_Barrier(MPI_COMM_WORLD);

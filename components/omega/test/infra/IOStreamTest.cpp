@@ -19,6 +19,7 @@
 #include "Error.h"
 #include "Field.h"
 #include "FillValues.h"
+#include "FloatExcept.h"
 #include "Forcing.h"
 #include "Halo.h"
 #include "HorzMesh.h"
@@ -207,6 +208,7 @@ int main(int argc, char **argv) {
    Kokkos::initialize();
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
+   enableFloatExceptionsInTests();
    {
 
       Clock *ModelClock = nullptr;
@@ -316,6 +318,7 @@ int main(int argc, char **argv) {
       // Write final output and remove all streams
       IOStream::finalize(ModelClock);
    }
+   disableFloatExceptions();
 
    // Clean up environments
    TimeStepper::clear();

@@ -15,6 +15,7 @@
 #include "Dimension.h"
 #include "Error.h"
 #include "Field.h"
+#include "FloatExcept.h"
 #include "Halo.h"
 #include "IO.h"
 #include "IOStream.h"
@@ -134,6 +135,7 @@ int main(int argc, char *argv[]) {
    Kokkos::initialize();
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
+   enableFloatExceptionsInTests();
    {
 
       int Err = 0;
@@ -671,6 +673,7 @@ int main(int argc, char *argv[]) {
       Decomp::clear();
       MachEnv::removeAll();
    }
+   disableFloatExceptions();
    Pacer::finalize();
    Kokkos::finalize();
 
