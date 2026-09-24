@@ -10,6 +10,7 @@
 //===---------------------------------------------------------------------------------------===//
 
 #include "FloatExcept.h"
+#include <Kokkos_Core.hpp>
 #include <cfenv>
 
 namespace OMEGA {
@@ -143,7 +144,7 @@ FloatExceptStatus enableFloatExceptionsInTests(int Exceptions) {
    Status = enableFloatExceptions(Exceptions);
 #else
    // Enable if using the GNU compiler
-#if defined(__GNUC__) && !defined(__llvm__) && !defined(__INTEL_COMPILER)
+#if defined(KOKKOS_COMPILER_GNU)
    Status = enableFloatExceptions(Exceptions);
 #endif
 #endif
