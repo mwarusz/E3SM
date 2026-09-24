@@ -8,9 +8,12 @@ on the target architecture, and is not always supported.
 
 To enable floating-point exceptions `Exceptions` call
 ```c++
-Error Err = enableFloatExceptions(Exceptions);
+FloatExceptStatus Status = enableFloatExceptions(Exceptions);
 ```
-The returned `Err` value indicates whether this succeeded.
+The returned `FloatExceptStatus` struct contains two fields.
+`Status.Err` holds an error code indicating success or failure.
+On success, `Status.OldExceptions` contains exceptions that were in effect
+before the call to the enable function.
 `Exceptions` is an integer mask, which can be composed of exception
 types defined in `<cfenv>`. They are implementation defined, but
 typically include
@@ -22,7 +25,7 @@ typically include
 
 For example, to enable divide-by-zero and underflow exceptions do
 ```c++
-Error Err = enableFloatExceptions(FE_DIVBYZERO | FE_OVERFLOW);
+FloatExceptStatus Status = enableFloatExceptions(FE_DIVBYZERO | FE_OVERFLOW);
 ```
 
 You can call `enableFloatExceptions` without an argument, which
@@ -33,7 +36,7 @@ enables
 
 To disable floating-point exceptions `Exceptions` call
 ```c++
-Error Err = disableFloatExceptions(Exceptions);
+FloatExceptStatus Status = disableFloatExceptions(Exceptions);
 ```
 Calling this function without an argument disables all exceptions.
 
