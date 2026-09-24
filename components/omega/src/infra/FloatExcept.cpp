@@ -55,7 +55,7 @@ static FloatExceptStatus disableFloatExceptionsGnuExtension(int Exceptions) {
 #endif
 
 // Floating-point exception handling for ARM64
-#ifdef __aarch64__
+#if defined(__aarch64__) || defined(__arm64__)
 static FloatExceptStatus enableFloatExceptionsArm64(int Exceptions) {
    FloatExceptStatus Status;
 
@@ -110,7 +110,7 @@ static FloatExceptStatus disableFloatExceptionsArm64(int Exceptions) {
 FloatExceptStatus enableFloatExceptions(int Exceptions) {
 #ifdef OMEGA_HAVE_FEENABLEEXCEPT
    return enableFloatExceptionsGnuExtension(Exceptions);
-#elif defined __arm64__
+#elif defined(__aarch64__) || defined(__arm64__)
    return enableFloatExceptionsArm64(Exceptions);
 #else // unsupported arch
    return Error(ErrorCode::Fail, "Omega doesn't support enabling floating "
@@ -124,7 +124,7 @@ FloatExceptStatus enableFloatExceptions(int Exceptions) {
 FloatExceptStatus disableFloatExceptions(int Exceptions) {
 #ifdef OMEGA_HAVE_FEENABLEEXCEPT
    return disableFloatExceptionsGnuExtension(Exceptions);
-#elif defined __arm64__
+#elif defined(__aarch64__) || defined(__arm64__)
    return disableFloatExceptionsArm64(Exceptions);
 #else // unsupported arch
    return FloatExceptStatus{Error(ErrorCode::Fail,

@@ -20,6 +20,7 @@
 #include "Eos.h"
 #include "Error.h"
 #include "Field.h"
+#include "FloatExcept.h"
 #include "Halo.h"
 #include "HorzMesh.h"
 #include "IO.h"
@@ -395,6 +396,7 @@ int main(int argc, char *argv[]) {
    Kokkos::initialize(argc, argv);
    Pacer::initialize(MPI_COMM_WORLD);
    Pacer::setPrefix("Omega:");
+   enableFloatExceptionsInTests();
 
    {
       int Err = initStateValidationTest("OmegaMesh.nc");
@@ -405,6 +407,8 @@ int main(int argc, char *argv[]) {
       }
       finalizeStateValidationTest();
    }
+
+   disableFloatExceptions();
 
    if (RetVal == 0)
       LOG_INFO("------ StateValidation unit tests successful ------");
