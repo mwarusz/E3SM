@@ -4,10 +4,9 @@ set(OMEGA_C_COMPILER "mpiicx" CACHE STRING "")
 set(OMEGA_CXX_COMPILER "mpiicpx" CACHE STRING "")
 set(OMEGA_Fortran_COMPILER "mpiifx" CACHE STRING "")
 
-set(CMAKE_C_FLAGS "-g --gcc-toolchain=$ENV{GCC_ROOT}" CACHE STRING "")
-set(CMAKE_CXX_FLAGS "-g --gcc-toolchain=$ENV{GCC_ROOT}" CACHE STRING "")
-#set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fp-model=precise -mprefer-vector-width=512" CACHE STRING "")
-set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O2 -fp-model=precise" CACHE STRING "")
+set(CMAKE_C_FLAGS "--gcc-toolchain=$ENV{GCC_ROOT}" CACHE STRING "")
+set(CMAKE_CXX_FLAGS "--gcc-toolchain=$ENV{GCC_ROOT}" CACHE STRING "")
+set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fp-model=precise -mprefer-vector-width=512 -fno-math-errno" CACHE STRING "")
 
 set(OMEGA_ARCH SERIAL CACHE STRING "")
 set(Kokkos_ARCH_NATIVE ON CACHE BOOL "")
@@ -17,7 +16,7 @@ set(OMEGA_GKLIB_ROOT "$ENV{HOME}/installs/gklib-intel" CACHE STRING "")
 set(OMEGA_METIS_ROOT "$ENV{HOME}/installs/metis-intel" CACHE STRING "")
 set(OMEGA_PARMETIS_ROOT "$ENV{HOME}/installs/parmetis-intel" CACHE STRING "")
 
-set(OMEGA_VECTOR_LENGTH 16 CACHE STRING "")
+set(OMEGA_VECTOR_LENGTH 1 CACHE STRING "")
 
 set(OMEGA_MPI_EXEC srun CACHE STRING "")
 set(OMEGA_BUILD_TEST ON CACHE BOOL "")
