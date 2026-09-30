@@ -51,11 +51,10 @@ class Teos10Eos {
    //   (gauge pressure, i.e., absolute pressure minus the standard atmosphere)
    //   as inputs, and outputs the specific volume according to the Roquet et
    //   al. 2015 75 term expansion.
-   KOKKOS_FUNCTION void operator()(Array2DReal SpecVol, const TeamMember &Team,
-                                   I4 ICell, const Array2DReal &ConservTemp,
-                                   const Array2DReal &AbsSalinity,
-                                   const Array2DReal &Pressure,
-                                   I4 KDisp) const {
+   KOKKOS_FUNCTION void
+   operator()(const Array2DReal &SpecVol, const TeamMember &Team, I4 ICell,
+              const Array2DReal &ConservTemp, const Array2DReal &AbsSalinity,
+              const Array2DReal &Pressure, I4 KDisp) const {
 
       const I4 KMin = MinLayerCell(ICell);
       const I4 KMax = MaxLayerCell(ICell);
@@ -75,25 +74,25 @@ class Teos10Eos {
              /// Note: KDisp is only used for TEOS-10, for Linear EOS it
              /// is always 0.
              if (KDisp == 0) {
+                const Real PDb = Pressure(ICell, K) * Pa2Db;
                 // No displacement
                 SpecVol(ICell, K) =
-                    calcRefProfile(Pressure(ICell, K) * Pa2Db) +
-                    calcDelta(SpecVolPCoeffs, Pressure(ICell, K) * Pa2Db);
+                    calcRefProfile(PDb) + calcDelta(SpecVolPCoeffs, PDb);
              } else {
                 // Displacement, use the displaced pressure
-                I4 KTmp = Kokkos::min(K + KDisp, KMax);
-                KTmp    = Kokkos::max(KMin, KTmp);
+                I4 KTmp        = Kokkos::min(K + KDisp, KMax);
+                KTmp           = Kokkos::max(KMin, KTmp);
+                const Real PDb = Pressure(ICell, KTmp) * Pa2Db;
                 SpecVol(ICell, K) =
-                    calcRefProfile(Pressure(ICell, KTmp) * Pa2Db) +
-                    calcDelta(SpecVolPCoeffs, Pressure(ICell, KTmp) * Pa2Db);
+                    calcRefProfile(PDb) + calcDelta(SpecVolPCoeffs, PDb);
              }
           });
    }
 
    /// TEOS-10 helpers
    /// Calculate pressure polynomial coefficients for TEOS-10
-   KOKKOS_FUNCTION void calcPCoeffs(Real (&SpecVolPCoeffs)[6], const Real Ct,
-                                    const Real Sa) const {
+   KOKKOS_FORCEINLINE_FUNCTION void
+   calcPCoeffs(Real (&SpecVolPCoeffs)[6], const Real Ct, const Real Sa) const {
       Real Ss = Kokkos::sqrt((Sa + DeltaS) / SaNorm);
       Real Tt = Ct / CtNorm;
 
@@ -212,8 +211,8 @@ class Teos10Eos {
    }
 
    /// Evaluate pressure polynomial delta for TEOS-10
-   KOKKOS_FUNCTION Real calcDelta(const Real (&SpecVolPCoeffs)[6],
-                                  const Real P) const {
+   KOKKOS_FORCEINLINE_FUNCTION Real calcDelta(const Real (&SpecVolPCoeffs)[6],
+                                              const Real P) const {
 
       Real Pp = P * PNorm;
 
