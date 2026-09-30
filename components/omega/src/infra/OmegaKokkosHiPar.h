@@ -256,8 +256,21 @@ struct Range {
 template <class F>
 KOKKOS_FUNCTION void parallelForInner(const TeamMember &Team, Range Rng,
                                       F &&Functor) {
+
+#ifdef OMEGA_TARGET_DEVICE
    const auto Policy = Kokkos::TeamThreadRange(Team, Rng.First, Rng.Last + 1);
    Kokkos::parallel_for(Policy, std::forward<F>(Functor));
+#else
+#ifdef KOKKOS_COMPILER_GNU
+#pragma GCC ivdep
+#endif
+#ifdef KOKKOS_COMPILER_INTEL_LLVM
+#pragma ivdep
+#endif
+   for (int K = Rng.First; K <= Rng.Last; ++K) {
+      Functor(K);
+   }
+#endif
 }
 
 template <class F>
