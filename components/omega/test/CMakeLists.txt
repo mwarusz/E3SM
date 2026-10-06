@@ -724,3 +724,11 @@ add_omega_test(
     base/MathUtilsTest.cpp
     "-n;1"
 )
+
+add_omega_test(
+  MATH_UTILS_SINGLE_PRECISION_TEST
+    testMathUtilsSinglePrecision.exe
+    base/MathUtilsTest.cpp
+    "-n;1"
+    single_precision
+)
