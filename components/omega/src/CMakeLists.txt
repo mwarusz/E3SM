@@ -51,16 +51,21 @@ target_link_directories(
 target_link_libraries(
     OmegaLibFlags
     INTERFACE
+    yaml-cpp::yaml-cpp
+)
+
+target_link_libraries(
+    OmegaLibFlags
+    INTERFACE
     Kokkos::kokkos
     spdlog::spdlog
     pioc
-    yaml-cpp::yaml-cpp
     parmetis
     metis
     gptl
     gswteos-10
     pacer
-    stdc++fs
+    # stdc++fs
     cpptrace::cpptrace
 )
 
