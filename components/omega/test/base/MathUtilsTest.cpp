@@ -61,6 +61,22 @@ Error testMathUtilsHost() {
       Err += Error(ErrorCode::Fail, "host max(2, 3, 1) FAIL");
    }
 
+   if (Math::min(1.5_Real, 2.5_Real) != 1.5_Real) {
+      Err += Error(ErrorCode::Fail, "host min(1.5_Real, 2.5_Real) FAIL");
+   }
+
+   if (Math::max(1.5_Real, 2.5_Real) != 2.5_Real) {
+      Err += Error(ErrorCode::Fail, "host max(1.5_Real, 2.5_Real) FAIL");
+   }
+
+   if (Math::min(2, 2.5_Real, 1.5_Real) != 1.5_Real) {
+      Err += Error(ErrorCode::Fail, "host min(2, 2.5_Real, 1.5_Real) FAIL");
+   }
+
+   if (Math::max(2.5_Real, 2, 1.5_Real) != 2.5_Real) {
+      Err += Error(ErrorCode::Fail, "host max(2.5_Real, 2, 1.5_Real) FAIL");
+   }
+
    return Err;
 }
 
@@ -93,6 +109,22 @@ Error testMathUtilsDevice() {
           if (Math::max(2, 3, 1) != 3) {
              Accum |= (1 << 4);
           }
+
+          if (Math::min(1.5_Real, 2.5_Real) != 1.5_Real) {
+             Accum |= (1 << 5);
+          }
+
+          if (Math::max(1.5_Real, 2.5_Real) != 2.5_Real) {
+             Accum |= (1 << 6);
+          }
+
+          if (Math::min(2, 2.5_Real, 1.5_Real) != 1.5_Real) {
+             Accum |= (1 << 7);
+          }
+
+          if (Math::max(2.5_Real, 2, 1.5_Real) != 2.5_Real) {
+             Accum |= (1 << 8);
+          }
        },
        DeviceResults);
 
@@ -114,6 +146,22 @@ Error testMathUtilsDevice() {
 
    if (DeviceResults & (1 << 4)) {
       Err += Error(ErrorCode::Fail, "device max(2, 3, 1) FAIL");
+   }
+
+   if (DeviceResults & (1 << 5)) {
+      Err += Error(ErrorCode::Fail, "device min(1.5_Real, 2.5_Real) FAIL");
+   }
+
+   if (DeviceResults & (1 << 6)) {
+      Err += Error(ErrorCode::Fail, "device max(1.5_Real, 2.5_Real) FAIL");
+   }
+
+   if (DeviceResults & (1 << 7)) {
+      Err += Error(ErrorCode::Fail, "device min(2, 2.5_Real, 1.5_Real) FAIL");
+   }
+
+   if (DeviceResults & (1 << 8)) {
+      Err += Error(ErrorCode::Fail, "device max(2.5_Real, 2, 1.5_Real) FAIL");
    }
 
    return Err;
