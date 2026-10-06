@@ -713,3 +713,14 @@ add_omega_test(
     analysis/AnalysisSystemTest.cpp
     "-n;8"
 )
+
+###################
+# Math utils tests
+###################
+
+add_omega_test(
+  MATH_UTILS_TEST
+    testMathUtils.exe
+    base/MathUtilsTest.cpp
+    "-n;1"
+)
