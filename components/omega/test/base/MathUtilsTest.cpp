@@ -13,6 +13,7 @@
 #include "OmegaKokkos.h"
 
 #include "mpi.h"
+#include <limits>
 
 using namespace OMEGA;
 
@@ -77,6 +78,33 @@ Error testMathUtilsHost() {
       Err += Error(ErrorCode::Fail, "host max(2.5_Real, 2, 1.5_Real) FAIL");
    }
 
+   if (!Math::isApprox(100.5_Real, 100.6_Real, 0.01_Real)) {
+      Err += Error(ErrorCode::Fail, "host isApprox relative tolerance FAIL");
+   }
+
+   if (Math::isApprox(100.5_Real, 102.5_Real, 0.01_Real)) {
+      Err += Error(ErrorCode::Fail,
+                   "host isApprox relative tolerance rejection FAIL");
+   }
+
+   if (!Math::isApprox(0.5_Real, 0.75_Real, 0.0_Real, 0.3_Real)) {
+      Err += Error(ErrorCode::Fail, "host isApprox absolute tolerance FAIL");
+   }
+
+   if (Math::isApprox(0.5_Real, 0.9_Real, 0.0_Real, 0.3_Real)) {
+      Err += Error(ErrorCode::Fail,
+                   "host isApprox absolute tolerance rejection FAIL");
+   }
+
+   const Real NaN = std::numeric_limits<Real>::quiet_NaN();
+   const Real Inf = std::numeric_limits<Real>::infinity();
+   if (Math::isApprox(NaN, 1.5_Real, 0.01_Real) ||
+       Math::isApprox(1.5_Real, NaN, 0.01_Real) ||
+       Math::isApprox(Inf, 1.5_Real, 0.01_Real) ||
+       Math::isApprox(1.5_Real, Inf, 0.01_Real)) {
+      Err += Error(ErrorCode::Fail, "host isApprox non-finite input FAIL");
+   }
+
    return Err;
 }
 
@@ -125,6 +153,31 @@ Error testMathUtilsDevice() {
           if (Math::max(2.5_Real, 2, 1.5_Real) != 2.5_Real) {
              Accum |= (1 << 8);
           }
+
+          if (!Math::isApprox(100.5_Real, 100.6_Real, 0.01_Real)) {
+             Accum |= (1 << 9);
+          }
+
+          if (Math::isApprox(100.5_Real, 102.5_Real, 0.01_Real)) {
+             Accum |= (1 << 10);
+          }
+
+          if (!Math::isApprox(0.5_Real, 0.75_Real, 0.0_Real, 0.3_Real)) {
+             Accum |= (1 << 11);
+          }
+
+          if (Math::isApprox(0.5_Real, 0.9_Real, 0.0_Real, 0.3_Real)) {
+             Accum |= (1 << 12);
+          }
+
+          const Real NaN = std::numeric_limits<Real>::quiet_NaN();
+          const Real Inf = std::numeric_limits<Real>::infinity();
+          if (Math::isApprox(NaN, 1.5_Real, 0.01_Real) ||
+              Math::isApprox(1.5_Real, NaN, 0.01_Real) ||
+              Math::isApprox(Inf, 1.5_Real, 0.01_Real) ||
+              Math::isApprox(1.5_Real, Inf, 0.01_Real)) {
+             Accum |= (1 << 13);
+          }
        },
        DeviceResults);
 
@@ -162,6 +215,28 @@ Error testMathUtilsDevice() {
 
    if (DeviceResults & (1 << 8)) {
       Err += Error(ErrorCode::Fail, "device max(2.5_Real, 2, 1.5_Real) FAIL");
+   }
+
+   if (DeviceResults & (1 << 9)) {
+      Err += Error(ErrorCode::Fail, "device isApprox relative tolerance FAIL");
+   }
+
+   if (DeviceResults & (1 << 10)) {
+      Err += Error(ErrorCode::Fail,
+                   "device isApprox relative tolerance rejection FAIL");
+   }
+
+   if (DeviceResults & (1 << 11)) {
+      Err += Error(ErrorCode::Fail, "device isApprox absolute tolerance FAIL");
+   }
+
+   if (DeviceResults & (1 << 12)) {
+      Err += Error(ErrorCode::Fail,
+                   "device isApprox absolute tolerance rejection FAIL");
+   }
+
+   if (DeviceResults & (1 << 13)) {
+      Err += Error(ErrorCode::Fail, "device isApprox non-finite input FAIL");
    }
 
    return Err;
