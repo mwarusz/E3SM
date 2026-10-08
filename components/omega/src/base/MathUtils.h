@@ -101,6 +101,17 @@ KOKKOS_INLINE_FUNCTION constexpr auto max(T X0, Ts... Xs) {
    return max(X0, max(Xs...));
 }
 
+KOKKOS_INLINE_FUNCTION
+bool isApprox(Real X, Real Y, Real RTol, Real ATol = 0) {
+   if (Kokkos::isnan(X) || Kokkos::isnan(Y) || Kokkos::isinf(X) ||
+       Kokkos::isinf(Y)) {
+      return false; // Treat NaN or Inf as failure
+   }
+
+   return Kokkos::abs(X - Y) <=
+          max(ATol, RTol * max(Kokkos::abs(X), Kokkos::abs(Y)));
+}
+
 // Below is a list of mathematical functions that we take from Kokkos without
 // modification See
 // https://kokkos.org/kokkos-core-wiki/API/core/numerics/mathematical-functions.html
