@@ -1304,7 +1304,7 @@ class TracerHorzAdvOnCellTest : public TracerHorzAdvOnCell {
  public:
    TracerHorzAdvOnCellTest(const HorzMesh *Mesh, const VertCoord *VCoord,
                            const VertAdv *VAdv)
-       : TracerHorzAdvOnCell(Mesh, VCoord, VAdv){};
+       : TracerHorzAdvOnCell(Mesh, VCoord, VAdv) {};
    Array2DReal GetHProvInv() const { return HProvInv; };
    Array2DReal GetHProv() const { return HProv; };
    Array2DReal GetHNewInv() const { return HNewInv; };

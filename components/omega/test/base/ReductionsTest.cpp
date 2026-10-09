@@ -698,12 +698,16 @@ void testArrayReductions() {
                sumDDTest(DDSumRef3D, DDVal3D); // local repro sum
                RefMin3DI4 = Math::min(RefMin3DI4, Kindx * FacI4[Task]);
                RefMin3DI8 = Math::min(RefMin3DI8, Kindx * FacI8[Task]);
-               RefMin3DR4 = Math::min(RefMin3DR4, (Kindx + EpsR4) * FacR4[Task]);
-               RefMin3DR8 = Math::min(RefMin3DR8, (Kindx + EpsR8) * FacR8[Task]);
+               RefMin3DR4 =
+                   Math::min(RefMin3DR4, (Kindx + EpsR4) * FacR4[Task]);
+               RefMin3DR8 =
+                   Math::min(RefMin3DR8, (Kindx + EpsR8) * FacR8[Task]);
                RefMax3DI4 = Math::max(RefMax3DI4, Kindx * FacI4[Task]);
                RefMax3DI8 = Math::max(RefMax3DI8, Kindx * FacI8[Task]);
-               RefMax3DR4 = Math::max(RefMax3DR4, (Kindx + EpsR4) * FacR4[Task]);
-               RefMax3DR8 = Math::max(RefMax3DR8, (Kindx + EpsR8) * FacR8[Task]);
+               RefMax3DR4 =
+                   Math::max(RefMax3DR4, (Kindx + EpsR4) * FacR4[Task]);
+               RefMax3DR8 =
+                   Math::max(RefMax3DR8, (Kindx + EpsR8) * FacR8[Task]);
                for (int M = 0; M < Nm; ++M) {
                   int Mindx = IGlob + J + K + M;
                   Ref4DI4 += Mindx * FacI4[Task];
@@ -1111,12 +1115,16 @@ void testArrayReductions() {
                sumDDTest(DDSumRef3D, DDVal3D); // local repro sum
                RefMin3DI4 = Math::min(RefMin3DI4, Kindx * FacI4[Task]);
                RefMin3DI8 = Math::min(RefMin3DI8, Kindx * FacI8[Task]);
-               RefMin3DR4 = Math::min(RefMin3DR4, (Kindx + EpsR4) * FacR4[Task]);
-               RefMin3DR8 = Math::min(RefMin3DR8, (Kindx + EpsR8) * FacR8[Task]);
+               RefMin3DR4 =
+                   Math::min(RefMin3DR4, (Kindx + EpsR4) * FacR4[Task]);
+               RefMin3DR8 =
+                   Math::min(RefMin3DR8, (Kindx + EpsR8) * FacR8[Task]);
                RefMax3DI4 = Math::max(RefMax3DI4, Kindx * FacI4[Task]);
                RefMax3DI8 = Math::max(RefMax3DI8, Kindx * FacI8[Task]);
-               RefMax3DR4 = Math::max(RefMax3DR4, (Kindx + EpsR4) * FacR4[Task]);
-               RefMax3DR8 = Math::max(RefMax3DR8, (Kindx + EpsR8) * FacR8[Task]);
+               RefMax3DR4 =
+                   Math::max(RefMax3DR4, (Kindx + EpsR4) * FacR4[Task]);
+               RefMax3DR8 =
+                   Math::max(RefMax3DR8, (Kindx + EpsR8) * FacR8[Task]);
                for (int M = MMin; M <= MMax; ++M) {
                   int Mindx = IGlob + J + K + M;
                   Ref4DI4 += Mindx * FacI4[Task];
