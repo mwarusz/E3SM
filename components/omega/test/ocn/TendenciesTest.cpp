@@ -309,7 +309,7 @@ int testTendencies() {
            VCoord->MaxLayerEdgeTop);
    constexpr Real DeltaATol = 1e-12_Real;
    if (!Math::isfinite(NormVelTendDelta) ||
-       isApprox(NormVelTendDelta, 0._Real, 0._Real, DeltaATol)) {
+       Math::isApprox(NormVelTendDelta, 0._Real, 0._Real, DeltaATol)) {
       Err++;
       LOG_ERROR("TendenciesTest: SfcStress forcing did not change "
                 "NormalVelocityTend");
@@ -532,7 +532,7 @@ int testSfcTracerForcing() {
    constexpr Real RelTol = 1.0e-10_Real;
    constexpr Real AbsTol = 1.0e-12_Real; // flux precision is ~e-15
 
-   if (!isApprox(ComputedTempTend, ExpectedTempTend, RelTol, AbsTol)) {
+   if (!Math::isApprox(ComputedTempTend, ExpectedTempTend, RelTol, AbsTol)) {
       Err++;
       LOG_ERROR("TendenciesTest: SfcTracerForcing temp tendency FAIL");
       LOG_ERROR("  Expected: {},  Computed: {}, Diff: {}", ExpectedTempTend,
@@ -543,7 +543,7 @@ int testSfcTracerForcing() {
    }
 
    // Check salinity tendency
-   if (!isApprox(ComputedSaltTend, ExpectedSaltTend, RelTol, AbsTol)) {
+   if (!Math::isApprox(ComputedSaltTend, ExpectedSaltTend, RelTol, AbsTol)) {
       Err++;
       LOG_ERROR("TendenciesTest: SfcTracerForcing salt tendency FAIL");
       LOG_INFO("  Expected: {},  Computed: {}, Diff: {}", ExpectedSaltTend,
@@ -660,7 +660,7 @@ int testKPPNonLocalVerticalMixGate() {
    DefTendencies->KPPNonLocalTracerFlux.Enabled = true;
    const Real BothDisabledTendency              = ComputeTempTendency();
 
-   if (!isApprox(BothDisabledTendency, BaselineTendency, 1.0e-10_Real,
+   if (!Math::isApprox(BothDisabledTendency, BaselineTendency, 1.0e-10_Real,
                  1.0e-12_Real)) {
       Err++;
       LOG_ERROR("TendenciesTest: KPP non-local flux was applied with both "
@@ -669,7 +669,7 @@ int testKPPNonLocalVerticalMixGate() {
 
    DefTendencies->VelVertMixTendencyEnable = true;
    const Real VelocityOnlyTendency         = ComputeTempTendency();
-   if (!isApprox(VelocityOnlyTendency, BaselineTendency, 1.0e-10_Real,
+   if (!Math::isApprox(VelocityOnlyTendency, BaselineTendency, 1.0e-10_Real,
                  1.0e-12_Real)) {
       Err++;
       LOG_ERROR("TendenciesTest: KPP non-local flux was applied with only "
@@ -685,8 +685,8 @@ int testKPPNonLocalVerticalMixGate() {
    const Real ExpectedTendencyDelta =
        SurfaceFluxHost(TempIndex, ICellTest) * (Real(KTest) - Real(KTest + 1));
    const Real ComputedTendencyDelta = EnabledTendency - BaselineTendency;
-   if (isApprox(ExpectedTendencyDelta, 0.0_Real, 0.0_Real, 1.0e-12_Real) ||
-       !isApprox(ComputedTendencyDelta, ExpectedTendencyDelta, 1.0e-10_Real,
+   if (Math::isApprox(ExpectedTendencyDelta, 0.0_Real, 0.0_Real, 1.0e-12_Real) ||
+       !Math::isApprox(ComputedTendencyDelta, ExpectedTendencyDelta, 1.0e-10_Real,
                  1.0e-12_Real)) {
       Err++;
       LOG_ERROR("TendenciesTest: KPP non-local flux did not run with tracer "
@@ -843,7 +843,7 @@ int testSfcThicknessForcing() {
    constexpr Real AbsTol = 1.0e-12_Real;
 
    // Check thickness tendency
-   if (!isApprox(ComputedThickTend, ExpectedThickTend, RelTol, AbsTol)) {
+   if (!Math::isApprox(ComputedThickTend, ExpectedThickTend, RelTol, AbsTol)) {
       Err++;
       LOG_ERROR("TendenciesTest: SfcThicknessForcing thickness tendency FAIL");
       LOG_INFO("  Expected: {},  Computed: {}, Diff: {}", ExpectedThickTend,

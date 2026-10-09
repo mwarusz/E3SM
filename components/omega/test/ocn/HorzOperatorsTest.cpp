@@ -625,21 +625,21 @@ int testsecondderivativeoncellDeterminePlanerPatchGeometry(Real RTol) {
          const double theta = -Pii / 2 + (5 == i ? -Pii / 3 : i * Pii / 3);
          const double x     = CtoC * Math::cos(theta);
          const double y     = CtoC * Math::sin(theta);
-         if (!isApprox(XPH[i], x, RTol)) {
+         if (!Math::isApprox(XPH[i], x, RTol)) {
             Err++;
             LOG_ERROR(
                 "{}: FAIL, expected {}, got {}",
                 "testsecondderivativeoncellDeterminePlanerPatchGeometry:x", x,
                 XP[i]);
          }
-         if (!isApprox(YPH[i], y, RTol)) {
+         if (!Math::isApprox(YPH[i], y, RTol)) {
             Err++;
             LOG_ERROR(
                 "{}: FAIL, expected {}, got {}",
                 "testsecondderivativeoncellDeterminePlanerPatchGeometry:y", y,
                 YP[i]);
          }
-         if (!isApprox(Angle2DH[i], theta, RTol)) {
+         if (!Math::isApprox(Angle2DH[i], theta, RTol)) {
             Err++;
             LOG_ERROR(
                 "{}: FAIL, expected {}, got {}",
@@ -714,7 +714,7 @@ int testsecondderivativeoncellLeastSquaresFit(Real RTol) {
                          BH(i, j));
             }
          } else {
-            if (!isApprox(BH(i, j), m, RTol)) {
+            if (!Math::isApprox(BH(i, j), m, RTol)) {
                Err++;
                LOG_ERROR("{}: FAIL, expected {}, got {}",
                          "testsecondderivativeoncellLeastSquaresFit", m,
@@ -947,21 +947,21 @@ int testsecondderivativeoncellDetermineSphericalPatchGeometry(Real RTol) {
          const double x = -T[0]; // same as CtoC*std::cos(phi);
          const double y = -T[1]; // same as CtoC*std::sin(phi);
 
-         if (!isApprox(1 + XPH[i], 1 + x, RTol)) {
+         if (!Math::isApprox(1 + XPH[i], 1 + x, RTol)) {
             Err++;
             LOG_ERROR(
                 "{}: FAIL, expected {}, got {}",
                 "testsecondderivativeoncellDetermineSphericalPatchGeometry:x",
                 x, XPH[i]);
          }
-         if (!isApprox(1 + YPH[i], 1 + y, RTol)) {
+         if (!Math::isApprox(1 + YPH[i], 1 + y, RTol)) {
             Err++;
             LOG_ERROR(
                 "{}: FAIL, expected {}, got {}",
                 "testsecondderivativeoncellDetermineSphericalPatchGeometry:y",
                 y, YPH[i]);
          }
-         if (!isApprox(Angle2DH[i], phi, RTol)) {
+         if (!Math::isApprox(Angle2DH[i], phi, RTol)) {
             Err++;
             LOG_ERROR(
                 "{}: FAIL, expected {}, got {}",

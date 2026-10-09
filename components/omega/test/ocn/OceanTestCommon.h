@@ -11,17 +11,6 @@
 
 namespace OMEGA {
 
-// check if two real numbers are equal with a given relative tolerance
-KOKKOS_INLINE_FUNCTION
-bool isApprox(Real X, Real Y, Real RTol, Real ATol = 0) {
-   if (Math::isnan(X) || Math::isnan(Y) || Math::isinf(X) || Math::isinf(Y)) {
-      return false; // Treat NaN or Inf as failure
-   }
-
-   return Math::abs(X - Y) <=
-          Math::max(ATol, RTol * Math::max(Math::abs(X), Math::abs(Y)));
-}
-
 // convert spherical components of a vector to Cartesian
 KOKKOS_INLINE_FUNCTION void sphereToCartVec(Real (&CartVec)[3],
                                             const Real (&SphereVec)[2],
@@ -671,12 +660,12 @@ inline int checkErrors(const std::string &TestSuite,
                        const ErrorMeasures &ExpectedErrors, Real RTol,
                        Real ATol = 0) {
    int Err = 0;
-   if (!isApprox(Errors.LInf, ExpectedErrors.LInf, RTol, ATol)) {
+   if (!Math::isApprox(Errors.LInf, ExpectedErrors.LInf, RTol, ATol)) {
       Err++;
       LOG_ERROR("{}: {} LInf FAIL, expected {}, got {}", TestSuite, Variable,
                 ExpectedErrors.LInf, Errors.LInf);
    }
-   if (!isApprox(Errors.L2, ExpectedErrors.L2, RTol, ATol)) {
+   if (!Math::isApprox(Errors.L2, ExpectedErrors.L2, RTol, ATol)) {
       Err++;
       LOG_ERROR("{}: {} L2 FAIL, expected {}, got {}", TestSuite, Variable,
                 ExpectedErrors.L2, Errors.L2);
