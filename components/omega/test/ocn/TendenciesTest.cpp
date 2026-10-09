@@ -661,7 +661,7 @@ int testKPPNonLocalVerticalMixGate() {
    const Real BothDisabledTendency              = ComputeTempTendency();
 
    if (!Math::isApprox(BothDisabledTendency, BaselineTendency, 1.0e-10_Real,
-                 1.0e-12_Real)) {
+                       1.0e-12_Real)) {
       Err++;
       LOG_ERROR("TendenciesTest: KPP non-local flux was applied with both "
                 "vertical mixing flags disabled");
@@ -670,7 +670,7 @@ int testKPPNonLocalVerticalMixGate() {
    DefTendencies->VelVertMixTendencyEnable = true;
    const Real VelocityOnlyTendency         = ComputeTempTendency();
    if (!Math::isApprox(VelocityOnlyTendency, BaselineTendency, 1.0e-10_Real,
-                 1.0e-12_Real)) {
+                       1.0e-12_Real)) {
       Err++;
       LOG_ERROR("TendenciesTest: KPP non-local flux was applied with only "
                 "velocity vertical mixing enabled");
@@ -685,9 +685,10 @@ int testKPPNonLocalVerticalMixGate() {
    const Real ExpectedTendencyDelta =
        SurfaceFluxHost(TempIndex, ICellTest) * (Real(KTest) - Real(KTest + 1));
    const Real ComputedTendencyDelta = EnabledTendency - BaselineTendency;
-   if (Math::isApprox(ExpectedTendencyDelta, 0.0_Real, 0.0_Real, 1.0e-12_Real) ||
-       !Math::isApprox(ComputedTendencyDelta, ExpectedTendencyDelta, 1.0e-10_Real,
-                 1.0e-12_Real)) {
+   if (Math::isApprox(ExpectedTendencyDelta, 0.0_Real, 0.0_Real,
+                      1.0e-12_Real) ||
+       !Math::isApprox(ComputedTendencyDelta, ExpectedTendencyDelta,
+                       1.0e-10_Real, 1.0e-12_Real)) {
       Err++;
       LOG_ERROR("TendenciesTest: KPP non-local flux did not run with tracer "
                 "vertical mixing enabled (expected {}, got {})",

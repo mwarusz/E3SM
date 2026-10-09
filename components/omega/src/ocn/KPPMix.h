@@ -932,8 +932,8 @@ class KPPMix {
    /// Output arrays are computed in-place.
    void computeKPPMix(
        const Array2DReal
-           &PotentialDensity, ///< Density (kg/m³) [NCells×NLevels]
-       const Array2DReal &NormalVelocity,     ///< Normal vel on edges (m/s)
+           &PotentialDensity,             ///< Density (kg/m³) [NCells×NLevels]
+       const Array2DReal &NormalVelocity, ///< Normal vel on edges (m/s)
        const Array2DReal &TangentialVelocity, ///< Tangential vel on edges (m/s)
        const Array1DReal &SurfaceFrictionVelocity, ///< u* (m/s)
        const Array1DReal &SurfaceBuoyancyFlux,     ///< B_0 (m²/s³)
