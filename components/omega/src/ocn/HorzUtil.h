@@ -7,7 +7,8 @@
 namespace OMEGA {
 
 KOKKOS_INLINE_FUNCTION Real distance(const Real x, const Real y, const Real z) {
-   const Real dist = Math::sqrt(x * x + y * y + z * z);
+   const Real dist =
+       Math::sqrt(Math::pow<2>(x) + Math::pow<2>(y) + Math::pow<2>(z));
    return dist;
 }
 
@@ -62,8 +63,10 @@ KOKKOS_INLINE_FUNCTION Real arc_length(const Real ax, const Real ay,
    const auto cx = bx - ax;
    const auto cy = by - ay;
    const auto cz = bz - az;
-   const auto r  = Math::sqrt(ax * ax + ay * ay + az * az);
-   const auto c  = Math::sqrt(cx * cx + cy * cy + cz * cz);
+   const auto r =
+       Math::sqrt(Math::pow<2>(ax) + Math::pow<2>(ay) + Math::pow<2>(az));
+   const auto c =
+       Math::sqrt(Math::pow<2>(cx) + Math::pow<2>(cy) + Math::pow<2>(cz));
    const auto al = r * 2.0 * Math::asin(c / (2.0 * r));
    return al;
 }
@@ -186,11 +189,13 @@ KOKKOS_INLINE_FUNCTION void arc_bisect(const Real ax, const Real ay,
    if (cx == 0. && cy == 0. && cz == 0.) {
       Kokkos::abort("arc_bisect: A and B are diametrically opposite");
    } else {
-      const Real d = Math::sqrt(cx * cx + cy * cy + cz * cz);
-      const Real r = Math::sqrt(ax * ax + ay * ay + az * az);
-      cx           = r * cx / d;
-      cy           = r * cy / d;
-      cz           = r * cz / d;
+      const Real d =
+          Math::sqrt(Math::pow<2>(cx) + Math::pow<2>(cy) + Math::pow<2>(cz));
+      const Real r =
+          Math::sqrt(Math::pow<2>(ax) + Math::pow<2>(ay) + Math::pow<2>(az));
+      cx = r * cx / d;
+      cy = r * cy / d;
+      cz = r * cz / d;
    }
 }
 

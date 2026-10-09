@@ -539,7 +539,7 @@ void KPPMix::logDiagnostics(const Array2DReal &PotentialDensity,
       const Real WTurb =
           computeTurbVelocityScale(UStarEff, BuoyFluxEff, ZDepth);
       const Real RiBulk =
-          DeltaB * ZDepth / (WTurb * WTurb + KPP::NumericalTolerance);
+          DeltaB * ZDepth / (Math::pow<2>(WTurb) + KPP::NumericalTolerance);
 
       Real Sigma = 0.0_Real;
       if (K <= KOSBL) {
@@ -553,7 +553,7 @@ void KPPMix::logDiagnostics(const Array2DReal &PotentialDensity,
       Real Zeta         = 0.0_Real;
       const Real Denom  = VonKar * BuoyFlux;
       if (Math::abs(Denom) > 1.0e-16_Real) {
-         const Real LMoninObukhov = (UStarEff * UStarEff * UStarEff) / Denom;
+         const Real LMoninObukhov = Math::pow<3>(UStarEff) / Denom;
          if (Math::abs(LMoninObukhov) > 1.0e-16_Real) {
             Zeta = ZLocal / LMoninObukhov;
          }
