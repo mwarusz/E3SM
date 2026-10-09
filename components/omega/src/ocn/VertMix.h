@@ -15,6 +15,7 @@
 #include "Config.h"
 #include "HorzMesh.h"
 #include "MachEnv.h"
+#include "MathUtils.h"
 #include "OmegaKokkos.h"
 #include "TimeMgr.h"
 #include "VertCoord.h"
@@ -87,18 +88,16 @@ class ShearMix {
          } else if (GradRichNumSmoothed(ICell, K) > 0.0_Real &&
                     GradRichNumSmoothed(ICell, K) < ShearRiCrit) {
             VertDiff(ICell, K) +=
-                Kokkos::pow(
-                    1.0_Real -
-                        (GradRichNumSmoothed(ICell, K) / ShearRiCrit) *
-                            (GradRichNumSmoothed(ICell, K) / ShearRiCrit),
-                    ShearExponent) *
+                Math::pow(1.0_Real -
+                              (GradRichNumSmoothed(ICell, K) / ShearRiCrit) *
+                                  (GradRichNumSmoothed(ICell, K) / ShearRiCrit),
+                          ShearExponent) *
                 BaseShearValue;
             VertVisc(ICell, K) +=
-                Kokkos::pow(
-                    1.0_Real -
-                        (GradRichNumSmoothed(ICell, K) / ShearRiCrit) *
-                            (GradRichNumSmoothed(ICell, K) / ShearRiCrit),
-                    ShearExponent) *
+                Math::pow(1.0_Real -
+                              (GradRichNumSmoothed(ICell, K) / ShearRiCrit) *
+                                  (GradRichNumSmoothed(ICell, K) / ShearRiCrit),
+                          ShearExponent) *
                 BaseShearValue;
          }
       }
@@ -161,9 +160,9 @@ class GradRichardsonNum {
             Real ShearSquared =
                 (DNormVel * DNormVel + DTanVel * DTanVel) / (DzEdge * DzEdge);
             Real RiEdge =
-                Kokkos::max(0.0_Real,
-                            0.5_Real * (BruntVaisalaFreqSq(ICell, K2) +
-                                        BruntVaisalaFreqSq(JCell, K2))) /
+                Math::max(0.0_Real,
+                          0.5_Real * (BruntVaisalaFreqSq(ICell, K2) +
+                                      BruntVaisalaFreqSq(JCell, K2))) /
                 (ShearSquared + 1.0e-12_Real);
 
             Real Weight = 0.25_Real * DcEdge(JEdge) * DvEdge(JEdge);
@@ -298,8 +297,8 @@ class VelVertMixSetupOnEdge {
       if (ImplicitBottomDragEnabled && K == KMax) {
          const Real SpecVolEdgeK =
              0.5_Real * (SpecVol(JCell0, K) + SpecVol(JCell1, K));
-         const Real VelNormEdge = Kokkos::sqrt(KineticEnergyCell(JCell0, K) +
-                                               KineticEnergyCell(JCell1, K));
+         const Real VelNormEdge = Math::sqrt(KineticEnergyCell(JCell0, K) +
+                                             KineticEnergyCell(JCell1, K));
 
          H += DT * BottomDragCoeff * VelNormEdge / (LocRhoSw * SpecVolEdgeK);
       }

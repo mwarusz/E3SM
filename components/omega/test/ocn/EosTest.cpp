@@ -19,6 +19,7 @@
 #include "IOStream.h"
 #include "Logging.h"
 #include "MachEnv.h"
+#include "MathUtils.h"
 #include "OceanTestCommon.h"
 #include "OmegaKokkos.h"
 #include "Pacer.h"
@@ -494,8 +495,8 @@ void testBruntVaisalaFreqSqLinear() {
                        InnerCount++;
                  } else { // just check for unreasonable values
                     if (BruntVaisalaFreqSq(ICell, K) == 0.0 or
-                        Kokkos::isnan(BruntVaisalaFreqSq(ICell, K)) or
-                        Kokkos::isinf(BruntVaisalaFreqSq(ICell, K)))
+                        Math::isnan(BruntVaisalaFreqSq(ICell, K)) or
+                        Math::isinf(BruntVaisalaFreqSq(ICell, K)))
                        InnerCount++;
                  }
               },
@@ -523,8 +524,8 @@ void testBruntVaisalaFreqSqLinear() {
          // remaining values just check for other conditions
          for (int K = 2; K < NVertLayers + 1; ++K) {
             if (BruntVaisalaFreqSqH(I, K) == 0.0 or
-                Kokkos::isnan(BruntVaisalaFreqSqH(I, K)) or
-                Kokkos::isinf(BruntVaisalaFreqSqH(I, K)))
+                Math::isnan(BruntVaisalaFreqSqH(I, K)) or
+                Math::isinf(BruntVaisalaFreqSqH(I, K)))
                LOG_ERROR("EosTest: Brunt-Vaisala Linear Bad Value: "
                          "BruntVaisala({},{}) = {}",
                          I, K, BruntVaisalaFreqSqH(I, K));
@@ -755,8 +756,8 @@ void testBruntVaisalaFreqSqTeos10() {
                        InnerCount++;
                  } else { // just check for unreasonable values
                     if (BruntVaisalaFreqSq(ICell, K) == 0.0 or
-                        Kokkos::isnan(BruntVaisalaFreqSq(ICell, K)) or
-                        Kokkos::isinf(BruntVaisalaFreqSq(ICell, K)))
+                        Math::isnan(BruntVaisalaFreqSq(ICell, K)) or
+                        Math::isinf(BruntVaisalaFreqSq(ICell, K)))
                        InnerCount++;
                  }
               },
@@ -784,8 +785,8 @@ void testBruntVaisalaFreqSqTeos10() {
          // remaining values just check for other conditions
          for (int K = 2; K < NVertLayers + 1; ++K) {
             if (BruntVaisalaFreqSqH(ICell, K) == 0.0 or
-                Kokkos::isnan(BruntVaisalaFreqSqH(ICell, K)) or
-                Kokkos::isinf(BruntVaisalaFreqSqH(ICell, K)))
+                Math::isnan(BruntVaisalaFreqSqH(ICell, K)) or
+                Math::isinf(BruntVaisalaFreqSqH(ICell, K)))
                LOG_ERROR("EosTest: Brunt-Vaisala TEOS Bad Value: "
                          "BruntVaisala({},{}) = {}",
                          ICell, K, BruntVaisalaFreqSqH(ICell, K));
@@ -1251,8 +1252,8 @@ void checkValueGswcCtFreezing() {
 
 /// Relative difference between two values, zero when both vanish
 Real relDiff(Real X, Real Y) {
-   const Real Scale = std::max(std::abs(X), std::abs(Y));
-   return Scale > 0.0 ? std::abs(X - Y) / Scale : 0.0;
+   const Real Scale = Math::max(Math::abs(X), Math::abs(Y));
+   return Scale > 0.0 ? Math::abs(X - Y) / Scale : 0.0;
 }
 
 /// Test the TEOS-10 specific volume derivatives against the GSW-C library over
@@ -1302,10 +1303,10 @@ void checkValueGswcSpecVolDerivs() {
                                           &GswDP);
             const double GswSpecVol = gsw_specvol(SaVal, CtVal, PDb);
 
-            WorstSv  = std::max(WorstSv, relDiff(SpecVol, GswSpecVol));
-            WorstDCt = std::max(WorstDCt, relDiff(SpecVolDCt, GswDCt));
-            WorstDSa = std::max(WorstDSa, relDiff(SpecVolDSa, GswDSa));
-            WorstDP  = std::max(WorstDP, relDiff(SpecVolDP, GswDP));
+            WorstSv  = Math::max(WorstSv, relDiff(SpecVol, GswSpecVol));
+            WorstDCt = Math::max(WorstDCt, relDiff(SpecVolDCt, GswDCt));
+            WorstDSa = Math::max(WorstDSa, relDiff(SpecVolDSa, GswDSa));
+            WorstDP  = Math::max(WorstDP, relDiff(SpecVolDP, GswDP));
             ++NumChecked;
 
             if (!isApprox(SpecVol, GswSpecVol, DerivRTol)) {
@@ -1473,8 +1474,8 @@ void checkValueGswcAlphaBeta() {
             gsw_specvol_alpha_beta(SaVal, CtVal, PDb, &GswSpecVol, &GswAlpha,
                                    &GswBeta);
 
-            WorstAlpha = std::max(WorstAlpha, relDiff(Alpha, GswAlpha));
-            WorstBeta  = std::max(WorstBeta, relDiff(Beta, GswBeta));
+            WorstAlpha = Math::max(WorstAlpha, relDiff(Alpha, GswAlpha));
+            WorstBeta  = Math::max(WorstBeta, relDiff(Beta, GswBeta));
 
             if (!isApprox(Alpha, GswAlpha, DerivRTol, AlphaATol)) {
                LOG_ERROR("EosTest: Alpha Bad Value at Sa={}, Ct={}, "
