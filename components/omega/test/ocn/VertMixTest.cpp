@@ -21,6 +21,7 @@
 #include "KPPMix.h"
 #include "Logging.h"
 #include "MachEnv.h"
+#include "MathUtils.h"
 #include "OceanTestCommon.h"
 #include "OmegaKokkos.h"
 #include "Pacer.h"
@@ -875,8 +876,8 @@ void testTotalVertMix() {
                     // otherwise check for invalid values
                  } else {
                     if (VertDiffP(ICell, K) == 0.0 or
-                        Kokkos::isnan(VertDiffP(ICell, K)) or
-                        Kokkos::isinf(VertDiffP(ICell, K)))
+                        Math::isnan(VertDiffP(ICell, K)) or
+                        Math::isinf(VertDiffP(ICell, K)))
                        InnerCount++;
                  }
               },
@@ -919,8 +920,8 @@ void testTotalVertMix() {
                     // otherwise check for invalid values
                  } else {
                     if (VertViscP(ICell, K) == 0.0 or
-                        Kokkos::isnan(VertViscP(ICell, K)) or
-                        Kokkos::isinf(VertViscP(ICell, K)))
+                        Math::isnan(VertViscP(ICell, K)) or
+                        Math::isinf(VertViscP(ICell, K)))
                        InnerCount++;
                  }
               },
@@ -974,8 +975,8 @@ void testTotalVertMix() {
                     // otherwise check for invalid values
                  } else {
                     if (VertDiffN(ICell, K) == 0.0 or
-                        Kokkos::isnan(VertDiffN(ICell, K)) or
-                        Kokkos::isinf(VertDiffN(ICell, K)))
+                        Math::isnan(VertDiffN(ICell, K)) or
+                        Math::isinf(VertDiffN(ICell, K)))
                        InnerCount++;
                  }
               },
@@ -1018,8 +1019,8 @@ void testTotalVertMix() {
                     // otherwise check for invalid values
                  } else {
                     if (VertViscN(ICell, K) == 0.0 or
-                        Kokkos::isnan(VertViscN(ICell, K)) or
-                        Kokkos::isinf(VertViscN(ICell, K)))
+                        Math::isnan(VertViscN(ICell, K)) or
+                        Math::isinf(VertViscN(ICell, K)))
                        InnerCount++;
                  }
               },
