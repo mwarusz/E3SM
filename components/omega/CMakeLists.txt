@@ -104,6 +104,8 @@ if(OMEGA_BUILD_TEST)
 
 endif()
 
+add_subdirectory(bench)
+
 ###########################################################
 # STEP 4: Output                                          #
 #                                                         #
