@@ -440,11 +440,11 @@ int testUpdateExportFields(const I4 NSteps) {
    I4 SalinErr = 0;
 
    for (int Cell = 0; Cell < NCells; Cell++) {
-      if (!isApprox(AvgTempH(Cell), ExpectedTemp(Cell), RTol)) {
+      if (!Math::isApprox(AvgTempH(Cell), ExpectedTemp(Cell), RTol)) {
          TempErr++;
       }
 
-      if (!isApprox(AvgSalinH(Cell), ExpectedSalin(Cell) / Psu2Gpkg, RTol)) {
+      if (!Math::isApprox(AvgSalinH(Cell), ExpectedSalin(Cell) / Psu2Gpkg, RTol)) {
          SalinErr++;
       }
    }
