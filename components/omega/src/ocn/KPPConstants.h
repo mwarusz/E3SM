@@ -143,8 +143,8 @@ Real kppShapeMatched(Real Sigma, Real ShapeAtBase) {
    Sigma = Math::max(-1.0, Math::min(0.0, Sigma));
 
    const Real SigmaMu = -Sigma;
-   const Real Simple  = SigmaMu * (1.0 - SigmaMu) * (1.0 - SigmaMu);
-   const Real Smooth  = SigmaMu * SigmaMu * (3.0 - 2.0 * SigmaMu);
+   const Real Simple  = SigmaMu * Math::pow<2>(1.0 - SigmaMu);
+   const Real Smooth  = Math::pow<2>(SigmaMu) * (3.0 - 2.0 * SigmaMu);
    return Simple + ShapeAtBase * Smooth;
 }
 
@@ -287,7 +287,7 @@ Real computeLangmuirEnhancement(Real Wind10m, Real UStar, Real HBL) {
    // R_L = sqrt(1 + 0.5/La^2); La is floored at 0.5 so that the weak-wave
    // limit returns the unenhanced scales rather than diverging.
    const Real LaInv = 1.0 / Math::max(0.5, La);
-   const Real RL    = Math::sqrt(1.0 + 0.5 * LaInv * LaInv);
+   const Real RL    = Math::sqrt(1.0 + 0.5 * Math::pow<2>(LaInv));
 
    return Math::min(2.0, Math::max(1.0, RL));
 }
@@ -350,7 +350,7 @@ Real computeTurbVelocityScale(Real UStar, Real BuoyFlux, Real HOBL) {
    HOBL  = Math::max(0.0_Real, HOBL);
 
    // Momentum contribution
-   const Real WMom = UStar * UStar * UStar;
+   const Real WMom = Math::pow<3>(UStar);
 
    // Buoyancy contribution for unstable (cooling/densifying) forcing.
    // In this sign convention, free convection corresponds to BuoyFlux < 0.
@@ -380,7 +380,7 @@ void kppTurbScales(Real UStar, Real BuoyFlux, Real HOBL, Real SigmaLoc,
    WSTurb = 0.0_Real;
 
    if (UStar > 0.0_Real) {
-      const Real U3 = UStar * UStar * UStar;
+      const Real U3 = Math::pow<3>(UStar);
       const Real Zeta =
           SigmaLoc * HOBL * BuoyFlux * Kappa / Math::max(U3, Real(Tiny));
 

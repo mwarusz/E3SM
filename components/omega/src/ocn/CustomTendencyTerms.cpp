@@ -87,7 +87,8 @@ void ManufacturedSolution::init() {
    R8 Kx = TwoPi / WavelengthX; // Wave in X-dir
    R8 Ky = TwoPi / WavelengthY; // Wave in Y-dir
    R8 AngFreq =
-       Math::sqrt(H0 * Gravity * (Kx * Kx + Ky * Ky)); // Angular frequency
+       Math::sqrt(H0 * Gravity *
+                  (Math::pow<2>(Kx) + Math::pow<2>(Ky))); // Angular frequency
 
    // Assign constants for thickness tendency function
    ManufacturedThickTend.H0      = H0;
@@ -175,10 +176,10 @@ void ManufacturedSolution::ManufacturedVelocityTendency::operator()(
    OMEGA_SCOPE(LocVelDiffTendencyEnable, VelDiffTendencyEnable);
    OMEGA_SCOPE(LocVelHyperDiffTendencyEnable, VelHyperDiffTendencyEnable);
 
-   R8 LocKx2 = LocKx * LocKx;
-   R8 LocKy2 = LocKy * LocKy;
-   R8 LocKx4 = LocKx2 * LocKx2;
-   R8 LocKy4 = LocKy2 * LocKy2;
+   R8 LocKx2 = Math::pow<2>(LocKx);
+   R8 LocKy2 = Math::pow<2>(LocKy);
+   R8 LocKx4 = Math::pow<4>(LocKx);
+   R8 LocKy4 = Math::pow<4>(LocKy);
 
    parallelFor(
        {Mesh->NEdgesAll, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int KLevel) {
