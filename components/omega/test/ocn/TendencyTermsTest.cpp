@@ -1304,7 +1304,7 @@ class TracerHorzAdvOnCellTest : public TracerHorzAdvOnCell {
  public:
    TracerHorzAdvOnCellTest(const HorzMesh *Mesh, const VertCoord *VCoord,
                            const VertAdv *VAdv)
-       : TracerHorzAdvOnCell(Mesh, VCoord, VAdv){};
+       : TracerHorzAdvOnCell(Mesh, VCoord, VAdv) {};
    Array2DReal GetHProvInv() const { return HProvInv; };
    Array2DReal GetHProv() const { return HProv; };
    Array2DReal GetHNewInv() const { return HNewInv; };
@@ -1782,7 +1782,7 @@ int testKPPNonLocalTracerFluxOnCell(int NVertLayers, int NTracers, Real RTol) {
    parallelFor(
        {Mesh->NCellsSize, NVertLayers + 1}, KOKKOS_LAMBDA(int ICell, int K) {
           const Real DistanceFromBottom = Real(NVertLayers - K);
-          VertNonLocalFlux(ICell, K)    = ProfileScale * Real(ICell + 1) *
+          VertNonLocalFlux(ICell, K) = ProfileScale * Real(ICell + 1) *
                                        DistanceFromBottom * DistanceFromBottom;
        });
 

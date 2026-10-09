@@ -138,7 +138,7 @@ class SpatialWeights {
                 if (LocActive(I, 0) > 0) {
                    Real Dev = static_cast<Real>(Data(I)) - Center;
                    Sum      = LocAreaWeights(I) *
-                         (Power == 2 ? Math::pow<2>(Dev) : Dev);
+                              (Power == 2 ? Math::pow<2>(Dev) : Dev);
                 }
                 LocTerms(I) = Sum;
              });
