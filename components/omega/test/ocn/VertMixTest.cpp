@@ -260,7 +260,8 @@ void testGradRichNum() {
                  }
 
                  if (HasValidEdge) {
-                    if (!Math::isApprox(GradRichNum(ICell, K), RiExpValue, RTol))
+                    if (!Math::isApprox(GradRichNum(ICell, K), RiExpValue,
+                                        RTol))
                        InnerCount++;
                  } else {
                     // With all edges skipped, GradRichNum remains at sentinel
@@ -364,13 +365,13 @@ void testOneTwoOneFilter() {
                  if (K > MinLayerCell(ICell) && K <= MaxLayerCell(ICell)) {
                     // Interior layers should be smoothed to 0.0
                     if (!Math::isApprox(GradRichNumSmoothed(ICell, K), 0.0_Real,
-                                  RTol))
+                                        RTol))
                        InnerCount++;
                  } else {
                     // Boundary layers (K==0 or K==NVertLayers) should be
                     // the same as input
                     if (!Math::isApprox(GradRichNumSmoothed(ICell, K),
-                                  GradRichNum(ICell, K), RTol))
+                                        GradRichNum(ICell, K), RTol))
                        InnerCount++;
                  }
               },
@@ -463,7 +464,7 @@ void testBackVertMix() {
                        InnerCount++;
                  } else {
                     if (!Math::isApprox(BackVertVisc(ICell, K), VertViscBackExp,
-                                  RTol))
+                                        RTol))
                        InnerCount++;
                  }
               },
@@ -501,7 +502,7 @@ void testBackVertMix() {
                        InnerCount++;
                  } else {
                     if (!Math::isApprox(BackVertDiff(ICell, K), VertDiffBackExp,
-                                  RTol))
+                                        RTol))
                        InnerCount++;
                  }
               },
@@ -592,7 +593,8 @@ void testConvVertMix() {
                     if (VertViscOut(ICell, K) != 0.0_Real)
                        InnerCount++;
                  } else if (K < 30) {
-                    if (!Math::isApprox(VertViscOut(ICell, K), VertConvExp, RTol))
+                    if (!Math::isApprox(VertViscOut(ICell, K), VertConvExp,
+                                        RTol))
                        InnerCount++;
                  } else {
                     if (!Math::isApprox(VertViscOut(ICell, K), 0.0_Real, RTol))
@@ -631,7 +633,8 @@ void testConvVertMix() {
                     if (VertDiffOut(ICell, K) != 0.0_Real)
                        InnerCount++;
                  } else if (K < 30) {
-                    if (!Math::isApprox(VertDiffOut(ICell, K), VertConvExp, RTol))
+                    if (!Math::isApprox(VertDiffOut(ICell, K), VertConvExp,
+                                        RTol))
                        InnerCount++;
                  } else {
                     if (!Math::isApprox(VertDiffOut(ICell, K), 0.0_Real, RTol))
@@ -727,10 +730,11 @@ void testShearVertMix() {
                        InnerCount++;
                  } else if (K < 20) {
                     if (!Math::isApprox(VertViscOut(ICell, K), VertShearBaseExp,
-                                  RTol))
+                                        RTol))
                        InnerCount++;
                  } else if (K >= 20 && K < 40) {
-                    if (!Math::isApprox(VertViscOut(ICell, K), VertShearExp, RTol))
+                    if (!Math::isApprox(VertViscOut(ICell, K), VertShearExp,
+                                        RTol))
                        InnerCount++;
                  } else {
                     if (!Math::isApprox(VertViscOut(ICell, K), 0.0_Real, RTol))
@@ -770,10 +774,11 @@ void testShearVertMix() {
                        InnerCount++;
                  } else if (K < 20) {
                     if (!Math::isApprox(VertDiffOut(ICell, K), VertShearBaseExp,
-                                  RTol))
+                                        RTol))
                        InnerCount++;
                  } else if (K >= 20 && K < 40) {
-                    if (!Math::isApprox(VertDiffOut(ICell, K), VertShearExp, RTol))
+                    if (!Math::isApprox(VertDiffOut(ICell, K), VertShearExp,
+                                        RTol))
                        InnerCount++;
                  } else {
                     if (!Math::isApprox(VertDiffOut(ICell, K), 0.0_Real, RTol))
@@ -881,7 +886,8 @@ void testTotalVertMix() {
                        InnerCount++;
                     // K = 1 should have ref value
                  } else if (K == KMin + 1) {
-                    if (!Math::isApprox(VertDiffP(ICell, K), VertDiffExpValueP, RTol))
+                    if (!Math::isApprox(VertDiffP(ICell, K), VertDiffExpValueP,
+                                        RTol))
                        InnerCount++;
                     // otherwise check for invalid values
                  } else {
@@ -925,7 +931,8 @@ void testTotalVertMix() {
                        InnerCount++;
                     // K = 1 should have ref value
                  } else if (K == KMin + 1) {
-                    if (!Math::isApprox(VertViscP(ICell, K), VertViscExpValueP, RTol))
+                    if (!Math::isApprox(VertViscP(ICell, K), VertViscExpValueP,
+                                        RTol))
                        InnerCount++;
                     // otherwise check for invalid values
                  } else {
@@ -980,7 +987,8 @@ void testTotalVertMix() {
                        InnerCount++;
                     // K = 1 should have ref value
                  } else if (K == KMin + 1) {
-                    if (!Math::isApprox(VertDiffN(ICell, K), VertDiffExpValueN, RTol))
+                    if (!Math::isApprox(VertDiffN(ICell, K), VertDiffExpValueN,
+                                        RTol))
                        InnerCount++;
                     // otherwise check for invalid values
                  } else {
@@ -1024,7 +1032,8 @@ void testTotalVertMix() {
                        InnerCount++;
                     // K = 1 should have ref value
                  } else if (K == KMin + 1) {
-                    if (!Math::isApprox(VertViscN(ICell, K), VertViscExpValueN, RTol))
+                    if (!Math::isApprox(VertViscN(ICell, K), VertViscExpValueN,
+                                        RTol))
                        InnerCount++;
                     // otherwise check for invalid values
                  } else {
