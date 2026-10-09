@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
       LOG_ERROR("Error finalizing OMEGA");
    Pacer::stop("Finalize", 0);
 
-   ErrAll = Math::abs(ErrCurr) + Math::abs(ErrFinalize);
+   ErrAll = OMEGA::Math::abs(ErrCurr) + OMEGA::Math::abs(ErrFinalize);
    if (ErrAll == 0) {
       LOG_INFO("OMEGA successfully completed");
    } else {
