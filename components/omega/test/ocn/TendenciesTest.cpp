@@ -17,6 +17,7 @@
 #include "KPPMix.h"
 #include "Logging.h"
 #include "MachEnv.h"
+#include "MathUtils.h"
 #include "OceanTestCommon.h"
 #include "OmegaKokkos.h"
 #include "PGrad.h"
@@ -36,20 +37,21 @@ struct TestSetup {
    Real Radius = REarth;
 
    KOKKOS_FUNCTION Real pseudoThickness(Real Lon, Real Lat) const {
-      return (2 + std::cos(Lon) * std::pow(std::cos(Lat), 4));
+      return (2 + Math::cos(Lon) * Math::pow(Math::cos(Lat), 4));
    }
 
    KOKKOS_FUNCTION Real velocityX(Real Lon, Real Lat) const {
-      return -Radius * std::pow(std::sin(Lon), 2) * std::pow(std::cos(Lat), 3);
+      return -Radius * Math::pow(Math::sin(Lon), 2) *
+             Math::pow(Math::cos(Lat), 3);
    }
 
    KOKKOS_FUNCTION Real velocityY(Real Lon, Real Lat) const {
-      return -4 * Radius * std::sin(Lon) * std::cos(Lon) *
-             std::pow(std::cos(Lat), 3) * std::sin(Lat);
+      return -4 * Radius * Math::sin(Lon) * Math::cos(Lon) *
+             Math::pow(Math::cos(Lat), 3) * Math::sin(Lat);
    }
 
    KOKKOS_FUNCTION Real tracer(Real Lon, Real Lat) const {
-      return (2 - std::cos(Lon) * std::pow(std::cos(Lat), 4));
+      return (2 - Math::cos(Lon) * Math::pow(Math::cos(Lat), 4));
    }
 };
 
@@ -295,8 +297,8 @@ int testTendencies() {
                  for (int K = KChunk; K <= KMax; K += VecLength) {
                     if (K >= KMin) {
                        LocNormalVelocityTendDiff(IEdge, K) =
-                           Kokkos::abs(LocNormalVelocityTend(IEdge, K) -
-                                       LocBaselineNormalVelocityTend(IEdge, K));
+                           Math::abs(LocNormalVelocityTend(IEdge, K) -
+                                     LocBaselineNormalVelocityTend(IEdge, K));
                     }
                  }
               });
@@ -306,7 +308,7 @@ int testTendencies() {
        sum(NormalVelocityTendDiff, Mesh->NEdgesOwned, VCoord->MinLayerEdgeBot,
            VCoord->MaxLayerEdgeTop);
    constexpr Real DeltaATol = 1e-12_Real;
-   if (!Kokkos::isfinite(NormVelTendDelta) ||
+   if (!Math::isfinite(NormVelTendDelta) ||
        isApprox(NormVelTendDelta, 0._Real, 0._Real, DeltaATol)) {
       Err++;
       LOG_ERROR("TendenciesTest: SfcStress forcing did not change "
@@ -316,7 +318,7 @@ int testTendencies() {
    const Real NormVelTendSum =
        sum(DefTendencies->NormalVelocityTend, Mesh->NEdgesOwned,
            VCoord->MinLayerEdgeBot, VCoord->MaxLayerEdgeTop);
-   if (!Kokkos::isfinite(NormVelTendSum) || NormVelTendSum == 0) {
+   if (!Math::isfinite(NormVelTendSum) || NormVelTendSum == 0) {
       Err++;
       LOG_ERROR("TendenciesTest: NormVelTendSum FAIL");
    }
@@ -341,7 +343,7 @@ int testTendencies() {
    const Real PseudoThickTendSum =
        sum(DefTendencies->PseudoThicknessTend, NCellsOwned,
            VCoord->MinLayerCell, VCoord->MaxLayerCell);
-   if (!Kokkos::isfinite(PseudoThickTendSum) || PseudoThickTendSum == 0) {
+   if (!Math::isfinite(PseudoThickTendSum) || PseudoThickTendSum == 0) {
       Err++;
       LOG_ERROR("TendenciesTest: PseudoThickTend FAIL");
    }
@@ -349,7 +351,7 @@ int testTendencies() {
    const Real TraceTendSum =
        sum(DefTendencies->TracerTend, NTracers, NCellsOwned,
            VCoord->MinLayerCell, VCoord->MaxLayerCell);
-   if (!Kokkos::isfinite(TraceTendSum) || TraceTendSum == 0) {
+   if (!Math::isfinite(TraceTendSum) || TraceTendSum == 0) {
       Err++;
       LOG_ERROR("TendenciesTest: TraceTendSum FAIL");
    }
@@ -535,7 +537,7 @@ int testSfcTracerForcing() {
       LOG_ERROR("TendenciesTest: SfcTracerForcing temp tendency FAIL");
       LOG_ERROR("  Expected: {},  Computed: {}, Diff: {}", ExpectedTempTend,
                 ComputedTempTend,
-                Kokkos::abs(ComputedTempTend - ExpectedTempTend));
+                Math::abs(ComputedTempTend - ExpectedTempTend));
    } else {
       LOG_INFO("TendenciesTest: SfcTracerForcing temp tendency PASS");
    }
@@ -546,7 +548,7 @@ int testSfcTracerForcing() {
       LOG_ERROR("TendenciesTest: SfcTracerForcing salt tendency FAIL");
       LOG_INFO("  Expected: {},  Computed: {}, Diff: {}", ExpectedSaltTend,
                ComputedSaltTend,
-               Kokkos::abs(ComputedSaltTend - ExpectedSaltTend));
+               Math::abs(ComputedSaltTend - ExpectedSaltTend));
    } else {
       LOG_INFO("TendenciesTest: SfcTracerForcing salt tendency PASS");
    }
@@ -846,7 +848,7 @@ int testSfcThicknessForcing() {
       LOG_ERROR("TendenciesTest: SfcThicknessForcing thickness tendency FAIL");
       LOG_INFO("  Expected: {},  Computed: {}, Diff: {}", ExpectedThickTend,
                ComputedThickTend,
-               Kokkos::abs(ComputedThickTend - ExpectedThickTend));
+               Math::abs(ComputedThickTend - ExpectedThickTend));
    } else {
       LOG_INFO("TendenciesTest: SfcThicknessForcing thickness tendency PASS");
    }
