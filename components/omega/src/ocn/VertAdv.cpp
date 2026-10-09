@@ -981,14 +981,12 @@ void VertAdv::computeFCTVAdvTend(
                        TracerMin = Math::min(Tracers(L, ICell, K - 1),
                                              Tracers(L, ICell, K));
                     } else {
-                       TracerMax =
-                           Math::max(Tracers(L, ICell, K - 1),
-                                     Math::max(Tracers(L, ICell, K),
-                                               Tracers(L, ICell, K + 1)));
-                       TracerMin =
-                           Math::min(Tracers(L, ICell, K - 1),
-                                     Math::min(Tracers(L, ICell, K),
-                                               Tracers(L, ICell, K + 1)));
+                       TracerMax = Math::max(Tracers(L, ICell, K - 1),
+                                             Tracers(L, ICell, K),
+                                             Tracers(L, ICell, K + 1));
+                       TracerMin = Math::min(Tracers(L, ICell, K - 1),
+                                             Tracers(L, ICell, K),
+                                             Tracers(L, ICell, K + 1));
                     }
 
                     // Accumulate upwind flux in WorkTend

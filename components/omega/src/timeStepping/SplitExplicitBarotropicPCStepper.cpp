@@ -192,9 +192,8 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
    constexpr I4 VelCorrShrink   = 1;
    constexpr I4 PressCorrShrink = 2;
 
-   constexpr I4 MinHaloWidth =
-       1 + Math::max(Math::max(VelPredShrink, PressPredShrink),
-                     Math::max(VelCorrShrink, PressCorrShrink));
+   constexpr I4 MinHaloWidth = 1 + Math::max(VelPredShrink, PressPredShrink,
+                                             VelCorrShrink, PressCorrShrink);
 
    if (HaloWidth < MinHaloWidth)
       ABORT_ERROR("Split-explicit barotropic subcycling needs a Decomp "
