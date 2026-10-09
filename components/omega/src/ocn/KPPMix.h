@@ -222,7 +222,7 @@ class KPPOSBLDepthSearch {
       const Real VtCoef =
           Math::sqrt(0.2_Real / Math::max(KPP::NumericalTolerance,
                                           CSUnres * SurfaceLayerExtent)) /
-          (VonKar * VonKar);
+          Math::pow<2>(VonKar);
 
       // ----------------------------------------------------------------
       // Edge weights are the MPAS triangle areas formed between the
@@ -374,7 +374,7 @@ class KPPOSBLDepthSearch {
             const Real VtK       = TangentialVelocity(IEdge, KE);
             const Real DUn       = UnK - UnAvg;
             const Real DVt       = VtK - VtAvg;
-            const Real EdgeShear = DUn * DUn + DVt * DVt;
+            const Real EdgeShear = Math::pow<2>(DUn) + Math::pow<2>(DVt);
             DeltaVSq += EdgeWeights[J] * EdgeShear;
             EdgeWeightSum += EdgeWeights[J];
          }
@@ -386,7 +386,7 @@ class KPPOSBLDepthSearch {
          // Turbulent scalar velocity scale w_s at the surface-layer depth
          Real WTurb = 0.0_Real;
          if (UStar > KPP::NumericalTolerance) {
-            const Real U3   = UStar * UStar * UStar;
+            const Real U3   = Math::pow<3>(UStar);
             const Real Zeta = SurfaceLayerExtent * ZDepth * VonKar *
                               BuoyFluxEff / Math::max(U3, KPP::Tiny);
             // kppPhiInvScalar is positive over its whole domain.
@@ -468,7 +468,7 @@ class KPPOSBLDepthSearch {
                // fixed by requiring Ri(H) = RiBelow. The OSBL base is the
                // root of Ri(T) = RiCritical.
                const Real QuadA =
-                   (RiBelow - RiAbove - SlopeAbove * H) / (H * H);
+                   (RiBelow - RiAbove - SlopeAbove * H) / Math::pow<2>(H);
                const Real QuadC = RiAbove - RiCritical;
 
                Real TCross = H;
@@ -483,7 +483,7 @@ class KPPOSBLDepthSearch {
                   }
                } else {
                   const Real Disc =
-                      SlopeAbove * SlopeAbove - 4.0_Real * QuadA * QuadC;
+                      Math::pow<2>(SlopeAbove) - 4.0_Real * QuadA * QuadC;
                   if (Disc >= 0.0_Real) {
                      const Real SqrtDisc = Math::sqrt(Disc);
                      const Real T1 =
@@ -853,10 +853,10 @@ class KPPMixingCoeffs {
          const Real ViscProfile = VertVisc(ICell, KTarget);
          const Real DiffProfile = VertDiff(ICell, KTarget);
 
-         const Real EnhVisc = OneMinusDelta * OneMinusDelta * ViscKtup +
-                              Delta * Delta * ViscProfile;
-         const Real EnhDiff = OneMinusDelta * OneMinusDelta * DiffKtup +
-                              Delta * Delta * DiffProfile;
+         const Real EnhVisc = Math::pow<2>(OneMinusDelta) * ViscKtup +
+                              Math::pow<2>(Delta) * ViscProfile;
+         const Real EnhDiff = Math::pow<2>(OneMinusDelta) * DiffKtup +
+                              Math::pow<2>(Delta) * DiffProfile;
 
          const Real OldVisc =
              UseInteriorMix ? InteriorVertVisc(ICell, KTarget) : 0.0_Real;

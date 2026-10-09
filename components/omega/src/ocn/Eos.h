@@ -770,8 +770,8 @@ class LinearEos {
                                         DRhodS * AbsSalinity(ICell, K)));
 
              SpecVol(ICell, K)    = Sv;
-             SpecVolDCt(ICell, K) = -DRhodT * Sv * Sv;
-             SpecVolDSa(ICell, K) = -DRhodS * Sv * Sv;
+             SpecVolDCt(ICell, K) = -DRhodT * Math::pow<2>(Sv);
+             SpecVolDSa(ICell, K) = -DRhodS * Math::pow<2>(Sv);
              SpecVolDP(ICell, K)  = 0.0_Real;
           });
    }
@@ -869,7 +869,7 @@ class Teos10BruntVaisalaFreqSq {
              Real DCt      = ConservTemp(ICell, K) - ConservTemp(ICell, K - 1);
              Real DP       = Pressure(ICell, K) - Pressure(ICell, K - 1);
 
-             BruntVaisalaFreqSq(ICell, K) = Gravity * Gravity *
+             BruntVaisalaFreqSq(ICell, K) = Math::pow<2>(Gravity) *
                                             (BetaInt * DSa - AlphaInt * DCt) /
                                             (SpInt * DP);
           });

@@ -158,7 +158,8 @@ class GradRichardsonNum {
                 0.5_Real * (GeomZMid(ICell, K1) + GeomZMid(JCell, K1) -
                             (GeomZMid(ICell, K2) + GeomZMid(JCell, K2)));
             Real ShearSquared =
-                (DNormVel * DNormVel + DTanVel * DTanVel) / (DzEdge * DzEdge);
+                (Math::pow<2>(DNormVel) + Math::pow<2>(DTanVel)) /
+                Math::pow<2>(DzEdge);
             Real RiEdge =
                 Math::max(0.0_Real,
                           0.5_Real * (BruntVaisalaFreqSq(ICell, K2) +

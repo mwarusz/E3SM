@@ -251,9 +251,9 @@ class SecondDerivativeOnCell {
          const Real Theta = Angle2D[I];
          const Real x     = Math::cos(Theta);
          const Real y     = Math::sin(Theta);
-         const Real xx    = x * x;
+         const Real xx    = Math::pow<2>(x);
          const Real xy    = x * y;
-         const Real yy    = y * y;
+         const Real yy    = Math::pow<2>(y);
          // Real(2) rather than 2._Real: nvcc 12.9 on pm-gpu fails to find
          // the _Real literal operator here
          for (int J = 0; J <= NEdges; ++J)
