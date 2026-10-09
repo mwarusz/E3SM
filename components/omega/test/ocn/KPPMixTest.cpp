@@ -19,6 +19,7 @@
 #include "KPPConstants.h"
 #include "Logging.h"
 #include "MachEnv.h"
+#include "MathUtils.h"
 #include "OceanTestCommon.h"
 #include "OmegaKokkos.h"
 #include "Pacer.h"
@@ -154,20 +155,20 @@ void testStabilityFunctions() {
           if (Zeta >= 0.0_Real) {
              ExpectedM = 1.0_Real / (1.0_Real + 5.0_Real * Zeta);
           } else if (Zeta >= KPP::ZetaM) {
-             ExpectedM = Kokkos::pow(1.0_Real - 16.0_Real * Zeta, 0.25_Real);
+             ExpectedM = Math::pow(1.0_Real - 16.0_Real * Zeta, 0.25_Real);
           } else {
              ExpectedM =
-                 Kokkos::pow(KPP::AMoM - KPP::CMoM * Zeta, 1.0_Real / 3.0_Real);
+                 Math::pow(KPP::AMoM - KPP::CMoM * Zeta, 1.0_Real / 3.0_Real);
           }
 
           Real ExpectedS;
           if (Zeta >= 0.0_Real) {
              ExpectedS = 1.0_Real / (1.0_Real + 5.0_Real * Zeta);
           } else if (Zeta >= KPP::ZetaS) {
-             ExpectedS = Kokkos::sqrt(1.0_Real - 16.0_Real * Zeta);
+             ExpectedS = Math::sqrt(1.0_Real - 16.0_Real * Zeta);
           } else {
              ExpectedS =
-                 Kokkos::pow(KPP::AMoS - KPP::CMoS * Zeta, 1.0_Real / 3.0_Real);
+                 Math::pow(KPP::AMoS - KPP::CMoS * Zeta, 1.0_Real / 3.0_Real);
           }
 
           const Real ActualM = KPP::kppPhiInvMomentum(Zeta);
@@ -233,7 +234,7 @@ void testShapeFunctions() {
           }
 
           const Real SigmaClamped =
-              Kokkos::fmax(-1.0_Real, Kokkos::fmin(0.0_Real, Sigma));
+              Math::max(-1.0_Real, Math::min(0.0_Real, Sigma));
           const Real SigmaMu         = -SigmaClamped;
           const Real OneMinus        = 1.0_Real - SigmaMu;
           const Real ExpectedSimple  = SigmaMu * OneMinus * OneMinus;
@@ -272,16 +273,16 @@ void testLangmuirFunctions() {
                                       : ITest == 2 ? 10.0_Real
                                                    : 100.0_Real;
           const Real UStar          = ITest < 2 ? 0.0_Real : 0.01_Real;
-          const Real WindClamped    = Kokkos::fmax(0.0_Real, Wind);
+          const Real WindClamped    = Math::max(0.0_Real, Wind);
           const Real ExpectedStokes = 0.016_Real * WindClamped;
-          const Real UStarClamped   = Kokkos::fmax(KPP::MinUStar, UStar);
-          const Real StokesClamped  = Kokkos::fmax(1.0e-8_Real, ExpectedStokes);
-          const Real ExpectedLa = Kokkos::sqrt(UStarClamped / StokesClamped);
-          const Real LaInv      = 1.0_Real / Kokkos::fmax(0.5_Real, ExpectedLa);
-          const Real ExpectedEnhancement = Kokkos::fmin(
+          const Real UStarClamped   = Math::max(KPP::MinUStar, UStar);
+          const Real StokesClamped  = Math::max(1.0e-8_Real, ExpectedStokes);
+          const Real ExpectedLa     = Math::sqrt(UStarClamped / StokesClamped);
+          const Real LaInv = 1.0_Real / Math::max(0.5_Real, ExpectedLa);
+          const Real ExpectedEnhancement = Math::min(
               2.0_Real,
-              Kokkos::fmax(1.0_Real,
-                           Kokkos::sqrt(1.0_Real + 0.5_Real * LaInv * LaInv)));
+              Math::max(1.0_Real,
+                        Math::sqrt(1.0_Real + 0.5_Real * LaInv * LaInv)));
 
           const Real Stokes = KPP::estimateStokesDriftSL(Wind, 50.0_Real);
           const Real La     = KPP::computeLangmuirNumber(UStar, Stokes);
@@ -322,10 +323,10 @@ void testOSBLUtilities() {
                                   : ITest == 1 ? 20.0_Real
                                   : ITest == 2 ? 1.0_Real
                                                : 200.0_Real;
-          Real ExpectedDepth    = Kokkos::fmax(InputDepth, 4.0_Real);
+          Real ExpectedDepth    = Math::max(InputDepth, 4.0_Real);
           if (IceFraction > KPP::IceSuppressThresh)
-             ExpectedDepth = Kokkos::fmax(ExpectedDepth, KPP::MinOSBLUnderIce);
-          ExpectedDepth = Kokkos::fmin(ExpectedDepth, 95.0_Real);
+             ExpectedDepth = Math::max(ExpectedDepth, KPP::MinOSBLUnderIce);
+          ExpectedDepth = Math::min(ExpectedDepth, 95.0_Real);
           if (!isApprox(KPP::constrainOSBLDepth(InputDepth, 4.0_Real,
                                                 100.0_Real, IceFraction),
                         ExpectedDepth, RTol, ATol))
@@ -353,13 +354,13 @@ void testTurbulentVelocityScale() {
                                     : ITest == 3 ? 1.0e-7_Real
                                                  : 0.0_Real;
           const Real H            = ITest == 5 ? -50.0_Real : 50.0_Real;
-          const Real UStarClamped = Kokkos::fmax(0.0_Real, UStar);
-          const Real HClamped     = Kokkos::fmax(0.0_Real, H);
+          const Real UStarClamped = Math::max(0.0_Real, UStar);
+          const Real HClamped     = Math::max(0.0_Real, H);
           const Real Momentum     = UStarClamped * UStarClamped * UStarClamped;
           const Real Buoyancy =
-              KPP::ConvectiveVelFac * Kokkos::fmax(0.0_Real, -B0) * HClamped;
+              KPP::ConvectiveVelFac * Math::max(0.0_Real, -B0) * HClamped;
           const Real Expected =
-              Kokkos::pow(Momentum + Buoyancy, 1.0_Real / 3.0_Real);
+              Math::pow(Momentum + Buoyancy, 1.0_Real / 3.0_Real);
           const Real Actual = KPP::computeTurbVelocityScale(UStar, B0, H);
           if (!isApprox(Actual, Expected, RTol, ATol) || Actual < 0.0_Real)
              ++ErrorCount;
@@ -395,16 +396,16 @@ void testTurbScales() {
           if (UStar > 0.0_Real) {
              const Real U3 = UStar * UStar * UStar;
              const Real Zeta =
-                 SigmaLoc * HOSBL * B0 * VonKar / Kokkos::max(U3, 1.0e-20_Real);
+                 SigmaLoc * HOSBL * B0 * VonKar / Math::max(U3, 1.0e-20_Real);
              ExpectedWM = VonKar * UStar *
-                          Kokkos::max(KPP::kppPhiInvMomentum(Zeta), 0.0_Real);
+                          Math::max(KPP::kppPhiInvMomentum(Zeta), 0.0_Real);
              ExpectedWS = VonKar * UStar *
-                          Kokkos::max(KPP::kppPhiInvScalar(Zeta), 0.0_Real);
+                          Math::max(KPP::kppPhiInvScalar(Zeta), 0.0_Real);
           } else if (B0 < 0.0_Real) {
              const Real WM3 = -KPP::CMoM * SigmaLoc * HOSBL * VonKar * B0;
              const Real WS3 = -KPP::CMoS * SigmaLoc * HOSBL * VonKar * B0;
-             ExpectedWM     = VonKar * Kokkos::pow(WM3, 1.0_Real / 3.0_Real);
-             ExpectedWS     = VonKar * Kokkos::pow(WS3, 1.0_Real / 3.0_Real);
+             ExpectedWM     = VonKar * Math::pow(WM3, 1.0_Real / 3.0_Real);
+             ExpectedWS     = VonKar * Math::pow(WS3, 1.0_Real / 3.0_Real);
           }
 
           if (!isApprox(WM, ExpectedWM, RTol, ATol) ||
@@ -468,13 +469,13 @@ void testNonLocalCs() {
           const Real Cs = KPP::kppNonLocalCs(VonKar, KPP::SurfaceLayerExtent);
           const Real Expected =
               10.0_Real * VonKar *
-              Kokkos::pow(KPP::CMoS * VonKar * KPP::SurfaceLayerExtent,
-                          1.0_Real / 3.0_Real);
+              Math::pow(KPP::CMoS * VonKar * KPP::SurfaceLayerExtent,
+                        1.0_Real / 3.0_Real);
           if (!isApprox(Cs, Expected, RTol, ATol))
              ++ErrorCount;
 
           // Large et al. (1994) quote C_s ~ 6.33 for the default constants.
-          if (Kokkos::abs(Cs - 6.33_Real) > 0.05_Real)
+          if (Math::abs(Cs - 6.33_Real) > 0.05_Real)
              ++ErrorCount;
        },
        NumErrors);
@@ -500,10 +501,10 @@ void testClampOSBLDepth() {
           const Real Actual = KPP::kppClampOSBLDepth(
               Input, MinDepth, MaxDepth, ApplyIce, KPP::MinOSBLUnderIce);
 
-          Real Expected = Kokkos::fmax(Input, MinDepth);
+          Real Expected = Math::max(Input, MinDepth);
           if (ApplyIce)
-             Expected = Kokkos::fmax(Expected, KPP::MinOSBLUnderIce);
-          Expected = Kokkos::fmin(Expected, MaxDepth);
+             Expected = Math::max(Expected, KPP::MinOSBLUnderIce);
+          Expected = Math::min(Expected, MaxDepth);
 
           if (!isApprox(Actual, Expected, RTol, ATol))
              ++ErrorCount;
@@ -586,8 +587,8 @@ void setCoefficientTestGeometry(Real Ssh = 0.0_Real) {
 
 Real nonLocalNormalization() {
    return 10.0_Real * VonKar *
-          Kokkos::pow(KPP::CMoS * VonKar * KPP::SurfaceLayerExtent,
-                      1.0_Real / 3.0_Real);
+          Math::pow(KPP::CMoS * VonKar * KPP::SurfaceLayerExtent,
+                    1.0_Real / 3.0_Real);
 }
 
 void testWindOnlyCoefficients() {
@@ -660,12 +661,12 @@ void testConvectionOnlyCoefficients() {
    const auto TurbVelH =
        createHostMirrorCopy(KPPInstance->TurbulentVelocityScale);
    const Real SigmaLoc = KPP::SurfaceLayerExtent;
-   const Real WM = VonKar * Kokkos::pow(KPP::CMoM * SigmaLoc * TestOSBLDepth *
-                                            VonKar * 1.0e-7_Real,
-                                        1.0_Real / 3.0_Real);
-   const Real WS = VonKar * Kokkos::pow(KPP::CMoS * SigmaLoc * TestOSBLDepth *
-                                            VonKar * 1.0e-7_Real,
-                                        1.0_Real / 3.0_Real);
+   const Real WM = VonKar * Math::pow(KPP::CMoM * SigmaLoc * TestOSBLDepth *
+                                          VonKar * 1.0e-7_Real,
+                                      1.0_Real / 3.0_Real);
+   const Real WS = VonKar * Math::pow(KPP::CMoS * SigmaLoc * TestOSBLDepth *
+                                          VonKar * 1.0e-7_Real,
+                                      1.0_Real / 3.0_Real);
    constexpr Real Shape    = 0.125_Real;
    const Real ExpectedVisc = TestOSBLDepth * WM * Shape;
    const Real ExpectedDiff = TestOSBLDepth * WS * Shape;
@@ -1178,7 +1179,7 @@ void testOSBLDepth() {
    constexpr Real RiScaling = 1.0_Real - 0.5_Real * KPP::SurfaceLayerExtent;
    constexpr Real TestN     = 1.0_Real;
    const Real UnresolvedShearConstant =
-       Kokkos::sqrt(0.2_Real / (KPP::CMoS * KPP::SurfaceLayerExtent)) /
+       Math::sqrt(0.2_Real / (KPP::CMoS * KPP::SurfaceLayerExtent)) /
        (VonKar * VonKar);
    const Real WindTurbulentScale = VonKar * 0.02_Real;
    parallelFor(
@@ -1222,7 +1223,7 @@ void testOSBLDepth() {
    const Real Discriminant =
        Slope * Slope - 4.0_Real * Quadratic * (RiAbove - 0.25_Real);
    const Real ExpectedBLD =
-       ZAbove + (-Slope + Kokkos::sqrt(Discriminant)) / (2.0_Real * Quadratic);
+       ZAbove + (-Slope + Math::sqrt(Discriminant)) / (2.0_Real * Quadratic);
    const Real ExpectedVt2 = 1.7_Real * UnresolvedShearConstant * 25.0_Real *
                             TestN * WindTurbulentScale / 0.25_Real;
    const Real ExpectedDeltaB = 0.4_Real * ExpectedVt2 / (RiScaling * 25.0_Real);
@@ -1439,7 +1440,7 @@ void testBoundaryLayerNonuniformThickness() {
    constexpr Real TestN     = 1.0_Real;
    constexpr Real TestUStar = 0.02_Real;
    const Real UnresolvedShearConstant =
-       Kokkos::sqrt(0.2_Real / (KPP::CMoS * KPP::SurfaceLayerExtent)) /
+       Math::sqrt(0.2_Real / (KPP::CMoS * KPP::SurfaceLayerExtent)) /
        (VonKar * VonKar);
    const Real WindTurbulentScale = VonKar * TestUStar;
 
@@ -1552,7 +1553,7 @@ void testBoundaryLayerNonuniformThickness() {
    const Real Discriminant =
        Slope * Slope - 4.0_Real * Quadratic * (RiAbove - 0.25_Real);
    const Real ExpectedBLD =
-       ZAbove + (-Slope + Kokkos::sqrt(Discriminant)) / (2.0_Real * Quadratic);
+       ZAbove + (-Slope + Math::sqrt(Discriminant)) / (2.0_Real * Quadratic);
    const Real ExpectedDeltaB =
        0.40_Real *
        (0.25_Real + 1.7_Real * UnresolvedShearConstant * ZBelow * TestN *
@@ -1750,7 +1751,7 @@ void testSshOffsetInvariance() {
    constexpr Real RiScaling = 1.0_Real - 0.5_Real * KPP::SurfaceLayerExtent;
    constexpr Real TestN     = 1.0_Real;
    const Real UnresolvedShearConstant =
-       Kokkos::sqrt(0.2_Real / (KPP::CMoS * KPP::SurfaceLayerExtent)) /
+       Math::sqrt(0.2_Real / (KPP::CMoS * KPP::SurfaceLayerExtent)) /
        (VonKar * VonKar);
    const Real WindTurbulentScale = VonKar * 0.02_Real;
    parallelFor(
@@ -1928,7 +1929,7 @@ void testBoundaryLayerLangmuir() {
    constexpr Real TestN     = 1.0_Real;
    constexpr Real RiScaling = 1.0_Real - 0.5_Real * KPP::SurfaceLayerExtent;
    const Real UnresolvedShearConstant =
-       Kokkos::sqrt(0.2_Real / (KPP::CMoS * KPP::SurfaceLayerExtent)) /
+       Math::sqrt(0.2_Real / (KPP::CMoS * KPP::SurfaceLayerExtent)) /
        (VonKar * VonKar);
 
    deepCopy(NormalVelocity, 0.0_Real);
@@ -1945,7 +1946,7 @@ void testBoundaryLayerLangmuir() {
           const Real ZCenter = LayerThickness * (K + 0.5_Real);
           const Real Zeta = KPP::SurfaceLayerExtent * ZDepth * VonKar * TestB0 /
                             (TestUStar * TestUStar * TestUStar);
-          const Real PhiInv = Kokkos::sqrt(1.0_Real - 16.0_Real * Zeta);
+          const Real PhiInv = Math::sqrt(1.0_Real - 16.0_Real * Zeta);
           const Real WTurb  = VonKar * TestUStar * PhiInv;
           const Real Vt2    = 1.7_Real * UnresolvedShearConstant * ZCenter *
                            TestN * WTurb / 0.25_Real;
@@ -2000,14 +2001,14 @@ void testBoundaryLayerLangmuir() {
 
    constexpr Real ZDepth   = 30.0_Real;
    constexpr Real ZCenter  = 25.0_Real;
-   const Real Enhancement  = Kokkos::sqrt(3.0_Real);
+   const Real Enhancement  = Math::sqrt(3.0_Real);
    const Real DisabledZeta = KPP::SurfaceLayerExtent * ZDepth * VonKar *
                              TestB0 / (TestUStar * TestUStar * TestUStar);
    const Real EnabledZeta = DisabledZeta * Enhancement;
    const Real DisabledWTurb =
-       VonKar * TestUStar * Kokkos::sqrt(1.0_Real - 16.0_Real * DisabledZeta);
+       VonKar * TestUStar * Math::sqrt(1.0_Real - 16.0_Real * DisabledZeta);
    const Real EnabledWTurb =
-       VonKar * TestUStar * Kokkos::sqrt(1.0_Real - 16.0_Real * EnabledZeta);
+       VonKar * TestUStar * Math::sqrt(1.0_Real - 16.0_Real * EnabledZeta);
    const Real ExpectedDisabledVt2 = 1.7_Real * UnresolvedShearConstant *
                                     ZCenter * TestN * DisabledWTurb / 0.25_Real;
    const Real ExpectedEnabledVt2 = 1.7_Real * UnresolvedShearConstant *
@@ -2079,7 +2080,7 @@ void testBoundaryLayerSmoothing() {
    constexpr Real TestN     = 1.0_Real;
    constexpr Real RiScaling = 1.0_Real - 0.5_Real * KPP::SurfaceLayerExtent;
    const Real UnresolvedShearConstant =
-       Kokkos::sqrt(0.2_Real / (KPP::CMoS * KPP::SurfaceLayerExtent)) /
+       Math::sqrt(0.2_Real / (KPP::CMoS * KPP::SurfaceLayerExtent)) /
        (VonKar * VonKar);
    const Real WTurb = VonKar * TestUStar;
 
@@ -2151,8 +2152,8 @@ void testBoundaryLayerSmoothing() {
       }
       Real ExpectedDepth =
           AreaSum > 0.0_Real ? WeightedDepth / AreaSum : UnsmoothedBLDH(ICell);
-      ExpectedDepth = Kokkos::fmax(MinDepth, ExpectedDepth);
-      ExpectedDepth = Kokkos::fmin(MaxDepth, ExpectedDepth);
+      ExpectedDepth = Math::max(MinDepth, ExpectedDepth);
+      ExpectedDepth = Math::min(MaxDepth, ExpectedDepth);
 
       I4 ExpectedIndex = NVertLayers - 1;
       for (I4 K = 0; K < NVertLayers - 1; ++K) {

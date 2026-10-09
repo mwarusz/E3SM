@@ -20,6 +20,7 @@
 #include "IOStream.h"
 #include "Logging.h"
 #include "MachEnv.h"
+#include "MathUtils.h"
 #include "OceanTestCommon.h"
 #include "OmegaKokkos.h"
 #include "Pacer.h"
@@ -568,25 +569,25 @@ int main(int argc, char *argv[]) {
          I4 CellID1 = DefDecomp->CellIDH(DefMesh->CellsOnEdgeH(IEdge, 0));
          I4 CellID2 = DefDecomp->CellIDH(DefMesh->CellsOnEdgeH(IEdge, 1));
          /// MinLayerEdgeTop is the min of the min cell values on edge
-         Expected = std::min(-2 * CellID1, -2 * CellID2);
+         Expected = Math::min(-2 * CellID1, -2 * CellID2);
          if (!isApprox(DefVertCoord->MinLayerEdgeTopH(IEdge), Expected, RTol,
                        ATol)) {
             Err += 1;
          }
          /// MinLayerEdgeBot is the max of the min cell values on edge
-         Expected = std::max(-2 * CellID1, -2 * CellID2);
+         Expected = Math::max(-2 * CellID1, -2 * CellID2);
          if (!isApprox(DefVertCoord->MinLayerEdgeBotH(IEdge), Expected, RTol,
                        ATol)) {
             Err += 1;
          }
          /// MaxLayerEdgeTop is the min of the max cell values on edge
-         Expected = std::min(2 * CellID1, 2 * CellID2);
+         Expected = Math::min(2 * CellID1, 2 * CellID2);
          if (!isApprox(DefVertCoord->MaxLayerEdgeTopH(IEdge), Expected, RTol,
                        ATol)) {
             Err += 1;
          }
          /// MaxLayerEdgeBot is the max of the max cell values on edge
-         Expected = std::max(2 * CellID1, 2 * CellID2);
+         Expected = Math::max(2 * CellID1, 2 * CellID2);
          if (!isApprox(DefVertCoord->MaxLayerEdgeBotH(IEdge), Expected, RTol,
                        ATol)) {
             Err += 1;
@@ -632,7 +633,7 @@ int main(int argc, char *argv[]) {
          /// MinLayerVertexTop is the min of the min cell values on vertex
          I4 Expected = 1e7;
          for (int I = 0; I < VertexDegree; I++) {
-            Expected = std::min(Expected, -2 * CellIDs[I]);
+            Expected = Math::min(Expected, -2 * CellIDs[I]);
          }
          if (!isApprox(DefVertCoord->MinLayerVertexTopH(IVertex), Expected,
                        RTol, ATol)) {
@@ -642,7 +643,7 @@ int main(int argc, char *argv[]) {
          /// MinLayerVertexBot is the max of the min cell values on vertex
          Expected = -1e7;
          for (int I = 0; I < VertexDegree; I++) {
-            Expected = std::max(Expected, -2 * CellIDs[I]);
+            Expected = Math::max(Expected, -2 * CellIDs[I]);
          }
          if (!isApprox(DefVertCoord->MinLayerVertexBotH(IVertex), Expected,
                        RTol, ATol)) {
@@ -652,7 +653,7 @@ int main(int argc, char *argv[]) {
          /// MaxLayerVertexTop is the min of the max cell values on vertex
          Expected = 1e7;
          for (int I = 0; I < VertexDegree; I++) {
-            Expected = std::min(Expected, 2 * CellIDs[I]);
+            Expected = Math::min(Expected, 2 * CellIDs[I]);
          }
          if (!isApprox(DefVertCoord->MaxLayerVertexTopH(IVertex), Expected,
                        RTol, ATol)) {
@@ -662,7 +663,7 @@ int main(int argc, char *argv[]) {
          /// MaxLayerVertexBot is the max of the max cell values on vertex
          Expected = -1e7;
          for (int I = 0; I < VertexDegree; I++) {
-            Expected = std::max(Expected, 2 * CellIDs[I]);
+            Expected = Math::max(Expected, 2 * CellIDs[I]);
          }
          if (!isApprox(DefVertCoord->MaxLayerVertexBotH(IVertex), Expected,
                        RTol, ATol)) {
