@@ -260,7 +260,7 @@ void testGradRichNum() {
                  }
 
                  if (HasValidEdge) {
-                    if (!isApprox(GradRichNum(ICell, K), RiExpValue, RTol))
+                    if (!Math::isApprox(GradRichNum(ICell, K), RiExpValue, RTol))
                        InnerCount++;
                  } else {
                     // With all edges skipped, GradRichNum remains at sentinel
@@ -354,13 +354,13 @@ void testOneTwoOneFilter() {
                  const int K = KMin + KOff;
                  if (K > MinLayerCell(ICell) && K < MaxLayerCell(ICell)) {
                     // Interior layers should be smoothed to 0.0
-                    if (!isApprox(GradRichNumSmoothed(ICell, K), 0.0_Real,
+                    if (!Math::isApprox(GradRichNumSmoothed(ICell, K), 0.0_Real,
                                   RTol))
                        InnerCount++;
                  } else {
                     // Boundary layers (K==0 or K==NVertLayers) should be
                     // the same as input
-                    if (!isApprox(GradRichNumSmoothed(ICell, K),
+                    if (!Math::isApprox(GradRichNumSmoothed(ICell, K),
                                   GradRichNum(ICell, K), RTol))
                        InnerCount++;
                  }
@@ -453,7 +453,7 @@ void testBackVertMix() {
                     if (BackVertVisc(ICell, K) != 0.0_Real)
                        InnerCount++;
                  } else {
-                    if (!isApprox(BackVertVisc(ICell, K), VertViscBackExp,
+                    if (!Math::isApprox(BackVertVisc(ICell, K), VertViscBackExp,
                                   RTol))
                        InnerCount++;
                  }
@@ -491,7 +491,7 @@ void testBackVertMix() {
                     if (BackVertDiff(ICell, K) != 0.0_Real)
                        InnerCount++;
                  } else {
-                    if (!isApprox(BackVertDiff(ICell, K), VertDiffBackExp,
+                    if (!Math::isApprox(BackVertDiff(ICell, K), VertDiffBackExp,
                                   RTol))
                        InnerCount++;
                  }
@@ -582,10 +582,10 @@ void testConvVertMix() {
                     if (VertViscOut(ICell, K) != 0.0_Real)
                        InnerCount++;
                  } else if (K < 30) {
-                    if (!isApprox(VertViscOut(ICell, K), VertConvExp, RTol))
+                    if (!Math::isApprox(VertViscOut(ICell, K), VertConvExp, RTol))
                        InnerCount++;
                  } else {
-                    if (!isApprox(VertViscOut(ICell, K), 0.0_Real, RTol))
+                    if (!Math::isApprox(VertViscOut(ICell, K), 0.0_Real, RTol))
                        InnerCount++;
                  }
               },
@@ -621,10 +621,10 @@ void testConvVertMix() {
                     if (VertDiffOut(ICell, K) != 0.0_Real)
                        InnerCount++;
                  } else if (K < 30) {
-                    if (!isApprox(VertDiffOut(ICell, K), VertConvExp, RTol))
+                    if (!Math::isApprox(VertDiffOut(ICell, K), VertConvExp, RTol))
                        InnerCount++;
                  } else {
-                    if (!isApprox(VertDiffOut(ICell, K), 0.0_Real, RTol))
+                    if (!Math::isApprox(VertDiffOut(ICell, K), 0.0_Real, RTol))
                        InnerCount++;
                  }
               },
@@ -716,14 +716,14 @@ void testShearVertMix() {
                     if (VertViscOut(ICell, K) != 0.0_Real)
                        InnerCount++;
                  } else if (K < 20) {
-                    if (!isApprox(VertViscOut(ICell, K), VertShearBaseExp,
+                    if (!Math::isApprox(VertViscOut(ICell, K), VertShearBaseExp,
                                   RTol))
                        InnerCount++;
                  } else if (K >= 20 && K < 40) {
-                    if (!isApprox(VertViscOut(ICell, K), VertShearExp, RTol))
+                    if (!Math::isApprox(VertViscOut(ICell, K), VertShearExp, RTol))
                        InnerCount++;
                  } else {
-                    if (!isApprox(VertViscOut(ICell, K), 0.0_Real, RTol))
+                    if (!Math::isApprox(VertViscOut(ICell, K), 0.0_Real, RTol))
                        InnerCount++;
                  }
               },
@@ -759,14 +759,14 @@ void testShearVertMix() {
                     if (VertDiffOut(ICell, K) != 0.0_Real)
                        InnerCount++;
                  } else if (K < 20) {
-                    if (!isApprox(VertDiffOut(ICell, K), VertShearBaseExp,
+                    if (!Math::isApprox(VertDiffOut(ICell, K), VertShearBaseExp,
                                   RTol))
                        InnerCount++;
                  } else if (K >= 20 && K < 40) {
-                    if (!isApprox(VertDiffOut(ICell, K), VertShearExp, RTol))
+                    if (!Math::isApprox(VertDiffOut(ICell, K), VertShearExp, RTol))
                        InnerCount++;
                  } else {
-                    if (!isApprox(VertDiffOut(ICell, K), 0.0_Real, RTol))
+                    if (!Math::isApprox(VertDiffOut(ICell, K), 0.0_Real, RTol))
                        InnerCount++;
                  }
               },
@@ -871,7 +871,7 @@ void testTotalVertMix() {
                        InnerCount++;
                     // K = 1 should have ref value
                  } else if (K == KMin + 1) {
-                    if (!isApprox(VertDiffP(ICell, K), VertDiffExpValueP, RTol))
+                    if (!Math::isApprox(VertDiffP(ICell, K), VertDiffExpValueP, RTol))
                        InnerCount++;
                     // otherwise check for invalid values
                  } else {
@@ -915,7 +915,7 @@ void testTotalVertMix() {
                        InnerCount++;
                     // K = 1 should have ref value
                  } else if (K == KMin + 1) {
-                    if (!isApprox(VertViscP(ICell, K), VertViscExpValueP, RTol))
+                    if (!Math::isApprox(VertViscP(ICell, K), VertViscExpValueP, RTol))
                        InnerCount++;
                     // otherwise check for invalid values
                  } else {
@@ -970,7 +970,7 @@ void testTotalVertMix() {
                        InnerCount++;
                     // K = 1 should have ref value
                  } else if (K == KMin + 1) {
-                    if (!isApprox(VertDiffN(ICell, K), VertDiffExpValueN, RTol))
+                    if (!Math::isApprox(VertDiffN(ICell, K), VertDiffExpValueN, RTol))
                        InnerCount++;
                     // otherwise check for invalid values
                  } else {
@@ -1014,7 +1014,7 @@ void testTotalVertMix() {
                        InnerCount++;
                     // K = 1 should have ref value
                  } else if (K == KMin + 1) {
-                    if (!isApprox(VertViscN(ICell, K), VertViscExpValueN, RTol))
+                    if (!Math::isApprox(VertViscN(ICell, K), VertViscExpValueN, RTol))
                        InnerCount++;
                     // otherwise check for invalid values
                  } else {
@@ -1099,9 +1099,9 @@ void testInteriorSnapshotForMatchBoth() {
        "CheckInteriorSnapshot", {Mesh->NCellsAll},
        KOKKOS_LAMBDA(int ICell, int &Count) {
           const int K       = MinLayerCell(ICell) + TestLevel;
-          const bool DiffOk = isApprox(
+          const bool DiffOk = Math::isApprox(
               VertDiff(ICell, K), InteriorDiff(ICell, K) + TestConvDiff, RTol);
-          const bool ViscOk = isApprox(
+          const bool ViscOk = Math::isApprox(
               VertVisc(ICell, K), InteriorVisc(ICell, K) + TestConvDiff, RTol);
           const bool SnapshotFilled = InteriorDiff(ICell, K) != -1.0_Real;
           if (!DiffOk || !ViscOk || !SnapshotFilled)
