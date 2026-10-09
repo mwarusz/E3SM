@@ -437,7 +437,7 @@ int testDiffusionStability() {
    const Real NormCustomSmallDiff =
        runDiffusionStability(UseGeneralSolver, SmallDiffValue);
 
-   if (!isApprox(NormGeneralSmallDiff, NormCustomSmallDiff, 1e-3)) {
+   if (!Math::isApprox(NormGeneralSmallDiff, NormCustomSmallDiff, 1e-3)) {
       Err += 1;
       LOG_ERROR("TridiagonalSolver: Different norms");
    }
