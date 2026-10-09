@@ -909,8 +909,8 @@ void TimeStepper::prescribeVelocity(OceanState *State1, int TimeLevel1,
                                     Math::cos(Pi * TSim / Tau) +
                                 2.0 * Pi * Math::cos(LatEdge(IEdge)));
              const R8 v         = ((2.5 / Tau) * Math::sin(lon_p) *
-                           Math::pow(Math::cos(LatEdge(IEdge)), 3) *
-                           Math::cos(Pi * TSim / Tau));
+                                   Math::pow(Math::cos(LatEdge(IEdge)), 3) *
+                                   Math::cos(Pi * TSim / Tau));
              const R8 normalVel = REarth * (u * Math::cos(AngleEdge(IEdge)) +
                                             v * Math::sin(AngleEdge(IEdge)));
 

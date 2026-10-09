@@ -555,11 +555,11 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
              LInfElement(IElement) = Math::abs(NumValElement - ExactValElement);
              LInfScaleElement(IElement) = Math::abs(ExactValElement);
              L2Element(IElement)        = AreaElement(IElement) *
-                                   LInfElement(IElement) *
-                                   LInfElement(IElement);
-             L2ScaleElement(IElement) = AreaElement(IElement) *
-                                        LInfScaleElement(IElement) *
-                                        LInfScaleElement(IElement);
+                                          LInfElement(IElement) *
+                                          LInfElement(IElement);
+             L2ScaleElement(IElement)   = AreaElement(IElement) *
+                                          LInfScaleElement(IElement) *
+                                          LInfScaleElement(IElement);
           });
    }
    if constexpr (Array::rank == 2) {
@@ -581,11 +581,11 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
                  Math::abs(NumValElement - ExactValElement);
              LInfScaleElement(IElement, K) = Math::abs(ExactValElement);
              L2Element(IElement, K)        = AreaElement(IElement) *
-                                      LInfElement(IElement, K) *
-                                      LInfElement(IElement, K);
-             L2ScaleElement(IElement, K) = AreaElement(IElement) *
-                                           LInfScaleElement(IElement, K) *
-                                           LInfScaleElement(IElement, K);
+                                             LInfElement(IElement, K) *
+                                             LInfElement(IElement, K);
+             L2ScaleElement(IElement, K)   = AreaElement(IElement) *
+                                             LInfScaleElement(IElement, K) *
+                                             LInfScaleElement(IElement, K);
           });
    }
 
@@ -612,8 +612,8 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
                  Math::abs(NumValElement - ExactValElement);
              LInfScaleElement(L, IElement, K) = Math::abs(ExactValElement);
              L2Element(L, IElement, K)        = AreaElement(IElement) *
-                                         LInfElement(L, IElement, K) *
-                                         LInfElement(L, IElement, K);
+                                                LInfElement(L, IElement, K) *
+                                                LInfElement(L, IElement, K);
              L2ScaleElement(L, IElement, K) = AreaElement(IElement) *
                                               LInfScaleElement(L, IElement, K) *
                                               LInfScaleElement(L, IElement, K);
