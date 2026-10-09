@@ -251,9 +251,9 @@ class SecondDerivativeOnCell {
          const Real Theta = Angle2D[I];
          const Real x     = Math::cos(Theta);
          const Real y     = Math::sin(Theta);
-         const Real xx    = x * x;
+         const Real xx    = Math::pow<2>(x);
          const Real xy    = x * y;
-         const Real yy    = y * y;
+         const Real yy    = Math::pow<2>(y);
          // Real(2) rather than 2._Real: nvcc 12.9 on pm-gpu fails to find
          // the _Real literal operator here
          for (int J = 0; J <= NEdges; ++J)
@@ -373,8 +373,8 @@ class SecondDerivativeOnCell {
          // angles from cell center to neighbor centers (thetav)
          const Real Thetav = sphere_angle(XC[0], YC[0], ZC[0], XC[Ip1], YC[Ip1],
                                           ZC[Ip1], XC[Ip2], YC[Ip2], ZC[Ip2]);
-         Real Dl_sphere    = sphereRadius * arc_length(XC[0], YC[0], ZC[0],
-                                                       XC[Ip1], YC[Ip1], ZC[Ip1]);
+         Real Dl_sphere = sphereRadius * arc_length(XC[0], YC[0], ZC[0],
+                                                    XC[Ip1], YC[Ip1], ZC[Ip1]);
 
          Dl_sphere /= length_scale;
          // Thetat = 0.  this defines the x direction,

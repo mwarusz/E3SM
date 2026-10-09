@@ -64,7 +64,7 @@ class ShearMix {
    // Shear mixing parameters
    Real BaseShearValue = 0.005; ///< Base shear vertical viscosity and
                                 ///< diffusivity (m^2 s^-1) of LMD94
-   Real ShearRiCrit = 0.7;      ///< Critical Richardson number of LMD94
+   Real ShearRiCrit    = 0.7;   ///< Critical Richardson number of LMD94
    Real ShearExponent =
        3.0; /// Exponent value used interior shear mixing calculation of LMD94
    I4 RiSmoothLoops = 2; ///< Number of smoothing loops for Richardson number
@@ -158,7 +158,8 @@ class GradRichardsonNum {
                 0.5_Real * (GeomZMid(ICell, K1) + GeomZMid(JCell, K1) -
                             (GeomZMid(ICell, K2) + GeomZMid(JCell, K2)));
             Real ShearSquared =
-                (DNormVel * DNormVel + DTanVel * DTanVel) / (DzEdge * DzEdge);
+                (Math::pow<2>(DNormVel) + Math::pow<2>(DTanVel)) /
+                Math::pow<2>(DzEdge);
             Real RiEdge =
                 Math::max(0.0_Real,
                           0.5_Real * (BruntVaisalaFreqSq(ICell, K2) +
