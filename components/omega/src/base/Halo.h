@@ -31,6 +31,8 @@
 #include <type_traits>
 #include <vector>
 
+// #define PACK
+
 namespace OMEGA {
 
 // Set the default MPI real data type as single or double precision based on
@@ -301,6 +303,7 @@ class Halo {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          expandBuffer(LocNeighbor.SendBuffer, BufferSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
+#ifdef PACK
          parallelFor(
              {LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
                 const ValType Val = Array(LocIndex(IExch));
@@ -308,6 +311,7 @@ class Halo {
                 memcpy(&RVal, &Val, sizeof(ValType));
                 LocBuff(IExch) = RVal;
              });
+#endif
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
          expandBuffer(LocNeighbor.SendBufferH, BufferSize);
@@ -341,6 +345,7 @@ class Halo {
          expandBuffer(LocNeighbor.SendBuffer, BufferSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
 
+#ifdef PACK
          parallelFor(
              {LocList.NTot, NJ}, KOKKOS_LAMBDA(int IExch, int J) {
                 const ValType Val = Array(LocIndex(IExch), J);
@@ -349,6 +354,7 @@ class Halo {
                 const I4 IBuff = IExch * NJ + J;
                 LocBuff(IBuff) = RVal;
              });
+#endif
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
          expandBuffer(LocNeighbor.SendBufferH, BufferSize);
@@ -387,6 +393,7 @@ class Halo {
          expandBuffer(LocNeighbor.SendBuffer, BufferSize);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
 
+#ifdef PACK
          parallelFor(
              {NK, NTotList, NJ}, KOKKOS_LAMBDA(int K, int IExch, int J) {
                 const ValType Val = Array(K, LocIndex(IExch), J);
@@ -395,6 +402,7 @@ class Halo {
                 const I4 IBuff = (K * NTotList + IExch) * NJ + J;
                 LocBuff(IBuff) = RVal;
              });
+#endif
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
          expandBuffer(LocNeighbor.SendBufferH, BufferSize);
@@ -542,6 +550,7 @@ class Halo {
       if (devBufferPUP(Array)) {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
+#ifdef PACK
          parallelFor(
              {LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
                 const I4 IArr = LocIndex(IExch);
@@ -550,6 +559,7 @@ class Halo {
                 memcpy(&Val, &RVal, sizeof(ValType));
                 Array(IArr) = Val;
              });
+#endif
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
          OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].RecvBufferH);
@@ -580,6 +590,7 @@ class Halo {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
 
+#ifdef PACK
          parallelFor(
              {LocList.NTot, NJ}, KOKKOS_LAMBDA(int IExch, int J) {
                 const I4 IBuff = IExch * NJ + J;
@@ -589,6 +600,7 @@ class Halo {
                 memcpy(&Val, &RVal, sizeof(ValType));
                 Array(IArr, J) = Val;
              });
+#endif
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
          OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].RecvBufferH);
@@ -625,6 +637,7 @@ class Halo {
          OMEGA_SCOPE(LocIndex, LocList.Index);
          OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
 
+#ifdef PACK
          parallelFor(
              {NK, NTotList, NJ}, KOKKOS_LAMBDA(int K, int IExch, int J) {
                 const I4 IBuff = (K * NTotList + IExch) * NJ + J;
@@ -634,6 +647,7 @@ class Halo {
                 memcpy(&Val, &RVal, sizeof(ValType));
                 Array(K, IArr, J) = Val;
              });
+#endif
       } else {
          OMEGA_SCOPE(LocIndexH, LocList.IndexH);
          OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].RecvBufferH);
