@@ -468,6 +468,7 @@ int Halo::generateExchangeLists(
 
    I4 IErr{0}; // error code
 
+   I4 NumLayers; // number of halo layers for IndexSpace
    // Pointers to the needed info from the Decomp for the input index space
    const I4 *NOwnedPtr{nullptr};
    const I4 *NAllPtr{nullptr};
@@ -666,7 +667,7 @@ int Halo::exchangeVectorInt(
 // Allocate the required receive buffer and prepare for MPI communication by
 // calling MPI_Irecv for each Neighbor
 
-int Halo::startReceives(const bool UseDevBuffer) {
+int Halo::startReceives(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
 
    // Initialize vector to track MPI errors for each MPI_Irecv
    std::vector<I4> IErr(NNghbr, 0);
@@ -709,7 +710,7 @@ int Halo::startReceives(const bool UseDevBuffer) {
 // Initiate MPI communication by calling MPI_Isend for each Neighbor to send
 // the packed buffers to each task
 
-int Halo::startSends(const bool UseDevBuffer) {
+int Halo::startSends(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
 
    // Initialize vector to track MPI errors for each MPI_Isend
    std::vector<I4> IErr(NNghbr, 0);

@@ -52,13 +52,31 @@ void expandBuffer(BufferType &Buffer, int BufferSize) {
    }
 }
 
+// Determine the number of array elements per cell, edge, or vertex
+// in the input array
+template <class ArrayType> I4 totalSize(const ArrayType &Array) {
+   I4 TotSize;
+   I4 NDims = Array.rank();
+
+   if (NDims == 1) {
+      TotSize = 1;
+   } else if (NDims == 2) {
+      TotSize = Array.extent(1);
+   } else {
+      TotSize = 1;
+      for (int I = 0; I < NDims - 2; ++I) {
+         TotSize *= Array.extent(I);
+      }
+      TotSize *= Array.extent(NDims - 1);
+   }
+   return TotSize;
+}
+
 /// The Halo class contains two nested classes, ExchList and Neighbor classes,
 /// defined below. The Halo class holds all the Neighbor objects needed by a
 /// task to perform a full halo exchange with each of its neighboring tasks for
 /// any array defined on the mesh. The local task ID and the MPI communicator
-/// handle are also stored here. NumLayers, CurElem, and TotSize are temporary
-/// variables utilized by the current halo exchange which are stored here
-/// for easy accessibility by the Halo methods.
+/// handle are also stored here.
 class Halo {
  private:
    /// Flag to allow passing device arrays to MPI_Irecv and MPI_Isend in
@@ -80,13 +98,10 @@ class Halo {
 
    const Decomp *MyDecomp{nullptr}; /// Pointer to decomposition object
 
-   I4 NNghbr;           /// number of neighboring tasks
-   I4 MyTask;           /// local MPI Task ID
-   I4 HaloWidth;        /// cell width of halo
-   I4 NumLayers;        /// number of halo layers for current exchange
-   I4 TotSize;          /// Array size at each mesh element for current exchange
-   MPI_Comm MyComm;     /// MPI communicator handle
-   MeshElement CurElem; /// index space of current array
+   I4 NNghbr;       /// number of neighboring tasks
+   I4 MyTask;       /// local MPI Task ID
+   I4 HaloWidth;    /// cell width of halo
+   MPI_Comm MyComm; /// MPI communicator handle
 
    /// Forward Declaration of Neighbor class, defined below
    class Neighbor;
@@ -227,12 +242,12 @@ class Halo {
    /// Allocate the recieve buffers and call MPI_Irecv for each Neighbor.
    /// The input bool UseDevBuffer specifies whether or not the device buffer
    /// will be used in the unpackBuffer functionfor unpacking into the array.
-   int startReceives(bool UseDevBuffer);
+   int startReceives(bool UseDevBuffer, I4 TotSize, I4 CurElem);
 
    /// Call MPI_Isend for each Neighbor to send the packed buffers to the
    /// neighboring tasks. The input bool UseDevBuffer specifies whether or not
    /// the device buffer was packed in the packBuffer function.
-   int startSends(bool UseDevBuffer);
+   int startSends(bool UseDevBuffer, I4 TotSize, I4 CurElem);
 
    /// Function template that returns a bool that is true if the Array is
    /// on the device, or if the device and host memory spaces are the same
@@ -287,8 +302,9 @@ class Halo {
    /// that Neighbor.
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is1D>
-   packBuffer(const T &Array,      // 1D Kokkos array of any type
-              const I4 CurNeighbor // current neighbor
+   packBuffer(const T &Array,       // 1D Kokkos array of any type
+              const I4 CurNeighbor, // current neighbor
+              const I4 CurElem      // current element
    ) {
       using ValType = typename T::non_const_value_type;
 
@@ -323,8 +339,9 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is2D>
-   packBuffer(const T &Array,      // 2D Kokkos array of any type
-              const I4 CurNeighbor // current neighbor
+   packBuffer(const T &Array,       // 2D Kokkos array of any type
+              const I4 CurNeighbor, // current neighbor
+              const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
@@ -334,7 +351,7 @@ class Halo {
 
       const I4 NJ = Array.extent(1);
 
-      const I4 BufferSize = LocList.NTot * TotSize;
+      const I4 BufferSize = LocList.NTot * totalSize(Array);
 
       if (devBufferPUP(Array)) {
          OMEGA_SCOPE(LocIndex, LocList.Index);
@@ -367,8 +384,9 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is3D>
-   packBuffer(const T &Array,      // 3D Kokkos array of any type
-              const I4 CurNeighbor // current neighbor
+   packBuffer(const T &Array,       // 3D Kokkos array of any type
+              const I4 CurNeighbor, // current neighbor
+              const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
@@ -380,7 +398,7 @@ class Halo {
       const I4 NK = Array.extent(0);
 
       const I4 NTotList   = LocList.NTot;
-      const I4 BufferSize = LocList.NTot * TotSize;
+      const I4 BufferSize = LocList.NTot * totalSize(Array);
 
       if (devBufferPUP(Array)) {
          OMEGA_SCOPE(LocIndex, LocList.Index);
@@ -415,8 +433,9 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is4D>
-   packBuffer(const T &Array,      // 4D Kokkos array of any type
-              const I4 CurNeighbor // current neighbor
+   packBuffer(const T &Array,       // 4D Kokkos array of any type
+              const I4 CurNeighbor, // current neighbor
+              const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
@@ -429,7 +448,7 @@ class Halo {
       const I4 NL = Array.extent(0);
 
       const I4 NTotList   = LocList.NTot;
-      const I4 BufferSize = LocList.NTot * TotSize;
+      const I4 BufferSize = LocList.NTot * totalSize(Array);
 
       if (devBufferPUP(Array)) {
          OMEGA_SCOPE(LocIndex, LocList.Index);
@@ -468,8 +487,9 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is5D>
-   packBuffer(const T &Array,      // 5D Kokkos array of any type
-              const I4 CurNeighbor // current neighbor
+   packBuffer(const T &Array,       // 5D Kokkos array of any type
+              const I4 CurNeighbor, // current neighbor
+              const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
@@ -483,7 +503,7 @@ class Halo {
       const I4 NM = Array.extent(0);
 
       const I4 NTotList   = LocList.NTot;
-      const I4 BufferSize = LocList.NTot * TotSize;
+      const I4 BufferSize = LocList.NTot * totalSize(Array);
 
       if (devBufferPUP(Array)) {
          OMEGA_SCOPE(LocIndex, LocList.Index);
@@ -530,8 +550,9 @@ class Halo {
    /// corresponding halo elements of the input Array
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is1D>
-   unpackBuffer(const T &Array,      // 1D Kokkos array of any type
-                const I4 CurNeighbor // current neighbor
+   unpackBuffer(const T &Array,       // 1D Kokkos array of any type
+                const I4 CurNeighbor, // current neighbor
+                const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
@@ -565,8 +586,9 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is2D>
-   unpackBuffer(const T &Array,      // 2D Kokkos array of any type
-                const I4 CurNeighbor // current neighbor
+   unpackBuffer(const T &Array,       // 2D Kokkos array of any type
+                const I4 CurNeighbor, // current neighbor
+                const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
@@ -607,8 +629,9 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is3D>
-   unpackBuffer(const T &Array,      // 3D Kokkos array of any type
-                const I4 CurNeighbor // current neighbor
+   unpackBuffer(const T &Array,       // 3D Kokkos array of any type
+                const I4 CurNeighbor, // current neighbor
+                const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
@@ -654,8 +677,9 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is4D>
-   unpackBuffer(const T &Array,      // 4D Kokkos array of any type
-                const I4 CurNeighbor // current neighbor
+   unpackBuffer(const T &Array,       // 4D Kokkos array of any type
+                const I4 CurNeighbor, // current neighbor
+                const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
@@ -706,8 +730,9 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is5D>
-   unpackBuffer(const T &Array,      // 5D Kokkos array of any type
-                const I4 CurNeighbor // current neighbor
+   unpackBuffer(const T &Array,       // 5D Kokkos array of any type
+                const I4 CurNeighbor, // current neighbor
+                const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
@@ -766,8 +791,8 @@ class Halo {
    // array of any supported type defined on the input index space ThisElem
    template <typename T>
    int
-   exchangeFullArrayHalo(T &Array,            // Kokkos array of any type
-                         MeshElement ThisElem // index space Array is defined on
+   exchangeFullArrayHalo(T &Array,           // Kokkos array of any type
+                         MeshElement CurElem // index space Array is defined on
    ) {
       // Add more context for timers in this function
       // BUG: fails when there is no parent timer
@@ -779,32 +804,6 @@ class Halo {
       // Logical flag to track if all messages have been received
       bool AllReceived{false};
 
-      // Save the index space the input array is defined on
-      CurElem = ThisElem;
-
-      // For cell-based quantities, the number of halo layers equals HaloWidth,
-      // edge- and vertex-based quantities have an extra layer.
-      if (CurElem == OnCell) {
-         NumLayers = HaloWidth;
-      } else {
-         NumLayers = HaloWidth + 1;
-      }
-
-      // Determine the number of array elements per cell, edge, or vertex
-      // in the input array
-      I4 NDims = Array.rank();
-      if (NDims == 1) {
-         TotSize = 1;
-      } else if (NDims == 2) {
-         TotSize = Array.extent(1);
-      } else {
-         TotSize = 1;
-         for (int I = 0; I < NDims - 2; ++I) {
-            TotSize *= Array.extent(I);
-         }
-         TotSize *= Array.extent(NDims - 1);
-      }
-
       // If the Array is in device memory space, the buffer pack and unpack
       // functions will use device buffers
       bool UseDevBuffer = devBufferPUP(Array);
@@ -812,7 +811,7 @@ class Halo {
       // Allocate the receive buffers and Call MPI_Irecv for each Neighbor
       // so the local task is ready to accept messages from each
       // neighboring task
-      startReceives(UseDevBuffer);
+      startReceives(UseDevBuffer, totalSize(Array), CurElem);
 
       // Loop through each Neighbor, resetting communication flags and packing
       // buffers if there are elements to be sent to the neighboring task
@@ -821,13 +820,13 @@ class Halo {
          Neighbors[INghbr].Received = false;
          Neighbors[INghbr].Unpacked = false;
          if (SendFlags[CurElem][INghbr]) {
-            packBuffer(Array, INghbr);
+            packBuffer(Array, INghbr, CurElem);
          }
       }
       Pacer::stop("Halo:packBuffers", 4);
 
       // Call MPI_Isend for each Neighbor to send the packed buffers
-      startSends(UseDevBuffer);
+      startSends(UseDevBuffer, totalSize(Array), CurElem);
 
       // Collect all send requests
       std::vector<MPI_Request> SendReqs;
@@ -870,7 +869,8 @@ class Halo {
                      // The number of elements we need to copy is different
                      // than the buffer allocation size
                      const I4 BufferSize =
-                         TotSize * Neighbors[INghbr].RecvLists[CurElem].NTot;
+                         totalSize(Array) *
+                         Neighbors[INghbr].RecvLists[CurElem].NTot;
                      auto CopyRange = Kokkos::make_pair(0, BufferSize);
 
                      deepCopy(Kokkos::subview(Neighbors[INghbr].RecvBuffer,
@@ -878,7 +878,7 @@ class Halo {
                               Kokkos::subview(Neighbors[INghbr].RecvBufferH,
                                               CopyRange));
                   }
-                  unpackBuffer(Array, INghbr);
+                  unpackBuffer(Array, INghbr, CurElem);
                   Neighbors[INghbr].Unpacked = true;
                }
             }
