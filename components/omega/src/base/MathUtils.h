@@ -169,7 +169,7 @@ using Kokkos::floor;
 // using Kokkos::llround;
 // using Kokkos::lrint;
 // using Kokkos::lround;
-using Kokkos::nearbyint;
+// using Kokkos::nearbyint;
 // using Kokkos::rint;
 using Kokkos::round;
 using Kokkos::trunc;

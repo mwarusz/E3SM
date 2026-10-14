@@ -64,7 +64,7 @@ are available in `OMEGA::Math`:
 | Trigonometric | `acos`, `asin`, `atan`, `atan2`, `cos`, `sin`, `tan` |
 | Hyperbolic | `acosh`, `asinh`, `atanh`, `cosh`, `sinh`, `tanh` |
 | Error and gamma | `erf`, `erfc`, `lgamma`, `tgamma` |
-| Nearest-integer operations | `ceil`, `floor`, `nearbyint`, `round`, `trunc` |
+| Nearest-integer operations | `ceil`, `floor`, `round`, `trunc` |
 | Floating-point manipulation | `copysign`, `logb`, `nextafter` |
 | Classification and comparison | `isfinite`, `isinf`, `isnan`, `signbit` |
 | Non-standard | `rsqrt` |
