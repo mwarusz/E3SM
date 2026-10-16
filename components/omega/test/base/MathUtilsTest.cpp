@@ -115,6 +115,9 @@ Error testMathUtilsDevice() {
    // A bit is set when the corresponding test failed
    I8 DeviceResults;
 
+   const Real NaN = std::numeric_limits<Real>::quiet_NaN();
+   const Real Inf = std::numeric_limits<Real>::infinity();
+
    parallelReduce(
        {1},
        KOKKOS_LAMBDA(int, I8 &Accum) {
@@ -170,8 +173,6 @@ Error testMathUtilsDevice() {
              Accum |= (1 << 12);
           }
 
-          const Real NaN = std::numeric_limits<Real>::quiet_NaN();
-          const Real Inf = std::numeric_limits<Real>::infinity();
           if (Math::isApprox(NaN, 1.5_Real, 0.01_Real) ||
               Math::isApprox(1.5_Real, NaN, 0.01_Real) ||
               Math::isApprox(Inf, 1.5_Real, 0.01_Real) ||
