@@ -59,7 +59,12 @@ template <std::integral T> KOKKOS_INLINE_FUNCTION constexpr T min(T A, T B) {
 // Min of two floating-point types
 template <std::floating_point T>
 KOKKOS_INLINE_FUNCTION constexpr T min(T A, T B) {
+// fmin is usually faster on GPUs, ternary is better on CPUs
+#ifdef OMEGA_TARGET_DEVICE
    return Kokkos::fmin(A, B);
+#else
+   return B < A ? B : A;
+#endif
 }
 
 // Min of two arbitrary types
@@ -84,7 +89,12 @@ template <std::integral T> KOKKOS_INLINE_FUNCTION constexpr T max(T A, T B) {
 // Max of two floating-point types
 template <std::floating_point T>
 KOKKOS_INLINE_FUNCTION constexpr T max(T A, T B) {
+// fmax is usually faster on GPUs, ternary is better on CPUs
+#ifdef OMEGA_TARGET_DEVICE
    return Kokkos::fmax(A, B);
+#else
+   return A < B ? B : A;
+#endif
 }
 
 // Max of two arbitrary types
