@@ -445,12 +445,12 @@ int testTendencies() {
              parallelForInner(
                  Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
                     LocPseudoThicknessTendDiff(ICell, K) =
-                        Kokkos::abs(LocPseudoThicknessTend(ICell, K) -
-                                    LocBaselinePseudoThicknessTend(ICell, K));
-                    LocTempTracerTendDiff(ICell, K) = Kokkos::abs(
+                        Math::abs(LocPseudoThicknessTend(ICell, K) -
+                                  LocBaselinePseudoThicknessTend(ICell, K));
+                    LocTempTracerTendDiff(ICell, K) = Math::abs(
                         LocTracerTend(TempTracerIndex, ICell, K) -
                         LocBaselineTracerTend(TempTracerIndex, ICell, K));
-                    LocSaltTracerTendDiff(ICell, K) = Kokkos::abs(
+                    LocSaltTracerTendDiff(ICell, K) = Math::abs(
                         LocTracerTend(SaltTracerIndex, ICell, K) -
                         LocBaselineTracerTend(SaltTracerIndex, ICell, K));
                  });
@@ -464,20 +464,20 @@ int testTendencies() {
                                    VCoord->MinLayerCell, VCoord->MaxLayerCell);
 
       constexpr Real FrazilDeltaATol = 1e-12_Real;
-      if (!Kokkos::isfinite(PseudoDelta) ||
-          isApprox(PseudoDelta, 0._Real, 0._Real, FrazilDeltaATol)) {
+      if (!Math::isfinite(PseudoDelta) ||
+          Math::isApprox(PseudoDelta, 0._Real, 0._Real, FrazilDeltaATol)) {
          Err++;
          LOG_ERROR("TendenciesTest: Frazil did not change "
                    "PseudoThicknessTend");
       }
-      if (!Kokkos::isfinite(TempDelta) ||
-          isApprox(TempDelta, 0._Real, 0._Real, FrazilDeltaATol)) {
+      if (!Math::isfinite(TempDelta) ||
+          Math::isApprox(TempDelta, 0._Real, 0._Real, FrazilDeltaATol)) {
          Err++;
          LOG_ERROR("TendenciesTest: Frazil did not change Temperature tracer "
                    "tendency");
       }
-      if (!Kokkos::isfinite(SaltDelta) ||
-          isApprox(SaltDelta, 0._Real, 0._Real, FrazilDeltaATol)) {
+      if (!Math::isfinite(SaltDelta) ||
+          Math::isApprox(SaltDelta, 0._Real, 0._Real, FrazilDeltaATol)) {
          Err++;
          LOG_ERROR("TendenciesTest: Frazil did not change Salinity tracer "
                    "tendency");
