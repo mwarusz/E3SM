@@ -54,34 +54,22 @@ Halo::ExchList::ExchList(
    // First dimension of List is the number of halo layers
    I4 HaloLayers = List.size();
 
-   // Allocate member vectors and arrays based on number of halo layers
-   NHalo.resize(HaloLayers);
-   OffsetsH = HostArray1DI4("OffsetsH", HaloLayers);
-   Offsets  = Array1DI4("Offsets", HaloLayers);
-
    // Count the total number of elements in the list, set the number of
    // elements in each halo layer, and set the offsets for each layer
-   NTot        = 0;
-   OffsetsH(0) = 0;
-   for (int IHalo = 0; IHalo < HaloLayers - 1; ++IHalo) {
-      NHalo[IHalo] = List[IHalo].size();
-      NTot += NHalo[IHalo];
-      OffsetsH(IHalo + 1) = OffsetsH(IHalo) + NHalo[IHalo];
+   NTot = 0;
+   for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
+      NTot += List[IHalo].size();
    }
-   NHalo[HaloLayers - 1] = List[HaloLayers - 1].size();
-   NTot += NHalo[HaloLayers - 1];
-
-   // Copy OffsetsH to device
-   deepCopy(Offsets, OffsetsH);
 
    // Allocate host and device arrays for storing lists of indices
    IndexH = HostArray1DI4("IndexH", NTot);
    Index  = Array1DI4("Index", NTot);
 
    // Copy List into member IndexH array on host
+   int I = 0;
    for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
-      for (int IList = 0; IList < NHalo[IHalo]; ++IList) {
-         IndexH(OffsetsH(IHalo) + IList) = List[IHalo][IList];
+      for (int IList = 0; IList < List[IHalo].size(); ++IList) {
+         IndexH(I++) = List[IHalo][IList];
       }
    }
 

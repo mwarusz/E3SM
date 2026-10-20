@@ -126,14 +126,8 @@ class Halo {
    /// for a particular index space and neighbor
    class ExchList {
     private:
-      /// Array containing number of mesh elements in each halo layer
-      std::vector<I4> NHalo;
       /// Total number of elements in ExchList, sum of NList
       I4 NTot;
-      /// Host and device arrays containing starting indices in the
-      /// buffer for each halo layer
-      HostArray1DI4 OffsetsH;
-      Array1DI4 Offsets;
       /// Host and device arrays containing the list of local indices of array
       /// elements to be packed into the send buffer, or the local indices of
       /// elements unpacked from the receive buffer
