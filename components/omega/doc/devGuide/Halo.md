@@ -39,15 +39,13 @@ can be retrieved by supplying the Name to `OMEGA::Halo::get(Name)`.
 The Halo constructor will save the MPI communicator handle and the MPI task ID
 of the local task from the MachEnv object, and will extract and save from the
 Decomp object indices defining the local and neighboring halo elements for the
-cell, edge, and vertex index spaces. This information is organized into objects
-of two nested classes of the Halo class: the ExchList class and the Neighbor
-class. The ExchList class contains the indices of Halo elements to either send
-to or receive from a single neighboring task for a particular index space, and
-the Neighbor class contains all the ExchList objects needed to carry out a halo
-exchange with a single neighboring task in any index space, as well as the
-buffer memory space to communicate with that neighbor. All member variables
-and objects and most member methods of the Halo class are declared private
-as they are only needed by the Halo class methods to execute an exchange.
+cell, edge, and vertex index spaces. This information is organized into the
+nested ExchList and Neighbor classes. Each ExchList stores counts and indices
+for every neighbor for a particular index space and send or receive direction.
+The Neighbor class stores separate arrays of neighbor IDs, exchange buffers,
+MPI requests, and message state for all neighbors. All member variables and
+objects and most member methods of the Halo class are declared private as they
+are only needed by the Halo class methods to execute an exchange.
 
 The main methods of the Halo class which execute an exchange are
   - startReceives: wrapper to call MPI_Irecv for each neighbor

@@ -44,61 +44,71 @@ I4 searchVector(const std::vector<I4> &InVector, // vector to search
 } // end function searchVector (std::vector)
 
 //------------------------------------------------------------------------------
-// Construct a new ExchList based on input 2D vector which contains a list
-// of indices sorted by halo layer
+// Construct ExchList data for every neighbor from lists sorted by halo layer
 
 Halo::ExchList::ExchList(
-    const std::vector<std::vector<I4>> List // list of indices
-) {
+    const std::vector<std::vector<std::vector<I4>>> &Lists) {
 
-   // First dimension of List is the number of halo layers
-   I4 HaloLayers = List.size();
+   const I4 NumNeighbors = Lists.size();
+   NTotH                 = HostArray1DI4("NTotH", NumNeighbors);
+   NTot                  = Array1DI4("NTot", NumNeighbors);
+   IndexOffsetH          = HostArray1DI4("IndexOffsetH", NumNeighbors);
+   IndexOffset           = Array1DI4("IndexOffset", NumNeighbors);
 
-   // Count the total number of elements in the list, set the number of
-   // elements in each halo layer, and set the offsets for each layer
-   NTot = 0;
-   for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
-      NTot += List[IHalo].size();
-   }
+   I4 TotalSize = 0;
+   for (int INghbr = 0; INghbr < NumNeighbors; ++INghbr) {
+      const I4 HaloLayers = Lists[INghbr].size();
 
-   // Allocate host and device arrays for storing lists of indices
-   IndexH = HostArray1DI4("IndexH", NTot);
-   Index  = Array1DI4("Index", NTot);
-
-   // Copy List into member IndexH array on host
-   int I = 0;
-   for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
-      for (int IList = 0; IList < List[IHalo].size(); ++IList) {
-         IndexH(I++) = List[IHalo][IList];
+      // Count the total number of elements for this neighbor
+      NTotH[INghbr] = 0;
+      for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
+         NTotH[INghbr] += Lists[INghbr][IHalo].size();
       }
+      TotalSize += NTotH[INghbr];
    }
 
-   // Copy IndexH to device
-   deepCopy(Index, IndexH);
+   // Allocate one host and device array for all neighbors' indices
+   IndexHBacking = HostArray1DI4("IndexH", TotalSize);
+   IndexBacking  = Array1DI4("Index", TotalSize);
+
+   // Store each neighbor's offset and copy its indices into the host array
+   I4 Offset = 0;
+   for (int INghbr = 0; INghbr < NumNeighbors; ++INghbr) {
+      const I4 End         = Offset + NTotH[INghbr];
+      IndexOffsetH(INghbr) = Offset;
+
+      I4 I = 0;
+      for (int IHalo = 0; IHalo < Lists[INghbr].size(); ++IHalo) {
+         for (int IList = 0; IList < Lists[INghbr][IHalo].size(); ++IList) {
+            IndexHBacking(Offset + I++) = Lists[INghbr][IHalo][IList];
+         }
+      }
+
+      Offset = End;
+   }
+
+   deepCopy(NTot, NTotH);
+   deepCopy(IndexOffset, IndexOffsetH);
+   deepCopy(IndexBacking, IndexHBacking);
 
 } // end ExchList constructor
 
-// Empty constructor for ExchList class
-Halo::ExchList::ExchList() = default;
-
 //------------------------------------------------------------------------------
-// Construct a new Neighbor given the send and receive lists for each index
-// space of the neighboring task identified by NghbrID
+// Construct Neighbor data from the send and receive lists for every task
 
 Halo::Neighbor::Neighbor(
-    const std::vector<std::vector<I4>> &SendCell, // list of cells to send
-    const std::vector<std::vector<I4>> &SendEdge, // list of edges to send
-    const std::vector<std::vector<I4>> &SendVrtx, // list of vertices to send
-    const std::vector<std::vector<I4>> &RecvCell, // list of cells to receive
-    const std::vector<std::vector<I4>> &RecvEdge, // list of edges to receive
-    const std::vector<std::vector<I4>> &RecvVrtx, // list of vertices to receive
-    const I4 NghbrID                              // ID of neighboring task
-) {
+    const std::vector<std::vector<std::vector<I4>>> &SendCell,
+    const std::vector<std::vector<std::vector<I4>>> &SendEdge,
+    const std::vector<std::vector<std::vector<I4>>> &SendVrtx,
+    const std::vector<std::vector<std::vector<I4>>> &RecvCell,
+    const std::vector<std::vector<std::vector<I4>>> &RecvEdge,
+    const std::vector<std::vector<std::vector<I4>>> &RecvVrtx,
+    const std::vector<I4> &NeighborIDs) {
 
-   // Set the ID of the neighboring task
-   TaskID = NghbrID;
+   const I4 NumNeighbors = NeighborIDs.size();
+   TaskID                = NeighborIDs;
 
-   // Construct the member ExchList objects
+   // Construct the member ExchList data for each index space
    SendLists[0] = ExchList(SendCell);
    SendLists[1] = ExchList(SendEdge);
    SendLists[2] = ExchList(SendVrtx);
@@ -107,9 +117,16 @@ Halo::Neighbor::Neighbor(
    RecvLists[1] = ExchList(RecvEdge);
    RecvLists[2] = ExchList(RecvVrtx);
 
-   SendBuffer = Array1DR8("SendBuffer", 0);
-   RecvBuffer = Array1DR8("RecvBuffer", 0);
-
+   SendBufferOffsetH = HostArray1DI4("SendBufferOffsetH", NumNeighbors);
+   RecvBufferOffsetH = HostArray1DI4("RecvBufferOffsetH", NumNeighbors);
+   SendBufferOffset  = Array1DI4("SendBufferOffset", NumNeighbors);
+   RecvBufferOffset  = Array1DI4("RecvBufferOffset", NumNeighbors);
+   RReq.resize(NumNeighbors);
+   SReq.resize(NumNeighbors);
+   Received.resize(NumNeighbors);
+   Unpacked.resize(NumNeighbors);
+   SendBuffer  = Array1DR8("SendBuffer", 0);
+   RecvBuffer  = Array1DR8("RecvBuffer", 0);
    SendBufferH = HostArray1DR8("SendBufferH", 0);
    RecvBufferH = HostArray1DR8("RecvBufferH", 0);
 
@@ -156,8 +173,7 @@ Halo::Halo(const std::string &Name, const MachEnv *InEnv,
    // Fetch the total number of tasks
    I4 NumTasks = InEnv->getNumTasks();
 
-   // Declare 3D vectors to hold lists of indices generated below which are
-   // used to construct a Neighbor for each neighboring task
+   // Declare 3D vectors to hold lists of indices for every neighboring task
    std::vector<std::vector<std::vector<I4>>> RecvCellLists;
    std::vector<std::vector<std::vector<I4>>> SendCellLists;
    std::vector<std::vector<std::vector<I4>>> RecvEdgeLists;
@@ -181,13 +197,10 @@ Halo::Halo(const std::string &Name, const MachEnv *InEnv,
    if (IErr != 0)
       LOG_ERROR("Halo: Error generating exchange lists for Vertices");
 
-   // Construct the Neighbor objects and save them in class member Neighbors
-   for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      Neighbors.push_back(Neighbor(SendCellLists[INghbr], SendEdgeLists[INghbr],
-                                   SendVrtxLists[INghbr], RecvCellLists[INghbr],
-                                   RecvEdgeLists[INghbr], RecvVrtxLists[INghbr],
-                                   NeighborList[INghbr]));
-   }
+   // Construct the exchange data for all neighboring tasks
+   Neighbors =
+       Neighbor(SendCellLists, SendEdgeLists, SendVrtxLists, RecvCellLists,
+                RecvEdgeLists, RecvVrtxLists, NeighborList);
 
 } // end Halo constructor
 
@@ -381,7 +394,7 @@ int Halo::generateListOfTasksInHalo(const I4 NOwned, const I4 NAll,
 }
 
 //------------------------------------------------------------------------------
-// For the input index space, set SendFlags and RecvFlags vectors that flag
+// For the input index space, set SendFlags and RecvFlags arrays that flag
 // which Neighbors in NeighborList the local task needs to send elements to or
 // receive elements from during a halo exchange
 
@@ -390,17 +403,19 @@ int Halo::setNeighborFlags(std::vector<I4> ListOfTasks,
 
    I4 Err{0}; // error code to return
 
-   // allocate size of SendFlags and RecvFlags
-   SendFlags[IdxSpace].resize(NNghbr);
-   RecvFlags[IdxSpace].resize(NNghbr);
+   // Allocate host and device flags for this index space
+   SendFlagsH[IdxSpace] = HostArray1DI4("SendFlagsH", NNghbr);
+   RecvFlagsH[IdxSpace] = HostArray1DI4("RecvFlagsH", NNghbr);
+   SendFlags[IdxSpace]  = Array1DI4("SendFlags", NNghbr);
+   RecvFlags[IdxSpace]  = Array1DI4("RecvFlags", NNghbr);
 
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
       auto It = std::find(ListOfTasks.begin(), ListOfTasks.end(),
                           NeighborList[INghbr]);
       if (It != ListOfTasks.end()) {
-         RecvFlags[IdxSpace][INghbr] = 1;
+         RecvFlagsH[IdxSpace](INghbr) = 1;
       } else {
-         RecvFlags[IdxSpace][INghbr] = 0;
+         RecvFlagsH[IdxSpace](INghbr) = 0;
       }
    }
 
@@ -414,7 +429,7 @@ int Halo::setNeighborFlags(std::vector<I4> ListOfTasks,
    std::vector<MPI_Request> SendReqs(NNghbr);
 
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      RecvErr[INghbr] = MPI_Irecv(&SendFlags[IdxSpace][INghbr], 1, MPI_INT,
+      RecvErr[INghbr] = MPI_Irecv(&SendFlagsH[IdxSpace](INghbr), 1, MPI_INT,
                                   NeighborList[INghbr], MPI_ANY_TAG, MyComm,
                                   &RecvReqs[INghbr]);
       if (RecvErr[INghbr] != 0) {
@@ -426,7 +441,7 @@ int Halo::setNeighborFlags(std::vector<I4> ListOfTasks,
 
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
       SendErr[INghbr] =
-          MPI_Isend(&RecvFlags[IdxSpace][INghbr], 1, MPI_INT,
+          MPI_Isend(&RecvFlagsH[IdxSpace](INghbr), 1, MPI_INT,
                     NeighborList[INghbr], 0, MyComm, &SendReqs[INghbr]);
       if (SendErr[INghbr] != 0) {
          LOG_ERROR("MPI error {} on task {} send to task {}", SendErr[INghbr],
@@ -437,6 +452,9 @@ int Halo::setNeighborFlags(std::vector<I4> ListOfTasks,
 
    MPI_Waitall(NNghbr, SendReqs.data(), MPI_STATUS_IGNORE);
    MPI_Waitall(NNghbr, RecvReqs.data(), MPI_STATUS_IGNORE);
+
+   deepCopy(SendFlags[IdxSpace], SendFlagsH[IdxSpace]);
+   deepCopy(RecvFlags[IdxSpace], RecvFlagsH[IdxSpace]);
 
    return Err;
 }
@@ -652,8 +670,7 @@ int Halo::exchangeVectorInt(
 } // end exchangeVectorInt
 
 //------------------------------------------------------------------------------
-// Allocate the required receive buffer and prepare for MPI communication by
-// calling MPI_Irecv for each Neighbor
+// Prepare MPI communication by calling MPI_Irecv for each Neighbor
 
 int Halo::startReceives(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
 
@@ -663,29 +680,32 @@ int Halo::startReceives(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
    I4 Err{0}; // Error code to return
 
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      if (RecvFlags[CurElem][INghbr]) {
-         auto &LocNeighbor = Neighbors[INghbr];
+      if (RecvFlagsH[CurElem](INghbr)) {
+         auto &LocNeighbor = Neighbors;
 
-         I4 BufferSize = TotSize * LocNeighbor.RecvLists[CurElem].NTot;
+         I4 BufferSize = TotSize * LocNeighbor.RecvLists[CurElem].NTotH[INghbr];
+         const I4 BufferOffset = LocNeighbor.RecvBufferOffsetH(INghbr);
+         const auto BufferRange =
+             Kokkos::make_pair(BufferOffset, BufferOffset + BufferSize);
 
          void *DataPtr{nullptr};
 
          // If both flags  are true, the device buffer will receive the message,
          // otherwise the host buffer will.
          if (UseDevBuffer && ExchOnDev) {
-            expandBuffer(LocNeighbor.RecvBuffer, BufferSize);
-            DataPtr = LocNeighbor.RecvBuffer.data();
+            auto Buffer = Kokkos::subview(LocNeighbor.RecvBuffer, BufferRange);
+            DataPtr     = Buffer.data();
          } else {
-            expandBuffer(LocNeighbor.RecvBufferH, BufferSize);
-            DataPtr = LocNeighbor.RecvBufferH.data();
+            auto Buffer = Kokkos::subview(LocNeighbor.RecvBufferH, BufferRange);
+            DataPtr     = Buffer.data();
          }
 
-         IErr[INghbr] =
-             MPI_Irecv(DataPtr, BufferSize, MPI_DOUBLE, LocNeighbor.TaskID,
-                       MPI_ANY_TAG, MyComm, &LocNeighbor.RReq);
+         IErr[INghbr] = MPI_Irecv(DataPtr, BufferSize, MPI_DOUBLE,
+                                  LocNeighbor.TaskID[INghbr], MPI_ANY_TAG,
+                                  MyComm, &LocNeighbor.RReq[INghbr]);
          if (IErr[INghbr] != 0) {
             LOG_ERROR("MPI error {} on task {} receive from task {}",
-                      IErr[INghbr], MyTask, LocNeighbor.TaskID);
+                      IErr[INghbr], MyTask, LocNeighbor.TaskID[INghbr]);
             Err = -1;
          }
       }
@@ -709,12 +729,15 @@ int Halo::startSends(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
       Kokkos::fence();
 
    for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-      if (SendFlags[CurElem][INghbr]) {
-         auto &LocNeighbor = Neighbors[INghbr];
+      if (SendFlagsH[CurElem](INghbr)) {
+         auto &LocNeighbor = Neighbors;
 
          void *DataPtr{nullptr};
 
-         I4 BufferSize = TotSize * LocNeighbor.SendLists[CurElem].NTot;
+         I4 BufferSize = TotSize * LocNeighbor.SendLists[CurElem].NTotH[INghbr];
+         const I4 BufferOffset = LocNeighbor.SendBufferOffsetH(INghbr);
+         const auto BufferRange =
+             Kokkos::make_pair(BufferOffset, BufferOffset + BufferSize);
 
          // If UseDevBuffer is true the device buffer was packed by packBuffer,
          // otherwise the host buffer was
@@ -723,29 +746,32 @@ int Halo::startSends(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
             // MPI_Isend, otherwise the device buffer needs to be copied
             // to the host buffer, which will be passed to MPI_Isend
             if (ExchOnDev) {
-               DataPtr = LocNeighbor.SendBuffer.data();
+               auto Buffer =
+                   Kokkos::subview(LocNeighbor.SendBuffer, BufferRange);
+               DataPtr = Buffer.data();
             } else {
-               expandBuffer(LocNeighbor.SendBufferH, BufferSize);
-
                // The number of elements we need to copy is different
                // than the buffer allocation size
-               auto CopyRange = Kokkos::make_pair(0, BufferSize);
+               const auto CopyRange = BufferRange;
 
                deepCopy(Kokkos::subview(LocNeighbor.SendBufferH, CopyRange),
                         Kokkos::subview(LocNeighbor.SendBuffer, CopyRange));
 
-               DataPtr = LocNeighbor.SendBufferH.data();
+               auto Buffer =
+                   Kokkos::subview(LocNeighbor.SendBufferH, BufferRange);
+               DataPtr = Buffer.data();
             }
          } else {
-            DataPtr = LocNeighbor.SendBufferH.data();
+            auto Buffer = Kokkos::subview(LocNeighbor.SendBufferH, BufferRange);
+            DataPtr     = Buffer.data();
          }
 
-         IErr[INghbr] =
-             MPI_Isend(DataPtr, BufferSize, MPI_DOUBLE, LocNeighbor.TaskID, 0,
-                       MyComm, &LocNeighbor.SReq);
+         IErr[INghbr] = MPI_Isend(DataPtr, BufferSize, MPI_DOUBLE,
+                                  LocNeighbor.TaskID[INghbr], 0, MyComm,
+                                  &LocNeighbor.SReq[INghbr]);
          if (IErr[INghbr] != 0) {
             LOG_ERROR("MPI error {} on task {} send to task {}", IErr[INghbr],
-                      MyTask, LocNeighbor.TaskID);
+                      MyTask, LocNeighbor.TaskID[INghbr]);
             Err = -1;
          }
       }
