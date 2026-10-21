@@ -60,7 +60,7 @@ void expandBuffer(BufferType &Buffer, int BufferSize) {
 /// variables utilized by the current halo exchange which are stored here
 /// for easy accessibility by the Halo methods.
 class Halo {
- private:
+ public:
    /// Flag to allow passing device arrays to MPI_Irecv and MPI_Isend in
    /// startReceives and startSends, determined by pre-processing parameter
 #ifdef OMEGA_MPI_ON_DEVICE
@@ -110,7 +110,7 @@ class Halo {
    /// an array into a buffer or unpack values from a buffer into an array
    /// for a particular index space and neighbor
    class ExchList {
-    private:
+    public:
       /// Array containing number of mesh elements in each halo layer
       std::vector<I4> NHalo;
       /// Total number of elements in ExchList, sum of NList
@@ -147,7 +147,7 @@ class Halo {
    /// needed to carry out a halo exchange in each index space for one
    /// neighboring task.
    class Neighbor {
-    private:
+    public:
       I4 TaskID; /// ID of neighboring task
 
       /// Arrays of ExchList objects for sends and recieves for each
