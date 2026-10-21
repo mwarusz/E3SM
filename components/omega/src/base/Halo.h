@@ -84,7 +84,7 @@ KOKKOS_INLINE_FUNCTION auto makeArraySubview(const ViewType &Array, I4 Offset,
 /// halo exchange with every neighboring task for any array defined on the mesh.
 /// The local task ID and the MPI communicator handle are also stored here.
 class Halo {
- private:
+ public:
    /// Flag to allow passing device arrays to MPI_Irecv and MPI_Isend in
    /// startReceives and startSends, determined by pre-processing parameter
 #ifdef OMEGA_MPI_ON_DEVICE
@@ -127,7 +127,7 @@ class Halo {
    /// an array into a buffer or unpack values from a buffer into an array
    /// for a particular index space and all neighbors.
    class ExchList {
-    private:
+    public:
       /// Total number of elements in each neighbor's exchange list
       HostArray1DI4 NTotH;
       Array1DI4 NTot;
@@ -162,7 +162,7 @@ class Halo {
    /// The Neighbor class stores each kind of halo-exchange data for all
    /// neighboring tasks in separate arrays.
    class Neighbor {
-    private:
+    public:
       std::vector<I4> TaskID; /// IDs of neighboring tasks
 
       /// Arrays of ExchList objects for sends and recieves for each
