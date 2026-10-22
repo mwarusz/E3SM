@@ -1083,58 +1083,13 @@ class Halo {
       Pacer::stop("Halo:packBuffers", 4);
    }
 
-   //---------------------------------------------------------------------------
-   // Function template to perform a full halo exchange on the input Kokkos
-   // array of any supported type defined on the input index space ThisElem
    template <typename T>
-   int
-   exchangeFullArrayHalo(T &Array,           // Kokkos array of any type
-                         MeshElement CurElem // index space Array is defined on
-   ) {
-      // Add more context for timers in this function
-      // BUG: fails when there is no parent timer
-      // Uncomment after fixing in Pacer
-      Pacer::addParentPrefix();
-
-      I4 IErr{0}; // error code
-
+   int receiveUnpack(T &Array,            // Kokkos array of any type
+                     MeshElement CurElem, // index space Array is defined on
+                     bool UseDevBuffer) {
+      int IErr = 0;
       // Logical flag to track if all messages have been received
       bool AllReceived{false};
-
-      // If the Array is in device memory space, the buffer pack and unpack
-      // functions will use device buffers
-      bool UseDevBuffer = devBufferPUP(Array);
-
-      TotalSize = totalSize(Array);
-
-      // Grow all buffers before starting communication or packing
-      expandBuffer(Neighbors.SendBuffer,
-                   Neighbors.SendBufferSize[CurElem] * TotalSize);
-      expandBuffer(Neighbors.SendBufferH,
-                   Neighbors.SendBufferSize[CurElem] * TotalSize);
-      expandBuffer(Neighbors.RecvBuffer,
-                   Neighbors.RecvBufferSize[CurElem] * TotalSize);
-      expandBuffer(Neighbors.RecvBufferH,
-                   Neighbors.RecvBufferSize[CurElem] * TotalSize);
-
-      // Call MPI_Irecv for each Neighbor
-      // so the local task is ready to accept messages from each
-      // neighboring task
-      startReceives(UseDevBuffer, CurElem);
-
-      // packAllBuffers(Array, CurElem);
-      packAllBuffersNbPar(Array, CurElem);
-
-      // Call MPI_Isend for each Neighbor to send the packed buffers
-      startSends(UseDevBuffer, CurElem);
-
-      // Collect all send requests
-      std::vector<MPI_Request> SendReqs;
-      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-         if (SendFlagsH[CurElem](INghbr)) {
-            SendReqs.push_back(Neighbors.SReq[INghbr]);
-         }
-      }
 
       I4 MaxIter = 1000000000; // Large integer to prevent infinite loop
       I4 IPass   = 0;          // Number of passes through while loop
@@ -1196,6 +1151,61 @@ class Halo {
          }
       }
       Pacer::stop("Halo:receiveUnpack", 4);
+
+      return IErr;
+   }
+
+   //---------------------------------------------------------------------------
+   // Function template to perform a full halo exchange on the input Kokkos
+   // array of any supported type defined on the input index space ThisElem
+   template <typename T>
+   int
+   exchangeFullArrayHalo(T &Array,           // Kokkos array of any type
+                         MeshElement CurElem // index space Array is defined on
+   ) {
+      // Add more context for timers in this function
+      // BUG: fails when there is no parent timer
+      // Uncomment after fixing in Pacer
+      Pacer::addParentPrefix();
+
+      I4 IErr{0}; // error code
+
+      // If the Array is in device memory space, the buffer pack and unpack
+      // functions will use device buffers
+      bool UseDevBuffer = devBufferPUP(Array);
+
+      TotalSize = totalSize(Array);
+
+      // Grow all buffers before starting communication or packing
+      expandBuffer(Neighbors.SendBuffer,
+                   Neighbors.SendBufferSize[CurElem] * TotalSize);
+      expandBuffer(Neighbors.SendBufferH,
+                   Neighbors.SendBufferSize[CurElem] * TotalSize);
+      expandBuffer(Neighbors.RecvBuffer,
+                   Neighbors.RecvBufferSize[CurElem] * TotalSize);
+      expandBuffer(Neighbors.RecvBufferH,
+                   Neighbors.RecvBufferSize[CurElem] * TotalSize);
+
+      // Call MPI_Irecv for each Neighbor
+      // so the local task is ready to accept messages from each
+      // neighboring task
+      startReceives(UseDevBuffer, CurElem);
+
+      // packAllBuffers(Array, CurElem);
+      packAllBuffersNbPar(Array, CurElem);
+
+      // Call MPI_Isend for each Neighbor to send the packed buffers
+      startSends(UseDevBuffer, CurElem);
+
+      // Collect all send requests
+      std::vector<MPI_Request> SendReqs;
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         if (SendFlagsH[CurElem](INghbr)) {
+            SendReqs.push_back(Neighbors.SReq[INghbr]);
+         }
+      }
+
+      IErr += receiveUnpack(Array, CurElem, UseDevBuffer);
 
       // We need to fence here because we are reusing buffers and GPU work is
       // async
