@@ -104,9 +104,10 @@ class Halo {
 
    const Decomp *MyDecomp{nullptr}; /// Pointer to decomposition object
 
-   I4 NNghbr;       /// number of neighboring tasks
-   I4 MyTask;       /// local MPI Task ID
-   I4 HaloWidth;    /// cell width of halo
+   I4 NNghbr;    /// number of neighboring tasks
+   I4 MyTask;    /// local MPI Task ID
+   I4 HaloWidth; /// cell width of halo
+   I4 TotalSize;
    MPI_Comm MyComm; /// MPI communicator handle
 
    /// Forward Declaration of Neighbor class, defined below
@@ -245,12 +246,12 @@ class Halo {
    /// Allocate the recieve buffers and call MPI_Irecv for each Neighbor.
    /// The input bool UseDevBuffer specifies whether or not the device buffer
    /// will be used in the unpackBuffer functionfor unpacking into the array.
-   int startReceives(bool UseDevBuffer, I4 TotSize, I4 CurElem);
+   int startReceives(bool UseDevBuffer, I4 CurElem);
 
    /// Call MPI_Isend for each Neighbor to send the packed buffers to the
    /// neighboring tasks. The input bool UseDevBuffer specifies whether or not
    /// the device buffer was packed in the packBuffer function.
-   int startSends(bool UseDevBuffer, I4 TotSize, I4 CurElem);
+   int startSends(bool UseDevBuffer, I4 CurElem);
 
    /// Function template that returns a bool that is true if the Array is
    /// on the device, or if the device and host memory spaces are the same
@@ -361,7 +362,7 @@ class Halo {
       const I4 NJ = Array.extent(1);
 
       const I4 NTotList     = LocList.NTotH[CurNeighbor];
-      const I4 BufferSize   = NTotList * totalSize(Array);
+      const I4 BufferSize   = NTotList * TotalSize;
       const I4 BufferOffset = Neighbors.SendBufferOffsetH(CurNeighbor);
 
       if (devBufferPUP(Array)) {
@@ -414,7 +415,7 @@ class Halo {
       const I4 NK = Array.extent(0);
 
       const I4 NTotList     = LocList.NTotH[CurNeighbor];
-      const I4 BufferSize   = LocList.NTotH[CurNeighbor] * totalSize(Array);
+      const I4 BufferSize   = LocList.NTotH[CurNeighbor] * TotalSize;
       const I4 BufferOffset = Neighbors.SendBufferOffsetH(CurNeighbor);
 
       if (devBufferPUP(Array)) {
@@ -471,7 +472,7 @@ class Halo {
       const I4 NL = Array.extent(0);
 
       const I4 NTotList     = LocList.NTotH[CurNeighbor];
-      const I4 BufferSize   = LocList.NTotH[CurNeighbor] * totalSize(Array);
+      const I4 BufferSize   = LocList.NTotH[CurNeighbor] * TotalSize;
       const I4 BufferOffset = Neighbors.SendBufferOffsetH(CurNeighbor);
 
       if (devBufferPUP(Array)) {
@@ -533,7 +534,7 @@ class Halo {
       const I4 NM = Array.extent(0);
 
       const I4 NTotList     = LocList.NTotH[CurNeighbor];
-      const I4 BufferSize   = LocList.NTotH[CurNeighbor] * totalSize(Array);
+      const I4 BufferSize   = LocList.NTotH[CurNeighbor] * TotalSize;
       const I4 BufferOffset = Neighbors.SendBufferOffsetH(CurNeighbor);
 
       if (devBufferPUP(Array)) {
@@ -775,7 +776,7 @@ class Halo {
 
       const I4 NJ           = Array.extent(1);
       const I4 NTotList     = LocList.NTotH[CurNeighbor];
-      const I4 BufferSize   = NTotList * totalSize(Array);
+      const I4 BufferSize   = NTotList * TotalSize;
       const I4 BufferOffset = Neighbors.RecvBufferOffsetH(CurNeighbor);
 
       if (devBufferPUP(Array)) {
@@ -830,7 +831,7 @@ class Halo {
       const I4 NK = Array.extent(0);
 
       const I4 NTotList     = LocList.NTotH[CurNeighbor];
-      const I4 BufferSize   = NTotList * totalSize(Array);
+      const I4 BufferSize   = NTotList * TotalSize;
       const I4 BufferOffset = Neighbors.RecvBufferOffsetH(CurNeighbor);
 
       if (devBufferPUP(Array)) {
@@ -889,7 +890,7 @@ class Halo {
       const I4 NL = Array.extent(0);
 
       const I4 NTotList     = LocList.NTotH[CurNeighbor];
-      const I4 BufferSize   = NTotList * totalSize(Array);
+      const I4 BufferSize   = NTotList * TotalSize;
       const I4 BufferOffset = Neighbors.RecvBufferOffsetH(CurNeighbor);
 
       if (devBufferPUP(Array)) {
@@ -953,7 +954,7 @@ class Halo {
       const I4 NM = Array.extent(0);
 
       const I4 NTotList     = LocList.NTotH[CurNeighbor];
-      const I4 BufferSize   = NTotList * totalSize(Array);
+      const I4 BufferSize   = NTotList * TotalSize;
       const I4 BufferOffset = Neighbors.RecvBufferOffsetH(CurNeighbor);
 
       if (devBufferPUP(Array)) {
@@ -1060,6 +1061,8 @@ class Halo {
       // functions will use device buffers
       bool UseDevBuffer = devBufferPUP(Array);
 
+      TotalSize = totalSize(Array);
+
       // Determine the contiguous buffer offsets and sizes for all neighbors
       I4 SendBufferSize = 0;
       I4 RecvBufferSize = 0;
@@ -1068,11 +1071,11 @@ class Halo {
          Neighbors.RecvBufferOffsetH(INghbr) = RecvBufferSize;
          if (SendFlagsH[CurElem](INghbr)) {
             SendBufferSize +=
-                totalSize(Array) * Neighbors.SendLists[CurElem].NTotH[INghbr];
+                TotalSize * Neighbors.SendLists[CurElem].NTotH[INghbr];
          }
          if (RecvFlagsH[CurElem](INghbr)) {
             RecvBufferSize +=
-                totalSize(Array) * Neighbors.RecvLists[CurElem].NTotH[INghbr];
+                TotalSize * Neighbors.RecvLists[CurElem].NTotH[INghbr];
          }
       }
       deepCopy(Neighbors.SendBufferOffset, Neighbors.SendBufferOffsetH);
@@ -1087,13 +1090,13 @@ class Halo {
       // Call MPI_Irecv for each Neighbor
       // so the local task is ready to accept messages from each
       // neighboring task
-      startReceives(UseDevBuffer, totalSize(Array), CurElem);
+      startReceives(UseDevBuffer, CurElem);
 
       // packAllBuffers(Array, CurElem);
       packAllBuffersNbPar(Array, CurElem);
 
       // Call MPI_Isend for each Neighbor to send the packed buffers
-      startSends(UseDevBuffer, totalSize(Array), CurElem);
+      startSends(UseDevBuffer, CurElem);
 
       // Collect all send requests
       std::vector<MPI_Request> SendReqs;
@@ -1135,8 +1138,7 @@ class Halo {
                      // The number of elements we need to copy is different
                      // than the buffer allocation size
                      const I4 BufferSize =
-                         totalSize(Array) *
-                         Neighbors.RecvLists[CurElem].NTotH[INghbr];
+                         TotalSize * Neighbors.RecvLists[CurElem].NTotH[INghbr];
                      const I4 Offset = Neighbors.RecvBufferOffsetH(INghbr);
                      const auto CopyRange =
                          Kokkos::make_pair(Offset, Offset + BufferSize);

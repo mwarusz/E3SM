@@ -672,7 +672,7 @@ int Halo::exchangeVectorInt(
 //------------------------------------------------------------------------------
 // Prepare MPI communication by calling MPI_Irecv for each Neighbor
 
-int Halo::startReceives(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
+int Halo::startReceives(const bool UseDevBuffer, I4 CurElem) {
 
    // Initialize vector to track MPI errors for each MPI_Irecv
    std::vector<I4> IErr(NNghbr, 0);
@@ -683,7 +683,8 @@ int Halo::startReceives(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
       if (RecvFlagsH[CurElem](INghbr)) {
          auto &LocNeighbor = Neighbors;
 
-         I4 BufferSize = TotSize * LocNeighbor.RecvLists[CurElem].NTotH[INghbr];
+         I4 BufferSize =
+             TotalSize * LocNeighbor.RecvLists[CurElem].NTotH[INghbr];
          const I4 BufferOffset = LocNeighbor.RecvBufferOffsetH(INghbr);
          const auto BufferRange =
              Kokkos::make_pair(BufferOffset, BufferOffset + BufferSize);
@@ -718,7 +719,7 @@ int Halo::startReceives(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
 // Initiate MPI communication by calling MPI_Isend for each Neighbor to send
 // the packed buffers to each task
 
-int Halo::startSends(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
+int Halo::startSends(const bool UseDevBuffer, I4 CurElem) {
 
    // Initialize vector to track MPI errors for each MPI_Isend
    std::vector<I4> IErr(NNghbr, 0);
@@ -734,7 +735,8 @@ int Halo::startSends(const bool UseDevBuffer, I4 TotSize, I4 CurElem) {
 
          void *DataPtr{nullptr};
 
-         I4 BufferSize = TotSize * LocNeighbor.SendLists[CurElem].NTotH[INghbr];
+         I4 BufferSize =
+             TotalSize * LocNeighbor.SendLists[CurElem].NTotH[INghbr];
          const I4 BufferOffset = LocNeighbor.SendBufferOffsetH(INghbr);
          const auto BufferRange =
              Kokkos::make_pair(BufferOffset, BufferOffset + BufferSize);
