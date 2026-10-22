@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Halo.h"
+#include "Config.h"
 #include "Error.h"
 #include "mpi.h"
 #include <algorithm>
@@ -166,7 +167,20 @@ int Halo::init() {
    Decomp *DefDecomp = Decomp::getDefault();
    OMEGA_REQUIRE(DefDecomp, "Null default Decomp pointer in Halo::init");
 
-   Halo::DefaultHalo = create("Default", DefEnv, DefDecomp);
+   bool PackNbPar      = true;
+   bool UnpackNbPar    = false;
+   Config *OmegaConfig = Config::getOmegaConfig();
+   if (OmegaConfig) {
+      Config HaloConfig("Halo");
+      if (OmegaConfig->get(HaloConfig).isSuccess()) {
+         HaloConfig.get("PackNbPar", PackNbPar);
+         HaloConfig.get("UnpackNbPar", UnpackNbPar);
+      }
+   }
+
+   Halo::DefaultHalo              = create("Default", DefEnv, DefDecomp);
+   Halo::DefaultHalo->PackNbPar   = PackNbPar;
+   Halo::DefaultHalo->UnpackNbPar = UnpackNbPar;
 
    return IErr;
 

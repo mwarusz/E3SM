@@ -21,6 +21,9 @@ Omega:
   Decomp:
     HaloWidth: 3
     DecompMethod: MetisKWay
+  Halo:
+    PackNbPar: true
+    UnpackNbPar: false
   IO:
     IOTasks:  1
     IOStride: 1

@@ -116,6 +116,8 @@ class Halo {
    I4 MyTask;    /// local MPI Task ID
    I4 HaloWidth; /// cell width of halo
    I4 TotalSize;
+   bool PackNbPar{true};
+   bool UnpackNbPar{false};
    MPI_Comm MyComm; /// MPI communicator handle
 
    /// Forward Declaration of Neighbor class, defined below
@@ -1398,8 +1400,11 @@ class Halo {
       // neighboring task
       startReceives(UseDevBuffer, CurElem);
 
-      // packAllBuffers(Array, CurElem);
-      packAllBuffersNbPar(Array, CurElem);
+      if (PackNbPar) {
+         packAllBuffersNbPar(Array, CurElem);
+      } else {
+         packAllBuffers(Array, CurElem);
+      }
 
       // Call MPI_Isend for each Neighbor to send the packed buffers
       startSends(UseDevBuffer, CurElem);
@@ -1412,7 +1417,11 @@ class Halo {
          }
       }
 
-      IErr += receiveUnpack(Array, CurElem, UseDevBuffer);
+      if (UnpackNbPar) {
+         IErr += receiveUnpackNbPar(Array, CurElem, UseDevBuffer);
+      } else {
+         IErr += receiveUnpack(Array, CurElem, UseDevBuffer);
+      }
 
       // We need to fence here because we are reusing buffers and GPU work is
       // async
