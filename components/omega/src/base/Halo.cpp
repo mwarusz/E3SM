@@ -103,7 +103,8 @@ Halo::Neighbor::Neighbor(
     const std::vector<std::vector<std::vector<I4>>> &RecvCell,
     const std::vector<std::vector<std::vector<I4>>> &RecvEdge,
     const std::vector<std::vector<std::vector<I4>>> &RecvVrtx,
-    const std::vector<I4> &NeighborIDs) {
+    const std::vector<I4> &NeighborIDs, const HostArray1DI4 (&SendFlagsH)[3],
+    const HostArray1DI4 (&RecvFlagsH)[3]) {
 
    const I4 NumNeighbors = NeighborIDs.size();
    TaskID                = NeighborIDs;
@@ -117,10 +118,6 @@ Halo::Neighbor::Neighbor(
    RecvLists[1] = ExchList(RecvEdge);
    RecvLists[2] = ExchList(RecvVrtx);
 
-   SendBufferOffsetH = HostArray1DI4("SendBufferOffsetH", NumNeighbors);
-   RecvBufferOffsetH = HostArray1DI4("RecvBufferOffsetH", NumNeighbors);
-   SendBufferOffset  = Array1DI4("SendBufferOffset", NumNeighbors);
-   RecvBufferOffset  = Array1DI4("RecvBufferOffset", NumNeighbors);
    RReq.resize(NumNeighbors);
    SReq.resize(NumNeighbors);
    Received.resize(NumNeighbors);
@@ -130,6 +127,30 @@ Halo::Neighbor::Neighbor(
    SendBufferH = HostArray1DR8("SendBufferH", 0);
    RecvBufferH = HostArray1DR8("RecvBufferH", 0);
 
+   for (int Elem = 0; Elem < 3; ++Elem) {
+      SendBufferOffsetH[Elem] =
+          HostArray1DI4("SendBufferOffsetH", NumNeighbors);
+      RecvBufferOffsetH[Elem] =
+          HostArray1DI4("RecvBufferOffsetH", NumNeighbors);
+      SendBufferOffset[Elem] = Array1DI4("SendBufferOffset", NumNeighbors);
+      RecvBufferOffset[Elem] = Array1DI4("RecvBufferOffset", NumNeighbors);
+
+      // Determine the contiguous buffer offsets and sizes for all neighbors
+      SendBufferSize[Elem] = 0;
+      RecvBufferSize[Elem] = 0;
+      for (int INghbr = 0; INghbr < NumNeighbors; ++INghbr) {
+         SendBufferOffsetH[Elem](INghbr) = SendBufferSize[Elem];
+         RecvBufferOffsetH[Elem](INghbr) = RecvBufferSize[Elem];
+         if (SendFlagsH[Elem](INghbr)) {
+            SendBufferSize[Elem] += SendLists[Elem].NTotH[INghbr];
+         }
+         if (RecvFlagsH[Elem](INghbr)) {
+            RecvBufferSize[Elem] += RecvLists[Elem].NTotH[INghbr];
+         }
+      }
+      deepCopy(SendBufferOffset[Elem], SendBufferOffsetH[Elem]);
+      deepCopy(RecvBufferOffset[Elem], RecvBufferOffsetH[Elem]);
+   }
 } // end Neighbor constructor
 
 //------------------------------------------------------------------------------
@@ -198,9 +219,9 @@ Halo::Halo(const std::string &Name, const MachEnv *InEnv,
       LOG_ERROR("Halo: Error generating exchange lists for Vertices");
 
    // Construct the exchange data for all neighboring tasks
-   Neighbors =
-       Neighbor(SendCellLists, SendEdgeLists, SendVrtxLists, RecvCellLists,
-                RecvEdgeLists, RecvVrtxLists, NeighborList);
+   Neighbors = Neighbor(SendCellLists, SendEdgeLists, SendVrtxLists,
+                        RecvCellLists, RecvEdgeLists, RecvVrtxLists,
+                        NeighborList, SendFlagsH, RecvFlagsH);
 
 } // end Halo constructor
 
@@ -685,7 +706,8 @@ int Halo::startReceives(const bool UseDevBuffer, I4 CurElem) {
 
          I4 BufferSize =
              TotalSize * LocNeighbor.RecvLists[CurElem].NTotH[INghbr];
-         const I4 BufferOffset = LocNeighbor.RecvBufferOffsetH(INghbr);
+         const I4 BufferOffset =
+             TotalSize * LocNeighbor.RecvBufferOffsetH[CurElem](INghbr);
          const auto BufferRange =
              Kokkos::make_pair(BufferOffset, BufferOffset + BufferSize);
 
@@ -737,7 +759,8 @@ int Halo::startSends(const bool UseDevBuffer, I4 CurElem) {
 
          I4 BufferSize =
              TotalSize * LocNeighbor.SendLists[CurElem].NTotH[INghbr];
-         const I4 BufferOffset = LocNeighbor.SendBufferOffsetH(INghbr);
+         const I4 BufferOffset =
+             TotalSize * LocNeighbor.SendBufferOffsetH[CurElem](INghbr);
          const auto BufferRange =
              Kokkos::make_pair(BufferOffset, BufferOffset + BufferSize);
 
