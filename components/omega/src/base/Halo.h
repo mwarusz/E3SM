@@ -25,9 +25,9 @@
 #include "OmegaKokkos.h"
 #include "Pacer.h"
 #include "mpi.h"
+#include <algorithm>
 #include <cstring>
 #include <memory>
-#include <numeric>
 #include <type_traits>
 #include <vector>
 
@@ -52,15 +52,47 @@ void expandBuffer(BufferType &Buffer, int BufferSize) {
    }
 }
 
+// Determine the number of array elements per cell, edge, or vertex
+// in the input array
+template <class ArrayType>
+KOKKOS_FUNCTION I4 totalSize(const ArrayType &Array) {
+   I4 TotSize;
+   I4 NDims = Array.rank();
+
+   if (NDims == 1) {
+      TotSize = 1;
+   } else if (NDims == 2) {
+      TotSize = Array.extent(1);
+   } else {
+      TotSize = 1;
+      for (int I = 0; I < NDims - 2; ++I) {
+         TotSize *= Array.extent(I);
+      }
+      TotSize *= Array.extent(NDims - 1);
+   }
+   return TotSize;
+}
+
+template <typename ViewType>
+KOKKOS_INLINE_FUNCTION auto makeArraySubview(const ViewType &Array, I4 Offset,
+                                             I4 Size) {
+   return Kokkos::subview(Array, Kokkos::make_pair(Offset, Offset + Size));
+}
+
+template <typename ViewType>
+KOKKOS_INLINE_FUNCTION auto makeBufferSubview(const ViewType &Array, I4 Offset,
+                                              I4 Size, I4 TotalSize) {
+   return Kokkos::subview(
+       Array,
+       Kokkos::make_pair(TotalSize * Offset, TotalSize * (Offset + Size)));
+}
+
 /// The Halo class contains two nested classes, ExchList and Neighbor classes,
-/// defined below. The Halo class holds all the Neighbor objects needed by a
-/// task to perform a full halo exchange with each of its neighboring tasks for
-/// any array defined on the mesh. The local task ID and the MPI communicator
-/// handle are also stored here. NumLayers, CurElem, and TotSize are temporary
-/// variables utilized by the current halo exchange which are stored here
-/// for easy accessibility by the Halo methods.
+/// defined below. The Neighbor class stores the data needed to perform a full
+/// halo exchange with every neighboring task for any array defined on the mesh.
+/// The local task ID and the MPI communicator handle are also stored here.
 class Halo {
- private:
+ public:
    /// Flag to allow passing device arrays to MPI_Irecv and MPI_Isend in
    /// startReceives and startSends, determined by pre-processing parameter
 #ifdef OMEGA_MPI_ON_DEVICE
@@ -80,21 +112,16 @@ class Halo {
 
    const Decomp *MyDecomp{nullptr}; /// Pointer to decomposition object
 
-   I4 NNghbr;           /// number of neighboring tasks
-   I4 MyTask;           /// local MPI Task ID
-   I4 HaloWidth;        /// cell width of halo
-   I4 NumLayers;        /// number of halo layers for current exchange
-   I4 TotSize;          /// Array size at each mesh element for current exchange
-   MPI_Comm MyComm;     /// MPI communicator handle
-   MeshElement CurElem; /// index space of current array
+   I4 NNghbr;    /// number of neighboring tasks
+   I4 MyTask;    /// local MPI Task ID
+   I4 HaloWidth; /// cell width of halo
+   I4 TotalSize;
+   bool PackNbPar{true};
+   bool UnpackNbPar{false};
+   MPI_Comm MyComm; /// MPI communicator handle
 
    /// Forward Declaration of Neighbor class, defined below
    class Neighbor;
-
-   /// Vector of Neighbor class objects for all neighboring tasks, contains
-   /// all the exchange lists and buffer memory sufficient for a full halo
-   /// exchange in any index space.
-   std::vector<Neighbor> Neighbors;
 
    /// Sorted list of Task IDs of all neighboring tasks in ascending order.
    /// Another task is considered a neighbor if a mesh element owned by that
@@ -104,51 +131,50 @@ class Halo {
 
    /// Flags to control which tasks in NeighborList the local task needs to
    /// send elements to and receive elements from for each index space.
-   std::vector<I4> SendFlags[3], RecvFlags[3];
+   HostArray1DI4 SendFlagsH[3], RecvFlagsH[3];
+   Array1DI4 SendFlags[3], RecvFlags[3];
 
    /// The ExchList class contains the information needed to pack values from
    /// an array into a buffer or unpack values from a buffer into an array
-   /// for a particular index space and neighbor
+   /// for a particular index space and all neighbors.
    class ExchList {
-    private:
-      /// Array containing number of mesh elements in each halo layer
-      std::vector<I4> NHalo;
-      /// Total number of elements in ExchList, sum of NList
-      I4 NTot;
-      /// Host and device arrays containing starting indices in the
-      /// buffer for each halo layer
-      HostArray1DI4 OffsetsH;
-      Array1DI4 Offsets;
-      /// Host and device arrays containing the list of local indices of array
-      /// elements to be packed into the send buffer, or the local indices of
-      /// elements unpacked from the receive buffer
-      HostArray1DI4 IndexH;
-      Array1DI4 Index;
+    public:
+      /// Total number of elements in each neighbor's exchange list
+      HostArray1DI4 NTotH;
+      Array1DI4 NTot;
+      /// Backing arrays for all neighbors' local indices
+      HostArray1DI4 IndexHBacking;
+      Array1DI4 IndexBacking;
+      /// Offsets for each neighbor's indices in the backing arrays
+      HostArray1DI4 IndexOffsetH;
+      Array1DI4 IndexOffset;
+      /// Create a neighbor's host index subview on demand
 
-      /// The constructor for the ExchList class takes as input an array of
-      /// vectors, each containing a list of indices to be sent or received for
-      /// each halo layer for a particular neighbor
-      ExchList(const std::vector<std::vector<I4>> List);
+      /// The input contains a list of indices for each neighbor and halo layer
+      ExchList(const std::vector<std::vector<std::vector<I4>>> &Lists);
+
+      HostArray1DI4 hostIndices(const I4 INeighbor) const {
+         const I4 Offset = IndexOffsetH(INeighbor);
+         return Kokkos::subview(
+             IndexHBacking,
+             Kokkos::make_pair(Offset, Offset + NTotH[INeighbor]));
+      }
 
       /// Empty constructor for ExchList class
-      ExchList();
+      ExchList() = default;
 
     public:
-      /// Destructor
-      ~ExchList() {}
-
       /// Halo and Neighbor are friend class to allow access to private
       /// members of the class
       friend class Halo;
       friend class Neighbor;
    }; // end class ExchList
 
-   /// The Neighbor class contains all the information and buffer memory
-   /// needed to carry out a halo exchange in each index space for one
-   /// neighboring task.
+   /// The Neighbor class stores each kind of halo-exchange data for all
+   /// neighboring tasks in separate arrays.
    class Neighbor {
-    private:
-      I4 TaskID; /// ID of neighboring task
+    public:
+      std::vector<I4> TaskID; /// IDs of neighboring tasks
 
       /// Arrays of ExchList objects for sends and recieves for each
       /// index space. 0 = OnCell, 1 = OnEdge, 2 = OnVertex
@@ -156,35 +182,42 @@ class Halo {
       /// Buffers for MPI communication on host and device
       HostArray1DR8 SendBufferH, RecvBufferH;
       Array1DR8 SendBuffer, RecvBuffer;
+      /// Offsets for each neighbor in the shared communication buffers
+      HostArray1DI4 SendBufferOffsetH[3], RecvBufferOffsetH[3];
+      Array1DI4 SendBufferOffset[3], RecvBufferOffset[3];
+      I4 SendBufferSize[3];
+      I4 RecvBufferSize[3];
       /// MPI request handles for non-blocking MPI communication
-      MPI_Request RReq, SReq;
+      std::vector<MPI_Request> RReq, SReq;
 
       // Flags to track whether a message has been received and whether
       // the buffer has been unpacked yet. The MPI_Test routine requires an
       // integer, so Received is stored as an I4.
-      I4 Received{false};
-      bool Unpacked{false};
+      std::vector<I4> Received;
+      std::vector<I4> Unpacked;
 
-      /// Neighbor constructor takes takes as input six unique vectors of
-      /// vectors containing the indices of array elements to send or receive
-      /// for each type of mesh element to be stored in the member ExchList
-      /// objects, as well as the ID of the neighboring task.
-      Neighbor(const std::vector<std::vector<I4>> &SendCell,
-               const std::vector<std::vector<I4>> &SendEdge,
-               const std::vector<std::vector<I4>> &SendVert,
-               const std::vector<std::vector<I4>> &RecvCell,
-               const std::vector<std::vector<I4>> &RecvEdge,
-               const std::vector<std::vector<I4>> &RecvVert, const I4 NghbrID);
+      Neighbor() = default;
+
+      /// Construct exchange data for all neighboring tasks.
+      Neighbor(const std::vector<std::vector<std::vector<I4>>> &SendCell,
+               const std::vector<std::vector<std::vector<I4>>> &SendEdge,
+               const std::vector<std::vector<std::vector<I4>>> &SendVert,
+               const std::vector<std::vector<std::vector<I4>>> &RecvCell,
+               const std::vector<std::vector<std::vector<I4>>> &RecvEdge,
+               const std::vector<std::vector<std::vector<I4>>> &RecvVert,
+               const std::vector<I4> &NeighborIDs,
+               const HostArray1DI4 (&SendFlagsH)[3],
+               const HostArray1DI4 (&RecvFlagsH)[3]);
 
     public:
-      /// Destructor
-      ~Neighbor() {}
-
       /// Halo is a friend class to allow access to private members
       /// of the class
       friend class Halo;
 
    }; // end class Neighbor
+
+   /// All exchange lists, buffers, and MPI state for neighboring tasks.
+   Neighbor Neighbors;
 
    // Private methods
 
@@ -227,12 +260,12 @@ class Halo {
    /// Allocate the recieve buffers and call MPI_Irecv for each Neighbor.
    /// The input bool UseDevBuffer specifies whether or not the device buffer
    /// will be used in the unpackBuffer functionfor unpacking into the array.
-   int startReceives(bool UseDevBuffer);
+   int startReceives(bool UseDevBuffer, I4 CurElem);
 
    /// Call MPI_Isend for each Neighbor to send the packed buffers to the
    /// neighboring tasks. The input bool UseDevBuffer specifies whether or not
    /// the device buffer was packed in the packBuffer function.
-   int startSends(bool UseDevBuffer);
+   int startSends(bool UseDevBuffer, I4 CurElem);
 
    /// Function template that returns a bool that is true if the Array is
    /// on the device, or if the device and host memory spaces are the same
@@ -287,32 +320,44 @@ class Halo {
    /// that Neighbor.
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is1D>
-   packBuffer(const T &Array,      // 1D Kokkos array of any type
-              const I4 CurNeighbor // current neighbor
+   packBuffer(const T &Array,       // 1D Kokkos array of any type
+              const I4 CurNeighbor, // current neighbor
+              const I4 CurElem      // current element
    ) {
       using ValType = typename T::non_const_value_type;
 
-      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
-      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+      OMEGA_SCOPE(LocList, Neighbors.SendLists[CurElem]);
 
-      const I4 BufferSize = LocList.NTot;
+      const I4 NTotList   = LocList.NTotH[CurNeighbor];
+      const I4 BufferSize = NTotList;
 
       if (devBufferPUP(Array)) {
-         OMEGA_SCOPE(LocIndex, LocList.Index);
-         expandBuffer(LocNeighbor.SendBuffer, BufferSize);
-         OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
+         const auto IndexBacking = LocList.IndexBacking;
+         const auto IndexOffset  = LocList.IndexOffsetH;
+         const auto LocIndex =
+             makeArraySubview(IndexBacking, IndexOffset(CurNeighbor), NTotList);
+
+         const auto Buffer        = Neighbors.SendBuffer;
+         const auto BufferOffsets = Neighbors.SendBufferOffsetH[CurElem];
+         const auto LocBuff       = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
          parallelFor(
-             {LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
+             {NTotList}, KOKKOS_LAMBDA(int IExch) {
                 const ValType Val = Array(LocIndex(IExch));
                 R8 RVal;
                 memcpy(&RVal, &Val, sizeof(ValType));
                 LocBuff(IExch) = RVal;
              });
       } else {
-         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
-         expandBuffer(LocNeighbor.SendBufferH, BufferSize);
-         OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].SendBufferH);
-         for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+         auto LocIndexH = LocList.hostIndices(CurNeighbor);
+
+         const auto Buffer        = Neighbors.SendBufferH;
+         const auto BufferOffsets = Neighbors.SendBufferOffsetH[CurElem];
+         const auto LocBuffH      = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
+         for (int IExch = 0; IExch < LocList.NTotH[CurNeighbor]; ++IExch) {
             const ValType Val = Array(LocIndexH(IExch));
             R8 RVal;
             memcpy(&RVal, &Val, sizeof(ValType));
@@ -323,26 +368,33 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is2D>
-   packBuffer(const T &Array,      // 2D Kokkos array of any type
-              const I4 CurNeighbor // current neighbor
+   packBuffer(const T &Array,       // 2D Kokkos array of any type
+              const I4 CurNeighbor, // current neighbor
+              const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
 
-      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
-      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+      OMEGA_SCOPE(LocList, Neighbors.SendLists[CurElem]);
 
       const I4 NJ = Array.extent(1);
 
-      const I4 BufferSize = LocList.NTot * TotSize;
+      const I4 NTotList   = LocList.NTotH[CurNeighbor];
+      const I4 BufferSize = NTotList;
 
       if (devBufferPUP(Array)) {
-         OMEGA_SCOPE(LocIndex, LocList.Index);
-         expandBuffer(LocNeighbor.SendBuffer, BufferSize);
-         OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
+         const auto IndexBacking = LocList.IndexBacking;
+         const auto IndexOffset  = LocList.IndexOffsetH;
+         const auto LocIndex =
+             makeArraySubview(IndexBacking, IndexOffset(CurNeighbor), NTotList);
+
+         const auto Buffer        = Neighbors.SendBuffer;
+         const auto BufferOffsets = Neighbors.SendBufferOffsetH[CurElem];
+         const auto LocBuff       = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
 
          parallelFor(
-             {LocList.NTot, NJ}, KOKKOS_LAMBDA(int IExch, int J) {
+             {NTotList, NJ}, KOKKOS_LAMBDA(int IExch, int J) {
                 const ValType Val = Array(LocIndex(IExch), J);
                 R8 RVal;
                 memcpy(&RVal, &Val, sizeof(ValType));
@@ -350,10 +402,14 @@ class Halo {
                 LocBuff(IBuff) = RVal;
              });
       } else {
-         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
-         expandBuffer(LocNeighbor.SendBufferH, BufferSize);
-         OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].SendBufferH);
-         for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+         auto LocIndexH = LocList.hostIndices(CurNeighbor);
+
+         const auto Buffer        = Neighbors.SendBufferH;
+         const auto BufferOffsets = Neighbors.SendBufferOffsetH[CurElem];
+         const auto LocBuffH      = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
+         for (int IExch = 0; IExch < LocList.NTotH[CurNeighbor]; ++IExch) {
             for (int J = 0; J < NJ; ++J) {
                const I4 IBuff    = IExch * NJ + J;
                const ValType Val = Array(LocIndexH(IExch), J);
@@ -367,25 +423,31 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is3D>
-   packBuffer(const T &Array,      // 3D Kokkos array of any type
-              const I4 CurNeighbor // current neighbor
+   packBuffer(const T &Array,       // 3D Kokkos array of any type
+              const I4 CurNeighbor, // current neighbor
+              const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
 
-      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
-      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+      OMEGA_SCOPE(LocList, Neighbors.SendLists[CurElem]);
 
       const I4 NJ = Array.extent(2);
       const I4 NK = Array.extent(0);
 
-      const I4 NTotList   = LocList.NTot;
-      const I4 BufferSize = LocList.NTot * TotSize;
+      const I4 NTotList   = LocList.NTotH[CurNeighbor];
+      const I4 BufferSize = LocList.NTotH[CurNeighbor];
 
       if (devBufferPUP(Array)) {
-         OMEGA_SCOPE(LocIndex, LocList.Index);
-         expandBuffer(LocNeighbor.SendBuffer, BufferSize);
-         OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
+         const auto IndexBacking = LocList.IndexBacking;
+         const auto IndexOffset  = LocList.IndexOffsetH;
+         const auto LocIndex =
+             makeArraySubview(IndexBacking, IndexOffset(CurNeighbor), NTotList);
+
+         const auto Buffer        = Neighbors.SendBuffer;
+         const auto BufferOffsets = Neighbors.SendBufferOffsetH[CurElem];
+         const auto LocBuff       = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
 
          parallelFor(
              {NK, NTotList, NJ}, KOKKOS_LAMBDA(int K, int IExch, int J) {
@@ -396,13 +458,18 @@ class Halo {
                 LocBuff(IBuff) = RVal;
              });
       } else {
-         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
-         expandBuffer(LocNeighbor.SendBufferH, BufferSize);
-         OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].SendBufferH);
+         auto LocIndexH = LocList.hostIndices(CurNeighbor);
+
+         const auto Buffer        = Neighbors.SendBufferH;
+         const auto BufferOffsets = Neighbors.SendBufferOffsetH[CurElem];
+         const auto LocBuffH      = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
          for (int K = 0; K < NK; ++K) {
-            for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+            for (int IExch = 0; IExch < LocList.NTotH[CurNeighbor]; ++IExch) {
                for (int J = 0; J < NJ; ++J) {
-                  const I4 IBuff    = (K * LocList.NTot + IExch) * NJ + J;
+                  const I4 IBuff =
+                      (K * LocList.NTotH[CurNeighbor] + IExch) * NJ + J;
                   const ValType Val = Array(K, LocIndexH(IExch), J);
                   R8 RVal;
                   memcpy(&RVal, &Val, sizeof(ValType));
@@ -415,26 +482,32 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is4D>
-   packBuffer(const T &Array,      // 4D Kokkos array of any type
-              const I4 CurNeighbor // current neighbor
+   packBuffer(const T &Array,       // 4D Kokkos array of any type
+              const I4 CurNeighbor, // current neighbor
+              const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
 
-      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
-      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+      OMEGA_SCOPE(LocList, Neighbors.SendLists[CurElem]);
 
       const I4 NJ = Array.extent(3);
       const I4 NK = Array.extent(1);
       const I4 NL = Array.extent(0);
 
-      const I4 NTotList   = LocList.NTot;
-      const I4 BufferSize = LocList.NTot * TotSize;
+      const I4 NTotList   = LocList.NTotH[CurNeighbor];
+      const I4 BufferSize = LocList.NTotH[CurNeighbor];
 
       if (devBufferPUP(Array)) {
-         OMEGA_SCOPE(LocIndex, LocList.Index);
-         expandBuffer(LocNeighbor.SendBuffer, BufferSize);
-         OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
+         const auto IndexBacking = LocList.IndexBacking;
+         const auto IndexOffset  = LocList.IndexOffsetH;
+         const auto LocIndex =
+             makeArraySubview(IndexBacking, IndexOffset(CurNeighbor), NTotList);
+
+         const auto Buffer        = Neighbors.SendBuffer;
+         const auto BufferOffsets = Neighbors.SendBufferOffsetH[CurElem];
+         const auto LocBuff       = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
 
          parallelFor(
              {NL, NK, NTotList, NJ},
@@ -446,12 +519,17 @@ class Halo {
                 LocBuff(IBuff) = RVal;
              });
       } else {
-         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
-         expandBuffer(LocNeighbor.SendBufferH, BufferSize);
-         OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].SendBufferH);
+         auto LocIndexH = LocList.hostIndices(CurNeighbor);
+
+         const auto Buffer        = Neighbors.SendBufferH;
+         const auto BufferOffsets = Neighbors.SendBufferOffsetH[CurElem];
+         const auto LocBuffH      = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
          for (int L = 0; L < NL; ++L) {
             for (int K = 0; K < NK; ++K) {
-               for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+               for (int IExch = 0; IExch < LocList.NTotH[CurNeighbor];
+                    ++IExch) {
                   for (int J = 0; J < NJ; ++J) {
                      const I4 IBuff =
                          ((L * NK + K) * NTotList + IExch) * NJ + J;
@@ -468,27 +546,33 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is5D>
-   packBuffer(const T &Array,      // 5D Kokkos array of any type
-              const I4 CurNeighbor // current neighbor
+   packBuffer(const T &Array,       // 5D Kokkos array of any type
+              const I4 CurNeighbor, // current neighbor
+              const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
 
-      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].SendLists[CurElem]);
-      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+      OMEGA_SCOPE(LocList, Neighbors.SendLists[CurElem]);
 
       const I4 NJ = Array.extent(4);
       const I4 NK = Array.extent(2);
       const I4 NL = Array.extent(1);
       const I4 NM = Array.extent(0);
 
-      const I4 NTotList   = LocList.NTot;
-      const I4 BufferSize = LocList.NTot * TotSize;
+      const I4 NTotList   = LocList.NTotH[CurNeighbor];
+      const I4 BufferSize = LocList.NTotH[CurNeighbor];
 
       if (devBufferPUP(Array)) {
-         OMEGA_SCOPE(LocIndex, LocList.Index);
-         expandBuffer(LocNeighbor.SendBuffer, BufferSize);
-         OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].SendBuffer);
+         const auto IndexBacking = LocList.IndexBacking;
+         const auto IndexOffset  = LocList.IndexOffsetH;
+         const auto LocIndex =
+             makeArraySubview(IndexBacking, IndexOffset(CurNeighbor), NTotList);
+
+         const auto Buffer        = Neighbors.SendBuffer;
+         const auto BufferOffsets = Neighbors.SendBufferOffsetH[CurElem];
+         const auto LocBuff       = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
 
          parallelFor(
              {NM, NL, NK, NTotList, NJ},
@@ -501,13 +585,18 @@ class Halo {
                 LocBuff(IBuff) = RVal;
              });
       } else {
-         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
-         expandBuffer(LocNeighbor.SendBufferH, BufferSize);
-         OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].SendBufferH);
+         auto LocIndexH = LocList.hostIndices(CurNeighbor);
+
+         const auto Buffer        = Neighbors.SendBufferH;
+         const auto BufferOffsets = Neighbors.SendBufferOffsetH[CurElem];
+         const auto LocBuffH      = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
          for (int M = 0; M < NM; ++M) {
             for (int L = 0; L < NL; ++L) {
                for (int K = 0; K < NK; ++K) {
-                  for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+                  for (int IExch = 0; IExch < LocList.NTotH[CurNeighbor];
+                       ++IExch) {
                      for (int J = 0; J < NJ; ++J) {
                         const I4 IBuff =
                             (((M * NL + L) * NK + K) * NTotList + IExch) * NJ +
@@ -524,26 +613,173 @@ class Halo {
       }
    }
 
+   /// Pack all neighbors and exchange indices in parallel when the input array
+   /// is on the device. This overload is not used by the halo exchange yet.
+   template <typename T>
+   void packBufferNbPar(const T &Array, const I4 CurElem, const I4 MaxNTot) {
+      static_assert(ArrayRank<T>::Is1D || ArrayRank<T>::Is2D ||
+                        ArrayRank<T>::Is3D || ArrayRank<T>::Is4D ||
+                        ArrayRank<T>::Is5D,
+                    "Unsupported array rank for Halo::packBuffer");
+
+      if (!devBufferPUP(Array)) {
+         for (I4 INghbr = 0; INghbr < NNghbr; ++INghbr) {
+            if (SendFlagsH[CurElem](INghbr)) {
+               packBuffer(Array, INghbr, CurElem);
+            }
+         }
+         return;
+      }
+
+      OMEGA_SCOPE(LocList, Neighbors.SendLists[CurElem]);
+      OMEGA_SCOPE(LocTotalSize, TotalSize);
+
+      if (NNghbr == 0 || MaxNTot == 0) {
+         return;
+      }
+
+      using ValType            = typename T::non_const_value_type;
+      const auto IndexBacking  = LocList.IndexBacking;
+      const auto IndexOffsets  = LocList.IndexOffset;
+      const auto NTot          = LocList.NTot;
+      const auto Buffer        = Neighbors.SendBuffer;
+      const auto BufferOffsets = Neighbors.SendBufferOffset[CurElem];
+      const auto SendActive    = SendFlags[CurElem];
+      if constexpr (ArrayRank<T>::Is1D) {
+         // parallelFor(
+         //     {NNghbr, MaxNTot}, KOKKOS_LAMBDA(int INghbr, int IExch) {
+         //        const I4 NTotList = NTot(INghbr);
+         //        if (SendActive(INghbr) == 0 || IExch >= NTotList) {
+         //           return;
+         //        }
+         //        const auto LocIndex = makeArraySubview(
+         //            IndexBacking, IndexOffsets(INghbr), NTotList);
+         //        const auto LocBuff = makeBufferSubview(
+         //            Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+         //        const ValType Val = Array(LocIndex(IExch));
+         //        R8 RVal;
+         //        memcpy(&RVal, &Val, sizeof(ValType));
+         //        LocBuff(IExch) = RVal;
+         //     });
+         parallelFor(
+             {IndexBacking.extent_int(0)}, KOKKOS_LAMBDA(int I) {
+                const ValType Val = Array(IndexBacking(I));
+                R8 RVal;
+                memcpy(&RVal, &Val, sizeof(ValType));
+                Buffer(I) = RVal;
+             });
+      } else if constexpr (ArrayRank<T>::Is2D) {
+         const I4 NJ = Array.extent(1);
+         parallelFor(
+             {NNghbr, MaxNTot, NJ},
+             KOKKOS_LAMBDA(int INghbr, int IExch, int J) {
+                const I4 NTotList = NTot(INghbr);
+                if (SendActive(INghbr) == 0 || IExch >= NTotList) {
+                   return;
+                }
+                const auto LocIndex = makeArraySubview(
+                    IndexBacking, IndexOffsets(INghbr), NTotList);
+                const auto LocBuff = makeBufferSubview(
+                    Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+                const ValType Val = Array(LocIndex(IExch), J);
+                R8 RVal;
+                memcpy(&RVal, &Val, sizeof(ValType));
+                LocBuff(IExch * NJ + J) = RVal;
+             });
+      } else if constexpr (ArrayRank<T>::Is3D) {
+         const I4 NK = Array.extent(0);
+         const I4 NJ = Array.extent(2);
+         parallelFor(
+             {NNghbr, NK, MaxNTot, NJ},
+             KOKKOS_LAMBDA(int INghbr, int K, int IExch, int J) {
+                const I4 NTotList = NTot(INghbr);
+                if (SendActive(INghbr) == 0 || IExch >= NTotList) {
+                   return;
+                }
+                const auto LocIndex = makeArraySubview(
+                    IndexBacking, IndexOffsets(INghbr), NTotList);
+                const auto LocBuff = makeBufferSubview(
+                    Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+                const ValType Val = Array(K, LocIndex(IExch), J);
+                R8 RVal;
+                memcpy(&RVal, &Val, sizeof(ValType));
+                LocBuff((K * NTotList + IExch) * NJ + J) = RVal;
+             });
+      } else if constexpr (ArrayRank<T>::Is4D) {
+         const I4 NL = Array.extent(0);
+         const I4 NK = Array.extent(1);
+         const I4 NJ = Array.extent(3);
+         parallelFor(
+             {NNghbr, NL, NK, MaxNTot, NJ},
+             KOKKOS_LAMBDA(int INghbr, int L, int K, int IExch, int J) {
+                const I4 NTotList = NTot(INghbr);
+                if (SendActive(INghbr) == 0 || IExch >= NTotList) {
+                   return;
+                }
+                const auto LocIndex = makeArraySubview(
+                    IndexBacking, IndexOffsets(INghbr), NTotList);
+                const auto LocBuff = makeBufferSubview(
+                    Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+                const ValType Val = Array(L, K, LocIndex(IExch), J);
+                R8 RVal;
+                memcpy(&RVal, &Val, sizeof(ValType));
+                LocBuff(((L * NK + K) * NTotList + IExch) * NJ + J) = RVal;
+             });
+      } else if constexpr (ArrayRank<T>::Is5D) {
+         const I4 NM = Array.extent(0);
+         const I4 NL = Array.extent(1);
+         const I4 NK = Array.extent(2);
+         const I4 NJ = Array.extent(4);
+         parallelFor(
+             {NNghbr, NM, NL, NK, MaxNTot, NJ},
+             KOKKOS_LAMBDA(int INghbr, int M, int L, int K, int IExch, int J) {
+                const I4 NTotList = NTot(INghbr);
+                if (SendActive(INghbr) == 0 || IExch >= NTotList) {
+                   return;
+                }
+                const auto LocIndex = makeArraySubview(
+                    IndexBacking, IndexOffsets(INghbr), NTotList);
+                const auto LocBuff = makeBufferSubview(
+                    Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+                const ValType Val = Array(M, L, K, LocIndex(IExch), J);
+                R8 RVal;
+                memcpy(&RVal, &Val, sizeof(ValType));
+                LocBuff((((M * NL + L) * NK + K) * NTotList + IExch) * NJ + J) =
+                    RVal;
+             });
+      }
+   }
+
    /// Buffer unpack specialized function templates for supported Kokkos array
    /// ranks. After receiving a message from a neighboring task, save the
    /// elements of the proper receive buffer for that Neighbor into the
    /// corresponding halo elements of the input Array
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is1D>
-   unpackBuffer(const T &Array,      // 1D Kokkos array of any type
-                const I4 CurNeighbor // current neighbor
+   unpackBuffer(const T &Array,       // 1D Kokkos array of any type
+                const I4 CurNeighbor, // current neighbor
+                const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
 
-      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].RecvLists[CurElem]);
-      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+      OMEGA_SCOPE(LocList, Neighbors.RecvLists[CurElem]);
+      const I4 NTotList   = LocList.NTotH[CurNeighbor];
+      const I4 BufferSize = NTotList;
 
       if (devBufferPUP(Array)) {
-         OMEGA_SCOPE(LocIndex, LocList.Index);
-         OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
+         const auto IndexBacking = LocList.IndexBacking;
+         const auto IndexOffset  = LocList.IndexOffsetH;
+         const auto LocIndex =
+             makeArraySubview(IndexBacking, IndexOffset(CurNeighbor), NTotList);
+
+         const auto Buffer        = Neighbors.RecvBuffer;
+         const auto BufferOffsets = Neighbors.RecvBufferOffsetH[CurElem];
+         const auto LocBuff       = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
          parallelFor(
-             {LocList.NTot}, KOKKOS_LAMBDA(int IExch) {
+             {NTotList}, KOKKOS_LAMBDA(int IExch) {
                 const I4 IArr = LocIndex(IExch);
                 const R8 RVal = LocBuff(IExch);
                 ValType Val;
@@ -551,9 +787,14 @@ class Halo {
                 Array(IArr) = Val;
              });
       } else {
-         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
-         OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].RecvBufferH);
-         for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+         auto LocIndexH = LocList.hostIndices(CurNeighbor);
+
+         const auto Buffer        = Neighbors.RecvBufferH;
+         const auto BufferOffsets = Neighbors.RecvBufferOffsetH[CurElem];
+         const auto LocBuffH      = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
+         for (int IExch = 0; IExch < LocList.NTotH[CurNeighbor]; ++IExch) {
             const I4 IArr = LocIndexH(IExch);
             const R8 RVal = LocBuffH(IExch);
             ValType Val;
@@ -565,23 +806,32 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is2D>
-   unpackBuffer(const T &Array,      // 2D Kokkos array of any type
-                const I4 CurNeighbor // current neighbor
+   unpackBuffer(const T &Array,       // 2D Kokkos array of any type
+                const I4 CurNeighbor, // current neighbor
+                const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
 
-      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].RecvLists[CurElem]);
-      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+      OMEGA_SCOPE(LocList, Neighbors.RecvLists[CurElem]);
 
-      const I4 NJ = Array.extent(1);
+      const I4 NJ         = Array.extent(1);
+      const I4 NTotList   = LocList.NTotH[CurNeighbor];
+      const I4 BufferSize = NTotList;
 
       if (devBufferPUP(Array)) {
-         OMEGA_SCOPE(LocIndex, LocList.Index);
-         OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
+         const auto IndexBacking = LocList.IndexBacking;
+         const auto IndexOffset  = LocList.IndexOffsetH;
+         const auto LocIndex =
+             makeArraySubview(IndexBacking, IndexOffset(CurNeighbor), NTotList);
+
+         const auto Buffer        = Neighbors.RecvBuffer;
+         const auto BufferOffsets = Neighbors.RecvBufferOffsetH[CurElem];
+         const auto LocBuff       = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
 
          parallelFor(
-             {LocList.NTot, NJ}, KOKKOS_LAMBDA(int IExch, int J) {
+             {NTotList, NJ}, KOKKOS_LAMBDA(int IExch, int J) {
                 const I4 IBuff = IExch * NJ + J;
                 const I4 IArr  = LocIndex(IExch);
                 const R8 RVal  = LocBuff(IBuff);
@@ -590,9 +840,14 @@ class Halo {
                 Array(IArr, J) = Val;
              });
       } else {
-         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
-         OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].RecvBufferH);
-         for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+         auto LocIndexH = LocList.hostIndices(CurNeighbor);
+
+         const auto Buffer        = Neighbors.RecvBufferH;
+         const auto BufferOffsets = Neighbors.RecvBufferOffsetH[CurElem];
+         const auto LocBuffH      = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
+         for (int IExch = 0; IExch < LocList.NTotH[CurNeighbor]; ++IExch) {
             for (int J = 0; J < NJ; ++J) {
                const I4 IBuff = IExch * NJ + J;
                const I4 IArr  = LocIndexH(IExch);
@@ -607,23 +862,31 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is3D>
-   unpackBuffer(const T &Array,      // 3D Kokkos array of any type
-                const I4 CurNeighbor // current neighbor
+   unpackBuffer(const T &Array,       // 3D Kokkos array of any type
+                const I4 CurNeighbor, // current neighbor
+                const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
 
-      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].RecvLists[CurElem]);
-      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+      OMEGA_SCOPE(LocList, Neighbors.RecvLists[CurElem]);
 
       const I4 NJ = Array.extent(2);
       const I4 NK = Array.extent(0);
 
-      const I4 NTotList = LocList.NTot;
+      const I4 NTotList   = LocList.NTotH[CurNeighbor];
+      const I4 BufferSize = NTotList;
 
       if (devBufferPUP(Array)) {
-         OMEGA_SCOPE(LocIndex, LocList.Index);
-         OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
+         const auto IndexBacking = LocList.IndexBacking;
+         const auto IndexOffset  = LocList.IndexOffsetH;
+         const auto LocIndex =
+             makeArraySubview(IndexBacking, IndexOffset(CurNeighbor), NTotList);
+
+         const auto Buffer        = Neighbors.RecvBuffer;
+         const auto BufferOffsets = Neighbors.RecvBufferOffsetH[CurElem];
+         const auto LocBuff       = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
 
          parallelFor(
              {NK, NTotList, NJ}, KOKKOS_LAMBDA(int K, int IExch, int J) {
@@ -635,14 +898,20 @@ class Halo {
                 Array(K, IArr, J) = Val;
              });
       } else {
-         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
-         OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].RecvBufferH);
+         auto LocIndexH = LocList.hostIndices(CurNeighbor);
+
+         const auto Buffer        = Neighbors.RecvBufferH;
+         const auto BufferOffsets = Neighbors.RecvBufferOffsetH[CurElem];
+         const auto LocBuffH      = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
          for (int K = 0; K < NK; ++K) {
-            for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+            for (int IExch = 0; IExch < LocList.NTotH[CurNeighbor]; ++IExch) {
                for (int J = 0; J < NJ; ++J) {
-                  const I4 IBuff = (K * LocList.NTot + IExch) * NJ + J;
-                  const I4 IArr  = LocIndexH(IExch);
-                  const R8 RVal  = LocBuffH(IBuff);
+                  const I4 IBuff =
+                      (K * LocList.NTotH[CurNeighbor] + IExch) * NJ + J;
+                  const I4 IArr = LocIndexH(IExch);
+                  const R8 RVal = LocBuffH(IBuff);
                   ValType Val;
                   memcpy(&Val, &RVal, sizeof(ValType));
                   Array(K, IArr, J) = Val;
@@ -654,24 +923,32 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is4D>
-   unpackBuffer(const T &Array,      // 4D Kokkos array of any type
-                const I4 CurNeighbor // current neighbor
+   unpackBuffer(const T &Array,       // 4D Kokkos array of any type
+                const I4 CurNeighbor, // current neighbor
+                const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
 
-      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].RecvLists[CurElem]);
-      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+      OMEGA_SCOPE(LocList, Neighbors.RecvLists[CurElem]);
 
       const I4 NJ = Array.extent(3);
       const I4 NK = Array.extent(1);
       const I4 NL = Array.extent(0);
 
-      const I4 NTotList = LocList.NTot;
+      const I4 NTotList   = LocList.NTotH[CurNeighbor];
+      const I4 BufferSize = NTotList;
 
       if (devBufferPUP(Array)) {
-         OMEGA_SCOPE(LocIndex, LocList.Index);
-         OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
+         const auto IndexBacking = LocList.IndexBacking;
+         const auto IndexOffset  = LocList.IndexOffsetH;
+         const auto LocIndex =
+             makeArraySubview(IndexBacking, IndexOffset(CurNeighbor), NTotList);
+
+         const auto Buffer        = Neighbors.RecvBuffer;
+         const auto BufferOffsets = Neighbors.RecvBufferOffsetH[CurElem];
+         const auto LocBuff       = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
 
          parallelFor(
              {NL, NK, NTotList, NJ},
@@ -684,11 +961,17 @@ class Halo {
                 Array(L, K, IArr, J) = Val;
              });
       } else {
-         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
-         OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].RecvBufferH);
+         auto LocIndexH = LocList.hostIndices(CurNeighbor);
+
+         const auto Buffer        = Neighbors.RecvBufferH;
+         const auto BufferOffsets = Neighbors.RecvBufferOffsetH[CurElem];
+         const auto LocBuffH      = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
          for (int L = 0; L < NL; ++L) {
             for (int K = 0; K < NK; ++K) {
-               for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+               for (int IExch = 0; IExch < LocList.NTotH[CurNeighbor];
+                    ++IExch) {
                   for (int J = 0; J < NJ; ++J) {
                      const I4 IBuff =
                          ((L * NK + K) * NTotList + IExch) * NJ + J;
@@ -706,25 +989,33 @@ class Halo {
 
    template <typename T>
    std::enable_if_t<ArrayRank<T>::Is5D>
-   unpackBuffer(const T &Array,      // 5D Kokkos array of any type
-                const I4 CurNeighbor // current neighbor
+   unpackBuffer(const T &Array,       // 5D Kokkos array of any type
+                const I4 CurNeighbor, // current neighbor
+                const I4 CurElem      // current element
    ) {
 
       using ValType = typename T::non_const_value_type;
 
-      OMEGA_SCOPE(LocList, Neighbors[CurNeighbor].RecvLists[CurElem]);
-      OMEGA_SCOPE(LocNeighbor, Neighbors[CurNeighbor]);
+      OMEGA_SCOPE(LocList, Neighbors.RecvLists[CurElem]);
 
       const I4 NJ = Array.extent(4);
       const I4 NK = Array.extent(2);
       const I4 NL = Array.extent(1);
       const I4 NM = Array.extent(0);
 
-      const I4 NTotList = LocList.NTot;
+      const I4 NTotList   = LocList.NTotH[CurNeighbor];
+      const I4 BufferSize = NTotList;
 
       if (devBufferPUP(Array)) {
-         OMEGA_SCOPE(LocIndex, LocList.Index);
-         OMEGA_SCOPE(LocBuff, Neighbors[CurNeighbor].RecvBuffer);
+         const auto IndexBacking = LocList.IndexBacking;
+         const auto IndexOffset  = LocList.IndexOffsetH;
+         const auto LocIndex =
+             makeArraySubview(IndexBacking, IndexOffset(CurNeighbor), NTotList);
+
+         const auto Buffer        = Neighbors.RecvBuffer;
+         const auto BufferOffsets = Neighbors.RecvBufferOffsetH[CurElem];
+         const auto LocBuff       = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
 
          parallelFor(
              {NM, NL, NK, NTotList, NJ},
@@ -738,12 +1029,18 @@ class Halo {
                 Array(M, L, K, IArr, J) = Val;
              });
       } else {
-         OMEGA_SCOPE(LocIndexH, LocList.IndexH);
-         OMEGA_SCOPE(LocBuffH, Neighbors[CurNeighbor].RecvBufferH);
+         auto LocIndexH = LocList.hostIndices(CurNeighbor);
+
+         const auto Buffer        = Neighbors.RecvBufferH;
+         const auto BufferOffsets = Neighbors.RecvBufferOffsetH[CurElem];
+         const auto LocBuffH      = makeBufferSubview(
+             Buffer, BufferOffsets(CurNeighbor), BufferSize, TotalSize);
+
          for (int M = 0; M < NM; ++M) {
             for (int L = 0; L < NL; ++L) {
                for (int K = 0; K < NK; ++K) {
-                  for (int IExch = 0; IExch < LocList.NTot; ++IExch) {
+                  for (int IExch = 0; IExch < LocList.NTotH[CurNeighbor];
+                       ++IExch) {
                      for (int J = 0; J < NJ; ++J) {
                         const I4 IBuff =
                             (((M * NL + L) * NK + K) * NTotList + IExch) * NJ +
@@ -761,89 +1058,216 @@ class Halo {
       }
    }
 
-   //---------------------------------------------------------------------------
-   // Function template to perform a full halo exchange on the input Kokkos
-   // array of any supported type defined on the input index space ThisElem
+   /// Unpack all neighbors and exchange indices in parallel.
    template <typename T>
-   int
-   exchangeFullArrayHalo(T &Array,            // Kokkos array of any type
-                         MeshElement ThisElem // index space Array is defined on
-   ) {
-      // Add more context for timers in this function
-      // BUG: fails when there is no parent timer
-      // Uncomment after fixing in Pacer
-      // Pacer::addParentPrefix();
+   void unpackBufferNbPar(const T &Array, const I4 CurElem, const I4 MaxNTot) {
+      static_assert(ArrayRank<T>::Is1D || ArrayRank<T>::Is2D ||
+                        ArrayRank<T>::Is3D || ArrayRank<T>::Is4D ||
+                        ArrayRank<T>::Is5D,
+                    "Unsupported array rank for Halo::unpackBufferNbPar");
 
-      I4 IErr{0}; // error code
-
-      // Logical flag to track if all messages have been received
-      bool AllReceived{false};
-
-      // Save the index space the input array is defined on
-      CurElem = ThisElem;
-
-      // For cell-based quantities, the number of halo layers equals HaloWidth,
-      // edge- and vertex-based quantities have an extra layer.
-      if (CurElem == OnCell) {
-         NumLayers = HaloWidth;
-      } else {
-         NumLayers = HaloWidth + 1;
+      if (NNghbr == 0) {
+         return;
       }
-
-      // Determine the number of array elements per cell, edge, or vertex
-      // in the input array
-      I4 NDims = Array.rank();
-      if (NDims == 1) {
-         TotSize = 1;
-      } else if (NDims == 2) {
-         TotSize = Array.extent(1);
-      } else {
-         TotSize = 1;
-         for (int I = 0; I < NDims - 2; ++I) {
-            TotSize *= Array.extent(I);
+      if (!devBufferPUP(Array)) {
+         for (I4 INghbr = 0; INghbr < NNghbr; ++INghbr) {
+            if (RecvFlagsH[CurElem](INghbr)) {
+               unpackBuffer(Array, INghbr, CurElem);
+               Neighbors.Unpacked[INghbr] = true;
+            }
          }
-         TotSize *= Array.extent(NDims - 1);
+         return;
+      }
+      if (MaxNTot == 0) {
+         for (I4 INghbr = 0; INghbr < NNghbr; ++INghbr) {
+            if (RecvFlagsH[CurElem](INghbr)) {
+               Neighbors.Unpacked[INghbr] = true;
+            }
+         }
+         return;
       }
 
-      // If the Array is in device memory space, the buffer pack and unpack
-      // functions will use device buffers
-      bool UseDevBuffer = devBufferPUP(Array);
+      OMEGA_SCOPE(LocList, Neighbors.RecvLists[CurElem]);
+      OMEGA_SCOPE(LocTotalSize, TotalSize);
 
-      // Allocate the receive buffers and Call MPI_Irecv for each Neighbor
-      // so the local task is ready to accept messages from each
-      // neighboring task
-      startReceives(UseDevBuffer);
+      using ValType            = typename T::non_const_value_type;
+      const auto IndexBacking  = LocList.IndexBacking;
+      const auto IndexOffsets  = LocList.IndexOffset;
+      const auto NTot          = LocList.NTot;
+      const auto Buffer        = Neighbors.RecvBuffer;
+      const auto BufferOffsets = Neighbors.RecvBufferOffset[CurElem];
+      const auto RecvActive    = RecvFlags[CurElem];
 
-      // Loop through each Neighbor, resetting communication flags and packing
-      // buffers if there are elements to be sent to the neighboring task
+      if constexpr (ArrayRank<T>::Is1D) {
+         // parallelFor(
+         //     {NNghbr, MaxNTot}, KOKKOS_LAMBDA(int INghbr, int IExch) {
+         //        const I4 NTotList = NTot(INghbr);
+         //        if (RecvActive(INghbr) == 0 || IExch >= NTotList) {
+         //           return;
+         //        }
+         //        const auto LocIndex = makeArraySubview(
+         //            IndexBacking, IndexOffsets(INghbr), NTotList);
+         //        const auto LocBuff = makeBufferSubview(
+         //            Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+         //        const I4 IArr = LocIndex(IExch);
+         //        const R8 RVal = LocBuff(IExch);
+         //        ValType Val;
+         //        memcpy(&Val, &RVal, sizeof(ValType));
+         //        Array(IArr) = Val;
+         //     });
+         parallelFor(
+             {IndexBacking.extent_int(0)}, KOKKOS_LAMBDA(int I) {
+                const R8 RVal = Buffer(I);
+                ValType Val;
+                memcpy(&Val, &RVal, sizeof(ValType));
+                Array(IndexBacking(I)) = Val;
+             });
+      } else if constexpr (ArrayRank<T>::Is2D) {
+         const I4 NJ = Array.extent(1);
+         parallelFor(
+             {NNghbr, MaxNTot, NJ},
+             KOKKOS_LAMBDA(int INghbr, int IExch, int J) {
+                const I4 NTotList = NTot(INghbr);
+                if (RecvActive(INghbr) == 0 || IExch >= NTotList) {
+                   return;
+                }
+                const auto LocIndex = makeArraySubview(
+                    IndexBacking, IndexOffsets(INghbr), NTotList);
+                const auto LocBuff = makeBufferSubview(
+                    Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+                const I4 IArr = LocIndex(IExch);
+                const R8 RVal = LocBuff(IExch * NJ + J);
+                ValType Val;
+                memcpy(&Val, &RVal, sizeof(ValType));
+                Array(IArr, J) = Val;
+             });
+      } else if constexpr (ArrayRank<T>::Is3D) {
+         const I4 NK = Array.extent(0);
+         const I4 NJ = Array.extent(2);
+         parallelFor(
+             {NNghbr, NK, MaxNTot, NJ},
+             KOKKOS_LAMBDA(int INghbr, int K, int IExch, int J) {
+                const I4 NTotList = NTot(INghbr);
+                if (RecvActive(INghbr) == 0 || IExch >= NTotList) {
+                   return;
+                }
+                const auto LocIndex = makeArraySubview(
+                    IndexBacking, IndexOffsets(INghbr), NTotList);
+                const auto LocBuff = makeBufferSubview(
+                    Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+                const I4 IArr  = LocIndex(IExch);
+                const I4 IBuff = (K * NTotList + IExch) * NJ + J;
+                const R8 RVal  = LocBuff(IBuff);
+                ValType Val;
+                memcpy(&Val, &RVal, sizeof(ValType));
+                Array(K, IArr, J) = Val;
+             });
+      } else if constexpr (ArrayRank<T>::Is4D) {
+         const I4 NL = Array.extent(0);
+         const I4 NK = Array.extent(1);
+         const I4 NJ = Array.extent(3);
+         parallelFor(
+             {NNghbr, NL, NK, MaxNTot, NJ},
+             KOKKOS_LAMBDA(int INghbr, int L, int K, int IExch, int J) {
+                const I4 NTotList = NTot(INghbr);
+                if (RecvActive(INghbr) == 0 || IExch >= NTotList) {
+                   return;
+                }
+                const auto LocIndex = makeArraySubview(
+                    IndexBacking, IndexOffsets(INghbr), NTotList);
+                const auto LocBuff = makeBufferSubview(
+                    Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+                const I4 IArr  = LocIndex(IExch);
+                const I4 IBuff = ((L * NK + K) * NTotList + IExch) * NJ + J;
+                const R8 RVal  = LocBuff(IBuff);
+                ValType Val;
+                memcpy(&Val, &RVal, sizeof(ValType));
+                Array(L, K, IArr, J) = Val;
+             });
+      } else if constexpr (ArrayRank<T>::Is5D) {
+         const I4 NM = Array.extent(0);
+         const I4 NL = Array.extent(1);
+         const I4 NK = Array.extent(2);
+         const I4 NJ = Array.extent(4);
+         parallelFor(
+             {NNghbr, NM, NL, NK, MaxNTot, NJ},
+             KOKKOS_LAMBDA(int INghbr, int M, int L, int K, int IExch, int J) {
+                const I4 NTotList = NTot(INghbr);
+                if (RecvActive(INghbr) == 0 || IExch >= NTotList) {
+                   return;
+                }
+                const auto LocIndex = makeArraySubview(
+                    IndexBacking, IndexOffsets(INghbr), NTotList);
+                const auto LocBuff = makeBufferSubview(
+                    Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+                const I4 IArr = LocIndex(IExch);
+                const I4 IBuff =
+                    (((M * NL + L) * NK + K) * NTotList + IExch) * NJ + J;
+                const R8 RVal = LocBuff(IBuff);
+                ValType Val;
+                memcpy(&Val, &RVal, sizeof(ValType));
+                Array(M, L, K, IArr, J) = Val;
+             });
+      }
+
+      for (I4 INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         if (RecvFlagsH[CurElem](INghbr)) {
+            Neighbors.Unpacked[INghbr] = true;
+         }
+      }
+   }
+
+   template <typename T>
+   void packAllBuffers(T &Array,           // Kokkos array of any type
+                       MeshElement CurElem // index space Array is defined on
+   ) {
       Pacer::start("Halo:packBuffers", 4);
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-         Neighbors[INghbr].Received = false;
-         Neighbors[INghbr].Unpacked = false;
-         if (SendFlags[CurElem][INghbr]) {
-            packBuffer(Array, INghbr);
+         Neighbors.Received[INghbr] = false;
+         Neighbors.Unpacked[INghbr] = false;
+         if (SendFlagsH[CurElem](INghbr)) {
+            packBuffer(Array, INghbr, CurElem);
          }
       }
       Pacer::stop("Halo:packBuffers", 4);
+   }
 
-      // Call MPI_Isend for each Neighbor to send the packed buffers
-      startSends(UseDevBuffer);
+   template <typename T>
+   void
+   packAllBuffersNbPar(T &Array,           // Kokkos array of any type
+                       MeshElement CurElem // index space Array is defined on
+   ) {
+      Pacer::start("Halo:packBuffers", 4);
 
-      // Collect all send requests
-      std::vector<MPI_Request> SendReqs;
+      I4 MaxNTot = 0;
       for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-         if (SendFlags[CurElem][INghbr]) {
-            SendReqs.push_back(Neighbors[INghbr].SReq);
-         }
+         Neighbors.Received[INghbr] = false;
+         Neighbors.Unpacked[INghbr] = false;
+
+         const auto &SendList = Neighbors.SendLists[CurElem];
+         MaxNTot              = std::max(MaxNTot, SendList.NTotH[INghbr]);
       }
+      packBufferNbPar(Array, CurElem, MaxNTot);
+      Pacer::stop("Halo:packBuffers", 4);
+   }
+
+   template <typename T>
+   int receiveUnpack(T &Array,            // Kokkos array of any type
+                     MeshElement CurElem, // index space Array is defined on
+                     bool UseDevBuffer) {
+      int IErr = 0;
+      // Logical flag to track if all messages have been received
+      bool AllReceived{false};
 
       I4 MaxIter = 1000000000; // Large integer to prevent infinite loop
       I4 IPass   = 0;          // Number of passes through while loop
       I4 NRcvd   = 0;          // Integer to track number of messages received
 
       // Total number of messages the local task will receive
-      I4 NMessages = std::accumulate(RecvFlags[CurElem].begin(),
-                                     RecvFlags[CurElem].end(), 0);
+      I4 NMessages = 0;
+      for (I4 INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         NMessages += RecvFlagsH[CurElem](INghbr);
+      }
 
       // Until all messages from neighboring tasks are received, loop
       // through Neighbor objects and use MPI_Test to check if the message
@@ -851,35 +1275,35 @@ class Halo {
       Pacer::start("Halo:receiveUnpack", 4);
       while (!AllReceived) {
          for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
-            if (RecvFlags[CurElem][INghbr]) {
-               if (!Neighbors[INghbr].Received) {
-                  MPI_Test(&Neighbors[INghbr].RReq, &Neighbors[INghbr].Received,
+            if (RecvFlagsH[CurElem](INghbr)) {
+               if (!Neighbors.Received[INghbr]) {
+                  MPI_Test(&Neighbors.RReq[INghbr], &Neighbors.Received[INghbr],
                            MPI_STATUS_IGNORE);
-                  if (Neighbors[INghbr].Received) {
+                  if (Neighbors.Received[INghbr]) {
                      ++NRcvd;
                   }
                }
-               if (Neighbors[INghbr].Received && !Neighbors[INghbr].Unpacked) {
+               if (Neighbors.Received[INghbr] && !Neighbors.Unpacked[INghbr]) {
                   // If the device buffer will be used in unpackBuffer, but the
                   // exchange was done with the host buffer, a deep copy from
                   // host to device is needed.
                   if (UseDevBuffer && !ExchOnDev) {
-                     expandBuffer(Neighbors[INghbr].RecvBuffer,
-                                  Neighbors[INghbr].RecvBufferH.size());
-
                      // The number of elements we need to copy is different
                      // than the buffer allocation size
                      const I4 BufferSize =
-                         TotSize * Neighbors[INghbr].RecvLists[CurElem].NTot;
-                     auto CopyRange = Kokkos::make_pair(0, BufferSize);
+                         TotalSize * Neighbors.RecvLists[CurElem].NTotH[INghbr];
+                     const I4 Offset =
+                         TotalSize *
+                         Neighbors.RecvBufferOffsetH[CurElem](INghbr);
+                     const auto CopyRange =
+                         Kokkos::make_pair(Offset, Offset + BufferSize);
 
-                     deepCopy(Kokkos::subview(Neighbors[INghbr].RecvBuffer,
-                                              CopyRange),
-                              Kokkos::subview(Neighbors[INghbr].RecvBufferH,
-                                              CopyRange));
+                     deepCopy(
+                         Kokkos::subview(Neighbors.RecvBuffer, CopyRange),
+                         Kokkos::subview(Neighbors.RecvBufferH, CopyRange));
                   }
-                  unpackBuffer(Array, INghbr);
-                  Neighbors[INghbr].Unpacked = true;
+                  unpackBuffer(Array, INghbr, CurElem);
+                  Neighbors.Unpacked[INghbr] = true;
                }
             }
          }
@@ -896,6 +1320,123 @@ class Halo {
       }
       Pacer::stop("Halo:receiveUnpack", 4);
 
+      return IErr;
+   }
+
+   template <typename T>
+   int
+   receiveUnpackNbPar(T &Array,            // Kokkos array of any type
+                      MeshElement CurElem, // index space Array is defined on
+                      bool UseDevBuffer) {
+      Pacer::start("Halo:receiveUnpackNbPar", 4);
+
+      std::vector<MPI_Request> RecvReqs;
+      std::vector<I4> RecvNeighbors;
+      for (I4 INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         if (RecvFlagsH[CurElem](INghbr)) {
+            RecvReqs.push_back(Neighbors.RReq[INghbr]);
+            RecvNeighbors.push_back(INghbr);
+         }
+      }
+
+      if (!RecvReqs.empty()) {
+         const int WaitErr = MPI_Waitall(static_cast<int>(RecvReqs.size()),
+                                         RecvReqs.data(), MPI_STATUSES_IGNORE);
+         if (WaitErr != MPI_SUCCESS) {
+            LOG_ERROR("Halo: MPI_Waitall error while receiving halo data");
+            Pacer::stop("Halo:receiveUnpackNbPar", 4);
+            return -1;
+         }
+      }
+
+      for (const I4 INghbr : RecvNeighbors) {
+         Neighbors.Received[INghbr] = true;
+         Neighbors.RReq[INghbr]     = MPI_REQUEST_NULL;
+      }
+
+      if (UseDevBuffer && !ExchOnDev) {
+         for (const I4 INghbr : RecvNeighbors) {
+            const I4 BufferSize =
+                TotalSize * Neighbors.RecvLists[CurElem].NTotH[INghbr];
+            const I4 BufferOffset =
+                TotalSize * Neighbors.RecvBufferOffsetH[CurElem](INghbr);
+            const auto CopyRange =
+                Kokkos::make_pair(BufferOffset, BufferOffset + BufferSize);
+            deepCopy(Kokkos::subview(Neighbors.RecvBuffer, CopyRange),
+                     Kokkos::subview(Neighbors.RecvBufferH, CopyRange));
+         }
+      }
+
+      I4 MaxNTot = 0;
+      for (I4 INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         MaxNTot =
+             std::max(MaxNTot, Neighbors.RecvLists[CurElem].NTotH[INghbr]);
+      }
+      unpackBufferNbPar(Array, CurElem, MaxNTot);
+
+      Pacer::stop("Halo:receiveUnpackNbPar", 4);
+      return 0;
+   }
+
+   //---------------------------------------------------------------------------
+   // Function template to perform a full halo exchange on the input Kokkos
+   // array of any supported type defined on the input index space ThisElem
+   template <typename T>
+   int
+   exchangeFullArrayHalo(T &Array,           // Kokkos array of any type
+                         MeshElement CurElem // index space Array is defined on
+   ) {
+      // Add more context for timers in this function
+      // BUG: fails when there is no parent timer
+      // Uncomment after fixing in Pacer
+      Pacer::addParentPrefix();
+
+      I4 IErr{0}; // error code
+
+      // If the Array is in device memory space, the buffer pack and unpack
+      // functions will use device buffers
+      bool UseDevBuffer = devBufferPUP(Array);
+
+      TotalSize = totalSize(Array);
+
+      // Grow all buffers before starting communication or packing
+      expandBuffer(Neighbors.SendBuffer,
+                   Neighbors.SendBufferSize[CurElem] * TotalSize);
+      expandBuffer(Neighbors.SendBufferH,
+                   Neighbors.SendBufferSize[CurElem] * TotalSize);
+      expandBuffer(Neighbors.RecvBuffer,
+                   Neighbors.RecvBufferSize[CurElem] * TotalSize);
+      expandBuffer(Neighbors.RecvBufferH,
+                   Neighbors.RecvBufferSize[CurElem] * TotalSize);
+
+      // Call MPI_Irecv for each Neighbor
+      // so the local task is ready to accept messages from each
+      // neighboring task
+      startReceives(UseDevBuffer, CurElem);
+
+      if (PackNbPar) {
+         packAllBuffersNbPar(Array, CurElem);
+      } else {
+         packAllBuffers(Array, CurElem);
+      }
+
+      // Call MPI_Isend for each Neighbor to send the packed buffers
+      startSends(UseDevBuffer, CurElem);
+
+      // Collect all send requests
+      std::vector<MPI_Request> SendReqs;
+      for (int INghbr = 0; INghbr < NNghbr; ++INghbr) {
+         if (SendFlagsH[CurElem](INghbr)) {
+            SendReqs.push_back(Neighbors.SReq[INghbr]);
+         }
+      }
+
+      if (UnpackNbPar) {
+         IErr += receiveUnpackNbPar(Array, CurElem, UseDevBuffer);
+      } else {
+         IErr += receiveUnpack(Array, CurElem, UseDevBuffer);
+      }
+
       // We need to fence here because we are reusing buffers and GPU work is
       // async
       if (UseDevBuffer) {
@@ -909,7 +1450,7 @@ class Halo {
 
       // BUG: fails when there is no parent timer
       // Uncomment after fixing in Pacer
-      // Pacer::removeParentPrefix();
+      Pacer::removeParentPrefix();
 
       return IErr;
    } // end exchangeFullArrayHalo
