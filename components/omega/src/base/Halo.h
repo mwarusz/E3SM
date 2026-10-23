@@ -646,20 +646,27 @@ class Halo {
       const auto BufferOffsets = Neighbors.SendBufferOffset[CurElem];
       const auto SendActive    = SendFlags[CurElem];
       if constexpr (ArrayRank<T>::Is1D) {
+         // parallelFor(
+         //     {NNghbr, MaxNTot}, KOKKOS_LAMBDA(int INghbr, int IExch) {
+         //        const I4 NTotList = NTot(INghbr);
+         //        if (SendActive(INghbr) == 0 || IExch >= NTotList) {
+         //           return;
+         //        }
+         //        const auto LocIndex = makeArraySubview(
+         //            IndexBacking, IndexOffsets(INghbr), NTotList);
+         //        const auto LocBuff = makeBufferSubview(
+         //            Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+         //        const ValType Val = Array(LocIndex(IExch));
+         //        R8 RVal;
+         //        memcpy(&RVal, &Val, sizeof(ValType));
+         //        LocBuff(IExch) = RVal;
+         //     });
          parallelFor(
-             {NNghbr, MaxNTot}, KOKKOS_LAMBDA(int INghbr, int IExch) {
-                const I4 NTotList = NTot(INghbr);
-                if (SendActive(INghbr) == 0 || IExch >= NTotList) {
-                   return;
-                }
-                const auto LocIndex = makeArraySubview(
-                    IndexBacking, IndexOffsets(INghbr), NTotList);
-                const auto LocBuff = makeBufferSubview(
-                    Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
-                const ValType Val = Array(LocIndex(IExch));
+             {IndexBacking.extent_int(0)}, KOKKOS_LAMBDA(int I) {
+                const ValType Val = Array(IndexBacking(I));
                 R8 RVal;
                 memcpy(&RVal, &Val, sizeof(ValType));
-                LocBuff(IExch) = RVal;
+                Buffer(I) = RVal;
              });
       } else if constexpr (ArrayRank<T>::Is2D) {
          const I4 NJ = Array.extent(1);
@@ -1092,21 +1099,28 @@ class Halo {
       const auto RecvActive    = RecvFlags[CurElem];
 
       if constexpr (ArrayRank<T>::Is1D) {
+         // parallelFor(
+         //     {NNghbr, MaxNTot}, KOKKOS_LAMBDA(int INghbr, int IExch) {
+         //        const I4 NTotList = NTot(INghbr);
+         //        if (RecvActive(INghbr) == 0 || IExch >= NTotList) {
+         //           return;
+         //        }
+         //        const auto LocIndex = makeArraySubview(
+         //            IndexBacking, IndexOffsets(INghbr), NTotList);
+         //        const auto LocBuff = makeBufferSubview(
+         //            Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
+         //        const I4 IArr = LocIndex(IExch);
+         //        const R8 RVal = LocBuff(IExch);
+         //        ValType Val;
+         //        memcpy(&Val, &RVal, sizeof(ValType));
+         //        Array(IArr) = Val;
+         //     });
          parallelFor(
-             {NNghbr, MaxNTot}, KOKKOS_LAMBDA(int INghbr, int IExch) {
-                const I4 NTotList = NTot(INghbr);
-                if (RecvActive(INghbr) == 0 || IExch >= NTotList) {
-                   return;
-                }
-                const auto LocIndex = makeArraySubview(
-                    IndexBacking, IndexOffsets(INghbr), NTotList);
-                const auto LocBuff = makeBufferSubview(
-                    Buffer, BufferOffsets(INghbr), NTotList, LocTotalSize);
-                const I4 IArr = LocIndex(IExch);
-                const R8 RVal = LocBuff(IExch);
+             {IndexBacking.extent_int(0)}, KOKKOS_LAMBDA(int I) {
+                const R8 RVal = Buffer(I);
                 ValType Val;
                 memcpy(&Val, &RVal, sizeof(ValType));
-                Array(IArr) = Val;
+                Array(IndexBacking(I)) = Val;
              });
       } else if constexpr (ArrayRank<T>::Is2D) {
          const I4 NJ = Array.extent(1);
