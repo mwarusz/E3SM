@@ -330,7 +330,7 @@ void testOneTwoOneFilter() {
 
    OMEGA_SCOPE(ComputeOneTwoOneFilter, TestVertMix->ComputeOneTwoOneFilter);
    const int RiSmoothLoopsOrig = ComputeOneTwoOneFilter.RiSmoothLoops;
-   // Perform two smoothing iteration for this test
+   // Perform two smoothing iterations for this test
    ComputeOneTwoOneFilter.RiSmoothLoops = 2;
 
    // Apply the 1-2-1 filter to each cell
