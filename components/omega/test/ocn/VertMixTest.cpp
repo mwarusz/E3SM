@@ -302,7 +302,6 @@ void testOneTwoOneFilter() {
    VCoord->NVertLayers   = NVertLayers;
    VCoord->NVertLayersP1 = NVertLayersP1;
    I4 NCellsSize         = Mesh->NCellsSize;
-   I4 NChunks            = VCoord->NVertLayers / VecLength;
    OMEGA_SCOPE(MinLayerCell, VCoord->MinLayerCell);
    OMEGA_SCOPE(MaxLayerCell, VCoord->MaxLayerCell);
 
