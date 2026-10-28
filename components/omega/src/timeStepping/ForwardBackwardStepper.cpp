@@ -26,9 +26,9 @@ ForwardBackwardStepper::ForwardBackwardStepper(
                   InStartType, InStartTime, InStopType, InStopTime,
                   InDuration) {}
 
-void ForwardBackwardStepper::prepareFirstStep(OceanState *State,
-                                              const Array3DReal &CurTracerArray,
-                                              TimeInstant SimTime) const {
+void ForwardBackwardStepper::prepareFirstStep(
+    OceanState *State, const Array3DReal &CurTracerArray) const {
+   const TimeInstant SimTime = StepClock->getCurrentTime();
    prepareNextStep(State, CurTracerArray, SimTime + TimeStep, TimeStep);
 }
 

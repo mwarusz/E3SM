@@ -167,8 +167,7 @@ class TimeStepper {
    ) const {}
 
    virtual void prepareFirstStep(OceanState *State,
-                                 const Array3DReal &CurTracerArray,
-                                 TimeInstant SimTime) const = 0;
+                                 const Array3DReal &CurTracerArray) const = 0;
 
    /// 1st stage of two-stage initialization for the default time stepper
    /// This version with no input parameters is for standalone mode
