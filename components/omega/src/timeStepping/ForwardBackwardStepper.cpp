@@ -111,6 +111,9 @@ void ForwardBackwardStepper::doStep(
    StepClock->advance();
    SimTime = StepClock->getCurrentTime();
    ++StepCount;
+
+   prepareNextStep(State, Tracers::getAll(TracerCurLevel), SimTime + TimeStep,
+                   TimeStep);
 }
 
 } // namespace OMEGA

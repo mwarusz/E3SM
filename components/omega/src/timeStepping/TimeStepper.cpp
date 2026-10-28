@@ -1097,4 +1097,17 @@ void TimeStepper::applyImplicitVerticalMixing(
    }
 }
 
+void TimeStepper::prepareNextStep(OceanState *State,
+                                  const Array3DReal &CurTracerArray,
+                                  TimeInstant SimTime,
+                                  TimeInterval ProjDt) const {
+   const int CurLevel = 0;
+
+   prescribeState(State, CurLevel, State, CurLevel, SimTime);
+
+   AuxState->computeAll(State, CurTracerArray, CurLevel, CurLevel, ProjDt);
+
+   updateKPPFields(State, CurLevel, CurLevel, CurLevel);
+}
+
 } // namespace OMEGA

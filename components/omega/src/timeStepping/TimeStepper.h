@@ -486,6 +486,9 @@ class TimeStepper {
        ///< [in] duration of current run segment if StopType is AfterDuration
    );
 
+   void prepareNextStep(OceanState *State, const Array3DReal &CurTracerArray,
+                        TimeInstant SimTime, TimeInterval ProjDt) const;
+
    // Disable copy constructor
    TimeStepper(const TimeStepper &) = delete;
    TimeStepper(TimeStepper &&)      = delete;

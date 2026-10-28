@@ -646,6 +646,8 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
    StepClock->advance();
    SimTime = StepClock->getCurrentTime();
    ++StepCount;
+
+   prepareNextStep(State, Tracers::getAll(CurLevel), SimTime, TimeStep);
 }
 
 } // namespace OMEGA

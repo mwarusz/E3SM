@@ -152,6 +152,9 @@ void RungeKutta4Stepper::doStep(OceanState *State,   // model state
    StepClock->advance();
    SimTime = StepClock->getCurrentTime();
    ++StepCount;
+
+   prepareNextStep(State, Tracers::getAll(CurLevel), SimTime,
+                   RKProj[0] * TimeStep);
 }
 
 } // namespace OMEGA
