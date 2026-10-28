@@ -166,6 +166,10 @@ class TimeStepper {
        bool          ///< [in] true if restart input initialized the state
    ) const {}
 
+   virtual void prepareFirstStep(OceanState *State,
+                                 const Array3DReal &CurTracerArray,
+                                 TimeInstant SimTime) const = 0;
+
    /// 1st stage of two-stage initialization for the default time stepper
    /// This version with no input parameters is for standalone mode
    /// with parameters from configuration input

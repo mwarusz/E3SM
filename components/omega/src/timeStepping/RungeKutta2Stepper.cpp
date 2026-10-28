@@ -26,6 +26,12 @@ RungeKutta2Stepper::RungeKutta2Stepper(
                   InStartType, InStartTime, InStopType, InStopTime,
                   InDuration) {}
 
+void RungeKutta2Stepper::prepareFirstStep(OceanState *State,
+                                          const Array3DReal &CurTracerArray,
+                                          TimeInstant SimTime) const {
+   prepareNextStep(State, CurTracerArray, SimTime, 0.5 * TimeStep);
+}
+
 //------------------------------------------------------------------------------
 // Advance the state by one step of the midpoint Runge Kutta scheme
 void RungeKutta2Stepper::doStep(OceanState *State,   // model state

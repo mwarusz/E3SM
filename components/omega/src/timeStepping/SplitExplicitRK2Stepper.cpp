@@ -99,6 +99,12 @@ void SplitExplicitRK2Stepper::initializeStateFromInput(OceanState *State,
    State->copyToHost(CurLevel);
 }
 
+void SplitExplicitRK2Stepper::prepareFirstStep(
+    OceanState *State, const Array3DReal &CurTracerArray,
+    TimeInstant SimTime) const {
+   prepareNextStep(State, CurTracerArray, SimTime, TimeStep);
+}
+
 //------------------------------------------------------------------------------
 void SplitExplicitRK2Stepper::doBaroclinicVelocityUpdate(
     OceanState *State, const Array3DReal &TendencyTracerArray, I4 CurLevel,

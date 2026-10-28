@@ -72,6 +72,12 @@ void RungeKutta4Stepper::finalizeInit() {
        Array3DReal("ProvisTracers", NTracers, NCellsSize, NVertLayers);
 }
 
+void RungeKutta4Stepper::prepareFirstStep(OceanState *State,
+                                          const Array3DReal &CurTracerArray,
+                                          TimeInstant SimTime) const {
+   prepareNextStep(State, CurTracerArray, SimTime, RKProj[0] * TimeStep);
+}
+
 //------------------------------------------------------------------------------
 // Advance the state by one step of the fourth-order Runge Kutta scheme
 void RungeKutta4Stepper::doStep(OceanState *State,   // model state

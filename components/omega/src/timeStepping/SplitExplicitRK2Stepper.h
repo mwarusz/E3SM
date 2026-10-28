@@ -29,6 +29,9 @@ class SplitExplicitRK2Stepper : public TimeStepper {
    /// Indicate that this is a split time stepper
    bool isSplit() const override;
 
+   void prepareFirstStep(OceanState *State, const Array3DReal &CurTracerArray,
+                         TimeInstant SimTime) const override;
+
    /// Advance the state by one split-explicit RK2 step.
    void doStep(OceanState *State,   ///< [inout] model state
                TimeInstant &SimTime ///< [inout] current simulation time

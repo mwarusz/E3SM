@@ -26,6 +26,12 @@ ForwardBackwardStepper::ForwardBackwardStepper(
                   InStartType, InStartTime, InStopType, InStopTime,
                   InDuration) {}
 
+void ForwardBackwardStepper::prepareFirstStep(OceanState *State,
+                                              const Array3DReal &CurTracerArray,
+                                              TimeInstant SimTime) const {
+   prepareNextStep(State, CurTracerArray, SimTime + TimeStep, TimeStep);
+}
+
 //------------------------------------------------------------------------------
 // Advance the state by one step of the forward-backward scheme
 void ForwardBackwardStepper::doStep(
