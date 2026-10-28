@@ -105,6 +105,7 @@ static void initStateForTimeStepper(
    TimeStepper *DefStepper = TimeStepper::getDefault();
    OceanState *DefState    = OceanState::getDefault();
    DefStepper->initializeStateFromInput(DefState, ReadRestart);
+   DefStepper->prepareFirstStep(DefState, Tracers::getAll(0));
 }
 
 //------------------------------------------------------------------------------

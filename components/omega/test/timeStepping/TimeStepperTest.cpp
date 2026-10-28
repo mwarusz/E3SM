@@ -459,6 +459,7 @@ int testOptionalStopTime(const std::string &Name, TimeStepperType Type) {
    auto *State = OceanState::get("TestState");
    initState();
    Stepper->initializeStateFromInput(State, false);
+   Stepper->prepareFirstStep(State, Tracers::getAll(0));
    TimeInstant CurTime = TimeStart;
    Stepper->doStep(State, CurTime);
 
