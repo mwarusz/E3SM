@@ -393,8 +393,8 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
 
       Err += initState();
 
-      TestTimeStepper->initializeStateFromInput(OceanState::get("TestState"),
-                                                false);
+      TestTimeStepper->prepareFirstStep(OceanState::get("TestState"),
+                                        Tracers::getAll(0), false);
 
       timeLoop(TimeStart, TimeEnd);
 
@@ -458,8 +458,7 @@ int testOptionalStopTime(const std::string &Name, TimeStepperType Type) {
                        DefHalo);
    auto *State = OceanState::get("TestState");
    initState();
-   Stepper->initializeStateFromInput(State, false);
-   Stepper->prepareFirstStep(State, Tracers::getAll(0));
+   Stepper->prepareFirstStep(State, Tracers::getAll(0), false);
    TimeInstant CurTime = TimeStart;
    Stepper->doStep(State, CurTime);
 

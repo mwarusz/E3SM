@@ -26,8 +26,9 @@ RungeKutta2Stepper::RungeKutta2Stepper(
                   InStartType, InStartTime, InStopType, InStopTime,
                   InDuration) {}
 
-void RungeKutta2Stepper::prepareFirstStep(
-    OceanState *State, const Array3DReal &CurTracerArray) const {
+void RungeKutta2Stepper::prepareFirstStep(OceanState *State,
+                                          const Array3DReal &CurTracerArray,
+                                          bool ReadRestart) const {
    const TimeInstant SimTime = StepClock->getCurrentTime();
    prepareNextStep(State, CurTracerArray, SimTime, 0.5 * TimeStep);
 }

@@ -72,8 +72,9 @@ void RungeKutta4Stepper::finalizeInit() {
        Array3DReal("ProvisTracers", NTracers, NCellsSize, NVertLayers);
 }
 
-void RungeKutta4Stepper::prepareFirstStep(
-    OceanState *State, const Array3DReal &CurTracerArray) const {
+void RungeKutta4Stepper::prepareFirstStep(OceanState *State,
+                                          const Array3DReal &CurTracerArray,
+                                          bool ReadRestart) const {
    const TimeInstant SimTime = StepClock->getCurrentTime();
    prepareNextStep(State, CurTracerArray, SimTime, RKProj[0] * TimeStep);
 }

@@ -160,14 +160,11 @@ class TimeStepper {
                        TimeInstant &SimTime ///< [inout] current simulation time
    ) const = 0;
 
-   /// Optional method-specific state initialization after initial/restart read.
-   virtual void initializeStateFromInput(
-       OceanState *, ///< [inout] model state after input has been read
-       bool          ///< [in] true if restart input initialized the state
-   ) const {}
-
-   virtual void prepareFirstStep(OceanState *State,
-                                 const Array3DReal &CurTracerArray) const = 0;
+   /// Method-specific step preparation after initial/restart read.
+   virtual void prepareFirstStep(
+       OceanState *State, const Array3DReal &CurTracerArray,
+       bool ReadRestart ///< [in] true if restart input initialized the state
+   ) const = 0;
 
    /// 1st stage of two-stage initialization for the default time stepper
    /// This version with no input parameters is for standalone mode

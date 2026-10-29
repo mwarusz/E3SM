@@ -74,13 +74,6 @@ void SplitExplicitRK2Stepper::initializeStateFromInput(OceanState *State,
 
    Array3DReal CurTracerArray = Tracers::getAll(CurLevel);
 
-   // This is the only call to computeMomVertAux outside of the time stepping
-   // loop Don't time it to make the time stepping timer stack easier to
-   // interpret
-   Pacer::disableTiming();
-   AuxState->computeMomVertAux(State, CurTracerArray, CurLevel);
-   Pacer::enableTiming();
-
    if (SEConfig.SplitFactor == 0._Real) {
       SplitExplicitInit::computeUnsplitVelocitySplit(State, Mesh, VCoord,
                                                      CurLevel, NextLevel);
@@ -100,9 +93,14 @@ void SplitExplicitRK2Stepper::initializeStateFromInput(OceanState *State,
 }
 
 void SplitExplicitRK2Stepper::prepareFirstStep(
-    OceanState *State, const Array3DReal &CurTracerArray) const {
+    OceanState *State, const Array3DReal &CurTracerArray,
+    bool ReadRestart) const {
    const TimeInstant SimTime = StepClock->getCurrentTime();
+
    prepareNextStep(State, CurTracerArray, SimTime, TimeStep);
+
+   // Initialize split state
+   initializeStateFromInput(State, ReadRestart);
 }
 
 //------------------------------------------------------------------------------
