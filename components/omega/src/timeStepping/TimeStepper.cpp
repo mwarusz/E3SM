@@ -1102,9 +1102,13 @@ void TimeStepper::prepareNextStep(OceanState *State,
                                   TimeInterval ProjDt) const {
    const int CurLevel = 0;
 
+   resetFrazilFluxes();
+
    prescribeState(State, CurLevel, State, CurLevel, SimTime);
 
    AuxState->computeAll(State, CurTracerArray, CurLevel, CurLevel, ProjDt);
+
+   validateOceanState(State, AuxState, VertCoord::getDefault(), CurLevel);
 
    updateKPPFields(State, CurLevel, CurLevel, CurLevel);
 }

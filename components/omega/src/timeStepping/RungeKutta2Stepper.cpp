@@ -46,8 +46,6 @@ void RungeKutta2Stepper::doStep(OceanState *State,   // model state
 
    VertMix *VMix = VertMix::getInstance();
 
-   resetFrazilFluxes();
-
    // q = (h,u,phi)
    // R_q^{n} = RHS_q(u^{n}, h^{n}, phi^{n}, t^{n})
    Tend->computeAllTendenciesOnly(State, AuxState, CurTracerArray, CurLevel,
@@ -83,8 +81,6 @@ void RungeKutta2Stepper::doStep(OceanState *State,   // model state
    Pacer::stop("RK2:haloExch", 3);
 
    applyImplicitVerticalMixing(State, CurLevel, CurLevel, CurLevel, "RK2");
-
-   validateOceanState(State, AuxState, VertCoord::getDefault(), CurLevel);
 
    // Advance the clock and update the simulation time
    StepClock->advance();

@@ -107,8 +107,6 @@ void ForwardBackwardStepper::doStep(
    applyImplicitVerticalMixing(State, TracerCurLevel, ThickCurLevel,
                                VelCurLevel, "ForwardBackward");
 
-   validateOceanState(State, AuxState, VertCoord::getDefault(), 0);
-
    // Advance the clock and update the simulation time
    StepClock->advance();
    SimTime = StepClock->getCurrentTime();

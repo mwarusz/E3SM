@@ -95,8 +95,6 @@ void RungeKutta4Stepper::doStep(OceanState *State,   // model state
 
    VertMix *VMix = VertMix::getInstance();
 
-   resetFrazilFluxes();
-
    for (int Stage = 0; Stage < NStages; ++Stage) {
       const TimeInstant StageTime = SimTime + RKC[Stage] * TimeStep;
       // first stage does:
@@ -149,8 +147,6 @@ void RungeKutta4Stepper::doStep(OceanState *State,   // model state
    Pacer::stop("RK4:haloExch", 3);
 
    applyImplicitVerticalMixing(State, CurLevel, CurLevel, CurLevel, "RK4");
-
-   validateOceanState(State, AuxState, VertCoord::getDefault(), CurLevel);
 
    // Advance the clock and update the simulation time
    StepClock->advance();

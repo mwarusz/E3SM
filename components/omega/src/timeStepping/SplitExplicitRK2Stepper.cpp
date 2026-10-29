@@ -556,8 +556,6 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
 
    VertMix *VMix = VertMix::getInstance();
 
-   resetFrazilFluxes();
-
    // Initialize NextLevel from CurLevel
    // TODO: This can be optimized in the future.
    initializeNextState(State, CurLevel, NextLevel, SEConfig.SplitFactor,
@@ -633,8 +631,6 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
       Tracers::exchangeHalo(CurLevel);
       Pacer::stop("SE-RK2:vMixHaloExch", 3);
    }
-
-   validateOceanState(State, AuxState, VertCoord::getDefault(), CurLevel);
 
    // Advance the clock and update the simulation time
    StepClock->advance();
