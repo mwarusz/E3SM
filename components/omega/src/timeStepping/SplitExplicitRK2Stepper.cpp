@@ -109,18 +109,21 @@ void SplitExplicitRK2Stepper::prepareFirstStep(
 void SplitExplicitRK2Stepper::doBaroclinicVelocityUpdate(
     OceanState *State, const Array3DReal &TendencyTracerArray, I4 CurLevel,
     I4 NextLevel, const TimeInstant &StageTime,
-    const TimeInterval &StageTimeStep) const {
+    const TimeInterval &StageTimeStep, I4 Iter) const {
 
    Pacer::start("SE-RK2:stage1Bcl", 2);
 
-   // TODO: A placeholder at this moment.
-   // prescribeState(State, CurLevel, State, CurLevel, StageTime);
-
    // Compute baroclinic velocity tendencies and update baroclinic velocity for
    // the first half of the stage time step
-   Tend->computeVelocityTendencies(State, AuxState, TendencyTracerArray,
-                                   NextLevel, NextLevel, NextLevel, StageTime,
-                                   StageTimeStep);
+   if (Iter == 0) {
+      Tend->computeVelocityTendenciesOnly(State, AuxState, TendencyTracerArray,
+                                          NextLevel, NextLevel, NextLevel,
+                                          StageTime);
+   } else {
+      Tend->computeVelocityTendencies(State, AuxState, TendencyTracerArray,
+                                      NextLevel, NextLevel, NextLevel,
+                                      StageTime, StageTimeStep);
+   }
 
    // Perform baroclinic velocity iteration with Coriolis acceleration
    doBaroclinicCoriolisIteration(State, CurLevel, NextLevel, StageTimeStep);
@@ -554,7 +557,6 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
    VertMix *VMix = VertMix::getInstance();
 
    resetFrazilFluxes();
-   updateKPPFields(State, CurLevel, CurLevel, CurLevel);
 
    // Initialize NextLevel from CurLevel
    // TODO: This can be optimized in the future.
@@ -578,7 +580,7 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
 
       // Stage 1: Baroclinic velocity advance, with long time step
       doBaroclinicVelocityUpdate(State, NextTracerArray, CurLevel, NextLevel,
-                                 VelStageTime, TimeStep);
+                                 VelStageTime, TimeStep, TimeStepIteration);
 
       Pacer::timingBarrier("SE-RK2:haloStage1Barrier", 3, Comm);
       Pacer::start("SE-RK2:haloStage1", 3);

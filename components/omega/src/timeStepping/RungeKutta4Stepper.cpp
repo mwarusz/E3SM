@@ -104,11 +104,9 @@ void RungeKutta4Stepper::doStep(OceanState *State,   // model state
       // q^{n+1} = q^{n} + dt * RKB[0] * R^{(0)}
       if (Stage == 0) {
          weightTracers(NextTracerArray, CurTracerArray, State, CurLevel);
-         prescribeState(State, CurLevel, State, CurLevel, ForcingStageTime);
-         updateKPPFields(State, CurLevel, CurLevel, CurLevel);
-         Tend->computeAllTendencies(State, AuxState, CurTracerArray, CurLevel,
-                                    CurLevel, CurLevel, StageTime,
-                                    RKProj[Stage] * TimeStep, RKB[Stage]);
+         Tend->computeAllTendenciesOnly(State, AuxState, CurTracerArray,
+                                        CurLevel, CurLevel, CurLevel, StageTime,
+                                        RKB[Stage]);
          updateStateByTend(State, NextLevel, State, CurLevel,
                            RKB[Stage] * TimeStep);
          accumulateTracersUpdate(NextTracerArray, RKB[Stage] * TimeStep);

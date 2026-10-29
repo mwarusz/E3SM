@@ -59,14 +59,10 @@ void ForwardBackwardStepper::doStep(
    if (AuxState == nullptr)
       LOG_CRITICAL("Invalid AuxState");
 
-   prescribeVelocity(State, VelCurLevel, State, VelCurLevel, SimTime);
-
-   updateKPPFields(State, TracerCurLevel, ThickCurLevel, VelCurLevel);
-
    // R_u^{n} = RHS_u(u^{n}, h^{n}, t^{n})
-   Tend->computeVelocityTendencies(State, AuxState, CurTracerArray,
-                                   ThickCurLevel, VelCurLevel, TracerCurLevel,
-                                   SimTime + TimeStep, TimeStep);
+   Tend->computeVelocityTendenciesOnly(State, AuxState, CurTracerArray,
+                                       ThickCurLevel, VelCurLevel,
+                                       TracerCurLevel, SimTime + TimeStep);
 
    // u^{n+1} = u^{n} + R_u^{n}
    updateVelocityByTend(State, VelNextLevel, State, VelCurLevel, TimeStep);

@@ -98,7 +98,8 @@ class SplitExplicitRK2Stepper : public TimeStepper {
        I4 CurLevel,                            ///< [in] current time level
        I4 NextLevel,                           ///< [in] next time level
        const TimeInstant &StageTime,           ///< [in] current stage time
-       const TimeInterval &StageTimeStep       ///< [in] current stage time step
+       const TimeInterval &StageTimeStep,      ///< [in] current stage time step
+       I4 Iter                                 ///< [in] current outer iteration
    ) const;
 
    void doThicknessTracerUpdate(

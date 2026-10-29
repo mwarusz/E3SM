@@ -48,15 +48,10 @@ void RungeKutta2Stepper::doStep(OceanState *State,   // model state
 
    resetFrazilFluxes();
 
-   prescribeState(State, CurLevel, State, CurLevel, SimTime);
-
-   updateKPPFields(State, CurLevel, CurLevel, CurLevel);
-
    // q = (h,u,phi)
    // R_q^{n} = RHS_q(u^{n}, h^{n}, phi^{n}, t^{n})
-   Tend->computeAllTendencies(State, AuxState, CurTracerArray, CurLevel,
-                              CurLevel, CurLevel, SimTime, 0.5 * TimeStep,
-                              0.0_Real);
+   Tend->computeAllTendenciesOnly(State, AuxState, CurTracerArray, CurLevel,
+                                  CurLevel, CurLevel, SimTime, 0.0_Real);
 
    // q^{n+0.5} = q^{n} + 0.5*dt*R_q^{n}
    updateStateByTend(State, NextLevel, State, CurLevel, 0.5 * TimeStep);
