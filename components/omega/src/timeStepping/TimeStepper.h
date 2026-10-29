@@ -160,7 +160,9 @@ class TimeStepper {
                        TimeInstant &SimTime ///< [inout] current simulation time
    ) const = 0;
 
-   /// Method-specific step preparation after initial/restart read.
+   /// Method-specific initialization to perform the first time step after
+   /// initial/restart read. Calling doStep before calling this function is an
+   /// error.
    virtual void prepareFirstStep(
        OceanState *State, const Array3DReal &CurTracerArray,
        bool ReadRestart ///< [in] true if restart input initialized the state
@@ -486,6 +488,9 @@ class TimeStepper {
        ///< [in] duration of current run segment if StopType is AfterDuration
    );
 
+   /// Computes all auxiliary variables and performs other preparations (e.g.
+   /// resets fluxes) for the first stage of the next time step. It also
+   /// validates the current state.
    void prepareNextStep(OceanState *State, const Array3DReal &CurTracerArray,
                         TimeInstant SimTime, TimeInterval ProjDt) const;
 
