@@ -620,20 +620,6 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
    Tracers::updateTimeLevels();
    Pacer::stop("SE-RK2:haloExch", 3);
 
-   // Refresh kinetic diagnostics from the completed n+dt velocity before
-   // validation and history output.
-   const Array2DReal NormalVelCur = State->getNormalVelocity(CurLevel);
-   OMEGA_SCOPE(LocKineticAux, AuxState->KineticAux);
-   OMEGA_SCOPE(MinLayerCell, VCoord->MinLayerCell);
-   OMEGA_SCOPE(MaxLayerCell, VCoord->MaxLayerCell);
-   parallelForOuter(
-       "refreshFinalKineticAux",
-       LaunchConfig({Mesh->NCellsAll},
-                    TeamScratch<Real>(2 * VCoord->NVertLayers)),
-       KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-          LocKineticAux.computeVarsOnCell(Team, ICell, NormalVelCur);
-       });
-
    // Apply implicit vertical mixing
    CurTracerArray = Tracers::getAll(CurLevel);
    if (VMix->VelVertMixSetup.Enabled or VMix->TracerVertMixSetup.Enabled) {
