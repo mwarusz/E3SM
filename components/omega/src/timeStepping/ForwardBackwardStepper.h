@@ -25,7 +25,7 @@ class ForwardBackwardStepper : public TimeStepper {
    );
 
    void prepareFirstStep(OceanState *State, const Array3DReal &CurTracerArray,
-                         bool ReadRestart) const override;
+                         bool ReadRestart) override;
 
    /// Advance the state by one step of the forward-backward scheme
    void doStep(OceanState *State,   ///< [inout] model state

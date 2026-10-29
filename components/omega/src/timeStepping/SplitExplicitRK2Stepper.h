@@ -30,7 +30,7 @@ class SplitExplicitRK2Stepper : public TimeStepper {
    bool isSplit() const override;
 
    void prepareFirstStep(OceanState *State, const Array3DReal &CurTracerArray,
-                         bool ReadRestart) const override;
+                         bool ReadRestart) override;
 
    /// Advance the state by one split-explicit RK2 step.
    void doStep(OceanState *State,   ///< [inout] model state

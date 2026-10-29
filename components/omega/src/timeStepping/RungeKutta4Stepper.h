@@ -26,7 +26,7 @@ class RungeKutta4Stepper : public TimeStepper {
    );
 
    void prepareFirstStep(OceanState *State, const Array3DReal &CurTracerArray,
-                         bool ReadRestart) const override;
+                         bool ReadRestart) override;
 
    /// Advance the state by one step of the fourth-order Runge Kutta scheme
    void doStep(OceanState *State,   ///< [inout] model state

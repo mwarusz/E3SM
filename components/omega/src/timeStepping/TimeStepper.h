@@ -166,7 +166,7 @@ class TimeStepper {
    virtual void prepareFirstStep(
        OceanState *State, const Array3DReal &CurTracerArray,
        bool ReadRestart ///< [in] true if restart input initialized the state
-   ) const = 0;
+       ) = 0;
 
    /// 1st stage of two-stage initialization for the default time stepper
    /// This version with no input parameters is for standalone mode
@@ -464,6 +464,9 @@ class TimeStepper {
    HorzMesh *Mesh;           /// Ptr to horizontal mesh info
    VertCoord *VCoord;        /// Ptr to vertical coordinate
    Halo *MeshHalo;           /// Ptr to defined halos
+
+   // Flag that indicates prepareFirstStep has been called
+   bool PrepareFirstStepCalled = false;
 
    /// Reset frazil fluxes accumulated across the current outer ocean step.
    void resetFrazilFluxes() const;

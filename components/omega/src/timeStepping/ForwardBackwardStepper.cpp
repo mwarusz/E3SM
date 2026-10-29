@@ -28,9 +28,11 @@ ForwardBackwardStepper::ForwardBackwardStepper(
 
 void ForwardBackwardStepper::prepareFirstStep(OceanState *State,
                                               const Array3DReal &CurTracerArray,
-                                              bool ReadRestart) const {
+                                              bool ReadRestart) {
    const TimeInstant SimTime = StepClock->getCurrentTime();
    prepareNextStep(State, CurTracerArray, SimTime + TimeStep, TimeStep);
+
+   PrepareFirstStepCalled = true;
 }
 
 //------------------------------------------------------------------------------
@@ -39,6 +41,9 @@ void ForwardBackwardStepper::doStep(
     OceanState *State,   // input model state
     TimeInstant &SimTime // current simulation time
 ) const {
+
+   OMEGA_REQUIRE(PrepareFirstStepCalled,
+                 "prepareFirstStep was not called before doStep");
 
    const int VelCurLevel    = 0;
    const int ThickCurLevel  = 0;

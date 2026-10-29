@@ -93,14 +93,15 @@ void SplitExplicitRK2Stepper::initializeStateFromInput(OceanState *State,
 }
 
 void SplitExplicitRK2Stepper::prepareFirstStep(
-    OceanState *State, const Array3DReal &CurTracerArray,
-    bool ReadRestart) const {
+    OceanState *State, const Array3DReal &CurTracerArray, bool ReadRestart) {
    const TimeInstant SimTime = StepClock->getCurrentTime();
 
    prepareNextStep(State, CurTracerArray, SimTime, TimeStep);
 
    // Initialize split state
    initializeStateFromInput(State, ReadRestart);
+
+   PrepareFirstStepCalled = true;
 }
 
 //------------------------------------------------------------------------------
@@ -539,6 +540,8 @@ void SplitExplicitRK2Stepper::finalizeTimeStepIterationState(
 //------------------------------------------------------------------------------
 void SplitExplicitRK2Stepper::doStep(OceanState *State,
                                      TimeInstant &SimTime) const {
+   OMEGA_REQUIRE(PrepareFirstStepCalled,
+                 "prepareFirstStep was not called before doStep");
 
    if (!State)
       LOG_CRITICAL("Invalid State");

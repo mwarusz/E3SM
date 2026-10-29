@@ -74,9 +74,11 @@ void RungeKutta4Stepper::finalizeInit() {
 
 void RungeKutta4Stepper::prepareFirstStep(OceanState *State,
                                           const Array3DReal &CurTracerArray,
-                                          bool ReadRestart) const {
+                                          bool ReadRestart) {
    const TimeInstant SimTime = StepClock->getCurrentTime();
    prepareNextStep(State, CurTracerArray, SimTime, RKProj[0] * TimeStep);
+
+   PrepareFirstStepCalled = true;
 }
 
 //------------------------------------------------------------------------------
@@ -84,6 +86,9 @@ void RungeKutta4Stepper::prepareFirstStep(OceanState *State,
 void RungeKutta4Stepper::doStep(OceanState *State,   // model state
                                 TimeInstant &SimTime // current simulation time
 ) const {
+
+   OMEGA_REQUIRE(PrepareFirstStepCalled,
+                 "prepareFirstStep was not called before doStep");
 
    const MPI_Comm Comm = MeshHalo->getComm();
 
