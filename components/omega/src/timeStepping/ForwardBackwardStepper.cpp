@@ -30,7 +30,7 @@ void ForwardBackwardStepper::prepareFirstStep(OceanState *State,
                                               const Array3DReal &CurTracerArray,
                                               bool ReadRestart) {
    const TimeInstant SimTime = StepClock->getCurrentTime();
-   prepareNextStep(State, CurTracerArray, SimTime + TimeStep, TimeStep);
+   prepareNextStep(State, CurTracerArray, SimTime, TimeStep);
 
    PrepareFirstStepCalled = true;
 }
@@ -118,8 +118,7 @@ void ForwardBackwardStepper::doStep(
    SimTime = StepClock->getCurrentTime();
    ++StepCount;
 
-   prepareNextStep(State, Tracers::getAll(TracerCurLevel), SimTime + TimeStep,
-                   TimeStep);
+   prepareNextStep(State, Tracers::getAll(TracerCurLevel), SimTime, TimeStep);
 }
 
 } // namespace OMEGA
