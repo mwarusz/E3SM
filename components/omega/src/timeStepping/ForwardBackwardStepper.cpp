@@ -25,7 +25,7 @@ ForwardBackwardStepper::ForwardBackwardStepper(
     : TimeStepper(InName, TimeStepperType::ForwardBackward, 2, InTimeStep,
                   InStartType, InStartTime, InStopType, InStopTime,
                   InDuration) {
-   FirstProjTimeStep = TimeStep;
+   FirstProjFactor = 1;
 }
 
 //------------------------------------------------------------------------------

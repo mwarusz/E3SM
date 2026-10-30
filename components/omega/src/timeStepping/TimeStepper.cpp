@@ -1116,7 +1116,7 @@ void TimeStepper::prepareNextStep(OceanState *State,
    prescribeState(State, CurLevel, State, CurLevel, SimTime);
 
    AuxState->computeAll(State, CurTracerArray, CurLevel, CurLevel,
-                        FirstProjTimeStep);
+                        FirstProjFactor * TimeStep);
 
    validateOceanState(State, AuxState, VertCoord::getDefault(), CurLevel);
 

@@ -32,7 +32,7 @@ SplitExplicitRK2Stepper::SplitExplicitRK2Stepper(
       SEConfig(SplitExplicitInit::readConfigOptions(
           InTimeStep, InType == TimeStepperType::UnsplitRK2)) {
 
-   FirstProjTimeStep = TimeStep;
+   FirstProjFactor = 1;
 }
 
 bool SplitExplicitRK2Stepper::isSplit() const { return true; }

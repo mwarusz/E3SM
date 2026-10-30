@@ -25,7 +25,7 @@ RungeKutta2Stepper::RungeKutta2Stepper(
     : TimeStepper(InName, TimeStepperType::RungeKutta2, 2, InTimeStep,
                   InStartType, InStartTime, InStopType, InStopTime,
                   InDuration) {
-   FirstProjTimeStep = 0.5 * TimeStep;
+   FirstProjFactor = 0.5_Real;
 }
 
 //------------------------------------------------------------------------------

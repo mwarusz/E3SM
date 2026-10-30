@@ -46,7 +46,7 @@ RungeKutta4Stepper::RungeKutta4Stepper(
    RKProj[2] = 1.;
    RKProj[3] = 1.;
 
-   FirstProjTimeStep = RKProj[0] * TimeStep;
+   FirstProjFactor = RKProj[0];
 }
 
 //------------------------------------------------------------------------------

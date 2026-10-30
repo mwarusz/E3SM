@@ -474,8 +474,8 @@ class TimeStepper {
    // Flag that indicates prepareFirstStep has been called
    bool PrepareFirstStepCalled = false;
 
-   // Projection time step of the first time stepper stage
-   TimeInterval FirstProjTimeStep;
+   // Time step projection factor of the first time stepper stage
+   Real FirstProjFactor;
 
    /// Reset frazil fluxes accumulated across the current outer ocean step.
    void resetFrazilFluxes() const;
