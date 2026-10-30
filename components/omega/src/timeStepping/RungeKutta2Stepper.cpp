@@ -52,6 +52,8 @@ void RungeKutta2Stepper::doStep(OceanState *State,   // model state
 
    VertMix *VMix = VertMix::getInstance();
 
+   resetFrazilFluxes();
+
    // q = (h,u,phi)
    // R_q^{n} = RHS_q(u^{n}, h^{n}, phi^{n}, t^{n})
    Tend->computeAllTendenciesOnly(State, AuxState, CurTracerArray, CurLevel,

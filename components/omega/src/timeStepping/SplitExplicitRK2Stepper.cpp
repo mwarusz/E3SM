@@ -557,6 +557,8 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
 
    VertMix *VMix = VertMix::getInstance();
 
+   resetFrazilFluxes();
+
    // Initialize NextLevel from CurLevel
    // TODO: This can be optimized in the future.
    initializeNextState(State, CurLevel, NextLevel, SEConfig.SplitFactor,

@@ -1098,15 +1098,13 @@ void TimeStepper::applyImplicitVerticalMixing(
 
 //------------------------------------------------------------------------------
 // Computes all auxiliary variables and performs other setup (e.g.
-// resets fluxes) for the first stage of the next time step. It also
+// prescribes state) for the first stage of the next time step. It also
 // validates the current state.
 void TimeStepper::prepareNextStep(OceanState *State,
                                   const Array3DReal &CurTracerArray,
                                   TimeInstant SimTime,
                                   TimeInterval ProjDt) const {
    const int CurLevel = 0;
-
-   resetFrazilFluxes();
 
    prescribeState(State, CurLevel, State, CurLevel, SimTime);
 

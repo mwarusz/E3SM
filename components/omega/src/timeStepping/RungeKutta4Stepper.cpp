@@ -101,6 +101,8 @@ void RungeKutta4Stepper::doStep(OceanState *State,   // model state
 
    VertMix *VMix = VertMix::getInstance();
 
+   resetFrazilFluxes();
+
    for (int Stage = 0; Stage < NStages; ++Stage) {
       const TimeInstant StageTime = SimTime + RKC[Stage] * TimeStep;
       // first stage does:
