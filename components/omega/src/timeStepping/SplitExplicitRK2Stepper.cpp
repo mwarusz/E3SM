@@ -30,7 +30,10 @@ SplitExplicitRK2Stepper::SplitExplicitRK2Stepper(
     : TimeStepper(InName, InType, 2, InTimeStep, InStartType, InStartTime,
                   InStopType, InStopTime, InDuration),
       SEConfig(SplitExplicitInit::readConfigOptions(
-          InTimeStep, InType == TimeStepperType::UnsplitRK2)) {}
+          InTimeStep, InType == TimeStepperType::UnsplitRK2)) {
+
+   FirstProjTimeStep = TimeStep;
+}
 
 bool SplitExplicitRK2Stepper::isSplit() const { return true; }
 
@@ -94,9 +97,8 @@ void SplitExplicitRK2Stepper::initializeStateFromInput(OceanState *State,
 
 void SplitExplicitRK2Stepper::prepareFirstStep(
     OceanState *State, const Array3DReal &CurTracerArray, bool ReadRestart) {
-   const TimeInstant SimTime = StepClock->getCurrentTime();
 
-   prepareNextStep(State, CurTracerArray, SimTime, TimeStep);
+   prepareNextStep(State, CurTracerArray);
 
    // Initialize split state
    initializeStateFromInput(State, ReadRestart);
@@ -640,7 +642,7 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
    SimTime = StepClock->getCurrentTime();
    ++StepCount;
 
-   prepareNextStep(State, Tracers::getAll(CurLevel), SimTime, TimeStep);
+   prepareNextStep(State, Tracers::getAll(CurLevel));
 }
 
 } // namespace OMEGA

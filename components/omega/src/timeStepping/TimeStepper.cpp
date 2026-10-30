@@ -1096,19 +1096,27 @@ void TimeStepper::applyImplicitVerticalMixing(
    }
 }
 
+void TimeStepper::prepareFirstStep(OceanState *State,
+                                   const Array3DReal &CurTracerArray,
+                                   bool ReadRestart) {
+   prepareNextStep(State, CurTracerArray);
+
+   PrepareFirstStepCalled = true;
+}
+
 //------------------------------------------------------------------------------
 // Computes all auxiliary variables and performs other setup (e.g.
 // prescribes state) for the first stage of the next time step. It also
 // validates the current state.
 void TimeStepper::prepareNextStep(OceanState *State,
-                                  const Array3DReal &CurTracerArray,
-                                  TimeInstant SimTime,
-                                  TimeInterval ProjDt) const {
-   const int CurLevel = 0;
+                                  const Array3DReal &CurTracerArray) const {
+   const int CurLevel        = 0;
+   const TimeInstant SimTime = StepClock->getCurrentTime();
 
    prescribeState(State, CurLevel, State, CurLevel, SimTime);
 
-   AuxState->computeAll(State, CurTracerArray, CurLevel, CurLevel, ProjDt);
+   AuxState->computeAll(State, CurTracerArray, CurLevel, CurLevel,
+                        FirstProjTimeStep);
 
    validateOceanState(State, AuxState, VertCoord::getDefault(), CurLevel);
 

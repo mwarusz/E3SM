@@ -45,6 +45,8 @@ RungeKutta4Stepper::RungeKutta4Stepper(
    RKProj[1] = 1. / 2;
    RKProj[2] = 1.;
    RKProj[3] = 1.;
+
+   FirstProjTimeStep = RKProj[0] * TimeStep;
 }
 
 //------------------------------------------------------------------------------
@@ -70,15 +72,6 @@ void RungeKutta4Stepper::finalizeInit() {
 
    ProvisTracers =
        Array3DReal("ProvisTracers", NTracers, NCellsSize, NVertLayers);
-}
-
-void RungeKutta4Stepper::prepareFirstStep(OceanState *State,
-                                          const Array3DReal &CurTracerArray,
-                                          bool ReadRestart) {
-   const TimeInstant SimTime = StepClock->getCurrentTime();
-   prepareNextStep(State, CurTracerArray, SimTime, RKProj[0] * TimeStep);
-
-   PrepareFirstStepCalled = true;
 }
 
 //------------------------------------------------------------------------------
@@ -161,8 +154,7 @@ void RungeKutta4Stepper::doStep(OceanState *State,   // model state
    SimTime = StepClock->getCurrentTime();
    ++StepCount;
 
-   prepareNextStep(State, Tracers::getAll(CurLevel), SimTime,
-                   RKProj[0] * TimeStep);
+   prepareNextStep(State, Tracers::getAll(CurLevel));
 }
 
 } // namespace OMEGA

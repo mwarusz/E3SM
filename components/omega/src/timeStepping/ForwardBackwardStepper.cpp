@@ -24,15 +24,8 @@ ForwardBackwardStepper::ForwardBackwardStepper(
     )
     : TimeStepper(InName, TimeStepperType::ForwardBackward, 2, InTimeStep,
                   InStartType, InStartTime, InStopType, InStopTime,
-                  InDuration) {}
-
-void ForwardBackwardStepper::prepareFirstStep(OceanState *State,
-                                              const Array3DReal &CurTracerArray,
-                                              bool ReadRestart) {
-   const TimeInstant SimTime = StepClock->getCurrentTime();
-   prepareNextStep(State, CurTracerArray, SimTime, TimeStep);
-
-   PrepareFirstStepCalled = true;
+                  InDuration) {
+   FirstProjTimeStep = TimeStep;
 }
 
 //------------------------------------------------------------------------------
@@ -118,7 +111,7 @@ void ForwardBackwardStepper::doStep(
    SimTime = StepClock->getCurrentTime();
    ++StepCount;
 
-   prepareNextStep(State, Tracers::getAll(TracerCurLevel), SimTime, TimeStep);
+   prepareNextStep(State, Tracers::getAll(TracerCurLevel));
 }
 
 } // namespace OMEGA

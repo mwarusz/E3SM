@@ -24,15 +24,8 @@ RungeKutta2Stepper::RungeKutta2Stepper(
     )
     : TimeStepper(InName, TimeStepperType::RungeKutta2, 2, InTimeStep,
                   InStartType, InStartTime, InStopType, InStopTime,
-                  InDuration) {}
-
-void RungeKutta2Stepper::prepareFirstStep(OceanState *State,
-                                          const Array3DReal &CurTracerArray,
-                                          bool ReadRestart) {
-   const TimeInstant SimTime = StepClock->getCurrentTime();
-   prepareNextStep(State, CurTracerArray, SimTime, 0.5 * TimeStep);
-
-   PrepareFirstStepCalled = true;
+                  InDuration) {
+   FirstProjTimeStep = 0.5 * TimeStep;
 }
 
 //------------------------------------------------------------------------------
@@ -95,7 +88,7 @@ void RungeKutta2Stepper::doStep(OceanState *State,   // model state
    SimTime = StepClock->getCurrentTime();
    ++StepCount;
 
-   prepareNextStep(State, Tracers::getAll(CurLevel), SimTime, 0.5 * TimeStep);
+   prepareNextStep(State, Tracers::getAll(CurLevel));
 }
 
 } // namespace OMEGA

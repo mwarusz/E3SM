@@ -26,9 +26,6 @@ class RungeKutta2Stepper : public TimeStepper {
        std::optional<TimeInterval> InDuration  ///< [in] duration if AfterDur
    );
 
-   void prepareFirstStep(OceanState *State, const Array3DReal &CurTracerArray,
-                         bool ReadRestart) override;
-
    /// Advance the state by one step of the midpoint Runge Kutta scheme
    void doStep(OceanState *State,   ///< [inout] model state
                TimeInstant &SimTime ///< [inout] current simulation time

@@ -166,7 +166,7 @@ class TimeStepper {
    virtual void prepareFirstStep(
        OceanState *State, const Array3DReal &CurTracerArray,
        bool ReadRestart ///< [in] true if restart input initialized the state
-       ) = 0;
+   );
 
    /// 1st stage of two-stage initialization for the default time stepper
    /// This version with no input parameters is for standalone mode
@@ -416,6 +416,12 @@ class TimeStepper {
        const std::string &TimerPrefix ///< [in] timer name prefix
    ) const;
 
+   /// Computes all auxiliary variables and performs other setup (e.g.
+   /// prescribes state ) for the first stage of the next time step. It also
+   /// validates the current state.
+   void prepareNextStep(OceanState *State,
+                        const Array3DReal &CurTracerArray) const;
+
  protected:
    /// Name of time stepper
    std::string Name;
@@ -468,6 +474,9 @@ class TimeStepper {
    // Flag that indicates prepareFirstStep has been called
    bool PrepareFirstStepCalled = false;
 
+   // Projection time step of the first time stepper stage
+   TimeInterval FirstProjTimeStep;
+
    /// Reset frazil fluxes accumulated across the current outer ocean step.
    void resetFrazilFluxes() const;
 
@@ -490,12 +499,6 @@ class TimeStepper {
        std::optional<TimeInterval> InDuration = std::nullopt
        ///< [in] duration of current run segment if StopType is AfterDuration
    );
-
-   /// Computes all auxiliary variables and performs other setup (e.g.
-   /// resets fluxes) for the first stage of the next time step. It also
-   /// validates the current state.
-   void prepareNextStep(OceanState *State, const Array3DReal &CurTracerArray,
-                        TimeInstant SimTime, TimeInterval ProjDt) const;
 
    // Disable copy constructor
    TimeStepper(const TimeStepper &) = delete;
