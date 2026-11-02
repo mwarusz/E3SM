@@ -569,6 +569,8 @@ Decomp::Decomp(
     const std::string &MeshFileName_ //< [in] name of file with mesh info
 ) {
 
+   Method = PartMethod;
+
    bool TimerFlag = Pacer::start("Decomp construct", 1);
 
    // Retrieve some info on the MPI layout
