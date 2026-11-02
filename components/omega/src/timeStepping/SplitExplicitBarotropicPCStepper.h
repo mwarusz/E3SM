@@ -26,7 +26,8 @@ class SplitExplicitBarotropicPCStepper {
         const SplitExplicitConfig *InConfig, ///< [in] split-explicit options
         const HorzMesh *InMesh,              ///< [in] horizontal mesh
         Halo *InMeshHalo,                    ///< [in] mesh halo exchange
-        const VertCoord *InVCoord            ///< [in] vertical coordinate
+        const VertCoord *InVCoord,           ///< [in] vertical coordinate
+        const Decomp *BarotropicDecomp       ///< [in] barotropic decomp
    );
 
    void doBarotropicVelocityUpdate(
@@ -43,6 +44,7 @@ class SplitExplicitBarotropicPCStepper {
    const HorzMesh *Mesh                = nullptr;
    Halo *MeshHalo                      = nullptr;
    const VertCoord *VCoord             = nullptr;
+   const Decomp *BarotropicDecomp      = nullptr;
 };
 
 } // namespace OMEGA

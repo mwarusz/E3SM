@@ -47,7 +47,8 @@ void SplitExplicitBarotropicPCStepper::init(const AuxiliaryState *InAuxState,
                                             const SplitExplicitConfig *InConfig,
                                             const HorzMesh *InMesh,
                                             Halo *InMeshHalo,
-                                            const VertCoord *InVCoord) {
+                                            const VertCoord *InVCoord,
+                                            const Decomp *InBarotropicDecomp) {
 
    if (!InAuxState)
       LOG_CRITICAL("Invalid auxiliary state");
@@ -63,13 +64,16 @@ void SplitExplicitBarotropicPCStepper::init(const AuxiliaryState *InAuxState,
       LOG_CRITICAL("Invalid vertical coordinate");
    if (InConfig->NBtrSubcycles < 1)
       LOG_CRITICAL("Invalid split-explicit barotropic subcycle count");
+   if (!InBarotropicDecomp)
+      LOG_CRITICAL("Invalid barotropic decomp");
 
-   AuxState = InAuxState;
-   Scratch  = InScratch;
-   SEConfig = InConfig;
-   Mesh     = InMesh;
-   MeshHalo = InMeshHalo;
-   VCoord   = InVCoord;
+   AuxState         = InAuxState;
+   Scratch          = InScratch;
+   SEConfig         = InConfig;
+   Mesh             = InMesh;
+   MeshHalo         = InMeshHalo;
+   VCoord           = InVCoord;
+   BarotropicDecomp = InBarotropicDecomp;
 }
 
 //------------------------------------------------------------------------------
