@@ -69,7 +69,7 @@ void SplitExplicitRK2Stepper::finalizeInit() {
                                       VCoord, Name);
 
    BarotropicPCStepper.init(AuxState, &SEScratch, &SEConfig, Mesh, MeshHalo,
-                            VCoord);
+                            VCoord, BarotropicDecomp);
 }
 
 //------------------------------------------------------------------------------
