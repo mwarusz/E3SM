@@ -123,6 +123,7 @@ class SplitExplicitRK2Stepper : public TimeStepper {
    ) const;
 
    Decomp *BarotropicDecomp;
+   Halo *BarotropicHalo;
    SplitExplicitConfig SEConfig;
    mutable SplitExplicitScratch SEScratch;
    SplitExplicitBarotropicPCStepper BarotropicPCStepper;
