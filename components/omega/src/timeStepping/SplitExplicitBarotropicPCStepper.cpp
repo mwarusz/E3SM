@@ -137,20 +137,23 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
        AuxState->PseudoThicknessAux.FluxThickEdgeChoice ==
        FluxThickEdgeOption::Upwind;
 
-   OMEGA_SCOPE(CellsOnEdge, Mesh->CellsOnEdge);
-   OMEGA_SCOPE(NEdgesOnCell, Mesh->NEdgesOnCell);
-   OMEGA_SCOPE(EdgesOnCell, Mesh->EdgesOnCell);
+   OMEGA_SCOPE(CellsOnEdge, BarotropicDecomp->CellsOnEdge);
+   OMEGA_SCOPE(NEdgesOnCell, BarotropicDecomp->NEdgesOnCell);
+   OMEGA_SCOPE(EdgesOnCell, BarotropicDecomp->EdgesOnCell);
+   OMEGA_SCOPE(NEdgesOnEdge, BarotropicDecomp->NEdgesOnEdge);
+   OMEGA_SCOPE(EdgesOnEdge, BarotropicDecomp->EdgesOnEdge);
+
    OMEGA_SCOPE(EdgeSignOnCell, Mesh->EdgeSignOnCell);
-   OMEGA_SCOPE(NEdgesOnEdge, Mesh->NEdgesOnEdge);
-   OMEGA_SCOPE(EdgesOnEdge, Mesh->EdgesOnEdge);
+   OMEGA_SCOPE(AreaCell, Mesh->AreaCell);
+
    OMEGA_SCOPE(WeightsOnEdge, Mesh->WeightsOnEdge);
    OMEGA_SCOPE(DcEdge, Mesh->DcEdge);
    OMEGA_SCOPE(DvEdge, Mesh->DvEdge);
-   OMEGA_SCOPE(AreaCell, Mesh->AreaCell);
    OMEGA_SCOPE(FEdge, Mesh->FEdge);
    OMEGA_SCOPE(MinLayerEdgeBot, VCoord->MinLayerEdgeBot);
    OMEGA_SCOPE(MaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
    OMEGA_SCOPE(EdgeMask, VCoord->EdgeMask);
+
    OMEGA_SCOPE(DepthMeanSpecVol, EqState->DepthMeanSpecificVolume);
 
    // Initialize barotropic vars
