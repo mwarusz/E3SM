@@ -142,47 +142,59 @@ I4 SplitExplicitInit::computeSubcycleCount(const TimeInterval &TimeStep,
 
 //------------------------------------------------------------------------------
 void SplitExplicitInit::allocateScratch(SplitExplicitScratch &Scratch,
-                                        const HorzMesh *Mesh,
+                                        const Decomp *DefDecomp,
+                                        const Decomp *BarotropicDecomp,
                                         const VertCoord *VCoord,
                                         const std::string &Name) {
 
-   if (!Mesh)
-      LOG_CRITICAL("Invalid mesh");
+   if (!DefDecomp)
+      LOG_CRITICAL("Invalid default decomp");
+   if (!BarotropicDecomp)
+      LOG_CRITICAL("Invalid barotropic decomp");
    if (!VCoord)
       LOG_CRITICAL("Invalid vertical coordinate");
 
-   Scratch.NormalBarotropicVelocitySubcycleCur = Array1DReal(
-       "NormalBarotropicVelocitySubcycleCur" + Name, Mesh->NEdgesSize);
-   Scratch.NormalBarotropicVelocitySubcyclePre = Array1DReal(
-       "NormalBarotropicVelocitySubcyclePre" + Name, Mesh->NEdgesSize);
-   Scratch.NormalBarotropicVelocitySubcycleCor = Array1DReal(
-       "NormalBarotropicVelocitySubcycleCor" + Name, Mesh->NEdgesSize);
-   Scratch.BarotropicPressureAnomalySubcycleCur = Array1DReal(
-       "BarotropicPressureAnomalySubcycleCur" + Name, Mesh->NCellsSize);
-   Scratch.BarotropicPressureAnomalySubcyclePre = Array1DReal(
-       "BarotropicPressureAnomalySubcyclePre" + Name, Mesh->NCellsSize);
-   Scratch.BarotropicPressureAnomalySubcycleCor = Array1DReal(
-       "BarotropicPressureAnomalySubcycleCor" + Name, Mesh->NCellsSize);
+   Scratch.NormalBarotropicVelocitySubcycleCur =
+       Array1DReal("NormalBarotropicVelocitySubcycleCur" + Name,
+                   BarotropicDecomp->NEdgesSize);
+   Scratch.NormalBarotropicVelocitySubcyclePre =
+       Array1DReal("NormalBarotropicVelocitySubcyclePre" + Name,
+                   BarotropicDecomp->NEdgesSize);
+   Scratch.NormalBarotropicVelocitySubcycleCor =
+       Array1DReal("NormalBarotropicVelocitySubcycleCor" + Name,
+                   BarotropicDecomp->NEdgesSize);
+   Scratch.BarotropicPressureAnomalySubcycleCur =
+       Array1DReal("BarotropicPressureAnomalySubcycleCur" + Name,
+                   BarotropicDecomp->NCellsSize);
+   Scratch.BarotropicPressureAnomalySubcyclePre =
+       Array1DReal("BarotropicPressureAnomalySubcyclePre" + Name,
+                   BarotropicDecomp->NCellsSize);
+   Scratch.BarotropicPressureAnomalySubcycleCor =
+       Array1DReal("BarotropicPressureAnomalySubcycleCor" + Name,
+                   BarotropicDecomp->NCellsSize);
    Scratch.BarotropicForcing =
-       Array1DReal("BarotropicForcing" + Name, Mesh->NEdgesSize);
+       Array1DReal("BarotropicForcing" + Name, BarotropicDecomp->NEdgesSize);
    Scratch.BarotropicFlux =
-       Array1DReal("BarotropicFlux" + Name, Mesh->NEdgesSize);
-   Scratch.BaroclinicPseudoThicknessEdge =
-       Array1DReal("BaroclinicPseudoThicknessEdge" + Name, Mesh->NEdgesSize);
+       Array1DReal("BarotropicFlux" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.BaroclinicPseudoThicknessEdge = Array1DReal(
+       "BaroclinicPseudoThicknessEdge" + Name, BarotropicDecomp->NEdgesSize);
    Scratch.IterVelocityTend = Array2DReal(
-       "IterVelocityTend" + Name, Mesh->NEdgesSize, VCoord->NVertLayers);
-   Scratch.TransportVelocityAdd = Array2DReal(
-       "TransportVelocityAdd" + Name, Mesh->NEdgesSize, VCoord->NVertLayers);
+       "IterVelocityTend" + Name, DefDecomp->NEdgesSize, VCoord->NVertLayers);
+   Scratch.TransportVelocityAdd =
+       Array2DReal("TransportVelocityAdd" + Name, DefDecomp->NEdgesSize,
+                   VCoord->NVertLayers);
 
    parallelFor(
-       "initializeCell1D", {Mesh->NCellsAll}, KOKKOS_LAMBDA(I4 ICell) {
+       "initializeCell1D", {BarotropicDecomp->NCellsAll},
+       KOKKOS_LAMBDA(I4 ICell) {
           Scratch.BarotropicPressureAnomalySubcycleCur(ICell) = 0._Real;
           Scratch.BarotropicPressureAnomalySubcyclePre(ICell) = 0._Real;
           Scratch.BarotropicPressureAnomalySubcycleCor(ICell) = 0._Real;
        });
 
    parallelFor(
-       "initializeEdge1D", {Mesh->NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge) {
+       "initializeEdge1D", {BarotropicDecomp->NEdgesAll},
+       KOKKOS_LAMBDA(I4 IEdge) {
           Scratch.NormalBarotropicVelocitySubcycleCur(IEdge) = 0._Real;
           Scratch.NormalBarotropicVelocitySubcyclePre(IEdge) = 0._Real;
           Scratch.NormalBarotropicVelocitySubcycleCor(IEdge) = 0._Real;
