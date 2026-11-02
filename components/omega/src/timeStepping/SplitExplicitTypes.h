@@ -45,6 +45,16 @@ struct SplitExplicitScratch {
    Array1DReal BaroclinicPseudoThicknessEdge;
    Array2DReal IterVelocityTend;
    Array2DReal TransportVelocityAdd;
+
+   Array1DReal AreaCell;
+   Array2DReal EdgeSignOnCell;
+   Array1DReal DcEdge;
+   Array1DReal DvEdge;
+   Array1DReal FEdge;
+   Array2DReal EdgeMask;
+   Array2DReal WeightsOnEdge;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
 };
 
 } // namespace OMEGA
