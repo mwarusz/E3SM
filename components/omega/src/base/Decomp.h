@@ -197,6 +197,8 @@ class Decomp {
 
    std::string MeshFileName; ///< The name of the file with mesh info
 
+   PartMethod Method; ///< The method used for partitioning
+
    // Sizes and global IDs
    // Note that all sizes are actual counts (1-based) so that loop extents
    // should always use the 0:NCellsXX-1 form.

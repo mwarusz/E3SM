@@ -548,10 +548,12 @@ Decomp::Decomp(
     const std::string &Name,         //< [in] Name for new decomposition
     const MachEnv *InEnv,            //< [in] MachEnv for the new partition
     I4 NParts,                       //< [in] num of partitions for new decomp
-    PartMethod Method,               //< [in] method for partitioning
+    PartMethod InMethod,             //< [in] method for partitioning
     I4 InHaloWidth,                  //< [in] width of halo in new decomp
     const std::string &MeshFileName_ //< [in] name of file with mesh info
 ) {
+
+   Method = InMethod;
 
    bool TimerFlag = Pacer::start("Decomp construct", 1);
 
