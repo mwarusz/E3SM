@@ -65,6 +65,10 @@ void SplitExplicitRK2Stepper::finalizeInit() {
        Name + DecompName, DefMachEnv, DefMachEnv->getNumTasks(),
        DefDecomp->Method, BarotropicHaloWidth, DefDecomp->MeshFileName);
 
+   std::string HaloName = "BarotropicHalo";
+   // Create barotropic halo exchange
+   BarotropicHalo = Halo::create(Name + HaloName, DefMachEnv, BarotropicDecomp);
+
    SplitExplicitInit::allocateScratch(SEScratch, DefDecomp, BarotropicDecomp,
                                       VCoord, Name);
 
