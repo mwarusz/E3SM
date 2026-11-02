@@ -143,16 +143,16 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
    OMEGA_SCOPE(NEdgesOnEdge, BarotropicDecomp->NEdgesOnEdge);
    OMEGA_SCOPE(EdgesOnEdge, BarotropicDecomp->EdgesOnEdge);
 
-   OMEGA_SCOPE(EdgeSignOnCell, Mesh->EdgeSignOnCell);
-   OMEGA_SCOPE(AreaCell, Mesh->AreaCell);
+   OMEGA_SCOPE(EdgeSignOnCell, Scratch->EdgeSignOnCell);
+   OMEGA_SCOPE(AreaCell, Scratch->AreaCell);
 
-   OMEGA_SCOPE(WeightsOnEdge, Mesh->WeightsOnEdge);
-   OMEGA_SCOPE(DcEdge, Mesh->DcEdge);
-   OMEGA_SCOPE(DvEdge, Mesh->DvEdge);
-   OMEGA_SCOPE(FEdge, Mesh->FEdge);
-   OMEGA_SCOPE(MinLayerEdgeBot, VCoord->MinLayerEdgeBot);
-   OMEGA_SCOPE(MaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
-   OMEGA_SCOPE(EdgeMask, VCoord->EdgeMask);
+   OMEGA_SCOPE(WeightsOnEdge, Scratch->WeightsOnEdge);
+   OMEGA_SCOPE(DcEdge, Scratch->DcEdge);
+   OMEGA_SCOPE(DvEdge, Scratch->DvEdge);
+   OMEGA_SCOPE(FEdge, Scratch->FEdge);
+   OMEGA_SCOPE(MinLayerEdgeBot, Scratch->MinLayerEdgeBot);
+   OMEGA_SCOPE(MaxLayerEdgeTop, Scratch->MaxLayerEdgeTop);
+   OMEGA_SCOPE(EdgeMask, Scratch->EdgeMask);
 
    OMEGA_SCOPE(DepthMeanSpecVol, EqState->DepthMeanSpecificVolume);
 
