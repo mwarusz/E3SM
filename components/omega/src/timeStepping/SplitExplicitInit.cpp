@@ -183,6 +183,23 @@ void SplitExplicitInit::allocateScratch(SplitExplicitScratch &Scratch,
    Scratch.TransportVelocityAdd =
        Array2DReal("TransportVelocityAdd" + Name, DefDecomp->NEdgesSize,
                    VCoord->NVertLayers);
+   Scratch.AreaCell =
+       Array1DReal("AreaCell" + Name, BarotropicDecomp->NCellsSize);
+   Scratch.EdgeSignOnCell =
+       Array2DReal("EdgeSignOnCell" + Name, BarotropicDecomp->NCellsSize,
+                   BarotropicDecomp->MaxEdges);
+   Scratch.DcEdge = Array1DReal("DcEdge" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.DvEdge = Array1DReal("DvEdge" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.FEdge  = Array1DReal("FEdge" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.EdgeMask = Array2DReal(
+       "EdgeMask" + Name, BarotropicDecomp->NEdgesSize, VCoord->NVertLayers);
+   Scratch.WeightsOnEdge =
+       Array2DReal("WeightsOnEdge" + Name, BarotropicDecomp->NEdgesSize,
+                   BarotropicDecomp->MaxEdges2);
+   Scratch.MinLayerEdgeBot =
+       Array1DI4("MinLayerEdgeBot" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.MaxLayerEdgeTop =
+       Array1DI4("MaxLayerEdgeTop" + Name, BarotropicDecomp->NEdgesSize);
 
    parallelFor(
        "initializeCell1D", {BarotropicDecomp->NCellsAll},
