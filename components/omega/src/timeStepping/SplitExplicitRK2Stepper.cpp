@@ -65,7 +65,8 @@ void SplitExplicitRK2Stepper::finalizeInit() {
        Name + DecompName, DefMachEnv, DefMachEnv->getNumTasks(),
        DefDecomp->Method, BarotropicHaloWidth, DefDecomp->MeshFileName);
 
-   SplitExplicitInit::allocateScratch(SEScratch, Mesh, VCoord, Name);
+   SplitExplicitInit::allocateScratch(SEScratch, DefDecomp, BarotropicDecomp,
+                                      VCoord, Name);
 
    BarotropicPCStepper.init(AuxState, &SEScratch, &SEConfig, Mesh, MeshHalo,
                             VCoord);
