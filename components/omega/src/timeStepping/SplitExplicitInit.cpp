@@ -225,6 +225,56 @@ void SplitExplicitInit::allocateScratch(SplitExplicitScratch &Scratch,
 }
 
 //------------------------------------------------------------------------------
+void SplitExplicitInit::transferMeshArrays(SplitExplicitScratch &Scratch,
+                                           const HorzMesh *Mesh,
+                                           const VertCoord *VCoord,
+                                           const Decomp *BarotropicDecomp,
+                                           Halo *BarotropicHalo) {
+
+   if (!Mesh)
+      LOG_CRITICAL("Invalid mesh");
+   if (!VCoord)
+      LOG_CRITICAL("Invalid vertical coordinate");
+   if (!BarotropicDecomp)
+      LOG_CRITICAL("Invalid barotropic decomposition");
+   if (!BarotropicHalo)
+      LOG_CRITICAL("Invalid barotropic halo");
+
+   const auto OwnedCellRange = std::make_pair(0, BarotropicDecomp->NCellsOwned);
+   const auto OwnedEdgeRange = std::make_pair(0, BarotropicDecomp->NEdgesOwned);
+
+   deepCopy(Kokkos::subview(Scratch.AreaCell, OwnedCellRange),
+            Kokkos::subview(Mesh->AreaCell, OwnedCellRange));
+   deepCopy(
+       Kokkos::subview(Scratch.EdgeSignOnCell, OwnedCellRange, Kokkos::ALL),
+       Kokkos::subview(Mesh->EdgeSignOnCell, OwnedCellRange, Kokkos::ALL));
+   deepCopy(Kokkos::subview(Scratch.DcEdge, OwnedEdgeRange),
+            Kokkos::subview(Mesh->DcEdge, OwnedEdgeRange));
+   deepCopy(Kokkos::subview(Scratch.DvEdge, OwnedEdgeRange),
+            Kokkos::subview(Mesh->DvEdge, OwnedEdgeRange));
+   deepCopy(Kokkos::subview(Scratch.FEdge, OwnedEdgeRange),
+            Kokkos::subview(Mesh->FEdge, OwnedEdgeRange));
+   deepCopy(Kokkos::subview(Scratch.EdgeMask, OwnedEdgeRange, Kokkos::ALL),
+            Kokkos::subview(VCoord->EdgeMask, OwnedEdgeRange, Kokkos::ALL));
+   deepCopy(Kokkos::subview(Scratch.WeightsOnEdge, OwnedEdgeRange, Kokkos::ALL),
+            Kokkos::subview(Mesh->WeightsOnEdge, OwnedEdgeRange, Kokkos::ALL));
+   deepCopy(Kokkos::subview(Scratch.MinLayerEdgeBot, OwnedEdgeRange),
+            Kokkos::subview(VCoord->MinLayerEdgeBot, OwnedEdgeRange));
+   deepCopy(Kokkos::subview(Scratch.MaxLayerEdgeTop, OwnedEdgeRange),
+            Kokkos::subview(VCoord->MaxLayerEdgeTop, OwnedEdgeRange));
+
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.AreaCell, OnCell);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.EdgeSignOnCell, OnCell);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.DcEdge, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.DvEdge, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.FEdge, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.EdgeMask, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.WeightsOnEdge, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.MinLayerEdgeBot, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.MaxLayerEdgeTop, OnEdge);
+}
+
+//------------------------------------------------------------------------------
 void SplitExplicitInit::computeVelocitySplit(OceanState *State,
                                              const HorzMesh *Mesh,
                                              const VertCoord *VCoord,
