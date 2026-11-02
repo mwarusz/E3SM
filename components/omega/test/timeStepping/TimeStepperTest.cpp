@@ -367,7 +367,8 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
    const std::string StateName = "TestState" + Name;
    auto *TestState             = OceanState::create(
        StateName, DefMesh, DefHalo, NVertLayers,
-       TestTimeStepper->getNTimeLevels(), TestTimeStepper->isSplit());
+       TestTimeStepper->getNTimeLevels(), TestTimeStepper->isSplit(),
+       TestTimeStepper->getBarotropicDecomp());
 
    if (!TestState) {
       Err++;
@@ -456,9 +457,9 @@ int testOptionalStopTime(const std::string &Name, TimeStepperType Type) {
    Stepper->attachData(TestTendencies, TestAuxState, DefMesh, DefVCoord,
                        DefHalo);
    const std::string StateName = "TestStateCoupled" + Name;
-   auto *State =
-       OceanState::create(StateName, DefMesh, DefHalo, NVertLayers,
-                          Stepper->getNTimeLevels(), Stepper->isSplit());
+   auto *State                 = OceanState::create(
+       StateName, DefMesh, DefHalo, NVertLayers, Stepper->getNTimeLevels(),
+       Stepper->isSplit(), Stepper->getBarotropicDecomp());
    if (!State) {
       Err++;
       LOG_ERROR("TimeStepperTest: error creating test state {}", StateName);

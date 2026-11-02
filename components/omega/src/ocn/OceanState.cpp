@@ -65,9 +65,12 @@ int OceanState::init() {
    // pressure fields; every other stepper leaves them unallocated.
    const bool UseModeSplit = DefTimeStepper->isSplit();
 
+   Decomp *BarotropicDecomp = DefTimeStepper->getBarotropicDecomp();
+
    // Create the default state and set pointer to it
-   OceanState::DefaultOceanState = create(
-       "Default", DefHorzMesh, DefHalo, NVertLayers, NTimeLevels, UseModeSplit);
+   OceanState::DefaultOceanState =
+       create("Default", DefHorzMesh, DefHalo, NVertLayers, NTimeLevels,
+              UseModeSplit, BarotropicDecomp);
 
    // State values are filled by a later read of the initial state or
    // restart file
