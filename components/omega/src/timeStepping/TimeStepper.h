@@ -168,6 +168,9 @@ class TimeStepper {
        bool ReadRestart ///< [in] true if restart input initialized the state
    );
 
+   // Get decomposition of barotropic fields
+   virtual Decomp *getBarotropicDecomp() const { return nullptr; }
+
    /// 1st stage of two-stage initialization for the default time stepper
    /// This version with no input parameters is for standalone mode
    /// with parameters from configuration input
