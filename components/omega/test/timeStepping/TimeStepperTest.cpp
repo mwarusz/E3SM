@@ -78,11 +78,9 @@ struct DecayVelocityTendency {
    }
 };
 
-int initState() {
+int initState(OceanState *State) {
    int Err = 0;
 
-   auto *Mesh              = HorzMesh::getDefault();
-   auto *State             = OceanState::get("TestState");
    auto *VCoord            = VertCoord::getDefault();
    Array3DReal TracerArray = Tracers::getAll(0);
 
@@ -125,10 +123,9 @@ int createExactSolution(Real TimeEnd) {
    return Err;
 }
 
-ErrorMeasures computeErrors() {
+ErrorMeasures computeErrors(const OceanState *State) {
    const auto *DefMesh = HorzMesh::getDefault();
 
-   const auto *State      = OceanState::get("TestState");
    const auto *ExactState = OceanState::get("Exact");
 
    Array2DReal NormalVelEdge      = State->getNormalVelocity(0);
@@ -231,16 +228,7 @@ int initTimeStepperTest(const std::string &mesh) {
    auto *DefPGrad = PressureGrad::getDefault();
    auto *DefVMix  = VertMix::getInstance();
 
-   int NTracers            = Tracers::getNumTracers();
-   const int NTimeLevels   = 2;
-   const bool UseModeSplit = true;
-   auto *TestOceanState    = OceanState::create(
-       "TestState", DefMesh, DefHalo, NVertLayers, NTimeLevels, UseModeSplit);
-
-   if (!TestOceanState) {
-      Err++;
-      LOG_ERROR("TimeStepperTest: error creating test state");
-   }
+   int NTracers = Tracers::getNumTracers();
 
    TimeInterval PosTimeStep(
        1, TimeUnits::Seconds); // Arbitrary positive time step (unused)
@@ -310,9 +298,8 @@ int adjustTimeStep(TimeStepper *Stepper, Real TimeEnd) {
    return NSteps;
 }
 
-void timeLoop(TimeStepper *Stepper, TimeInstant TimeStart, Real TimeEnd) {
-   auto *State = OceanState::get("TestState");
-
+void timeLoop(TimeStepper *Stepper, OceanState *State, TimeInstant TimeStart,
+              Real TimeEnd) {
    const int NSteps            = adjustTimeStep(Stepper, TimeEnd);
    const TimeInterval TimeStep = Stepper->getTimeStep();
    TimeInstant CurTime         = Stepper->getStartTime();
@@ -371,6 +358,19 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
    if (!TestTimeStepper) {
       Err++;
       LOG_ERROR("TimeStepperTest: error creating test time stepper {}", Name);
+      return Err;
+   }
+
+   const std::string StateName = "TestState" + Name;
+   auto *TestState             = OceanState::create(
+       StateName, DefMesh, DefHalo, NVertLayers,
+       TestTimeStepper->getNTimeLevels(), TestTimeStepper->isSplit());
+
+   if (!TestState) {
+      Err++;
+      LOG_ERROR("TimeStepperTest: error creating test state {}", StateName);
+      TimeStepper::erase(Name);
+      return Err;
    }
 
    int NRefinements = 2;
@@ -389,14 +389,13 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
       TestTimeStepper->changeTimeStep(
           TimeInterval(TimeStepSeconds, TimeUnits::Seconds));
 
-      Err += initState();
+      Err += initState(TestState);
 
-      TestTimeStepper->initializeStateFromInput(OceanState::get("TestState"),
-                                                false);
+      TestTimeStepper->initializeStateFromInput(TestState, false);
 
-      timeLoop(TestTimeStepper, TimeStart, TimeEnd);
+      timeLoop(TestTimeStepper, TestState, TimeStart, TimeEnd);
 
-      Errors[RefLevel] = computeErrors();
+      Errors[RefLevel] = computeErrors(TestState);
 
       TimeStepSeconds /= 2;
    }
@@ -415,6 +414,7 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
    }
 
    TimeStepper::erase(Name);
+   OceanState::erase(StateName);
 
    return Err;
 }
@@ -454,8 +454,17 @@ int testOptionalStopTime(const std::string &Name, TimeStepperType Type) {
    // Verify doStep works without an EndAlarm (coupled run loop never uses it)
    Stepper->attachData(TestTendencies, TestAuxState, DefMesh, DefVCoord,
                        DefHalo);
-   auto *State = OceanState::get("TestState");
-   initState();
+   const std::string StateName = "TestStateCoupled" + Name;
+   auto *State =
+       OceanState::create(StateName, DefMesh, DefHalo, NVertLayers,
+                          Stepper->getNTimeLevels(), Stepper->isSplit());
+   if (!State) {
+      Err++;
+      LOG_ERROR("TimeStepperTest: error creating test state {}", StateName);
+      TimeStepper::erase("Coupled" + Name);
+      return Err;
+   }
+   initState(State);
    Stepper->initializeStateFromInput(State, false);
    TimeInstant CurTime = TimeStart;
    Stepper->doStep(State, CurTime);
@@ -480,6 +489,7 @@ int testOptionalStopTime(const std::string &Name, TimeStepperType Type) {
    }
 
    TimeStepper::erase("Coupled" + Name);
+   OceanState::erase(StateName);
 
    return Err;
 }
