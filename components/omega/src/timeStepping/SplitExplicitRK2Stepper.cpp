@@ -61,7 +61,7 @@ void SplitExplicitRK2Stepper::finalizeInit() {
    auto *DefDecomp               = Decomp::getDefault();
    const int BarotropicHaloWidth = 6;
    std::string DecompName        = "BarotropicDecomp";
-   auto *BarotropicDecomp        = Decomp::create(
+   BarotropicDecomp              = Decomp::create(
        Name + DecompName, DefMachEnv, DefMachEnv->getNumTasks(),
        DefDecomp->Method, BarotropicHaloWidth, DefDecomp->MeshFileName);
 
