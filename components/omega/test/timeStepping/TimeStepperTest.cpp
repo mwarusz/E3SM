@@ -310,9 +310,8 @@ int adjustTimeStep(TimeStepper *Stepper, Real TimeEnd) {
    return NSteps;
 }
 
-void timeLoop(TimeInstant TimeStart, Real TimeEnd) {
-   auto *Stepper = TimeStepper::get("TestTimeStepper");
-   auto *State   = OceanState::get("TestState");
+void timeLoop(TimeStepper *Stepper, TimeInstant TimeStart, Real TimeEnd) {
+   auto *State = OceanState::get("TestState");
 
    const int NSteps            = adjustTimeStep(Stepper, TimeEnd);
    const TimeInterval TimeStep = Stepper->getTimeStep();
@@ -366,9 +365,8 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
    TimeInterval TimeStepTI(BaseTimeStepSeconds, TimeUnits::Seconds);
 
    auto *TestTimeStepper = TimeStepper::create(
-       "TestTimeStepper", Type, TestTendencies, TestAuxState, DefMesh,
-       DefVCoord, DefHalo, TimeStepTI, StartType, TimeStart, StopType,
-       TimeEndTI);
+       Name, Type, TestTendencies, TestAuxState, DefMesh, DefVCoord, DefHalo,
+       TimeStepTI, StartType, TimeStart, StopType, TimeEndTI);
 
    if (!TestTimeStepper) {
       Err++;
@@ -396,7 +394,7 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
       TestTimeStepper->initializeStateFromInput(OceanState::get("TestState"),
                                                 false);
 
-      timeLoop(TimeStart, TimeEnd);
+      timeLoop(TestTimeStepper, TimeStart, TimeEnd);
 
       Errors[RefLevel] = computeErrors();
 
@@ -416,7 +414,7 @@ int testTimeStepper(const std::string &Name, TimeStepperType Type,
           Name, ConvRates.back(), ExpectedOrder);
    }
 
-   TimeStepper::erase("TestTimeStepper");
+   TimeStepper::erase(Name);
 
    return Err;
 }
@@ -436,7 +434,7 @@ int testOptionalStopTime(const std::string &Name, TimeStepperType Type) {
    // 2-phase create without StopTime — used by the coupled driver
    TimeStepperStartType StartType = TimeStepperStartType::StartUp;
    TimeStepperStopType StopType   = TimeStepperStopType::Coupled;
-   auto *Stepper = TimeStepper::create("CoupledTestStepper", Type, TimeStep,
+   auto *Stepper = TimeStepper::create("Coupled" + Name, Type, TimeStep,
                                        StartType, TimeStart, StopType);
 
    if (!Stepper) {
@@ -481,7 +479,7 @@ int testOptionalStopTime(const std::string &Name, TimeStepperType Type) {
                 Name);
    }
 
-   TimeStepper::erase("CoupledTestStepper");
+   TimeStepper::erase("Coupled" + Name);
 
    return Err;
 }
