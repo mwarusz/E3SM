@@ -308,7 +308,7 @@ void SplitExplicitRK2Stepper::doBaroclinicCoriolisIteration(
    if (SEConfig.SplitFactor != 0._Real) {
       Pacer::start("SE-RK2:haloBtrForcing", 3);
       Array1DReal BtrForcing = SEScratch.BarotropicForcing;
-      MeshHalo->exchangeFullArrayHalo(BtrForcing, OnEdge);
+      BarotropicHalo->exchangeFullArrayHalo(BtrForcing, OnEdge);
       Pacer::stop("SE-RK2:haloBtrForcing", 3);
    }
 
