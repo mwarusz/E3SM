@@ -178,6 +178,8 @@ void SplitExplicitInit::allocateScratch(SplitExplicitScratch &Scratch,
        Array1DReal("BarotropicFlux" + Name, BarotropicDecomp->NEdgesSize);
    Scratch.BaroclinicPseudoThicknessEdge = Array1DReal(
        "BaroclinicPseudoThicknessEdge" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.DepthMeanSpecificVolume = Array1DReal(
+       "DepthMeanSpecificVolume" + Name, BarotropicDecomp->NCellsSize);
    Scratch.IterVelocityTend = Array2DReal(
        "IterVelocityTend" + Name, DefDecomp->NEdgesSize, VCoord->NVertLayers);
    Scratch.TransportVelocityAdd =
