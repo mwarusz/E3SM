@@ -57,11 +57,11 @@ void SplitExplicitRK2Stepper::finalizeInit() {
       LOG_CRITICAL("Invalid split-explicit barotropic time stepper");
 
    // Create barotropic decomp
-   auto *DefMachEnv              = MachEnv::getDefault();
-   auto *DefDecomp               = Decomp::getDefault();
-   const int BarotropicHaloWidth = 6;
-   std::string DecompName        = "BarotropicDecomp";
-   BarotropicDecomp              = Decomp::create(
+   auto *DefMachEnv             = MachEnv::getDefault();
+   auto *DefDecomp              = Decomp::getDefault();
+   const I4 BarotropicHaloWidth = SEConfig.BarotropicHaloWidth;
+   std::string DecompName       = "BarotropicDecomp";
+   BarotropicDecomp             = Decomp::create(
        Name + DecompName, DefMachEnv, DefMachEnv->getNumTasks(),
        DefDecomp->Method, BarotropicHaloWidth, DefDecomp->MeshFileName);
 
