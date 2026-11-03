@@ -78,8 +78,8 @@ void SplitExplicitRK2Stepper::finalizeInit() {
    SplitExplicitInit::transferMeshArrays(SEScratch, Mesh, VCoord,
                                          BarotropicDecomp, BarotropicHalo);
 
-   BarotropicPCStepper.init(AuxState, &SEScratch, &SEConfig, Mesh, MeshHalo,
-                            VCoord, BarotropicDecomp);
+   BarotropicPCStepper.init(AuxState, &SEScratch, &SEConfig, BarotropicDecomp,
+                            BarotropicHalo);
 }
 
 //------------------------------------------------------------------------------
