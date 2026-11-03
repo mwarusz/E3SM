@@ -24,10 +24,8 @@ class SplitExplicitBarotropicPCStepper {
    init(const AuxiliaryState *InAuxState, ///< [in] provisional auxiliary state
         SplitExplicitScratch *InScratch,  ///< [inout] split-explicit scratch
         const SplitExplicitConfig *InConfig, ///< [in] split-explicit options
-        const HorzMesh *InMesh,              ///< [in] horizontal mesh
-        Halo *InMeshHalo,                    ///< [in] mesh halo exchange
-        const VertCoord *InVCoord,           ///< [in] vertical coordinate
-        const Decomp *BarotropicDecomp       ///< [in] barotropic decomp
+        const Decomp *BarotropicDecomp,      ///< [in] barotropic decomp
+        Halo *BarotropicHalo                 ///< [in] barotropic halo exchange
    );
 
    void doBarotropicVelocityUpdate(
@@ -41,10 +39,8 @@ class SplitExplicitBarotropicPCStepper {
    const AuxiliaryState *AuxState      = nullptr;
    SplitExplicitScratch *Scratch       = nullptr;
    const SplitExplicitConfig *SEConfig = nullptr;
-   const HorzMesh *Mesh                = nullptr;
-   Halo *MeshHalo                      = nullptr;
-   const VertCoord *VCoord             = nullptr;
    const Decomp *BarotropicDecomp      = nullptr;
+   Halo *BarotropicHalo                = nullptr;
 };
 
 } // namespace OMEGA
