@@ -207,23 +207,29 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
                   "HaloWidth of at least {}, got {}",
                   MinHaloWidth, HaloWidth);
 
-   // A halo deeper than the minimum just leaves every range deeper.
-   const I4 HaloAll = HaloWidth - 1;
-   const I4 VelPredEdgeRange =
-       BarotropicDecomp->NEdgesHaloH(HaloAll - VelPredShrink);
-   const I4 PressPredCellRange =
-       BarotropicDecomp->NCellsHaloH(HaloAll - PressPredShrink);
-   const I4 VelCorrEdgeRange =
-       BarotropicDecomp->NEdgesHaloH(HaloAll - VelCorrShrink);
-   const I4 PressCorrCellRange =
-       BarotropicDecomp->NCellsHaloH(HaloAll - PressCorrShrink);
+   I4 CurHalo = HaloWidth - 1;
 
    // Start the barotrolic subcycling
    for (I4 Subcycle = 0; Subcycle < NBtrSubcycles; ++Subcycle) {
 
-      // Restore buffers. This is the only communication inside the subcycle.
-      BarotropicHalo->exchangeFullArrayHalo(NormalBtrVelSubcycleCur, OnEdge);
-      BarotropicHalo->exchangeFullArrayHalo(BtrPressAnomalySubcycleCur, OnCell);
+      if ((CurHalo - PressCorrShrink) < 1) {
+         // Restore buffers. This is the only communication inside the subcycle.
+         BarotropicHalo->exchangeFullArrayHalo(NormalBtrVelSubcycleCur, OnEdge);
+         BarotropicHalo->exchangeFullArrayHalo(BtrPressAnomalySubcycleCur,
+                                               OnCell);
+         CurHalo = HaloWidth - 1;
+      }
+
+      const I4 VelPredEdgeRange =
+          BarotropicDecomp->NEdgesHaloH(CurHalo - VelPredShrink);
+      const I4 PressPredCellRange =
+          BarotropicDecomp->NCellsHaloH(CurHalo - PressPredShrink);
+      const I4 VelCorrEdgeRange =
+          BarotropicDecomp->NEdgesHaloH(CurHalo - VelCorrShrink);
+      const I4 PressCorrCellRange =
+          (CurHalo - PressCorrShrink) >= 0
+              ? BarotropicDecomp->NCellsHaloH(CurHalo - PressCorrShrink)
+              : BarotropicDecomp->NCellsOwned;
 
       // Barotropic velocity predictor
       parallelFor(
@@ -441,6 +447,8 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
       // at the start of the next subcycle.
       std::swap(NormalBtrVelSubcycleCur, NormalBtrVelSubcycleCor);
       std::swap(BtrPressAnomalySubcycleCur, BtrPressAnomalySubcycleCor);
+
+      CurHalo -= PressCorrShrink;
    } // Subcycle
 
    parallelFor(
