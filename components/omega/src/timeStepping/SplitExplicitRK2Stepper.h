@@ -33,6 +33,7 @@ class SplitExplicitRK2Stepper : public TimeStepper {
                          bool ReadRestart) override;
 
    Decomp *getBarotropicDecomp() const override { return BarotropicDecomp; }
+   Halo *getBarotropicHalo() const override { return BarotropicHalo; }
 
    /// Advance the state by one split-explicit RK2 step.
    void doStep(OceanState *State,   ///< [inout] model state
