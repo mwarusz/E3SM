@@ -57,6 +57,8 @@
 ///      # has no barotropic subcycle
 ///      BtrTimeStepper: Predictor-Corrector
 ///      BtrTimeStep: 0000_00:00:20
+///      # Halo width for barotropic decomposition; must be at least 3
+///      BarotropicHaloWidth: 6
 ///      # Iterations over stages 1-3. Two are needed for the RK2 predictor-
 ///      # corrector structure; one degrades the scheme to forward Euler.
 ///      NTimeStepIteration: 2
