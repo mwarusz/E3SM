@@ -1088,7 +1088,7 @@ void TimeStepper::applyImplicitVerticalMixing(
       const MPI_Comm Comm = MeshHalo->getComm();
       Pacer::timingBarrier(TimerPrefix + ":vMixHaloExchBarrier", 3, Comm);
       Pacer::start(TimerPrefix + ":vMixHaloExch", 3);
-      State->exchangeHalo(VelTimeLevel);
+      State->exchangeHalo(VelTimeLevel, getBarotropicHalo());
       Tracers::exchangeHalo(VelTimeLevel);
       Pacer::stop(TimerPrefix + ":vMixHaloExch", 3);
    }
