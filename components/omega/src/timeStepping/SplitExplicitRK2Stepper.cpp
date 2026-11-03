@@ -112,7 +112,7 @@ void SplitExplicitRK2Stepper::initializeStateFromInput(OceanState *State,
    // The velocity split is computed over all edges, so halo edges whose
    // neighboring cells lie outside the halo must be refreshed from their
    // owners before the newly split arrays are copied to the host
-   State->exchangeHalo(CurLevel);
+   State->exchangeHalo(CurLevel, BarotropicHalo);
    State->copyToHost(CurLevel);
 }
 
@@ -615,7 +615,7 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
       if (TimeStepIteration + 1 < SEConfig.NTimeStepIteration) {
          Pacer::timingBarrier("SE-RK2:haloTimeStepIterationBarrier", 3, Comm);
          Pacer::start("SE-RK2:haloTimeStepIteration", 3);
-         State->exchangeHalo(NextLevel);
+         State->exchangeHalo(NextLevel, BarotropicHalo);
          MeshHalo->exchangeFullArrayHalo(NextTracerArray, OnCell);
          Pacer::stop("SE-RK2:haloTimeStepIteration", 3);
       }
@@ -625,7 +625,7 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
    // exchanges
    Pacer::timingBarrier("SE-RK2:haloExchBarrier", 3, Comm);
    Pacer::start("SE-RK2:haloExch", 3);
-   State->updateTimeLevels();
+   State->updateTimeLevels(BarotropicHalo);
    Tracers::updateTimeLevels();
    Pacer::stop("SE-RK2:haloExch", 3);
 
@@ -652,7 +652,7 @@ void SplitExplicitRK2Stepper::doStep(OceanState *State,
       // Re-exchange halos after vertical mixing
       Pacer::timingBarrier("SE-RK2:vMixHaloExchBarrier", 3, Comm);
       Pacer::start("SE-RK2:vMixHaloExch", 3);
-      State->exchangeHalo(CurLevel);
+      State->exchangeHalo(CurLevel, BarotropicHalo);
       Tracers::exchangeHalo(CurLevel);
       Pacer::stop("SE-RK2:vMixHaloExch", 3);
    }
