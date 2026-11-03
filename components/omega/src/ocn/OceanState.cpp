@@ -535,32 +535,35 @@ void OceanState::applyLayerMasks(const I4 TimeLevel) {
 //------------------------------------------------------------------------------
 // Perform state halo exchange
 // TimeLevel == [1:new, 0:current, -1:previous, -2:two times ago, ...]
-void OceanState::exchangeHalo(const I4 TimeLevel) {
+void OceanState::exchangeHalo(const I4 TimeLevel, Halo *BarotropicHalo) {
 
    const I4 TimeIndex = getTimeIndex(TimeLevel);
 
    MeshHalo->exchangeFullArrayHalo(PseudoThickness[TimeIndex], OnCell);
    MeshHalo->exchangeFullArrayHalo(NormalVelocity[TimeIndex], OnEdge);
    if (UseModeSplit) {
+      OMEGA_REQUIRE(BarotropicHalo,
+                    "Null Barotropic Halo in State::exchangeHalo");
+
       MeshHalo->exchangeFullArrayHalo(NormalBaroclinicVelocity[TimeIndex],
                                       OnEdge);
-      MeshHalo->exchangeFullArrayHalo(NormalBarotropicVelocity[TimeIndex],
-                                      OnEdge);
-      MeshHalo->exchangeFullArrayHalo(BarotropicPressureAnomaly[TimeIndex],
-                                      OnCell);
+      BarotropicHalo->exchangeFullArrayHalo(NormalBarotropicVelocity[TimeIndex],
+                                            OnEdge);
+      BarotropicHalo->exchangeFullArrayHalo(
+          BarotropicPressureAnomaly[TimeIndex], OnCell);
    }
 
 } // end exchangeHalo
 
 //------------------------------------------------------------------------------
 // Perform time level update
-void OceanState::updateTimeLevels() {
+void OceanState::updateTimeLevels(Halo *BarotropicHalo) {
 
    if (NTimeLevels == 1)
       ABORT_ERROR("OceanState: can't update time levels for NTimeLevels == 1");
 
    // Exchange halo
-   exchangeHalo(1);
+   exchangeHalo(1, BarotropicHalo);
 
    // Update current time index for pseudo-thickness and normal velocity
    CurTimeIndex = (CurTimeIndex + 1) % NTimeLevels;

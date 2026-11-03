@@ -181,10 +181,10 @@ class OceanState {
    HostArray1DReal getBarotropicPressureAnomalyH(const I4 TimeLevel) const;
 
    /// Exchange halo
-   void exchangeHalo(const I4 TimeLevel);
+   void exchangeHalo(const I4 TimeLevel, Halo *BarotropicHalo = nullptr);
 
    /// Swap time levels to update state arrays
-   void updateTimeLevels();
+   void updateTimeLevels(Halo *BarotropicHalo = nullptr);
 
    /// Copy state variables from host to device
    void copyToDevice(const I4 TimeLevel);
