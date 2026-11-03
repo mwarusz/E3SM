@@ -156,7 +156,8 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
 
    // Compute the baroclinic pseudo thickness on edges
    parallelForOuter(
-       "computeBtrBaroclinicPseudoThicknessEdge", {BarotropicDecomp->NEdgesAll},
+       "computeBtrBaroclinicPseudoThicknessEdge",
+       {BarotropicDecomp->NEdgesOwned},
        KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
           const I4 KMin = MinLayerEdgeBot(IEdge);
           const I4 KMax = MaxLayerEdgeTop(IEdge);
@@ -174,6 +175,7 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
                  BaroclinicPseudoThicknessEdge(IEdge) = PseudoThicknessSum;
               });
        });
+   BarotropicHalo->exchangeFullArrayHalo(BaroclinicPseudoThicknessEdge, OnEdge);
 
    //-----------------------------------------------------------------------
    // Communication-avoiding barotropic subcycling:
