@@ -49,6 +49,7 @@ in a `SplitExplicitConfig` member of the stepper.
 | ------ | ------- | ----- |
 | BtrTimeStepper | Predictor-Corrector | only choice; ignored by `UnsplitRK2` |
 | BtrTimeStep | none | required for `SplitExplicitRK2`, must satisfy `0 < BtrTimeStep < TimeStep` |
+| BarotropicHaloWidth | 6 | halo width must be at least 3 for barotropic subcycling |
 | NTimeStepIteration | 2 | positive integer iterations over Stages 1-3; 1 retains only the first-order predictor |
 | NBclCoriolisIteration | 2 | must be positive if supplied; then forced to 1 for `UnsplitRK2` |
 | ReinitSplitVelocity | false | recompute the velocity split every step; no effect for `UnsplitRK2` |
@@ -57,9 +58,8 @@ in a `SplitExplicitConfig` member of the stepper.
 `ceil(TimeStep/BtrTimeStep)`, and the resolved options are reported with
 `LOG_INFO` at initialization.
 
-Two further requirements are enforced elsewhere. `Tendencies::setModeSplit`
-aborts if `SSHTendencyEnable` is true together with a nonzero split factor, and
-the barotropic subcycle aborts unless `Decomp::HaloWidth` is at least 3.
+`Tendencies::setModeSplit` aborts if `SSHTendencyEnable` is true together with
+a nonzero split factor.
 
 ## Initialization
 
