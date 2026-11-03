@@ -19,7 +19,8 @@ struct SplitExplicitConfig {
    TimeInterval BtrTimeStep;
    SplitExplicitBarotropicStepperType BtrTimeStepper =
        SplitExplicitBarotropicStepperType::PredictorCorrector;
-   I4 NBtrSubcycles = 1;
+   I4 BarotropicHaloWidth = 6;
+   I4 NBtrSubcycles       = 1;
    // Two iterations are required for the RK2 predictor-corrector structure;
    // a single iteration leaves only the predictor and degrades the scheme to
    // forward Euler.
@@ -43,8 +44,19 @@ struct SplitExplicitScratch {
    Array1DReal BarotropicForcing;
    Array1DReal BarotropicFlux;
    Array1DReal BaroclinicPseudoThicknessEdge;
+   Array1DReal DepthMeanSpecificVolume;
    Array2DReal IterVelocityTend;
    Array2DReal TransportVelocityAdd;
+
+   Array1DReal AreaCell;
+   Array2DReal EdgeSignOnCell;
+   Array1DReal DcEdge;
+   Array1DReal DvEdge;
+   Array1DReal FEdge;
+   Array2DReal EdgeMask;
+   Array2DReal WeightsOnEdge;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
 };
 
 } // namespace OMEGA

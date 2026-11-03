@@ -29,6 +29,9 @@ class SplitExplicitRK2Stepper : public TimeStepper {
    /// Indicate that this is a split time stepper
    bool isSplit() const override;
 
+   Decomp *getBarotropicDecomp() const override { return BarotropicDecomp; }
+   Halo *getBarotropicHalo() const override { return BarotropicHalo; }
+
    /// Advance the state by one split-explicit RK2 step.
    void doStep(OceanState *State,   ///< [inout] model state
                TimeInstant &SimTime ///< [inout] current simulation time
@@ -116,6 +119,8 @@ class SplitExplicitRK2Stepper : public TimeStepper {
        const TimeInterval &StageTimeStep ///< [in] current stage time step
    ) const;
 
+   Decomp *BarotropicDecomp;
+   Halo *BarotropicHalo;
    SplitExplicitConfig SEConfig;
    mutable SplitExplicitScratch SEScratch;
    SplitExplicitBarotropicPCStepper BarotropicPCStepper;
