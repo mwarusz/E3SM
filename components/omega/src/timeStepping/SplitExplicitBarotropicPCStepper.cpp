@@ -146,13 +146,18 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
    OMEGA_SCOPE(MaxLayerEdgeTop, Scratch->MaxLayerEdgeTop);
    OMEGA_SCOPE(EdgeMask, Scratch->EdgeMask);
 
-   OMEGA_SCOPE(DepthMeanSpecVol, EqState->DepthMeanSpecificVolume);
-
    // Initialize barotropic vars
    deepCopy(NormalBtrVelSubcycleCur, NormalBtrVelCur);
    deepCopy(BtrPressAnomalySubcycleCur, BtrPressAnomalyCur);
    deepCopy(NormalBtrVelNext, NormalBtrVelSubcycleCur);
    deepCopy(BtrFlux, 0._Real);
+
+   // Intitialize DepthMeanSpecVol
+   OMEGA_SCOPE(DepthMeanSpecVol, Scratch->DepthMeanSpecificVolume);
+   const auto OwnedCellRange = std::make_pair(0, BarotropicDecomp->NCellsOwned);
+   deepCopy(Kokkos::subview(DepthMeanSpecVol, OwnedCellRange),
+            Kokkos::subview(EqState->DepthMeanSpecificVolume, OwnedCellRange));
+   BarotropicHalo->exchangeFullArrayHalo(DepthMeanSpecVol, OnCell);
 
    // Compute the baroclinic pseudo thickness on edges
    parallelForOuter(
