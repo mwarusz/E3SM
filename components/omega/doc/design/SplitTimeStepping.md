@@ -1249,6 +1249,9 @@ Missing keys retain the defaults in `SplitExplicitConfig`.
   positive and is ignored by `UnsplitRK2`.
 - `BtrTimeStepper`: Barotropic subcycle algorithm.  The initial implementation
   supports `Predictor-Corrector`.
+- `BarotropicHaloWidth`: Number of cell halo layers used by the barotropic
+  decomposition. The default is 6, and the width must be at least 3 for
+  barotropic subcycling.
 - `SplitFactor`: Internal factor multiplying the barotropic pressure-anomaly
   contribution to the baroclinic velocity tendency.  It is 1 for
   `SplitExplicitRK2` and 0 for unsplit stepping.
@@ -1278,6 +1281,7 @@ TimeIntegration:
   ModeSplitShare:
     BtrTimeStepper: Predictor-Corrector
     BtrTimeStep: 0000_00:00:20
+    BarotropicHaloWidth: 6
     NTimeStepIteration: 2
     NBclCoriolisIteration: 2
     ReinitSplitVelocity: false

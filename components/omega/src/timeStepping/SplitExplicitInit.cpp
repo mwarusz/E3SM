@@ -34,6 +34,13 @@ SplitExplicitInit::readConfigOptions(const TimeInterval &TimeStep,
                      "TimeIntegration::ModeSplitShare group not found in "
                      "Config; it is required by the split time steppers");
 
+   ModeSplitShareConfig.get("BarotropicHaloWidth",
+                            SEConfig.BarotropicHaloWidth);
+   if (SEConfig.BarotropicHaloWidth < 3) {
+      ABORT_ERROR("BarotropicHaloWidth must be at least 3, got {}",
+                  SEConfig.BarotropicHaloWidth);
+   }
+
    // For the unsplit schemes, SplitFactor is 0.
    if (IsUnsplit) {
       SEConfig.SplitFactor = 0._Real;
@@ -95,10 +102,11 @@ SplitExplicitInit::readConfigOptions(const TimeInterval &TimeStep,
       SEConfig.BtrTimeStep.get(BtrTimeStepSeconds, TimeUnits::Seconds);
       LOG_INFO("SplitExplicitRK2: TimeStep={} s, BtrTimeStep={} s, "
                "NBtrSubcycles={}, BtrDt={} s, NTimeStepIteration={}, "
-               "NBclCoriolisIteration={}",
+               "NBclCoriolisIteration={}, BarotropicHaloWidth={}",
                TimeStepSeconds, BtrTimeStepSeconds, SEConfig.NBtrSubcycles,
                TimeStepSeconds / SEConfig.NBtrSubcycles,
-               SEConfig.NTimeStepIteration, SEConfig.NBclCoriolisIteration);
+               SEConfig.NTimeStepIteration, SEConfig.NBclCoriolisIteration,
+               SEConfig.BarotropicHaloWidth);
    }
 
    return SEConfig;

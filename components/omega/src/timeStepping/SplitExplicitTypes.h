@@ -19,7 +19,8 @@ struct SplitExplicitConfig {
    TimeInterval BtrTimeStep;
    SplitExplicitBarotropicStepperType BtrTimeStepper =
        SplitExplicitBarotropicStepperType::PredictorCorrector;
-   I4 NBtrSubcycles = 1;
+   I4 BarotropicHaloWidth = 6;
+   I4 NBtrSubcycles       = 1;
    // Two iterations are required for the RK2 predictor-corrector structure;
    // a single iteration leaves only the predictor and degrades the scheme to
    // forward Euler.
