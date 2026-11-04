@@ -722,22 +722,13 @@ void VertMix::VertMixImplicit(OceanState *State, AuxiliaryState *AuxState,
 
    // TODO: Temporary handling of computation of tangential velocity
    // Compute tangential velocity
-   OMEGA_SCOPE(MinLayerEdgeBot, VCoord->MinLayerEdgeBot);
-   OMEGA_SCOPE(MaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
    OMEGA_SCOPE(LocTangentialVelocity, TangentialVelocity);
 
-   TangentialReconOnEdge TanReconEdge(Mesh);
+   TangentialReconOnEdge TanReconEdge(Mesh, VCoord);
 
    parallelForOuter(
        {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          const int KMin   = MinLayerEdgeBot(IEdge);
-          const int KMax   = MaxLayerEdgeTop(IEdge);
-          const int KRange = vertRangeChunked(KMin, KMax);
-          parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 TanReconEdge(LocTangentialVelocity, IEdge, KChunk,
-                              NormalVelEdge);
-              });
+          TanReconEdge(Team, LocTangentialVelocity, IEdge, NormalVelEdge);
        });
 
    // Refresh kinetic energy for the implicit bottom drag
