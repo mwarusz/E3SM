@@ -14,6 +14,7 @@
 #include "OceanTestCommon.h"
 #include "OmegaKokkos.h"
 #include "Pacer.h"
+#include "VertCoord.h"
 #include "mpi.h"
 
 #include <cmath>
@@ -192,7 +193,8 @@ int testDivergence(Real RTol) {
    TestSetup Setup;
 
    const auto &Mesh      = HorzMesh::getDefault();
-   const int NVertLayers = 16;
+   const auto VCoord     = VertCoord::getDefault();
+   const int NVertLayers = VCoord->NVertLayers;
 
    // Prepare operator input
    Array2DReal VecEdge("VecEdge", Mesh->NEdgesSize, NVertLayers);
@@ -211,10 +213,10 @@ int testDivergence(Real RTol) {
 
    // Compute numerical result
    Array2DReal NumDivCell("NumDivCell", Mesh->NCellsOwned, NVertLayers);
-   DivergenceOnCell DivergenceCell(Mesh);
-   parallelFor(
-       {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int K) {
-          DivergenceCell(NumDivCell, ICell, K, VecEdge);
+   DivergenceOnCell DivergenceCell(Mesh, VCoord);
+   parallelForOuter(
+       {Mesh->NCellsOwned}, KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
+          DivergenceCell(Team, NumDivCell, ICell, VecEdge);
        });
 
    // Compute error measures
@@ -236,7 +238,8 @@ int testGradient(Real RTol) {
    TestSetup Setup;
 
    const auto &Mesh      = HorzMesh::getDefault();
-   const int NVertLayers = 16;
+   const auto VCoord     = VertCoord::getDefault();
+   const int NVertLayers = VCoord->NVertLayers;
 
    // Prepare operator input
    Array2DReal ScalarCell("ScalarCell", Mesh->NCellsSize, NVertLayers);
@@ -256,11 +259,11 @@ int testGradient(Real RTol) {
        ExactGradEdge, EdgeComponent::Normal, Geom, Mesh, ExchangeHalos::No);
 
    // Compute numerical result
-   GradientOnEdge GradientEdge(Mesh);
+   GradientOnEdge GradientEdge(Mesh, VCoord);
    Array2DReal NumGradEdge("NumGradEdge", Mesh->NEdgesOwned, NVertLayers);
-   parallelFor(
-       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int K) {
-          GradientEdge(NumGradEdge, IEdge, K, ScalarCell);
+   parallelForOuter(
+       {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          GradientEdge(Team, NumGradEdge, IEdge, ScalarCell);
        });
 
    // Compute error measures
@@ -281,7 +284,8 @@ int testCurl(Real RTol) {
    int Err = 0;
    TestSetup Setup;
    const auto &Mesh      = HorzMesh::getDefault();
-   const int NVertLayers = 16;
+   const auto VCoord     = VertCoord::getDefault();
+   const int NVertLayers = VCoord->NVertLayers;
 
    // Prepare operator input
    Array2DReal VecEdge("VecEdge", Mesh->NEdgesSize, NVertLayers);
@@ -302,10 +306,11 @@ int testCurl(Real RTol) {
    // Compute numerical result
    Array2DReal NumCurlVertex("NumCurlVertex", Mesh->NVerticesOwned,
                              NVertLayers);
-   CurlOnVertex CurlVertex(Mesh);
-   parallelFor(
-       {Mesh->NVerticesOwned, NVertLayers}, KOKKOS_LAMBDA(int IVertex, int K) {
-          CurlVertex(NumCurlVertex, IVertex, K, VecEdge);
+   CurlOnVertex CurlVertex(Mesh, VCoord);
+   parallelForOuter(
+       {Mesh->NVerticesOwned},
+       KOKKOS_LAMBDA(int IVertex, const TeamMember &Team) {
+          CurlVertex(Team, NumCurlVertex, IVertex, VecEdge);
        });
 
    // Compute error measures
@@ -328,7 +333,8 @@ int testTangentRecon(Real RTol) {
    TestSetup Setup;
 
    const auto &Mesh      = HorzMesh::getDefault();
-   const int NVertLayers = 16;
+   const auto VCoord     = VertCoord::getDefault();
+   const int NVertLayers = VCoord->NVertLayers;
 
    // Prepare operator input
    Array2DReal VecEdge("VecEdge", Mesh->NEdgesSize, NVertLayers);
@@ -352,10 +358,10 @@ int testTangentRecon(Real RTol) {
 
    // Compute numerical result
    Array2DReal NumReconEdge("NumReconEdge", Mesh->NEdgesOwned, NVertLayers);
-   TangentialReconOnEdge TanReconEdge(Mesh);
-   parallelFor(
-       {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int K) {
-          TanReconEdge(NumReconEdge, IEdge, K, VecEdge);
+   TangentialReconOnEdge TanReconEdge(Mesh, VCoord);
+   parallelForOuter(
+       {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          TanReconEdge(Team, NumReconEdge, IEdge, VecEdge);
        });
 
    // Compute error measures
@@ -1027,12 +1033,14 @@ int initOperatorsTest(const std::string &MeshFile) {
    Field::init(ModelClock);
    IOStream::init(ModelClock);
    HorzMesh::init(ModelClock);
+   VertCoord::init(false, 15);
 
    return Err;
 }
 
 void finalizeOperatorsTest() {
    IOStream::finalize();
+   VertCoord::clear();
    HorzMesh::clear();
    Field::clear();
    Dimension::clear();
