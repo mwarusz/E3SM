@@ -170,8 +170,8 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
               },
               PseudoThicknessSum);
 
-          Kokkos::single(
-              PerTeam(Team), INNER_LAMBDA() {
+          singleInner(
+              Team, INNER_LAMBDA() {
                  BaroclinicPseudoThicknessEdge(IEdge) = PseudoThicknessSum;
               });
        });

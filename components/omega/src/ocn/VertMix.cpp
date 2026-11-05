@@ -309,8 +309,8 @@ void VertMix::computeVertMix(const Array2DReal &NormalVelocity,
              // Fill Richardson number at vertical boundaries using the
              // closest valid value. This is equivalent to doing one-sided
              // differencing at the boundary.
-             Kokkos::single(
-                 PerTeam(Team), INNER_LAMBDA() {
+             singleInner(
+                 Team, INNER_LAMBDA() {
                     LocGradRichNum(ICell, MinLayerCell(ICell)) =
                         LocGradRichNum(ICell, MinLayerCell(ICell) + 1);
                     LocGradRichNum(ICell, MaxLayerCell(ICell) + 1) =

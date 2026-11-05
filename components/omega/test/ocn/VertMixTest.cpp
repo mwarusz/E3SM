@@ -288,8 +288,7 @@ void testGradRichNum() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -393,8 +392,7 @@ void testOneTwoOneFilter() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -486,8 +484,7 @@ void testBackVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -524,8 +521,7 @@ void testBackVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -618,8 +614,7 @@ void testConvVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -657,8 +652,7 @@ void testConvVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -756,8 +750,7 @@ void testShearVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -799,8 +792,7 @@ void testShearVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -910,8 +902,7 @@ void testTotalVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -954,8 +945,7 @@ void testTotalVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -1009,8 +999,7 @@ void testTotalVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -1053,8 +1042,7 @@ void testTotalVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 

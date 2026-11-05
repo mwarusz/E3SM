@@ -1137,8 +1137,8 @@ void VertCoord::computeTotalPseudoThickness(
               },
               ColumnThickness);
 
-          Kokkos::single(
-              PerTeam(Team), INNER_LAMBDA() {
+          singleInner(
+              Team, INNER_LAMBDA() {
                  LocTotalPseudoThickness(ICell) = ColumnThickness;
               });
        });

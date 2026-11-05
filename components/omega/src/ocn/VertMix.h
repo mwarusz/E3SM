@@ -237,8 +237,8 @@ class OneTwoOneFilter {
                     4.0_Real;
              });
 
-         Kokkos::single(
-             PerTeam(Team), INNER_LAMBDA() {
+         singleInner(
+             Team, INNER_LAMBDA() {
                 VarTmp(Next, MinLyrCell)     = VarTmp(Cur, MinLyrCell);
                 VarTmp(Next, MaxLyrCell + 1) = VarTmp(Cur, MaxLyrCell + 1);
              });

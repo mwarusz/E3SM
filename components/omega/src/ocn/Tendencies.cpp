@@ -1142,7 +1142,7 @@ void Tendencies::computeTracerTendenciesOnly(
                  Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
                     LocKPPNonLocalTracerTempTendDiag(ICell, K) = 0.0_Real;
                  });
-             Kokkos::single(Kokkos::PerTeam(Team), [&]() {
+             singleInner(Team, [&]() {
                 LocKPPNonLocalTracerTempColumnSumDiag(ICell) = 0.0_Real;
              });
           });
@@ -1435,7 +1435,7 @@ void Tendencies::computeTracerTendenciesOnly(
                           LocalSum += NonLocalTend;
                        },
                        Sum);
-                   Kokkos::single(Kokkos::PerTeam(Team), [&]() {
+                   singleInner(Team, [&]() {
                       LocKPPNonLocalTracerTempColumnSumDiag(ICell) = Sum;
                    });
                 });
