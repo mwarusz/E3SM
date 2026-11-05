@@ -44,9 +44,6 @@ class PseudoThicknessFluxDivOnCell {
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
-      const int MinLyrCell = MinLayerCell(ICell);
-      const int MaxLyrCell = MaxLayerCell(ICell);
-
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
 
@@ -54,10 +51,7 @@ class PseudoThicknessFluxDivOnCell {
          const int MaxLyrEdgeTop = MaxLayerEdgeTop(JEdge);
 
          parallelForInner(
-             Team,
-             Range{Kokkos::max(MinLyrCell, MinLyrEdgeBot),
-                   Kokkos::min(MaxLyrCell, MaxLyrEdgeTop)},
-             INNER_LAMBDA(int K) {
+             Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop}, INNER_LAMBDA(int K) {
                 Tend(ICell, K) += DvEdge(JEdge) * EdgeSignOnCell(ICell, J) *
                                   PseudoThicknessFlux(JEdge, K) *
                                   NormalVelEdge(JEdge, K) * InvAreaCell;
@@ -670,9 +664,6 @@ class TracerHorzAdvOnCell {
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
-      const int MinLyrCell = MinLayerCell(ICell);
-      const int MaxLyrCell = MaxLayerCell(ICell);
-
       for (int I = 0; I < NEdgesOnCell(ICell); ++I) {
          const I4 IEdge = EdgesOnCell(ICell, I);
 
@@ -680,10 +671,7 @@ class TracerHorzAdvOnCell {
          const int MaxLyrEdgeTop = MaxLayerEdgeTop(IEdge);
 
          parallelForInner(
-             Team,
-             Range{Kokkos::max(MinLyrCell, MinLyrEdgeBot),
-                   Kokkos::min(MaxLyrCell, MaxLyrEdgeTop)},
-             INNER_LAMBDA(int K) {
+             Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop}, INNER_LAMBDA(int K) {
                 LTend(ICell, K) += EdgeSignOnCell(ICell, I) *
                                    LHighOrderFlxHorz(IEdge, K) * InvAreaCell;
              });
@@ -1060,9 +1048,6 @@ class TracerDiffOnCell {
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
-      const int MinLyrCell = MinLayerCell(ICell);
-      const int MaxLyrCell = MaxLayerCell(ICell);
-
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
 
@@ -1076,10 +1061,7 @@ class TracerDiffOnCell {
          const int MaxLyrEdgeTop = MaxLayerEdgeTop(JEdge);
 
          parallelForInner(
-             Team,
-             Range{Kokkos::max(MinLyrCell, MinLyrEdgeBot),
-                   Kokkos::min(MaxLyrCell, MaxLyrEdgeTop)},
-             INNER_LAMBDA(int K) {
+             Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop}, INNER_LAMBDA(int K) {
                 const Real TracerGrad =
                     (LTracerCell(JCell1, K) - LTracerCell(JCell0, K));
 
@@ -1154,9 +1136,6 @@ class TracerHyperDiffOnCell {
 
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
 
-      const int MinLyrCell = MinLayerCell(ICell);
-      const int MaxLyrCell = MaxLayerCell(ICell);
-
       for (int J = 0; J < NEdgesOnCell(ICell); ++J) {
          const I4 JEdge = EdgesOnCell(ICell, J);
 
@@ -1170,10 +1149,7 @@ class TracerHyperDiffOnCell {
          const int MaxLyrEdgeTop = MaxLayerEdgeTop(JEdge);
 
          parallelForInner(
-             Team,
-             Range{Kokkos::max(MinLyrCell, MinLyrEdgeBot),
-                   Kokkos::min(MaxLyrCell, MaxLyrEdgeTop)},
-             INNER_LAMBDA(int K) {
+             Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop}, INNER_LAMBDA(int K) {
                 const Real Del2TrGrad =
                     (LTrDel2Cell(JCell1, K) - LTrDel2Cell(JCell0, K));
 
