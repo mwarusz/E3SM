@@ -508,8 +508,8 @@ void VertAdv::computeVerticalPseudoVelocityImpl(
           teamBarrier(Team);
 
           // Set velocity through top and bottom interfaces to zero
-          Kokkos::single(
-              PerTeam(Team), INNER_LAMBDA() {
+          singleInner(
+              Team, INNER_LAMBDA() {
                  VertPseudoVel(ICell, KMin)          = 0.;
                  VertPseudoVel(ICell, KMax + 1)      = 0.;
                  TotalVertPseudoVel(ICell, KMin)     = 0.;
@@ -623,8 +623,8 @@ void VertAdv::computeVelocityVAdvTend(
           ScratchArray1DReal WDuDzEdge(teamScratch(Team), LocNVertLayersP1);
 
           // Flux is zero at top and bottom
-          Kokkos::single(
-              PerTeam(Team), INNER_LAMBDA() {
+          singleInner(
+              Team, INNER_LAMBDA() {
                  WDuDzEdge(KMin)     = 0._Real;
                  WDuDzEdge(KMax + 1) = 0._Real;
               });

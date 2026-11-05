@@ -206,8 +206,8 @@ void SubmesoEddies::computeBuoyGrad(const Array2DReal &SpecVol,
 
           // Brunt-Vaisala freq is located on interfaces
           // Handle one remaining interpolation to edges at the ocean bottom
-          Kokkos::single(
-              PerTeam(Team), INNER_LAMBDA() {
+          singleInner(
+              Team, INNER_LAMBDA() {
                  const int K      = MaxLyrEdgeTop + 1;
                  const int JCell0 = CellsOnEdge(IEdge, 0);
                  const int JCell1 = CellsOnEdge(IEdge, 1);
@@ -249,8 +249,8 @@ void SubmesoEddies::computeBuoyGrad(const Array2DReal &SpecVol,
                         CoeffK * GradBuoyEdge(K);
                  });
 
-             Kokkos::single(
-                 PerTeam(Team), INNER_LAMBDA() {
+             singleInner(
+                 Team, INNER_LAMBDA() {
                     SpecVolEdgeInterface(MinLyrEdgeBot) =
                         SpecVolEdge(MinLyrEdgeBot);
                     SpecVolEdgeInterface(MaxLyrEdgeTop + 1) =
