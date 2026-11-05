@@ -521,11 +521,11 @@ void VertMix::applyVelVertMixImplicit(
 
       const int NVertLayers  = VCoord->NVertLayers;
       const int LocVecLength = VecLength;
-      auto LConfig =
-          TriDiagSolver::makeLaunchConfig(Mesh->NEdgesOwned, NVertLayers);
+      auto Policy =
+          TriDiagSolver::makeTeamPolicy(Mesh->NEdgesOwned, NVertLayers);
 
-      parallelForOuter(
-          LConfig, KOKKOS_LAMBDA(int, const TeamMember &Team) {
+      Kokkos::parallel_for(
+          Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
              const int IStart = Team.league_rank() * LocVecLength;
              const int ILen   = Kokkos::max(
                  0, Kokkos::min(LocVecLength, LocNEdgesOwned - IStart));
@@ -533,39 +533,40 @@ void VertMix::applyVelVertMixImplicit(
              TriDiagDiffScratch Scratch(Team, NVertLayers);
 
              // Construct a tri-diag diffusion matrix and RHS
-             parallelForInner(Team, NVertLayers, [=](int K) {
-                for (int IVec = 0; IVec < LocVecLength; ++IVec) {
-                   const int IEdge = IStart + IVec;
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NVertLayers), [=](int K) {
+                    for (int IVec = 0; IVec < LocVecLength; ++IVec) {
+                       const int IEdge = IStart + IVec;
 
-                   if (IEdge >= LocNEdgesOwned) {
-                      // Fill values
-                      Scratch.G(K, IVec) = 0._Real;
-                      Scratch.H(K, IVec) = 1._Real;
-                      Scratch.X(K, IVec) = 0._Real;
-                      continue;
-                   }
+                       if (IEdge >= LocNEdgesOwned) {
+                          // Fill values
+                          Scratch.G(K, IVec) = 0._Real;
+                          Scratch.H(K, IVec) = 1._Real;
+                          Scratch.X(K, IVec) = 0._Real;
+                          continue;
+                       }
 
-                   const int KMin = MinLayerEdgeBot(IEdge);
-                   const int KMax = MaxLayerEdgeTop(IEdge);
+                       const int KMin = MinLayerEdgeBot(IEdge);
+                       const int KMax = MaxLayerEdgeTop(IEdge);
 
-                   if (K < KMin || K > KMax) {
-                      // Fill values
-                      Scratch.G(K, IVec) = 0._Real;
-                      Scratch.H(K, IVec) = 1._Real;
-                      Scratch.X(K, IVec) = 0._Real;
-                      continue;
-                   }
+                       if (K < KMin || K > KMax) {
+                          // Fill values
+                          Scratch.G(K, IVec) = 0._Real;
+                          Scratch.H(K, IVec) = 1._Real;
+                          Scratch.X(K, IVec) = 0._Real;
+                          continue;
+                       }
 
-                   Real G, H, X;
-                   LocVelVertMixSetup(IEdge, K, KMin, KMax, DT, SpecVol,
-                                      KineticEnergyCell, PseudoThickCell,
-                                      VertVisc, NormalVelEdge, G, H, X);
+                       Real G, H, X;
+                       LocVelVertMixSetup(IEdge, K, KMin, KMax, DT, SpecVol,
+                                          KineticEnergyCell, PseudoThickCell,
+                                          VertVisc, NormalVelEdge, G, H, X);
 
-                   Scratch.G(K, IVec) = G;
-                   Scratch.H(K, IVec) = H;
-                   Scratch.X(K, IVec) = X;
-                }
-             });
+                       Scratch.G(K, IVec) = G;
+                       Scratch.H(K, IVec) = H;
+                       Scratch.X(K, IVec) = X;
+                    }
+                 });
 
              // Solve the tri-diag diffusion system
              Team.team_barrier();
@@ -573,16 +574,17 @@ void VertMix::applyVelVertMixImplicit(
              Team.team_barrier();
 
              // Store the solution vector X
-             parallelForInner(Team, NVertLayers, [=](int K) {
-                for (int IVec = 0; IVec < ILen; ++IVec) {
-                   const int IEdge = IStart + IVec;
+             Kokkos::parallel_for(
+                 Kokkos::TeamThreadRange(Team, NVertLayers), [=](int K) {
+                    for (int IVec = 0; IVec < ILen; ++IVec) {
+                       const int IEdge = IStart + IVec;
 
-                   if (K >= MinLayerEdgeBot(IEdge) &&
-                       K <= MaxLayerEdgeTop(IEdge)) {
-                      NormalVelEdge(IEdge, K) = Scratch.X(K, IVec);
-                   }
-                }
-             });
+                       if (K >= MinLayerEdgeBot(IEdge) &&
+                           K <= MaxLayerEdgeTop(IEdge)) {
+                          NormalVelEdge(IEdge, K) = Scratch.X(K, IVec);
+                       }
+                    }
+                 });
           });
 
       Pacer::stop("Tend:velocityVertMix", 1);
@@ -626,13 +628,13 @@ void VertMix::applyTracerVertMixImplicit(
       const auto &VertDiff = VertMixInstance->VertDiff;
 
       const int NVertLayers = VCoord->NVertLayers;
-      auto LConfig =
-          TriDiagSolver::makeLaunchConfig(Mesh->NCellsOwned, NVertLayers);
+      auto Policy =
+          TriDiagSolver::makeTeamPolicy(Mesh->NCellsOwned, NVertLayers);
       const int LocVecLength = VecLength;
 
       for (int L = 0; L < NTracers; ++L) {
-         parallelForOuter(
-             LConfig, KOKKOS_LAMBDA(int, const TeamMember &Team) {
+         Kokkos::parallel_for(
+             Policy, KOKKOS_LAMBDA(const TeamMember &Team) {
                 const int IStart = Team.league_rank() * LocVecLength;
                 const int ILen   = Kokkos::max(
                     0, Kokkos::min(LocVecLength, LocNCellsOwned - IStart));
@@ -640,38 +642,39 @@ void VertMix::applyTracerVertMixImplicit(
                 TriDiagDiffScratch Scratch(Team, NVertLayers);
 
                 // Construct a tri-diag diffusion matrix and RHS
-                parallelForInner(Team, NVertLayers, [=](int K) {
-                   for (int IVec = 0; IVec < LocVecLength; ++IVec) {
-                      const int ICell = IStart + IVec;
+                Kokkos::parallel_for(
+                    Kokkos::TeamThreadRange(Team, NVertLayers), [=](int K) {
+                       for (int IVec = 0; IVec < LocVecLength; ++IVec) {
+                          const int ICell = IStart + IVec;
 
-                      if (ICell >= LocNCellsOwned) {
-                         // Fill values
-                         Scratch.G(K, IVec) = 0._Real;
-                         Scratch.H(K, IVec) = 1._Real;
-                         Scratch.X(K, IVec) = 0._Real;
-                         continue;
-                      }
+                          if (ICell >= LocNCellsOwned) {
+                             // Fill values
+                             Scratch.G(K, IVec) = 0._Real;
+                             Scratch.H(K, IVec) = 1._Real;
+                             Scratch.X(K, IVec) = 0._Real;
+                             continue;
+                          }
 
-                      const int KMin = MinLayerCell(ICell);
-                      const int KMax = MaxLayerCell(ICell);
+                          const int KMin = MinLayerCell(ICell);
+                          const int KMax = MaxLayerCell(ICell);
 
-                      if (K < KMin || K > KMax) {
-                         // Fill values
-                         Scratch.G(K, IVec) = 0._Real;
-                         Scratch.H(K, IVec) = 1._Real;
-                         Scratch.X(K, IVec) = 0._Real;
-                         continue;
-                      }
+                          if (K < KMin || K > KMax) {
+                             // Fill values
+                             Scratch.G(K, IVec) = 0._Real;
+                             Scratch.H(K, IVec) = 1._Real;
+                             Scratch.X(K, IVec) = 0._Real;
+                             continue;
+                          }
 
-                      Real G, H, X;
-                      LocTracerVertMixSetup(L, ICell, K, KMin, KMax, DT,
-                                            SpecVol, PseudoThickCell, VertDiff,
-                                            TracerArray, G, H, X);
-                      Scratch.G(K, IVec) = G;
-                      Scratch.H(K, IVec) = H;
-                      Scratch.X(K, IVec) = X;
-                   }
-                });
+                          Real G, H, X;
+                          LocTracerVertMixSetup(L, ICell, K, KMin, KMax, DT,
+                                                SpecVol, PseudoThickCell,
+                                                VertDiff, TracerArray, G, H, X);
+                          Scratch.G(K, IVec) = G;
+                          Scratch.H(K, IVec) = H;
+                          Scratch.X(K, IVec) = X;
+                       }
+                    });
 
                 // Solve the tri-diag diffusion system
                 Team.team_barrier();
@@ -679,16 +682,17 @@ void VertMix::applyTracerVertMixImplicit(
                 Team.team_barrier();
 
                 // Store the solution vector X
-                parallelForInner(Team, NVertLayers, [=](int K) {
-                   for (int IVec = 0; IVec < ILen; ++IVec) {
-                      const int ICell = IStart + IVec;
+                Kokkos::parallel_for(
+                    Kokkos::TeamThreadRange(Team, NVertLayers), [=](int K) {
+                       for (int IVec = 0; IVec < ILen; ++IVec) {
+                          const int ICell = IStart + IVec;
 
-                      if (K >= MinLayerCell(ICell) &&
-                          K <= MaxLayerCell(ICell)) {
-                         TracerArray(L, ICell, K) = Scratch.X(K, IVec);
-                      }
-                   }
-                });
+                          if (K >= MinLayerCell(ICell) &&
+                              K <= MaxLayerCell(ICell)) {
+                             TracerArray(L, ICell, K) = Scratch.X(K, IVec);
+                          }
+                       }
+                    });
              });
 
       } // for L
