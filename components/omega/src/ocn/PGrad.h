@@ -350,28 +350,30 @@ class PressureGrad {
    Array2DReal ReconSlopeSa; ///< d(AbsSalinity)/dp of the reconstruction
    Array2DReal DeltaZIncr;   ///< per-layer integral of the matched-pressure
                              ///< integrand, the increment of the recurrence
-   Array2DReal DeltaZMoment; ///< its first moment about the layer's top
-                             ///< interface, which gives the layer mean
-   Array2DReal
-       DeltaZFixedP; ///< the fixed-pressure height difference at
-                     ///< edge-layer interfaces, (NEdgesSize, NVertLayersP1)
 
-   // Temporary: to be moveed to tidal forcing module in future
-   Array1DReal TidalPotential; ///< Tidal potential for tidal forcing
-   Array1DReal
-       SelfAttractionLoading; ///< Self attraction and loading for tidal forcing
+   // Map of all pressure gradient objects by name
+   static std::map<std::string, std::unique_ptr<PressureGrad>> AllPGrads;
+
+ public:
+   // Choice from config
+   PressureGradType PressureGradChoice = PressureGradType::Centered;
 
    // Instances of functors
    PressureGradCentered CenteredPGrad;
    PressureGradFiniteVolume FiniteVolumePGrad;
    BarotropicPressureGradOnEdge BarotropicPGrad;
 
-   // Choice from config
-   PressureGradType PressureGradChoice = PressureGradType::Centered;
+   // Temporary: to be moveed to tidal forcing module in future
+   Array1DReal TidalPotential; ///< Tidal potential for tidal forcing
+   Array1DReal
+       SelfAttractionLoading; ///< Self attraction and loading for tidal forcing
 
-   // Map of all pressure gradient objects by name
-   static std::map<std::string, std::unique_ptr<PressureGrad>> AllPGrads;
+   Array2DReal DeltaZMoment; ///< its first moment about the layer's top
+                             ///< interface, which gives the layer mean
 
+   Array2DReal
+       DeltaZFixedP; ///< the fixed-pressure height difference at
+                     ///< edge-layer interfaces, (NEdgesSize, NVertLayersP1)
 }; // end class PressureGrad
 
 } // namespace OMEGA
