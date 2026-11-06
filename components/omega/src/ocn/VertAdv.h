@@ -31,6 +31,73 @@ enum class VertFluxOption { Second, Third, Fourth };
 // Enum for advection scheme type
 enum class VertAdvOption { Standard, FCT };
 
+class VelVertAdv {
+ public:
+   /// constructor declaration
+   VelVertAdv(const HorzMesh *Mesh, const VertCoord *VCoord)
+       : CellsOnEdge(Mesh->CellsOnEdge), EdgeMask(VCoord->EdgeMask),
+         MinLayerEdgeBot(VCoord->MinLayerEdgeBot),
+         MaxLayerEdgeTop(VCoord->MaxLayerEdgeTop),
+         NVertLayersP1(VCoord->NVertLayersP1) {}
+
+   /// The functor takes edge index, vertical chunk index, and kinetic energy
+   /// array as inputs, outputs the tendency array
+   KOKKOS_FUNCTION void
+   operator()(const TeamMember &Team, const Array2DReal &VelTend, I4 IEdge,
+              const Array2DReal &NormalVelocity,
+              const Array2DReal &TotVertVelocity,
+              const Array2DReal &FluxPseudoThickEdge) const {
+
+      const I4 Cell1 = CellsOnEdge(IEdge, 0);
+      const I4 Cell2 = CellsOnEdge(IEdge, 1);
+      const I4 KMin  = MinLayerEdgeBot(IEdge);
+      const I4 KMax  = MaxLayerEdgeTop(IEdge);
+
+      // Allocate scratch space for W times Du/Dz at vertical interfaces
+      // between edges
+      ScratchArray1DReal WDuDzEdge(teamScratch(Team), NVertLayersP1);
+
+      if (KMax >= KMin) {
+         // Flux is zero at top and bottom
+         singleInner(
+             Team, INNER_LAMBDA() {
+                WDuDzEdge(KMin)     = 0._Real;
+                WDuDzEdge(KMax + 1) = 0._Real;
+             });
+      }
+
+      // Average vertical velocities from cell centers to edges and multiply
+      // by derivative of horizontal velocity to obtain flux of horizontal
+      // velocity at the vertical interfaces between edges
+      parallelForInner(
+          Team, Range{KMin + 1, KMax}, INNER_LAMBDA(int K) {
+             const Real WAvg = 0.5_Real * (TotVertVelocity(Cell1, K) +
+                                           TotVertVelocity(Cell2, K));
+             WDuDzEdge(K) =
+                 WAvg *
+                 (NormalVelocity(IEdge, K - 1) - NormalVelocity(IEdge, K)) /
+                 (0.5_Real * (FluxPseudoThickEdge(IEdge, K - 1) +
+                              FluxPseudoThickEdge(IEdge, K)));
+          });
+
+      teamBarrier(Team);
+
+      // Average W*Du/Dz from interfaces to layer midpoints
+      parallelForInner(
+          Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+             VelTend(IEdge, K) -= EdgeMask(IEdge, K) * 0.5_Real *
+                                  (WDuDzEdge(K) + WDuDzEdge(K + 1));
+          });
+   }
+
+ private:
+   Array2DI4 CellsOnEdge;
+   Array2DReal EdgeMask;
+   Array1DI4 MinLayerEdgeBot;
+   Array1DI4 MaxLayerEdgeTop;
+   I4 NVertLayersP1;
+};
+
 class VertAdv {
 
  public:
@@ -211,6 +278,8 @@ class VertAdv {
            &ProvPseudoThickness, ///< [in] provisional pseudo-thickness
        const Real Dt             ///< [in] time step
    );
+
+   VelVertAdv VelVAdv;
 
  private:
    // Vertical loop bounds from VertCoord
