@@ -698,7 +698,8 @@ int testKEGrad(int NVertLayers, Real RTol) {
    KEGradOnEdge KEGradOnE(Mesh, VCoord);
    parallelForOuter(
        {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          KEGradOnE(Team, NumKEGrad, IEdge, KECell);
+          auto NumKEGradIEdge = Kokkos::subview(NumKEGrad, IEdge, Kokkos::ALL);
+          KEGradOnE(Team, NumKEGradIEdge, IEdge, KECell);
        });
 
    // Compute errors

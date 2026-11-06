@@ -993,6 +993,9 @@ void Tendencies::computeVelocityTendenciesOnly(
           const int KTop = LocMinLayerEdgeTop(IEdge);
           const int KBot = LocMaxLayerEdgeBot(IEdge);
 
+          auto VelTendIEdge =
+              Kokkos::subview(LocNormalVelocityTend, IEdge, Kokkos::ALL);
+
           parallelForInner(
               Team, Range{KTop, KBot}, INNER_LAMBDA(int K) {
                  LocNormalVelocityTend(IEdge, K) = 0._Real;
@@ -1011,7 +1014,7 @@ void Tendencies::computeVelocityTendenciesOnly(
           }
 
           if (LocKEGrad.Enabled) {
-             LocKEGrad(Team, LocNormalVelocityTend, IEdge, KECell);
+             LocKEGrad(Team, VelTendIEdge, IEdge, KECell);
           }
 
           if (LocSplitFactor != 0._Real) {
