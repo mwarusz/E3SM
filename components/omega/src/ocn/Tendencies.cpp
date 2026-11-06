@@ -765,8 +765,7 @@ void Tendencies::computeCoriolisAccelerationOnEdge(
 
    Pacer::start("Tend:coriolisAccelerationOnEdge2DBase", 2);
    parallelForOuter(
-       LaunchConfig({Mesh->NEdgesAll}, TeamScratch<Real>(VCoord->NVertLayers)),
-       KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+       {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
           LocCoriolisAcceleration(Team, Tend, BaseTend, IEdge, NormalVelEdge,
                                   FEdge);
        });
@@ -835,9 +834,7 @@ void Tendencies::computePseudoThicknessTendenciesOnly(
    if (LocThicknessFluxDiv.Enabled) {
       Pacer::start("Tend:thicknessFluxDiv", 2);
       parallelForOuter(
-          LaunchConfig({Mesh->NCellsAll},
-                       TeamScratch<Real>(VCoord->NVertLayers)),
-          KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
+          {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
              LocThicknessFluxDiv(Team, LocPseudoThicknessTend, ICell,
                                  ThickFluxEdge, NormalTransportVelocity);
           });
@@ -910,171 +907,172 @@ void Tendencies::computeVelocityTendenciesOnly(
    OMEGA_SCOPE(MaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
    OMEGA_SCOPE(LocSshCell, VCoord->SshCell);
 
-   Pacer::start("Tend:computeVelocityTendenciesOnly", 1);
-
-   // Zero NVTend over all layers where at least one neighboring cell is active:
-   // [MinLayerEdgeTop, MaxLayerEdgeBot]. This includes boundary edges adjacent
-   // to land or bathymetry steps, which have no computed tendency but should
-   // show 0, not FillValueReal. Fully inactive layers (outside this range)
-   // keep their FillValueReal from attachData().
-   VCoord->zeroEdgeField(NormalVelocityTend, Mesh->NEdgesAll);
-
-   // Compute vorticity horizontal advection.
-   // With CoriolisTendMode::Separate only the relative vorticity is advected
-   // here; the time stepper adds the linear Coriolis acceleration itself so it
-   // can be iterated.
    const Array2DReal &FluxPseudoThickEdge =
        AuxState->PseudoThicknessAux.FluxPseudoThickEdge;
    const Array2DReal &NormRVortEdge = AuxState->VorticityAux.NormRelVortEdge;
    const Array2DReal &NormFEdge     = AuxState->VorticityAux.NormPlanetVortEdge;
    Array2DReal NormalVelEdge        = State->getNormalVelocity(VelTimeLevel);
-   if (LocPotentialVortHAdv.Enabled) {
-      Pacer::start("Tend:PotentialVortHAdv", 2);
-      if (CoriolisMode == CoriolisTendMode::Separate) {
-         parallelForOuter(
-             LaunchConfig({Mesh->NEdgesAll},
-                          TeamScratch<Real>(VCoord->NVertLayers)),
-             KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-                LocPotentialVortHAdv(Team, LocNormalVelocityTend, IEdge,
-                                     NormRVortEdge, FluxPseudoThickEdge,
-                                     NormalVelEdge);
-             });
-      } else {
-         parallelForOuter(
-             LaunchConfig({Mesh->NEdgesAll},
-                          TeamScratch<Real>(VCoord->NVertLayers)),
-             KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-                LocPotentialVortHAdv(Team, LocNormalVelocityTend, IEdge,
-                                     NormRVortEdge, NormFEdge,
-                                     FluxPseudoThickEdge, NormalVelEdge);
-             });
-      }
-      Pacer::stop("Tend:PotentialVortHAdv", 2);
-   }
 
-   // Compute kinetic energy gradient
-   const Array2DReal &KECell = AuxState->KineticAux.KineticEnergyCell;
-   if (LocKEGrad.Enabled) {
-      Pacer::start("Tend:KEGrad", 2);
-      parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             LocKEGrad(Team, LocNormalVelocityTend, IEdge, KECell);
-          });
-      Pacer::stop("Tend:KEGrad", 2);
+   Array1DReal NormalStressEdge;
+   if (LocSfcStressForcing.Enabled) {
+      const auto *ForcingState = Forcing::getDefault();
+      NormalStressEdge = ForcingState->SfcStressForcing.NormalStressEdge;
    }
+   const auto &MeanPseudoThickEdge =
+       AuxState->PseudoThicknessAux.MeanPseudoThickEdge;
 
-   // Compute the barotropic pressure gradient for the mode-split time steppers
+   const Array2DReal &KECell  = AuxState->KineticAux.KineticEnergyCell;
    const Array1DReal &SSHCell = LocSshCell;
-   if (SplitFactor != 0._Real) {
-      Pacer::start("Tend:barotropicPressureGradTerm", 2);
-      const Array1DReal &BtrPressAnomaly =
-          State->getBarotropicPressureAnomaly(VelTimeLevel);
-      const Array1DReal &DepthMeanSpecVol = EqState->DepthMeanSpecificVolume;
-      PGrad->computeBarotropicPressureGrad(LocNormalVelocityTend,
-                                           BtrPressAnomaly, DepthMeanSpecVol);
-      Pacer::stop("Tend:barotropicPressureGradTerm", 2);
-   } else if (LocSSHGrad.Enabled) {
-      Pacer::start("Tend:SSHGrad", 2);
-      parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             LocSSHGrad(Team, LocNormalVelocityTend, IEdge, SSHCell);
-          });
-      Pacer::stop("Tend:SSHGrad", 2);
-   }
 
-   // Compute del2 horizontal diffusion
    const Array2DReal &DivCell     = AuxState->KineticAux.VelocityDivCell;
    const Array2DReal &RVortVertex = AuxState->VorticityAux.RelVortVertex;
-   if (LocVelocityDiffusion.Enabled) {
-      Pacer::start("Tend:velocityDiffusion", 2);
-      parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             LocVelocityDiffusion(Team, LocNormalVelocityTend, IEdge, DivCell,
-                                  RVortVertex);
-          });
-      Pacer::stop("Tend:velocityDiffusion", 2);
-   }
 
-   // Compute del4 horizontal diffusion
+   Array1DReal BtrPressAnomaly;
+   if (SplitFactor != 0._Real) {
+      BtrPressAnomaly = State->getBarotropicPressureAnomaly(VelTimeLevel);
+   }
+   const Array1DReal &DepthMeanSpecVol = EqState->DepthMeanSpecificVolume;
+
    const Array2DReal &Del2DivCell = AuxState->VelocityDel2Aux.Del2DivCell;
    const Array2DReal &Del2RVortVertex =
        AuxState->VelocityDel2Aux.Del2RelVortVertex;
-   if (LocVelocityHyperDiff.Enabled) {
-      Pacer::start("Tend:velocityHyperDiff", 2);
-      parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             LocVelocityHyperDiff(Team, LocNormalVelocityTend, IEdge,
-                                  Del2DivCell, Del2RVortVertex);
-          });
-      Pacer::stop("Tend:velocityHyperDiff", 2);
+
+   Array2DReal PseudoThick       = State->getPseudoThickness(ThickTimeLevel);
+   const auto &PressureMid       = VCoord->PressureMid;
+   const auto &PressureInterface = VCoord->PressureInterface;
+   const auto &SpecVol           = EqState->SpecVol;
+   const auto &GeomZInterface    = VCoord->GeomZInterface;
+
+   // The FiniteVolume scheme reconstructs the layer-mean temperature and
+   // salinity in pressure and uses the specific volume derivatives Eos
+   // holds; the Centered scheme ignores both
+   I4 ConservTempIdx;
+   I4 AbsSalinityIdx;
+   Tracers::getIndex(ConservTempIdx, "Temperature");
+   Tracers::getIndex(AbsSalinityIdx, "Salinity");
+   const Array2DReal ConservTemp =
+       Kokkos::subview(TracerArray, ConservTempIdx, Kokkos::ALL, Kokkos::ALL);
+   const Array2DReal AbsSalinity =
+       Kokkos::subview(TracerArray, AbsSalinityIdx, Kokkos::ALL, Kokkos::ALL);
+
+   Pacer::start("Tend:computeVelocityTendenciesOnly", 1);
+
+   OMEGA_SCOPE(LocMinLayerEdgeTop, VCoord->MinLayerEdgeTop);
+   OMEGA_SCOPE(LocMaxLayerEdgeBot, VCoord->MaxLayerEdgeBot);
+   OMEGA_SCOPE(LocCoriolisMode, this->CoriolisMode);
+   OMEGA_SCOPE(LocSplitFactor, this->SplitFactor);
+   OMEGA_SCOPE(LocBarotropicPGrad, PGrad->BarotropicPGrad);
+   OMEGA_SCOPE(LocCenteredPGrad, PGrad->CenteredPGrad);
+   OMEGA_SCOPE(LocFiniteVolumePGrad, PGrad->FiniteVolumePGrad);
+   OMEGA_SCOPE(LocTidalPotential, PGrad->TidalPotential);
+   OMEGA_SCOPE(LocSelfAttractionLoading, PGrad->SelfAttractionLoading);
+   OMEGA_SCOPE(LocPressureGradChoice, PGrad->PressureGradChoice);
+   OMEGA_SCOPE(LocDeltaZMoment, PGrad->DeltaZMoment);
+   OMEGA_SCOPE(LocDeltaZFixedP, PGrad->DeltaZFixedP);
+   OMEGA_SCOPE(LocPGradEnabled, PGrad->Enabled);
+
+   if (LocPressureGradChoice == PressureGradType::FiniteVolume) {
+      // The per-cell reconstruction slopes are formed once and reused across
+      // each cell's edges; the per-edge work is polynomial arithmetic on them
+      PGrad->computeReconSlopes(ConservTemp, AbsSalinity, PressureMid);
+
+      // The column scan is a prefix sum with edge-dependent coefficients, so
+      // it cannot live inside the per-vertical-chunk functor below
+      PGrad->computeColumnScan(PressureMid, PressureInterface, GeomZInterface,
+                               ConservTemp, AbsSalinity, EqState);
    }
 
-   Pacer::start("Tend:computeVelocityVAdvTend", 2);
-   // Compute velocity tendency from vertical advection
-   VAdv->computeVelocityVAdvTend(NormalVelocityTend, NormalVelEdge,
-                                 FluxPseudoThickEdge);
-   Pacer::stop("Tend:computeVelocityVAdvTend", 2);
+   OMEGA_SCOPE(LocVelVAdv, VAdv->VelVAdv);
+   OMEGA_SCOPE(LocVAdvEnabled, VAdv->VelVertAdvEnabled);
+   OMEGA_SCOPE(LocTotVertVelocity, VAdv->TotalVerticalPseudoVelocity);
 
-   // Compute surface stress forcing
-   const auto *ForcingState = Forcing::getDefault();
-   const auto &NormalStressEdge =
-       ForcingState->SfcStressForcing.NormalStressEdge;
-   const auto &MeanPseudoThickEdge =
-       AuxState->PseudoThicknessAux.MeanPseudoThickEdge;
-   if (LocSfcStressForcing.Enabled) {
-      Pacer::start("Tend:sfcStressForcing", 2);
-      parallelForOuter(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             LocSfcStressForcing(Team, LocNormalVelocityTend, IEdge,
-                                 NormalStressEdge, MeanPseudoThickEdge);
-          });
-      Pacer::stop("Tend:sfcStressForcing", 2);
-   }
+   OMEGA_SCOPE(NVertLayers, VCoord->NVertLayers);
 
-   // Compute explicit bottom drag
-   if (LocExplicitBottomDrag.Enabled) {
-      Pacer::start("Tend:explicitBottomDrag", 2);
-      parallelFor(
-          {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
-             LocExplicitBottomDrag(LocNormalVelocityTend, IEdge, NormalVelEdge,
-                                   KECell, MeanPseudoThickEdge);
-          });
-      Pacer::stop("Tend:explicitBottomDrag", 2);
-   }
+   parallelForOuter(
+       LaunchConfig({Mesh->NEdgesAll},
+                    TeamScratch<Real>(2 * VCoord->NVertLayers + 1)),
+       KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          const int KTop = LocMinLayerEdgeTop(IEdge);
+          const int KBot = LocMaxLayerEdgeBot(IEdge);
+
+          ScratchArray1DReal VelTendIEdge(teamScratch(Team), NVertLayers);
+
+          parallelForInner(
+              Team, Range{KTop, KBot},
+              INNER_LAMBDA(int K) { VelTendIEdge(K) = 0._Real; });
+
+          if (LocPotentialVortHAdv.Enabled) {
+             if (LocCoriolisMode == CoriolisTendMode::Separate) {
+                LocPotentialVortHAdv(Team, VelTendIEdge, IEdge, NormRVortEdge,
+                                     FluxPseudoThickEdge, NormalVelEdge);
+             } else {
+                LocPotentialVortHAdv(Team, VelTendIEdge, IEdge, NormRVortEdge,
+                                     NormFEdge, FluxPseudoThickEdge,
+                                     NormalVelEdge);
+             }
+          }
+
+          if (LocKEGrad.Enabled) {
+             LocKEGrad(Team, VelTendIEdge, IEdge, KECell);
+          }
+
+          if (LocSplitFactor != 0._Real) {
+             LocBarotropicPGrad(Team, VelTendIEdge, IEdge, BtrPressAnomaly,
+                                DepthMeanSpecVol);
+          } else if (LocSSHGrad.Enabled) {
+             LocSSHGrad(Team, VelTendIEdge, IEdge, SSHCell);
+          }
+
+          if (LocVelocityDiffusion.Enabled) {
+             LocVelocityDiffusion(Team, VelTendIEdge, IEdge, DivCell,
+                                  RVortVertex);
+          }
+
+          if (LocVelocityHyperDiff.Enabled) {
+             LocVelocityHyperDiff(Team, VelTendIEdge, IEdge, Del2DivCell,
+                                  Del2RVortVertex);
+          }
+
+          if (LocSfcStressForcing.Enabled) {
+             LocSfcStressForcing(Team, VelTendIEdge, IEdge, NormalStressEdge,
+                                 MeanPseudoThickEdge);
+          }
+
+          if (LocExplicitBottomDrag.Enabled) {
+             LocExplicitBottomDrag(VelTendIEdge, IEdge, NormalVelEdge, KECell,
+                                   MeanPseudoThickEdge);
+          }
+
+          if (LocPGradEnabled) {
+             if (LocPressureGradChoice == PressureGradType::Centered) {
+                LocCenteredPGrad(Team, VelTendIEdge, IEdge, PressureMid,
+                                 PressureInterface, GeomZInterface,
+                                 LocTidalPotential, LocSelfAttractionLoading,
+                                 SpecVol);
+             } else {
+                LocFiniteVolumePGrad(Team, VelTendIEdge, IEdge,
+                                     PressureInterface, LocDeltaZFixedP,
+                                     LocDeltaZMoment, LocTidalPotential,
+                                     LocSelfAttractionLoading);
+             }
+          }
+
+          if (LocVAdvEnabled) {
+             LocVelVAdv(Team, VelTendIEdge, IEdge, NormalVelEdge,
+                        LocTotVertVelocity, FluxPseudoThickEdge);
+          }
+
+          parallelForInner(
+              Team, Range{KTop, KBot}, INNER_LAMBDA(int K) {
+                 LocNormalVelocityTend(IEdge, K) = VelTendIEdge(K);
+              });
+       });
 
    if (CustomVelocityTend) {
       Pacer::start("Tend:customVelocityTend", 2);
       CustomVelocityTend(LocNormalVelocityTend, State, AuxState, ThickTimeLevel,
                          VelTimeLevel, Time);
       Pacer::stop("Tend:customVelocityTend", 2);
-   }
-
-   // Compute pressure gradient
-   if (PGrad->Enabled) {
-
-      Pacer::start("Tend:pressureGradTerm", 2);
-      Array2DReal PseudoThick       = State->getPseudoThickness(ThickTimeLevel);
-      const auto &PressureMid       = VCoord->PressureMid;
-      const auto &PressureInterface = VCoord->PressureInterface;
-      const auto &SpecVol           = EqState->SpecVol;
-      const auto &GeomZInterface    = VCoord->GeomZInterface;
-
-      // The FiniteVolume scheme reconstructs the layer-mean temperature and
-      // salinity in pressure and uses the specific volume derivatives Eos
-      // holds; the Centered scheme ignores both
-      I4 ConservTempIdx;
-      I4 AbsSalinityIdx;
-      Tracers::getIndex(ConservTempIdx, "Temperature");
-      Tracers::getIndex(AbsSalinityIdx, "Salinity");
-      const Array2DReal ConservTemp = Kokkos::subview(
-          TracerArray, ConservTempIdx, Kokkos::ALL, Kokkos::ALL);
-      const Array2DReal AbsSalinity = Kokkos::subview(
-          TracerArray, AbsSalinityIdx, Kokkos::ALL, Kokkos::ALL);
-
-      PGrad->computePressureGrad(
-          LocNormalVelocityTend, PressureMid, PressureInterface, SpecVol,
-          GeomZInterface, PseudoThick, ConservTemp, AbsSalinity, EqState);
-      Pacer::stop("Tend:pressureGradTerm", 2);
    }
 
    Pacer::stop("Tend:computeVelocityTendenciesOnly", 1);
@@ -1142,7 +1140,7 @@ void Tendencies::computeTracerTendenciesOnly(
                  Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
                     LocKPPNonLocalTracerTempTendDiag(ICell, K) = 0.0_Real;
                  });
-             Kokkos::single(Kokkos::PerTeam(Team), [&]() {
+             singleInner(Team, [&]() {
                 LocKPPNonLocalTracerTempColumnSumDiag(ICell) = 0.0_Real;
              });
           });
@@ -1237,8 +1235,7 @@ void Tendencies::computeTracerTendenciesOnly(
                                  LocNormalTransportVelocity);
              });
          parallelForOuter(
-             LaunchConfig({NTracers, Mesh->NCellsAll},
-                          TeamScratch<Real>(VCoord->NVertLayers)),
+             {NTracers, Mesh->NCellsAll},
              KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
                 LocTracerHorzAdv(Team, LocTracerTend, L, ICell);
              });
@@ -1277,8 +1274,7 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerDiffusion.Enabled) {
       Pacer::start("Tend:tracerDiffusion", 2);
       parallelForOuter(
-          LaunchConfig({NTracers, Mesh->NCellsAll},
-                       TeamScratch<Real>(VCoord->NVertLayers)),
+          {NTracers, Mesh->NCellsAll},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
              LocTracerDiffusion(Team, LocTracerTend, L, ICell, TracerArray,
                                 MeanPseudoThickEdge);
@@ -1291,8 +1287,7 @@ void Tendencies::computeTracerTendenciesOnly(
    if (LocTracerHyperDiff.Enabled) {
       Pacer::start("Tend:tracerHyperDiff", 2);
       parallelForOuter(
-          LaunchConfig({NTracers, Mesh->NCellsAll},
-                       TeamScratch<Real>(VCoord->NVertLayers)),
+          {NTracers, Mesh->NCellsAll},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
              LocTracerHyperDiff(Team, LocTracerTend, L, ICell, Del2TracersCell);
           });
@@ -1435,7 +1430,7 @@ void Tendencies::computeTracerTendenciesOnly(
                           LocalSum += NonLocalTend;
                        },
                        Sum);
-                   Kokkos::single(Kokkos::PerTeam(Team), [&]() {
+                   singleInner(Team, [&]() {
                       LocKPPNonLocalTracerTempColumnSumDiag(ICell) = Sum;
                    });
                 });

@@ -44,7 +44,8 @@ VertAdv::VertAdv(const std::string &Name_,  //< [in] name for new VertAdv
                  const HorzMesh *InMesh,    //< [in] associated HorzMesh
                  const VertCoord *InVCoord, //< [in] associated VertCoord
                  Config *Options            //< [in] configuration options
-) {
+                 )
+    : VelVAdv(InMesh, InVCoord) {
 
    // Read options from Config object
    readConfigOptions(Options);
@@ -473,6 +474,7 @@ void VertAdv::computeVerticalPseudoVelocityImpl(
    OMEGA_SCOPE(LocEOnC, Mesh->EdgesOnCell);
    OMEGA_SCOPE(LocDvE, Mesh->DvEdge);
    OMEGA_SCOPE(LocESOnC, Mesh->EdgeSignOnCell);
+   OMEGA_SCOPE(LocMinLayerEdgeBot, VCoord->MinLayerEdgeBot);
    OMEGA_SCOPE(LocMaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
 
    // Loop over all cells owned by the task
@@ -481,51 +483,41 @@ void VertAdv::computeVerticalPseudoVelocityImpl(
        LaunchConfig({NCellsHalo0}, TeamScratch<Real>(NVertLayers)),
        KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
           ScratchArray1DReal DivHU(teamScratch(Team), LocNVertLayers);
+          parallelForInner(
+              Team, LocNVertLayers, INNER_LAMBDA(int K) { DivHU(K) = 0; });
 
           const Real InvAreaCell = 1._Real / LocAreaCell(ICell);
 
           const I4 KMin = MinLayerCell(ICell);
           const I4 KMax = MaxLayerCell(ICell);
-          I4 KRange     = vertRangeChunked(KMin, KMax);
 
           // Compute thickness-weighted divergence of horizontal velocity
           // in each layer
-          parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 Real DivHUTmp[VecLength] = {0};
-                 const I4 KStart          = chunkStart(KChunk, KMin);
-                 const I4 KLen            = chunkLength(KChunk, KStart, KMax);
-
-                 for (int J = 0; J < LocNEOnC(ICell); ++J) {
-                    const I4 JEdge    = LocEOnC(ICell, J);
-                    const I4 MaxKEdge = LocMaxLayerEdgeTop(JEdge);
-                    for (int KVec = 0; KVec < KLen; ++KVec) {
-                       const I4 K = KStart + KVec;
-                       if (K <= MaxKEdge) {
-                          DivHUTmp[KVec] -= LocDvE(JEdge) * LocESOnC(ICell, J) *
-                                            FluxPseudoThickEdge(JEdge, K) *
-                                            NormalVelocity(JEdge, K) *
-                                            InvAreaCell;
-                       }
-                    }
-                 }
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const I4 K = KStart + KVec;
-                    DivHU(K)   = DivHUTmp[KVec];
-                 }
-              });
+          for (int J = 0; J < LocNEOnC(ICell); ++J) {
+             const I4 JEdge         = LocEOnC(ICell, J);
+             const I4 MinLyrEdgeBot = LocMinLayerEdgeBot(JEdge);
+             const I4 MaxLyrEdgeTop = LocMaxLayerEdgeTop(JEdge);
+             parallelForInner(
+                 Team, Range{MinLyrEdgeBot, MaxLyrEdgeTop},
+                 INNER_LAMBDA(int K) {
+                    DivHU(K) -= LocDvE(JEdge) * LocESOnC(ICell, J) *
+                                FluxPseudoThickEdge(JEdge, K) *
+                                NormalVelocity(JEdge, K) * InvAreaCell;
+                 });
+          }
 
           teamBarrier(Team);
 
           // Set velocity through top and bottom interfaces to zero
-          Kokkos::single(
-              PerTeam(Team), INNER_LAMBDA() {
+          singleInner(
+              Team, INNER_LAMBDA() {
                  VertPseudoVel(ICell, KMin)          = 0.;
                  VertPseudoVel(ICell, KMax + 1)      = 0.;
                  TotalVertPseudoVel(ICell, KMin)     = 0.;
                  TotalVertPseudoVel(ICell, KMax + 1) = 0.;
               });
-          KRange = vertRange(KMin + 1, KMax);
+
+          const I4 KRange = vertRange(KMin + 1, KMax);
 
           // Prefix sum of divergence to determine velocity through each
           // interface
@@ -582,19 +574,13 @@ void VertAdv::computePseudoThicknessVAdvTend(
    parallelForOuter(
        "computePseudoThicknessVAdvTend", {NCellsOwned},
        KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-          const I4 KMin   = MinLayerCell(ICell);
-          const I4 KMax   = MaxLayerCell(ICell);
-          const I4 KRange = vertRangeChunked(KMin, KMax);
+          const I4 KMin = MinLayerCell(ICell);
+          const I4 KMax = MaxLayerCell(ICell);
 
           parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 const I4 KStart = chunkStart(KChunk, KMin);
-                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const I4 K = KStart + KVec;
-                    ThickTend(ICell, K) += LocTotVertTransVel(ICell, K + 1) -
-                                           LocTotVertTransVel(ICell, K);
-                 }
+              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                 ThickTend(ICell, K) += LocTotVertTransVel(ICell, K + 1) -
+                                        LocTotVertTransVel(ICell, K);
               });
        });
 
@@ -622,65 +608,16 @@ void VertAdv::computeVelocityVAdvTend(
    OMEGA_SCOPE(LocTotVertVelocity, TotalVerticalPseudoVelocity);
    OMEGA_SCOPE(EdgeMask, VCoord->EdgeMask);
    OMEGA_SCOPE(LocNVertLayersP1, NVertLayersP1);
+   OMEGA_SCOPE(LocVelVAdv, this->VelVAdv);
 
    // Loop over every owned edge
    parallelForOuter(
        "computeVelocityVAdvTend",
        LaunchConfig({NEdgesOwned}, TeamScratch<Real>(NVertLayersP1)),
        KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          const I4 Cell1 = LocCOnE(IEdge, 0);
-          const I4 Cell2 = LocCOnE(IEdge, 1);
-          const I4 KMin  = MinLayerEdgeBot(IEdge);
-          const I4 KMax  = MaxLayerEdgeTop(IEdge);
-          I4 KRange      = vertRangeChunked(KMin + 1, KMax);
-
-          // Allocate scratch space for W times Du/Dz at vertical interfaces
-          // between edges
-          ScratchArray1DReal WDuDzEdge(teamScratch(Team), LocNVertLayersP1);
-
-          // Flux is zero at top and bottom
-          Kokkos::single(
-              PerTeam(Team), INNER_LAMBDA() {
-                 WDuDzEdge(KMin)     = 0._Real;
-                 WDuDzEdge(KMax + 1) = 0._Real;
-              });
-
-          // Average vertical velocities from cell centers to edges and multiply
-          // by derivative of horizontal velocity to obtain flux of horizontal
-          // velocity at the vertical interfaces between edges
-          parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 const I4 KStart = chunkStart(KChunk, KMin + 1);
-                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
-
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const I4 K      = KStart + KVec;
-                    const Real WAvg = 0.5_Real * (LocTotVertVelocity(Cell1, K) +
-                                                  LocTotVertVelocity(Cell2, K));
-                    WDuDzEdge(K) =
-                        WAvg *
-                        (NormalVelocity(IEdge, K - 1) -
-                         NormalVelocity(IEdge, K)) /
-                        (0.5_Real * (FluxPseudoThickEdge(IEdge, K - 1) +
-                                     FluxPseudoThickEdge(IEdge, K)));
-                 }
-              });
-
-          teamBarrier(Team);
-
-          KRange = vertRangeChunked(KMin, KMax);
-          // Average W*Du/Dz from interfaces to layer midpoints
-          parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 const I4 KStart = chunkStart(KChunk, KMin);
-                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
-
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const I4 K = KStart + KVec;
-                    VelTend(IEdge, K) -= EdgeMask(IEdge, K) * 0.5_Real *
-                                         (WDuDzEdge(K) + WDuDzEdge(K + 1));
-                 }
-              });
+          auto VelTendIEdge = Kokkos::subview(VelTend, IEdge, Kokkos::ALL);
+          LocVelVAdv(Team, VelTendIEdge, IEdge, NormalVelocity,
+                     LocTotVertVelocity, FluxPseudoThickEdge);
        });
 
 } // end computeVelocityVAdvTend
@@ -743,27 +680,21 @@ void VertAdv::computeVerticalFluxes(
       parallelForOuter(
           "computeVerticalFluxes-Second", {NTracers, NCellsOwned},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
-             const I4 KMin   = MinLayerCell(ICell);
-             const I4 KMax   = MaxLayerCell(ICell);
-             const I4 KRange = vertRangeChunked(KMin + 2, KMax - 1);
+             const I4 KMin = MinLayerCell(ICell);
+             const I4 KMax = MaxLayerCell(ICell);
              parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    const I4 KStart = chunkStart(KChunk, KMin + 2);
-                    const I4 KLen   = chunkLength(KChunk, KStart, KMax - 1);
-                    for (int KVec = 0; KVec < KLen; ++KVec) {
-                       const I4 K = KStart + KVec;
-                       const Real InvPseudoThickSum =
-                           1._Real / (PseudoThickness(ICell, K - 1) +
-                                      PseudoThickness(ICell, K));
-                       const Real VerticalWeightK =
-                           PseudoThickness(ICell, K - 1) * InvPseudoThickSum;
-                       const Real VerticalWeightKm1 =
-                           PseudoThickness(ICell, K) * InvPseudoThickSum;
-                       LocVertFlux(L, ICell, K) =
-                           LocTotVertTransVel(ICell, K) *
-                           (VerticalWeightK * Tracers(L, ICell, K) +
-                            VerticalWeightKm1 * Tracers(L, ICell, K - 1));
-                    }
+                 Team, Range{KMin + 2, KMax - 1}, INNER_LAMBDA(int K) {
+                    const Real InvPseudoThickSum =
+                        1._Real / (PseudoThickness(ICell, K - 1) +
+                                   PseudoThickness(ICell, K));
+                    const Real VerticalWeightK =
+                        PseudoThickness(ICell, K - 1) * InvPseudoThickSum;
+                    const Real VerticalWeightKm1 =
+                        PseudoThickness(ICell, K) * InvPseudoThickSum;
+                    LocVertFlux(L, ICell, K) =
+                        LocTotVertTransVel(ICell, K) *
+                        (VerticalWeightK * Tracers(L, ICell, K) +
+                         VerticalWeightKm1 * Tracers(L, ICell, K - 1));
                  });
           });
       break;
@@ -772,29 +703,23 @@ void VertAdv::computeVerticalFluxes(
       parallelForOuter(
           "computeVerticalFluxes-Third", {NTracers, NCellsOwned},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
-             const I4 KMin   = MinLayerCell(ICell);
-             const I4 KMax   = MaxLayerCell(ICell);
-             const I4 KRange = vertRangeChunked(KMin + 2, KMax - 1);
+             const I4 KMin = MinLayerCell(ICell);
+             const I4 KMax = MaxLayerCell(ICell);
              parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    const I4 KStart = chunkStart(KChunk, KMin + 2);
-                    const I4 KLen   = chunkLength(KChunk, KStart, KMax - 1);
-                    for (int KVec = 0; KVec < KLen; ++KVec) {
-                       const I4 K = KStart + KVec;
-                       LocVertFlux(L, ICell, K) =
-                           (LocTotVertTransVel(ICell, K) *
-                                (7._Real * (Tracers(L, ICell, K) +
-                                            Tracers(L, ICell, K - 1)) -
-                                 (Tracers(L, ICell, K + 1) +
-                                  Tracers(L, ICell, K - 2))) -
-                            LocCoef3rdOrder *
-                                std::abs(LocTotVertTransVel(ICell, K)) *
-                                ((Tracers(L, ICell, K + 1) -
-                                  Tracers(L, ICell, K - 2)) -
-                                 3._Real * (Tracers(L, ICell, K) -
-                                            Tracers(L, ICell, K - 1)))) /
-                           12._Real;
-                    }
+                 Team, Range{KMin + 2, KMax - 1}, INNER_LAMBDA(int K) {
+                    LocVertFlux(L, ICell, K) =
+                        (LocTotVertTransVel(ICell, K) *
+                             (7._Real * (Tracers(L, ICell, K) +
+                                         Tracers(L, ICell, K - 1)) -
+                              (Tracers(L, ICell, K + 1) +
+                               Tracers(L, ICell, K - 2))) -
+                         LocCoef3rdOrder *
+                             std::abs(LocTotVertTransVel(ICell, K)) *
+                             ((Tracers(L, ICell, K + 1) -
+                               Tracers(L, ICell, K - 2)) -
+                              3._Real * (Tracers(L, ICell, K) -
+                                         Tracers(L, ICell, K - 1)))) /
+                        12._Real;
                  });
           });
       break;
@@ -803,23 +728,17 @@ void VertAdv::computeVerticalFluxes(
       parallelForOuter(
           "computeVerticalFluxes-Fourth", {NTracers, NCellsOwned},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
-             const I4 KMin   = MinLayerCell(ICell);
-             const I4 KMax   = MaxLayerCell(ICell);
-             const I4 KRange = vertRangeChunked(KMin + 2, KMax - 1);
+             const I4 KMin = MinLayerCell(ICell);
+             const I4 KMax = MaxLayerCell(ICell);
              parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    const I4 KStart = chunkStart(KChunk, KMin + 2);
-                    const I4 KLen   = chunkLength(KChunk, KStart, KMax - 1);
-                    for (int KVec = 0; KVec < KLen; ++KVec) {
-                       const I4 K = KStart + KVec;
-                       LocVertFlux(L, ICell, K) =
-                           LocTotVertTransVel(ICell, K) *
-                           (7._Real * (Tracers(L, ICell, K) +
-                                       Tracers(L, ICell, K - 1)) -
-                            (Tracers(L, ICell, K + 1) +
-                             Tracers(L, ICell, K - 2))) /
-                           12._Real;
-                    }
+                 Team, Range{KMin + 2, KMax - 1}, INNER_LAMBDA(int K) {
+                    LocVertFlux(L, ICell, K) =
+                        LocTotVertTransVel(ICell, K) *
+                        (7._Real *
+                             (Tracers(L, ICell, K) + Tracers(L, ICell, K - 1)) -
+                         (Tracers(L, ICell, K + 1) +
+                          Tracers(L, ICell, K - 2))) /
+                        12._Real;
                  });
           });
       break;
@@ -857,28 +776,22 @@ void VertAdv::computeVerticalFluxes(
       parallelForOuter(
           "computeVerticalFluxes-LowOrder", {NTracers, NCellsOwned},
           KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
-             const I4 KMin   = MinLayerCell(ICell);
-             const I4 KMax   = MaxLayerCell(ICell);
-             const I4 KRange = vertRangeChunked(KMin + 1, KMax);
+             const I4 KMin = MinLayerCell(ICell);
+             const I4 KMax = MaxLayerCell(ICell);
 
              for (int K : {KMin, KMax + 1}) {
                 LocLowOrderVertFlux(L, ICell, K) = 0._Real;
              }
              parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    const I4 KStart = chunkStart(KChunk, KMin + 1);
-                    const I4 KLen   = chunkLength(KChunk, KStart, KMax);
-                    for (int KVec = 0; KVec < KLen; ++KVec) {
-                       const I4 K = KStart + KVec;
-                       LocLowOrderVertFlux(L, ICell, K) =
-                           Kokkos::min(0._Real, LocTotVertTransVel(ICell, K)) *
-                               Tracers(L, ICell, K - 1) +
-                           Kokkos::max(0._Real, LocTotVertTransVel(ICell, K)) *
-                               Tracers(L, ICell, K);
+                 Team, Range{KMin + 1, KMax}, INNER_LAMBDA(int K) {
+                    LocLowOrderVertFlux(L, ICell, K) =
+                        Kokkos::min(0._Real, LocTotVertTransVel(ICell, K)) *
+                            Tracers(L, ICell, K - 1) +
+                        Kokkos::max(0._Real, LocTotVertTransVel(ICell, K)) *
+                            Tracers(L, ICell, K);
 
-                       LocVertFlux(L, ICell, K) -=
-                           LocLowOrderVertFlux(L, ICell, K);
-                    }
+                    LocVertFlux(L, ICell, K) -=
+                        LocLowOrderVertFlux(L, ICell, K);
                  });
           });
    }
@@ -901,18 +814,12 @@ void VertAdv::computeStdVAdvTend(
    parallelForOuter(
        "computeStdVAdvTend", {NTracers, NCellsOwned},
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
-          const I4 KMin   = MinLayerCell(ICell);
-          const I4 KMax   = MaxLayerCell(ICell);
-          const I4 KRange = vertRangeChunked(KMin, KMax);
+          const I4 KMin = MinLayerCell(ICell);
+          const I4 KMax = MaxLayerCell(ICell);
           parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 const I4 KStart = chunkStart(KChunk, KMin);
-                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const I4 K = KStart + KVec;
-                    TracerTend(L, ICell, K) +=
-                        LocVertFlux(L, ICell, K + 1) - LocVertFlux(L, ICell, K);
-                 }
+              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                 TracerTend(L, ICell, K) +=
+                     LocVertFlux(L, ICell, K + 1) - LocVertFlux(L, ICell, K);
               });
        });
 
@@ -945,7 +852,6 @@ void VertAdv::computeFCTVAdvTend(
        KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
           const I4 KMin = MinLayerCell(ICell);
           const I4 KMax = MaxLayerCell(ICell);
-          I4 KRange     = vertRangeChunked(KMin, KMax);
 
           ScratchArray1DReal InvNewProvThick(teamScratch(Team), LocNVertLayers);
           ScratchArray1DReal WorkTend(teamScratch(Team), LocNVertLayers);
@@ -955,117 +861,93 @@ void VertAdv::computeFCTVAdvTend(
                                           LocNVertLayers + 1);
 
           parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 const I4 KStart = chunkStart(KChunk, KMin);
-                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
-
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const I4 K = KStart + KVec;
-                    InvNewProvThick(K) =
-                        1._Real / (ProvPseudoThickness(ICell, K) +
-                                   Dt * (LocTotVertTransVel(ICell, K + 1) -
-                                         LocTotVertTransVel(ICell, K)));
-                    Real TracerMax;
-                    Real TracerMin;
-                    // Determine bounds on tracer from neighbor values for
-                    // limiting
-                    if (K == KMin) {
-                       TracerMax = Kokkos::max(Tracers(L, ICell, K),
-                                               Tracers(L, ICell, K + 1));
-                       TracerMin = Kokkos::min(Tracers(L, ICell, K),
-                                               Tracers(L, ICell, K + 1));
-                    } else if (K == KMax) {
-                       TracerMax = Kokkos::max(Tracers(L, ICell, K - 1),
-                                               Tracers(L, ICell, K));
-                       TracerMin = Kokkos::min(Tracers(L, ICell, K - 1),
-                                               Tracers(L, ICell, K));
-                    } else {
-                       TracerMax =
-                           Kokkos::max(Tracers(L, ICell, K - 1),
-                                       Kokkos::max(Tracers(L, ICell, K),
-                                                   Tracers(L, ICell, K + 1)));
-                       TracerMin =
-                           Kokkos::min(Tracers(L, ICell, K - 1),
-                                       Kokkos::min(Tracers(L, ICell, K),
-                                                   Tracers(L, ICell, K + 1)));
-                    }
-
-                    // Accumulate upwind flux in WorkTend
-                    WorkTend(K) = LocLowOrderVertFlux(L, ICell, K + 1) -
-                                  LocLowOrderVertFlux(L, ICell, K);
-                    // Accumulate remaining high-order flux into layer
-                    FlxIn(K) =
-                        Kokkos::max(0._Real, LocVertFlux(L, ICell, K + 1)) -
-                        Kokkos::min(0._Real, LocVertFlux(L, ICell, K));
-                    // Accumulate remaining high-order flux out of layer
-                    FlxOut(K) =
-                        Kokkos::min(0._Real, LocVertFlux(L, ICell, K + 1)) -
-                        Kokkos::max(0._Real, LocVertFlux(L, ICell, K));
-                    // Build scale factors to limit flux for FCT using the
-                    // bounds determined above and bounds on newly updated
-                    // values. Factors are stored in FlxIn and FlxOut
-                    // scratch space.
-                    Real TracerMinNew =
-                        (Tracers(L, ICell, K) * ProvPseudoThickness(ICell, K) +
-                         Dt * (WorkTend(K) + FlxOut(K))) *
-                        InvNewProvThick(K);
-                    Real TracerMaxNew =
-                        (Tracers(L, ICell, K) * ProvPseudoThickness(ICell, K) +
-                         Dt * (WorkTend(K) + FlxIn(K))) *
-                        InvNewProvThick(K);
-                    Real TracerUpwindNew =
-                        (Tracers(L, ICell, K) * ProvPseudoThickness(ICell, K) +
-                         Dt * WorkTend(K)) *
-                        InvNewProvThick(K);
-                    Real ScaleFactor =
-                        (TracerMax - TracerUpwindNew) /
-                        (TracerMaxNew - TracerUpwindNew + LocEps);
-                    FlxIn(K) =
-                        Kokkos::min(1._Real, Kokkos::max(0._Real, ScaleFactor));
-                    ScaleFactor = (TracerUpwindNew - TracerMin) /
-                                  (TracerUpwindNew - TracerMinNew + LocEps);
-                    FlxOut(K) =
-                        Kokkos::min(1._Real, Kokkos::max(0._Real, ScaleFactor));
+              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                 InvNewProvThick(K) =
+                     1._Real / (ProvPseudoThickness(ICell, K) +
+                                Dt * (LocTotVertTransVel(ICell, K + 1) -
+                                      LocTotVertTransVel(ICell, K)));
+                 Real TracerMax;
+                 Real TracerMin;
+                 // Determine bounds on tracer from neighbor values for
+                 // limiting
+                 if (K == KMin) {
+                    TracerMax = Kokkos::max(Tracers(L, ICell, K),
+                                            Tracers(L, ICell, K + 1));
+                    TracerMin = Kokkos::min(Tracers(L, ICell, K),
+                                            Tracers(L, ICell, K + 1));
+                 } else if (K == KMax) {
+                    TracerMax = Kokkos::max(Tracers(L, ICell, K - 1),
+                                            Tracers(L, ICell, K));
+                    TracerMin = Kokkos::min(Tracers(L, ICell, K - 1),
+                                            Tracers(L, ICell, K));
+                 } else {
+                    TracerMax =
+                        Kokkos::max(Tracers(L, ICell, K - 1),
+                                    Kokkos::max(Tracers(L, ICell, K),
+                                                Tracers(L, ICell, K + 1)));
+                    TracerMin =
+                        Kokkos::min(Tracers(L, ICell, K - 1),
+                                    Kokkos::min(Tracers(L, ICell, K),
+                                                Tracers(L, ICell, K + 1)));
                  }
+
+                 // Accumulate upwind flux in WorkTend
+                 WorkTend(K) = LocLowOrderVertFlux(L, ICell, K + 1) -
+                               LocLowOrderVertFlux(L, ICell, K);
+                 // Accumulate remaining high-order flux into layer
+                 FlxIn(K) = Kokkos::max(0._Real, LocVertFlux(L, ICell, K + 1)) -
+                            Kokkos::min(0._Real, LocVertFlux(L, ICell, K));
+                 // Accumulate remaining high-order flux out of layer
+                 FlxOut(K) =
+                     Kokkos::min(0._Real, LocVertFlux(L, ICell, K + 1)) -
+                     Kokkos::max(0._Real, LocVertFlux(L, ICell, K));
+                 // Build scale factors to limit flux for FCT using the
+                 // bounds determined above and bounds on newly updated
+                 // values. Factors are stored in FlxIn and FlxOut
+                 // scratch space.
+                 Real TracerMinNew =
+                     (Tracers(L, ICell, K) * ProvPseudoThickness(ICell, K) +
+                      Dt * (WorkTend(K) + FlxOut(K))) *
+                     InvNewProvThick(K);
+                 Real TracerMaxNew =
+                     (Tracers(L, ICell, K) * ProvPseudoThickness(ICell, K) +
+                      Dt * (WorkTend(K) + FlxIn(K))) *
+                     InvNewProvThick(K);
+                 Real TracerUpwindNew =
+                     (Tracers(L, ICell, K) * ProvPseudoThickness(ICell, K) +
+                      Dt * WorkTend(K)) *
+                     InvNewProvThick(K);
+                 Real ScaleFactor = (TracerMax - TracerUpwindNew) /
+                                    (TracerMaxNew - TracerUpwindNew + LocEps);
+                 FlxIn(K) =
+                     Kokkos::min(1._Real, Kokkos::max(0._Real, ScaleFactor));
+                 ScaleFactor = (TracerUpwindNew - TracerMin) /
+                               (TracerUpwindNew - TracerMinNew + LocEps);
+                 FlxOut(K) =
+                     Kokkos::min(1._Real, Kokkos::max(0._Real, ScaleFactor));
               });
 
           teamBarrier(Team);
-
-          KRange = vertRangeChunked(KMin + 1, KMax);
 
           // Rescale the high-order vertical flux
           RescaledFlux(KMin)     = 0._Real;
           RescaledFlux(KMax + 1) = 0._Real;
           parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 const I4 KStart = chunkStart(KChunk, KMin + 1);
-                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
-
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const I4 K = KStart + KVec;
-
-                    RescaledFlux(K) =
-                        Kokkos::max(0._Real, LocVertFlux(L, ICell, K)) *
-                            Kokkos::min(FlxOut(K), FlxIn(K - 1)) +
-                        Kokkos::min(0._Real, LocVertFlux(L, ICell, K)) *
-                            Kokkos::min(FlxOut(K - 1), FlxIn(K));
-                 }
+              Team, Range{KMin + 1, KMax}, INNER_LAMBDA(int K) {
+                 RescaledFlux(K) =
+                     Kokkos::max(0._Real, LocVertFlux(L, ICell, K)) *
+                         Kokkos::min(FlxOut(K), FlxIn(K - 1)) +
+                     Kokkos::min(0._Real, LocVertFlux(L, ICell, K)) *
+                         Kokkos::min(FlxOut(K - 1), FlxIn(K));
               });
 
           teamBarrier(Team);
 
           // Accumulate total FCT vertical advection tendency
-          KRange = vertRangeChunked(KMin, KMax);
           parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 const I4 KStart = chunkStart(KChunk, KMin);
-                 const I4 KLen   = chunkLength(KChunk, KStart, KMax);
-
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const I4 K = KStart + KVec;
-                    WorkTend(K) += RescaledFlux(K + 1) - RescaledFlux(K);
-                    TracerTend(L, ICell, K) += WorkTend(K);
-                 }
+              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                 WorkTend(K) += RescaledFlux(K + 1) - RescaledFlux(K);
+                 TracerTend(L, ICell, K) += WorkTend(K);
               });
           // TODO: Monotonicity and diagnostic checks
        });

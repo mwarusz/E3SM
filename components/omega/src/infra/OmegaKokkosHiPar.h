@@ -359,6 +359,11 @@ KOKKOS_FUNCTION void parallelSearchInner(const TeamMember &Team, int UpperBound,
                        Idx);
 }
 
+template <class F>
+KOKKOS_FUNCTION void singleInner(const TeamMember &Team, F &&Functor) {
+   Kokkos::single(Kokkos::PerTeam(Team), std::forward<F>(Functor));
+}
+
 } // end namespace OMEGA
 
 //===----------------------------------------------------------------------===//

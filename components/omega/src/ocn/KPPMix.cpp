@@ -286,20 +286,11 @@ void KPPMix::update(const Array3DReal &TracerArray, I4 TempTracerIndex,
        });
 
    {
-      TangentialReconOnEdge TanReconEdge(Mesh);
+      TangentialReconOnEdge TanReconEdge(Mesh, VCoord);
       OMEGA_SCOPE(LocTangentialVelocity, TangentialVelocity);
-      OMEGA_SCOPE(LocMinLayerEdgeBot, VCoord->MinLayerEdgeBot);
-      OMEGA_SCOPE(LocMaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
       parallelForOuter(
           {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-             const int KMin   = LocMinLayerEdgeBot(IEdge);
-             const int KMax   = LocMaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    TanReconEdge(LocTangentialVelocity, IEdge, KChunk,
-                                 NormalVelocity);
-                 });
+             TanReconEdge(Team, LocTangentialVelocity, IEdge, NormalVelocity);
           });
    }
 
