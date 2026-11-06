@@ -215,9 +215,9 @@ class KEGradOnEdge {
 
    /// The functor takes edge index, vertical chunk index, and kinetic energy
    /// array as inputs, outputs the tendency array
-   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
-                                   const Array2DReal &KECell) const {
+   template <class TendArr>
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team, const TendArr &Tend,
+                                   I4 IEdge, const Array2DReal &KECell) const {
 
       const I4 JCell0 = CellsOnEdge(IEdge, 0);
       const I4 JCell1 = CellsOnEdge(IEdge, 1);
@@ -229,9 +229,8 @@ class KEGradOnEdge {
 
       parallelForInner(
           Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-             Tend(IEdge, K) -= EdgeMask(IEdge, K) *
-                               (KECell(JCell1, K) - KECell(JCell0, K)) *
-                               InvDcEdge;
+             Tend(K) -= EdgeMask(IEdge, K) *
+                        (KECell(JCell1, K) - KECell(JCell0, K)) * InvDcEdge;
           });
    }
 
