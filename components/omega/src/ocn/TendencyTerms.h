@@ -85,9 +85,9 @@ class PotentialVortHAdvOnEdge {
    /// normalized relative vorticity, normalized planetary vorticity, layer
    /// thickness on edges, and normal velocity on edges as inputs,
    /// outputs the tendency array
-   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
-                                   const Array2DReal &NormRVortEdge,
+   template <class TendArr>
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team, const TendArr &Tend,
+                                   I4 IEdge, const Array2DReal &NormRVortEdge,
                                    const Array2DReal &NormFEdge,
                                    const Array2DReal &FluxPseudoThickEdge,
                                    const Array2DReal &NormVelEdge) const {
@@ -104,18 +104,18 @@ class PotentialVortHAdvOnEdge {
                      NormRVortEdge(JEdge, K) + NormFEdge(JEdge, K)) *
                     0.5_Real;
 
-                Tend(IEdge, K) += EdgeMask(IEdge, K) * WeightsOnEdge(IEdge, J) *
-                                  FluxPseudoThickEdge(JEdge, K) *
-                                  NormVelEdge(JEdge, K) * NormVort;
+                Tend(K) += EdgeMask(IEdge, K) * WeightsOnEdge(IEdge, J) *
+                           FluxPseudoThickEdge(JEdge, K) *
+                           NormVelEdge(JEdge, K) * NormVort;
              });
       }
    }
 
    /// Relative vorticity horizontal advection without Coriolis. Used for the
    /// split-explicit baroclinic velocity forcing term.
-   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
-                                   const Array2DReal &NormRVortEdge,
+   template <class TendArr>
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team, const TendArr &Tend,
+                                   I4 IEdge, const Array2DReal &NormRVortEdge,
                                    const Array2DReal &FluxPseudoThickEdge,
                                    const Array2DReal &NormVelEdge) const {
 
@@ -130,9 +130,9 @@ class PotentialVortHAdvOnEdge {
                     (NormRVortEdge(IEdge, K) + NormRVortEdge(JEdge, K)) *
                     0.5_Real;
 
-                Tend(IEdge, K) += EdgeMask(IEdge, K) * WeightsOnEdge(IEdge, J) *
-                                  FluxPseudoThickEdge(JEdge, K) *
-                                  NormVelEdge(JEdge, K) * NormVort;
+                Tend(K) += EdgeMask(IEdge, K) * WeightsOnEdge(IEdge, J) *
+                           FluxPseudoThickEdge(JEdge, K) *
+                           NormVelEdge(JEdge, K) * NormVort;
              });
       }
    }
@@ -253,9 +253,9 @@ class SSHGradOnEdge {
 
    /// The functor takes edge index, vertical chunk index, and array of
    /// pseudo-thickness/SSH, outputs tendency array
-   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
-                                   const Array1DReal &SshCell) const {
+   template <class TendArr>
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team, const TendArr &Tend,
+                                   I4 IEdge, const Array1DReal &SshCell) const {
 
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
       const I4 ICell1 = CellsOnEdge(IEdge, 1);
@@ -267,8 +267,8 @@ class SSHGradOnEdge {
 
       parallelForInner(
           Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-             Tend(IEdge, K) -= EdgeMask(IEdge, K) * Gravity *
-                               (SshCell(ICell1) - SshCell(ICell0)) * InvDcEdge;
+             Tend(K) -= EdgeMask(IEdge, K) * Gravity *
+                        (SshCell(ICell1) - SshCell(ICell0)) * InvDcEdge;
           });
    }
 
@@ -293,9 +293,9 @@ class VelocityDiffusionOnEdge {
    /// The functor takes edge index, vertical chunk index, and arrays for
    /// divergence of horizontal velocity (defined at cell centers) and relative
    /// vorticity (defined at vertices), outputs tendency array
-   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
-                                   const Array2DReal &DivCell,
+   template <class TendArr>
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team, const TendArr &Tend,
+                                   I4 IEdge, const Array2DReal &DivCell,
                                    const Array2DReal &RVortVertex) const {
 
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
@@ -317,7 +317,7 @@ class VelocityDiffusionOnEdge {
                   (RVortVertex(IVertex1, K) - RVortVertex(IVertex0, K)) *
                       DvEdgeInv);
 
-             Tend(IEdge, K) +=
+             Tend(K) +=
                  EdgeMask(IEdge, K) * ViscDel2 * MeshScalingDel2(IEdge) * Del2U;
           });
    }
@@ -347,9 +347,9 @@ class VelocityHyperDiffOnEdge {
    /// The functor takes the edge index, vertical chunk index, and arrays for
    /// the laplacian of divergence of horizontal velocity and the laplacian of
    /// the relative vorticity, outputs tendency array
-   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
-                                   const Array2DReal &Del2DivCell,
+   template <class TendArr>
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team, const TendArr &Tend,
+                                   I4 IEdge, const Array2DReal &Del2DivCell,
                                    const Array2DReal &Del2RVortVertex) const {
 
       const I4 ICell0 = CellsOnEdge(IEdge, 0);
@@ -374,7 +374,7 @@ class VelocityHyperDiffOnEdge {
                    Del2RVortVertex(IVertex0, K)) *
                       DvEdgeInv);
 
-             Tend(IEdge, K) -=
+             Tend(K) -=
                  EdgeMask(IEdge, K) * ViscDel4 * MeshScalingDel4(IEdge) * Del2U;
           });
    }
@@ -400,8 +400,9 @@ class SfcStressForcingOnEdge {
 
    /// The functor takes the edge index, vertical chunk index, and arrays for
    /// normal surface stress and edge pseudo-thickness, outputs tendency array
-   KOKKOS_FUNCTION void operator()(const TeamMember &Team,
-                                   const Array2DReal &Tend, I4 IEdge,
+   template <class TendArr>
+   KOKKOS_FUNCTION void operator()(const TeamMember &Team, const TendArr &Tend,
+                                   I4 IEdge,
                                    const Array1DReal &NormalStressEdge,
                                    const Array2DReal &PseudoThickEdge) const {
       const I4 KMin = MinLayerEdgeBot(IEdge);
@@ -411,8 +412,8 @@ class SfcStressForcingOnEdge {
           Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
              if (K == KMin) {
                 const Real InvThickEdge = 1._Real / PseudoThickEdge(IEdge, K);
-                Tend(IEdge, K) += EdgeMask(IEdge, K) * InvThickEdge *
-                                  NormalStressEdge(IEdge) / RhoSw;
+                Tend(K) += EdgeMask(IEdge, K) * InvThickEdge *
+                           NormalStressEdge(IEdge) / RhoSw;
              }
           });
    }
@@ -435,7 +436,8 @@ class BottomDragOnEdge {
    /// The functor takes the edge index and arrays for
    /// horizontal velocity, kinetic energy,
    /// and edge pseudo-thickness, outputs tendency array
-   KOKKOS_FUNCTION void operator()(const Array2DReal &Tend, I4 IEdge,
+   template <class TendArr>
+   KOKKOS_FUNCTION void operator()(const TendArr &Tend, I4 IEdge,
                                    const Array2DReal &NormalVelEdge,
                                    const Array2DReal &KECell,
                                    const Array2DReal &PseudoThickEdge) const {
@@ -456,8 +458,8 @@ class BottomDragOnEdge {
           Kokkos::sqrt(KECell(JCell0, KBot) + KECell(JCell1, KBot));
 
       const Real InvThickEdge = 1._Real / PseudoThickEdge(IEdge, KBot);
-      Tend(IEdge, KBot) -= EdgeMask(IEdge, KBot) * Coeff * VelNormEdge *
-                           InvThickEdge * NormalVelEdge(IEdge, KBot);
+      Tend(KBot) -= EdgeMask(IEdge, KBot) * Coeff * VelNormEdge * InvThickEdge *
+                    NormalVelEdge(IEdge, KBot);
    }
 
  private:

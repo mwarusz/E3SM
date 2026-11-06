@@ -1003,13 +1003,12 @@ void Tendencies::computeVelocityTendenciesOnly(
 
           if (LocPotentialVortHAdv.Enabled) {
              if (LocCoriolisMode == CoriolisTendMode::Separate) {
-                LocPotentialVortHAdv(Team, LocNormalVelocityTend, IEdge,
-                                     NormRVortEdge, FluxPseudoThickEdge,
-                                     NormalVelEdge);
-             } else {
-                LocPotentialVortHAdv(Team, LocNormalVelocityTend, IEdge,
-                                     NormRVortEdge, NormFEdge,
+                LocPotentialVortHAdv(Team, VelTendIEdge, IEdge, NormRVortEdge,
                                      FluxPseudoThickEdge, NormalVelEdge);
+             } else {
+                LocPotentialVortHAdv(Team, VelTendIEdge, IEdge, NormRVortEdge,
+                                     NormFEdge, FluxPseudoThickEdge,
+                                     NormalVelEdge);
              }
           }
 
@@ -1018,40 +1017,40 @@ void Tendencies::computeVelocityTendenciesOnly(
           }
 
           if (LocSplitFactor != 0._Real) {
-             LocBarotropicPGrad(Team, LocNormalVelocityTend, IEdge,
-                                BtrPressAnomaly, DepthMeanSpecVol);
+             LocBarotropicPGrad(Team, VelTendIEdge, IEdge, BtrPressAnomaly,
+                                DepthMeanSpecVol);
           } else if (LocSSHGrad.Enabled) {
-             LocSSHGrad(Team, LocNormalVelocityTend, IEdge, SSHCell);
+             LocSSHGrad(Team, VelTendIEdge, IEdge, SSHCell);
           }
 
           if (LocVelocityDiffusion.Enabled) {
-             LocVelocityDiffusion(Team, LocNormalVelocityTend, IEdge, DivCell,
+             LocVelocityDiffusion(Team, VelTendIEdge, IEdge, DivCell,
                                   RVortVertex);
           }
 
           if (LocVelocityHyperDiff.Enabled) {
-             LocVelocityHyperDiff(Team, LocNormalVelocityTend, IEdge,
-                                  Del2DivCell, Del2RVortVertex);
+             LocVelocityHyperDiff(Team, VelTendIEdge, IEdge, Del2DivCell,
+                                  Del2RVortVertex);
           }
 
           if (LocSfcStressForcing.Enabled) {
-             LocSfcStressForcing(Team, LocNormalVelocityTend, IEdge,
-                                 NormalStressEdge, MeanPseudoThickEdge);
+             LocSfcStressForcing(Team, VelTendIEdge, IEdge, NormalStressEdge,
+                                 MeanPseudoThickEdge);
           }
 
           if (LocExplicitBottomDrag.Enabled) {
-             LocExplicitBottomDrag(LocNormalVelocityTend, IEdge, NormalVelEdge,
-                                   KECell, MeanPseudoThickEdge);
+             LocExplicitBottomDrag(VelTendIEdge, IEdge, NormalVelEdge, KECell,
+                                   MeanPseudoThickEdge);
           }
 
           if (LocPGradEnabled) {
              if (LocPressureGradChoice == PressureGradType::Centered) {
-                LocCenteredPGrad(Team, LocNormalVelocityTend, IEdge,
-                                 PressureMid, PressureInterface, GeomZInterface,
+                LocCenteredPGrad(Team, VelTendIEdge, IEdge, PressureMid,
+                                 PressureInterface, GeomZInterface,
                                  LocTidalPotential, LocSelfAttractionLoading,
                                  SpecVol);
              } else {
-                LocFiniteVolumePGrad(Team, LocNormalVelocityTend, IEdge,
+                LocFiniteVolumePGrad(Team, VelTendIEdge, IEdge,
                                      PressureInterface, LocDeltaZFixedP,
                                      LocDeltaZMoment, LocTidalPotential,
                                      LocSelfAttractionLoading);
@@ -1059,7 +1058,7 @@ void Tendencies::computeVelocityTendenciesOnly(
           }
 
           if (LocVAdvEnabled) {
-             LocVelVAdv(Team, LocNormalVelocityTend, IEdge, NormalVelEdge,
+             LocVelVAdv(Team, VelTendIEdge, IEdge, NormalVelEdge,
                         LocTotVertVelocity, FluxPseudoThickEdge);
           }
        });

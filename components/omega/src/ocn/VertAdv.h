@@ -42,8 +42,9 @@ class VelVertAdv {
 
    /// The functor takes edge index, vertical chunk index, and kinetic energy
    /// array as inputs, outputs the tendency array
+   template <class TendArr>
    KOKKOS_FUNCTION void
-   operator()(const TeamMember &Team, const Array2DReal &VelTend, I4 IEdge,
+   operator()(const TeamMember &Team, const TendArr &VelTend, I4 IEdge,
               const Array2DReal &NormalVelocity,
               const Array2DReal &TotVertVelocity,
               const Array2DReal &FluxPseudoThickEdge) const {
@@ -85,8 +86,8 @@ class VelVertAdv {
       // Average W*Du/Dz from interfaces to layer midpoints
       parallelForInner(
           Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-             VelTend(IEdge, K) -= EdgeMask(IEdge, K) * 0.5_Real *
-                                  (WDuDzEdge(K) + WDuDzEdge(K + 1));
+             VelTend(K) -= EdgeMask(IEdge, K) * 0.5_Real *
+                           (WDuDzEdge(K) + WDuDzEdge(K + 1));
           });
    }
 
