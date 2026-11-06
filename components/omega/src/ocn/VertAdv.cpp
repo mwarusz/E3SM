@@ -44,7 +44,8 @@ VertAdv::VertAdv(const std::string &Name_,  //< [in] name for new VertAdv
                  const HorzMesh *InMesh,    //< [in] associated HorzMesh
                  const VertCoord *InVCoord, //< [in] associated VertCoord
                  Config *Options            //< [in] configuration options
-) {
+                 )
+    : VelVAdv(InMesh, InVCoord) {
 
    // Read options from Config object
    readConfigOptions(Options);
@@ -607,50 +608,15 @@ void VertAdv::computeVelocityVAdvTend(
    OMEGA_SCOPE(LocTotVertVelocity, TotalVerticalPseudoVelocity);
    OMEGA_SCOPE(EdgeMask, VCoord->EdgeMask);
    OMEGA_SCOPE(LocNVertLayersP1, NVertLayersP1);
+   OMEGA_SCOPE(LocVelVAdv, this->VelVAdv);
 
    // Loop over every owned edge
    parallelForOuter(
        "computeVelocityVAdvTend",
        LaunchConfig({NEdgesOwned}, TeamScratch<Real>(NVertLayersP1)),
        KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          const I4 Cell1 = LocCOnE(IEdge, 0);
-          const I4 Cell2 = LocCOnE(IEdge, 1);
-          const I4 KMin  = MinLayerEdgeBot(IEdge);
-          const I4 KMax  = MaxLayerEdgeTop(IEdge);
-
-          // Allocate scratch space for W times Du/Dz at vertical interfaces
-          // between edges
-          ScratchArray1DReal WDuDzEdge(teamScratch(Team), LocNVertLayersP1);
-
-          // Flux is zero at top and bottom
-          singleInner(
-              Team, INNER_LAMBDA() {
-                 WDuDzEdge(KMin)     = 0._Real;
-                 WDuDzEdge(KMax + 1) = 0._Real;
-              });
-
-          // Average vertical velocities from cell centers to edges and multiply
-          // by derivative of horizontal velocity to obtain flux of horizontal
-          // velocity at the vertical interfaces between edges
-          parallelForInner(
-              Team, Range{KMin + 1, KMax}, INNER_LAMBDA(int K) {
-                 const Real WAvg = 0.5_Real * (LocTotVertVelocity(Cell1, K) +
-                                               LocTotVertVelocity(Cell2, K));
-                 WDuDzEdge(K) =
-                     WAvg *
-                     (NormalVelocity(IEdge, K - 1) - NormalVelocity(IEdge, K)) /
-                     (0.5_Real * (FluxPseudoThickEdge(IEdge, K - 1) +
-                                  FluxPseudoThickEdge(IEdge, K)));
-              });
-
-          teamBarrier(Team);
-
-          // Average W*Du/Dz from interfaces to layer midpoints
-          parallelForInner(
-              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
-                 VelTend(IEdge, K) -= EdgeMask(IEdge, K) * 0.5_Real *
-                                      (WDuDzEdge(K) + WDuDzEdge(K + 1));
-              });
+          LocVelVAdv(Team, VelTend, IEdge, NormalVelocity, LocTotVertVelocity,
+                     FluxPseudoThickEdge);
        });
 
 } // end computeVelocityVAdvTend

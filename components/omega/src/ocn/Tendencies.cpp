@@ -982,8 +982,14 @@ void Tendencies::computeVelocityTendenciesOnly(
                                ConservTemp, AbsSalinity, EqState);
    }
 
+   OMEGA_SCOPE(LocVelVAdv, VAdv->VelVAdv);
+   OMEGA_SCOPE(LocVAdvEnabled, VAdv->VelVertAdvEnabled);
+   OMEGA_SCOPE(LocTotVertVelocity, VAdv->TotalVerticalPseudoVelocity);
+
    parallelForOuter(
-       {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+       LaunchConfig({Mesh->NEdgesAll},
+                    TeamScratch<Real>(VCoord->NVertLayersP1)),
+       KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
           const int KTop = LocMinLayerEdgeTop(IEdge);
           const int KBot = LocMaxLayerEdgeBot(IEdge);
 
@@ -1048,13 +1054,12 @@ void Tendencies::computeVelocityTendenciesOnly(
                                      LocSelfAttractionLoading);
              }
           }
-       });
 
-   Pacer::start("Tend:computeVelocityVAdvTend", 2);
-   // Compute velocity tendency from vertical advection
-   VAdv->computeVelocityVAdvTend(NormalVelocityTend, NormalVelEdge,
-                                 FluxPseudoThickEdge);
-   Pacer::stop("Tend:computeVelocityVAdvTend", 2);
+          if (LocVAdvEnabled) {
+             LocVelVAdv(Team, LocNormalVelocityTend, IEdge, NormalVelEdge,
+                        LocTotVertVelocity, FluxPseudoThickEdge);
+          }
+       });
 
    if (CustomVelocityTend) {
       Pacer::start("Tend:customVelocityTend", 2);
