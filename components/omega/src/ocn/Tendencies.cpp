@@ -986,20 +986,20 @@ void Tendencies::computeVelocityTendenciesOnly(
    OMEGA_SCOPE(LocVAdvEnabled, VAdv->VelVertAdvEnabled);
    OMEGA_SCOPE(LocTotVertVelocity, VAdv->TotalVerticalPseudoVelocity);
 
+   OMEGA_SCOPE(NVertLayers, VCoord->NVertLayers);
+
    parallelForOuter(
        LaunchConfig({Mesh->NEdgesAll},
-                    TeamScratch<Real>(VCoord->NVertLayersP1)),
+                    TeamScratch<Real>(2 * VCoord->NVertLayers + 1)),
        KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
           const int KTop = LocMinLayerEdgeTop(IEdge);
           const int KBot = LocMaxLayerEdgeBot(IEdge);
 
-          auto VelTendIEdge =
-              Kokkos::subview(LocNormalVelocityTend, IEdge, Kokkos::ALL);
+          ScratchArray1DReal VelTendIEdge(teamScratch(Team), NVertLayers);
 
           parallelForInner(
-              Team, Range{KTop, KBot}, INNER_LAMBDA(int K) {
-                 LocNormalVelocityTend(IEdge, K) = 0._Real;
-              });
+              Team, Range{KTop, KBot},
+              INNER_LAMBDA(int K) { VelTendIEdge(K) = 0._Real; });
 
           if (LocPotentialVortHAdv.Enabled) {
              if (LocCoriolisMode == CoriolisTendMode::Separate) {
@@ -1061,6 +1061,11 @@ void Tendencies::computeVelocityTendenciesOnly(
              LocVelVAdv(Team, VelTendIEdge, IEdge, NormalVelEdge,
                         LocTotVertVelocity, FluxPseudoThickEdge);
           }
+
+          parallelForInner(
+              Team, Range{KTop, KBot}, INNER_LAMBDA(int K) {
+                 LocNormalVelocityTend(IEdge, K) = VelTendIEdge(K);
+              });
        });
 
    if (CustomVelocityTend) {
