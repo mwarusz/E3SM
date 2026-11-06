@@ -615,8 +615,9 @@ void VertAdv::computeVelocityVAdvTend(
        "computeVelocityVAdvTend",
        LaunchConfig({NEdgesOwned}, TeamScratch<Real>(NVertLayersP1)),
        KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          LocVelVAdv(Team, VelTend, IEdge, NormalVelocity, LocTotVertVelocity,
-                     FluxPseudoThickEdge);
+          auto VelTendIEdge = Kokkos::subview(VelTend, IEdge, Kokkos::ALL);
+          LocVelVAdv(Team, VelTendIEdge, IEdge, NormalVelocity,
+                     LocTotVertVelocity, FluxPseudoThickEdge);
        });
 
 } // end computeVelocityVAdvTend

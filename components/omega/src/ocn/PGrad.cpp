@@ -510,9 +510,11 @@ void PressureGrad::computePressureGrad(
       parallelForOuter(
           "pgrad-centered", {NEdgesAll},
           KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
-             LocCenteredPGrad(Team, Tend, IEdge, PressureMid, PressureInterface,
-                              GeomZInterface, LocTidalPotential,
-                              LocSelfAttractionLoading, SpecVol);
+             auto TendIEdge = Kokkos::subview(Tend, IEdge, Kokkos::ALL);
+             LocCenteredPGrad(Team, TendIEdge, IEdge, PressureMid,
+                              PressureInterface, GeomZInterface,
+                              LocTidalPotential, LocSelfAttractionLoading,
+                              SpecVol);
           });
 
    } else {
@@ -533,7 +535,8 @@ void PressureGrad::computePressureGrad(
       parallelForOuter(
           "pgrad-finitevolume", {NEdgesAll},
           KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
-             LocFiniteVolumePGrad(Team, Tend, IEdge, PressureInterface,
+             auto TendIEdge = Kokkos::subview(Tend, IEdge, Kokkos::ALL);
+             LocFiniteVolumePGrad(Team, TendIEdge, IEdge, PressureInterface,
                                   LocDeltaZFixedP, LocDeltaZMoment,
                                   LocTidalPotential, LocSelfAttractionLoading);
           });
@@ -553,7 +556,8 @@ void PressureGrad::computeBarotropicPressureGrad(
    parallelForOuter(
        "pgrad-barotropic", {NEdgesAll},
        KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
-          LocBarotropicPGrad(Team, Tend, IEdge, BtrPressAnomaly,
+          auto TendIEdge = Kokkos::subview(Tend, IEdge, Kokkos::ALL);
+          LocBarotropicPGrad(Team, TendIEdge, IEdge, BtrPressAnomaly,
                              DepthMeanSpecVol);
        });
 } // end compute barotropic pressure gradient
