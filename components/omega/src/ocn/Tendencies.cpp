@@ -1161,68 +1161,65 @@ void Tendencies::computeTracerTendenciesOnly(
                     Team, ICell, Dt, LocFluxPseudoThickEdge, LocPseudoThickCell,
                     LocNormalTransportVelocity);
              });
-         for (int L = 0; L < NTracers; ++L) {
+         parallelForOuter(
+             "Tend:FCTTracerCurFill", {NTracers, Mesh->NCellsAll},
+             KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+                LocTracerHorzAdv.FCTTracerCurFill(Team, L, ICell,
+                                                  LocTracerArray);
+             });
+         parallelForOuter(
+             "Tend:FCTTracerMinMax", {NTracers, Mesh->NCellsAll},
+             KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+                LocTracerHorzAdv.FCTTracerMinMax(Team, L, ICell);
+             });
+         parallelForOuter(
+             "Tend:FCTHighAndLowOrderFlux", {NTracers, Mesh->NEdgesHaloH(1)},
+             KOKKOS_LAMBDA(int L, int IEdge, const TeamMember &Team) {
+                LocTracerHorzAdv.FCTHighAndLowOrderFlux(
+                    Team, L, IEdge, LocFluxPseudoThickEdge,
+                    LocNormalTransportVelocity);
+             });
+         parallelForOuter(
+             "Tend:FCTFluxInOut", {NTracers, Mesh->NCellsHaloH(0)},
+             KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+                LocTracerHorzAdv.FCTFluxInOut(Team, L, ICell, Dt,
+                                              LocPseudoThickCell);
+             });
+         parallelForOuter(
+             "Tend:FCTRescaleHighOrderFlux", {NTracers, Mesh->NEdgesHaloH(0)},
+             KOKKOS_LAMBDA(int L, int IEdge, const TeamMember &Team) {
+                LocTracerHorzAdv.FCTRescaleHighOrderFlux(Team, L, IEdge);
+             });
+         parallelForOuter(
+             "Tend:FCTAccumulateHighOrderFlux", {NTracers, Mesh->NCellsOwned},
+             KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+                const Array2DReal Tend =
+                    Kokkos::subview(LocTracerTend, L, Kokkos::ALL, Kokkos::ALL);
+                LocTracerHorzAdv.FCTAccumulateHighOrderFlux(
+                    Team, L, ICell, Dt, Tend, LocPseudoThickCell);
+             });
+         if (LocTracerHorzAdv.ComputeBudgets) {
             parallelForOuter(
-                "Tend:FCTTracerCurFill", {Mesh->NCellsAll},
-                KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-                   LocTracerHorzAdv.FCTTracerCurFill(Team, L, ICell,
-                                                     LocTracerArray);
+                "Tend:FCTComputeBudgetAdvectionEdgeFlux",
+                {NTracers, Mesh->NEdgesHaloH(1)},
+                KOKKOS_LAMBDA(int L, int IEdge, const TeamMember &Team) {
+                   LocTracerHorzAdv.FCTComputeBudgetAdvectionEdgeFlux(Team, L,
+                                                                      IEdge);
                 });
             parallelForOuter(
-                "Tend:FCTTracerMinMax", {Mesh->NCellsAll},
-                KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-                   LocTracerHorzAdv.FCTTracerMinMax(Team, ICell);
+                "Tend:FCTComputeBudgetAdvectionTendency",
+                {NTracers, Mesh->NCellsOwned},
+                KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+                   LocTracerHorzAdv.FCTComputeBudgetAdvectionTendency(Team, L,
+                                                                      ICell);
                 });
+         }
+         if (LocTracerHorzAdv.MonotonicityCheck) {
             parallelForOuter(
-                "Tend:FCTHighAndLowOrderFlux", {Mesh->NEdgesHaloH(1)},
-                KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-                   LocTracerHorzAdv.FCTHighAndLowOrderFlux(
-                       Team, IEdge, LocFluxPseudoThickEdge,
-                       LocNormalTransportVelocity);
+                "Tend:FCTMonotonicityCheck", {NTracers, Mesh->NCellsOwned},
+                KOKKOS_LAMBDA(int L, int ICell, const TeamMember &Team) {
+                   LocTracerHorzAdv.FCTMonotonicityCheck(Team, L, ICell);
                 });
-            parallelForOuter(
-                "Tend:FCTFluxInOut", {Mesh->NCellsHaloH(0)},
-                KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-                   LocTracerHorzAdv.FCTFluxInOut(Team, ICell, Dt,
-                                                 LocPseudoThickCell);
-                });
-            parallelForOuter(
-                "Tend:FCTRescaleHighOrderFlux", {Mesh->NEdgesHaloH(0)},
-                KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-                   LocTracerHorzAdv.FCTRescaleHighOrderFlux(Team, IEdge);
-                });
-            parallelForOuter(
-                "Tend:FCTAccumulateHighOrderFlux", {Mesh->NCellsOwned},
-                KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-                   const Array2DReal Tend = Kokkos::subview(
-                       LocTracerTend, L, Kokkos::ALL, Kokkos::ALL);
-                   LocTracerHorzAdv.FCTAccumulateHighOrderFlux(
-                       Team, ICell, Dt, Tend, LocPseudoThickCell);
-                });
-            if (LocTracerHorzAdv.ComputeBudgets) {
-               parallelForOuter(
-                   "Tend:FCTComputeBudgetAdvectionEdgeFlux",
-                   {Mesh->NEdgesHaloH(1)},
-                   KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-                      LocTracerHorzAdv.FCTComputeBudgetAdvectionEdgeFlux(
-                          Team, L, IEdge);
-                   });
-               parallelForOuter(
-                   "Tend:FCTComputeBudgetAdvectionTendency",
-                   {Mesh->NCellsOwned},
-                   KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-                      LocTracerHorzAdv.FCTComputeBudgetAdvectionTendency(
-                          Team, L, ICell);
-                   });
-            }
-            if (LocTracerHorzAdv.MonotonicityCheck) {
-               const I4 NCellsOwned = Mesh->NCellsOwned;
-               parallelForOuter(
-                   "Tend:FCTMonotonicityCheck", {Mesh->NCellsOwned},
-                   KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
-                      LocTracerHorzAdv.FCTMonotonicityCheck(Team, ICell);
-                   });
-            }
          }
       } else {
          const Array2DReal &FluxPseudoThickEdge =

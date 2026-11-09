@@ -268,18 +268,21 @@ void TracerHorzAdvOnCell::init() {
        {NEdgesAll}, KOKKOS_LAMBDA(int IEdge) { masksAndCoefficients(IEdge); });
    if (FCT) {
       const int NVertsFCT = NVertLayers + 1;
+      const int NTracers  = Tracers::getNumTracers();
       HProvInv =
           Array2DReal("FCTProvesionalLayerThickness", NCellsSize, NVertsFCT);
       HNewInv = Array2DReal("FCTProvesionalNewInverse", NCellsSize, NVertsFCT);
       HProv   = Array2DReal("FCTProvesionalThickness", NCellsSize, NVertsFCT);
-      TracerCur    = Array2DReal("TracerCur", NCellsSize, NVertsFCT),
-      TracerMax    = Array2DReal("FCTTracerMax", NCellsSize, NVertsFCT);
-      TracerMin    = Array2DReal("FCTTracerMin", NCellsSize, NVertsFCT);
-      HighOrderFlx = Array2DReal("FCTHighOrderFlx", NEdgesSize, NVertsFCT);
-      LowOrderFlx  = Array2DReal("FCTLowOrderFlx", NEdgesSize, NVertsFCT);
-      WorkTend     = Array2DReal("WorkTend", NCellsSize, NVertsFCT);
-      FlxIn        = Array2DReal("FlxIn", NCellsSize, NVertsFCT);
-      FlxOut       = Array2DReal("FlxOut", NCellsSize, NVertsFCT);
+      TracerCur = Array3DReal("TracerCur", NTracers, NCellsSize, NVertsFCT);
+      TracerMax = Array3DReal("FCTTracerMax", NTracers, NCellsSize, NVertsFCT);
+      TracerMin = Array3DReal("FCTTracerMin", NTracers, NCellsSize, NVertsFCT);
+      HighOrderFlx =
+          Array3DReal("FCTHighOrderFlx", NTracers, NEdgesSize, NVertsFCT);
+      LowOrderFlx =
+          Array3DReal("FCTLowOrderFlx", NTracers, NEdgesSize, NVertsFCT);
+      WorkTend = Array3DReal("WorkTend", NTracers, NCellsSize, NVertsFCT);
+      FlxIn    = Array3DReal("FlxIn", NTracers, NCellsSize, NVertsFCT);
+      FlxOut   = Array3DReal("FlxOut", NTracers, NCellsSize, NVertsFCT);
       deepCopy(HProvInv, 0.0);
       deepCopy(HNewInv, 0.0);
       deepCopy(HProv, 0.0);
@@ -293,7 +296,6 @@ void TracerHorzAdvOnCell::init() {
       deepCopy(FlxOut, 0.0);
       if (ComputeBudgets) {
          // Sized like the NEdges and NCells dimensions they are written with
-         const int NTracers = Tracers::getNumTracers();
          ActiveTracerHorizontalAdvectionEdgeFlux =
              Array3DReal("FCTActiveTracerHorizontalAdvectionEdgeFlux", NTracers,
                          NEdgesSize, NVertLayers);

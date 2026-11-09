@@ -792,11 +792,11 @@ class TracerHorzAdvOnCell {
 
    KOKKOS_FUNCTION void FCTTracerCurFill(const I4 L, const I4 ICell, const I4 K,
                                          const Array3DReal &TracerArray) const {
-      TracerCur(ICell, K) = TracerArray(L, ICell, K);
-      TracerMin(ICell, K) = TracerArray(L, ICell, K);
-      TracerMax(ICell, K) = TracerArray(L, ICell, K);
+      TracerCur(L, ICell, K) = TracerArray(L, ICell, K);
+      TracerMin(L, ICell, K) = TracerArray(L, ICell, K);
+      TracerMax(L, ICell, K) = TracerArray(L, ICell, K);
    }
-   KOKKOS_FUNCTION void FCTTracerMinMax(const TeamMember &Team,
+   KOKKOS_FUNCTION void FCTTracerMinMax(const TeamMember &Team, const I4 L,
                                         const I4 ICell) const {
       const I4 KMin   = MinLayerCell(ICell);
       const I4 KMax   = MaxLayerCell(ICell);
@@ -807,16 +807,16 @@ class TracerHorzAdvOnCell {
          const I4 KMax1  = Kokkos::min(KMax, MaxLayerCell(ICell2));
          parallelForInner(
              Team, Range(KMin1, KMax1), INNER_LAMBDA(int K) {
-                TracerMax(ICell, K) =
-                    Kokkos::max(TracerMax(ICell, K), TracerCur(ICell2, K));
-                TracerMin(ICell, K) =
-                    Kokkos::min(TracerMin(ICell, K), TracerCur(ICell2, K));
+                TracerMax(L, ICell, K) = Kokkos::max(TracerMax(L, ICell, K),
+                                                     TracerCur(L, ICell2, K));
+                TracerMin(L, ICell, K) = Kokkos::min(TracerMin(L, ICell, K),
+                                                     TracerCur(L, ICell2, K));
              });
       }
    }
 
    KOKKOS_FUNCTION void
-   FCTHighAndLowOrderFlux(const TeamMember &Team, const I4 IEdge,
+   FCTHighAndLowOrderFlux(const TeamMember &Team, const I4 L, const I4 IEdge,
                           const Array2DReal &FluxPseudoThickEdge,
                           const Array2DReal &NormVelEdge) const {
 
@@ -827,8 +827,8 @@ class TracerHorzAdvOnCell {
       const I4 KMax = MaxLayerEdgeTop(IEdge);
       parallelForInner(
           Team, Range(KMin, KMax), INNER_LAMBDA(int K) {
-             HighOrderFlx(IEdge, K) = 0;
-             LowOrderFlx(IEdge, K)  = 0;
+             HighOrderFlx(L, IEdge, K) = 0;
+             LowOrderFlx(L, IEdge, K)  = 0;
           });
       // Compute 3rd or 4th fluxes where requested.
       for (int I = 0; I < NAdvCellsForEdge(IEdge); ++I) {
@@ -845,8 +845,9 @@ class TracerHorzAdvOnCell {
                     NormalThicknessFlux *
                     (Coef1 +
                      Coef3 * std::copysign(1.0_Real, NormalThicknessFlux));
-                HighOrderFlx(IEdge, K) += TracerWgt * TracerCur(ICell, K) *
-                                          AdvMaskHighOrder(IEdge, K);
+                HighOrderFlx(L, IEdge, K) += TracerWgt *
+                                             TracerCur(L, ICell, K) *
+                                             AdvMaskHighOrder(IEdge, K);
              });
       }
       // Compute 2nd order fluxes where needed.
@@ -860,28 +861,29 @@ class TracerHorzAdvOnCell {
              const Real TracerWeight = (1.0_Real - AdvMaskHighOrder(IEdge, K)) *
                                        (DvEdge(IEdge) * 0.5_Real) *
                                        NormalThicknessFlux;
-             LowOrderFlx(IEdge, K) =
+             LowOrderFlx(L, IEdge, K) =
                  DvEdge(IEdge) * (Kokkos::max(0.0_Real, NormalThicknessFlux) *
-                                      TracerCur(ICell1, K) +
+                                      TracerCur(L, ICell1, K) +
                                   Kokkos::min(0.0_Real, NormalThicknessFlux) *
-                                      TracerCur(ICell2, K));
-             HighOrderFlx(IEdge, K) +=
-                 TracerWeight * (TracerCur(ICell1, K) + TracerCur(ICell2, K));
-             HighOrderFlx(IEdge, K) -= LowOrderFlx(IEdge, K);
+                                      TracerCur(L, ICell2, K));
+             HighOrderFlx(L, IEdge, K) +=
+                 TracerWeight *
+                 (TracerCur(L, ICell1, K) + TracerCur(L, ICell2, K));
+             HighOrderFlx(L, IEdge, K) -= LowOrderFlx(L, IEdge, K);
           });
    }
 
-   KOKKOS_FUNCTION void FCTFluxInOut(const TeamMember &Team, const I4 ICell,
-                                     const Real Dt,
+   KOKKOS_FUNCTION void FCTFluxInOut(const TeamMember &Team, const I4 L,
+                                     const I4 ICell, const Real Dt,
                                      const Array2DReal &LayerThickness) const {
       const I4 KMin          = MinLayerCell(ICell);
       const I4 KMax          = MaxLayerCell(ICell);
       const Real InvAreaCell = 1._Real / AreaCell(ICell);
       parallelForInner(
           Team, Range(KMin, KMax), INNER_LAMBDA(int K) {
-             WorkTend(ICell, K) = 0;
-             FlxIn(ICell, K)    = 0;
-             FlxOut(ICell, K)   = 0;
+             WorkTend(L, ICell, K) = 0;
+             FlxIn(L, ICell, K)    = 0;
+             FlxOut(L, ICell, K)   = 0;
           });
       // Finish computing the low order horizontal fluxes
       // Upwind fluxes are accumulated in workTend
@@ -894,12 +896,13 @@ class TracerHorzAdvOnCell {
              Team, Range(KMin, KMax), INNER_LAMBDA(int K) {
                 // Here workTend is the advection tendency due to the
                 // upwind (low order) fluxes.
-                WorkTend(ICell, K) += SignedFactor * LowOrderFlx(IEdge, K);
+                WorkTend(L, ICell, K) +=
+                    SignedFactor * LowOrderFlx(L, IEdge, K);
                 // Accumulate remaining high order fluxes
-                FlxOut(ICell, K) += Kokkos::min(
-                    0.0_Real, SignedFactor * HighOrderFlx(IEdge, K));
-                FlxIn(ICell, K) += Kokkos::max(
-                    0.0_Real, SignedFactor * HighOrderFlx(IEdge, K));
+                FlxOut(L, ICell, K) += Kokkos::min(
+                    0.0_Real, SignedFactor * HighOrderFlx(L, IEdge, K));
+                FlxIn(L, ICell, K) += Kokkos::max(
+                    0.0_Real, SignedFactor * HighOrderFlx(L, IEdge, K));
              });
       }
       // Build the factors for the FCT
@@ -910,48 +913,51 @@ class TracerHorzAdvOnCell {
           Team, Range(KMin, KMax), INNER_LAMBDA(int K) {
              // Here workTend is the upwind tendency
              const Real TracerUpwindNew =
-                 (TracerCur(ICell, K) * LayerThickness(ICell, K) +
-                  Dt * WorkTend(ICell, K)) *
+                 (TracerCur(L, ICell, K) * LayerThickness(ICell, K) +
+                  Dt * WorkTend(L, ICell, K)) *
                  HProvInv(ICell, K);
              const Real TracerMinNew =
-                 TracerUpwindNew + Dt * FlxOut(ICell, K) * HProvInv(ICell, K);
+                 TracerUpwindNew +
+                 Dt * FlxOut(L, ICell, K) * HProvInv(ICell, K);
              const Real TracerMaxNew =
-                 TracerUpwindNew + Dt * FlxIn(ICell, K) * HProvInv(ICell, K);
+                 TracerUpwindNew + Dt * FlxIn(L, ICell, K) * HProvInv(ICell, K);
              const Real ScaleFactorIn =
-                 (TracerMax(ICell, K) - TracerUpwindNew) /
+                 (TracerMax(L, ICell, K) - TracerUpwindNew) /
                  (TracerMaxNew - TracerUpwindNew + Eps);
-             FlxIn(ICell, K) =
+             FlxIn(L, ICell, K) =
                  Kokkos::min(1.0_Real, Kokkos::max(0.0_Real, ScaleFactorIn));
              const Real ScaleFactorOut =
-                 (TracerUpwindNew - TracerMin(ICell, K)) /
+                 (TracerUpwindNew - TracerMin(L, ICell, K)) /
                  (TracerUpwindNew - TracerMinNew + Eps);
-             FlxOut(ICell, K) =
+             FlxOut(L, ICell, K) =
                  Kokkos::min(1.0_Real, Kokkos::max(0.0_Real, ScaleFactorOut));
           });
    }
 
    KOKKOS_FUNCTION void FCTRescaleHighOrderFlux(const TeamMember &Team,
+                                                const I4 L,
                                                 const I4 IEdge) const {
       const int KMin = MinLayerEdgeBot(IEdge);
       const int KMax = MaxLayerEdgeTop(IEdge);
       parallelForInner(
           Team, Range(KMin, KMax),
-          INNER_LAMBDA(int K) { FCTRescaleHighOrderFlux(IEdge, K); });
+          INNER_LAMBDA(int K) { FCTRescaleHighOrderFlux(L, IEdge, K); });
    }
-   KOKKOS_FUNCTION void FCTRescaleHighOrderFlux(const I4 IEdge,
+   KOKKOS_FUNCTION void FCTRescaleHighOrderFlux(const I4 L, const I4 IEdge,
                                                 const I4 K) const {
       const I4 ICell1 = CellsOnEdge(IEdge, 0);
       const I4 ICell2 = CellsOnEdge(IEdge, 1);
-      HighOrderFlx(IEdge, K) =
-          Kokkos::max(0.0_Real, HighOrderFlx(IEdge, K)) *
-              Kokkos::min(FlxOut(ICell1, K), FlxIn(ICell2, K)) +
-          Kokkos::min(0.0_Real, HighOrderFlx(IEdge, K)) *
-              Kokkos::min(FlxIn(ICell1, K), FlxOut(ICell2, K));
+      HighOrderFlx(L, IEdge, K) =
+          Kokkos::max(0.0_Real, HighOrderFlx(L, IEdge, K)) *
+              Kokkos::min(FlxOut(L, ICell1, K), FlxIn(L, ICell2, K)) +
+          Kokkos::min(0.0_Real, HighOrderFlx(L, IEdge, K)) *
+              Kokkos::min(FlxIn(L, ICell1, K), FlxOut(L, ICell2, K));
    }
 
    KOKKOS_FUNCTION void
-   FCTAccumulateHighOrderFlux(const TeamMember &Team, const I4 ICell,
-                              const Real Dt, const Array2DReal &TracerArray,
+   FCTAccumulateHighOrderFlux(const TeamMember &Team, const I4 L,
+                              const I4 ICell, const Real Dt,
+                              const Array2DReal &TracerArray,
                               const Array2DReal &LayerThickness) const {
 
       // Accumulate the scaled high order vertical tendencies
@@ -967,7 +973,8 @@ class TracerHorzAdvOnCell {
              Team, Range(KMin, KMax), INNER_LAMBDA(int K) {
                 // WorkTend on RHS is upwind tendency
                 // WorkTend on LHS is total horiz advect tendency
-                WorkTend(ICell, K) += SignedFactor * HighOrderFlx(IEdge, K);
+                WorkTend(L, ICell, K) +=
+                    SignedFactor * HighOrderFlx(L, IEdge, K);
              });
       }
       const int KMin = MinLayerCell(ICell);
@@ -977,11 +984,11 @@ class TracerHorzAdvOnCell {
              // workTend  on RHS is total horiz advection tendency
              // TracerCur on LHS is provisional tracer after
              //                     horizontal fluxes only.
-             TracerCur(ICell, K) =
-                 (TracerCur(ICell, K) * LayerThickness(ICell, K) +
-                  Dt * WorkTend(ICell, K)) *
+             TracerCur(L, ICell, K) =
+                 (TracerCur(L, ICell, K) * LayerThickness(ICell, K) +
+                  Dt * WorkTend(L, ICell, K)) *
                  HProvInv(ICell, K);
-             TracerArray(ICell, K) += WorkTend(ICell, K);
+             TracerArray(ICell, K) += WorkTend(L, ICell, K);
           });
    }
 
@@ -1001,7 +1008,8 @@ class TracerHorzAdvOnCell {
       // Save u*h*T flux on edge for analysis. This variable will be
       // divided by h at the end of the time step.
       ActiveTracerHorizontalAdvectionEdgeFlux(L, IEdge, K) =
-          (LowOrderFlx(IEdge, K) + HighOrderFlx(IEdge, K)) / DvEdge(IEdge);
+          (LowOrderFlx(L, IEdge, K) + HighOrderFlx(L, IEdge, K)) /
+          DvEdge(IEdge);
    }
 
    KOKKOS_FUNCTION void
@@ -1017,33 +1025,35 @@ class TracerHorzAdvOnCell {
    KOKKOS_FUNCTION void FCTComputeBudgetAdvectionTendency(const I4 L,
                                                           const I4 ICell,
                                                           const I4 K) const {
-      ActiveTracerHorizontalAdvectionTendency(L, ICell, K) = WorkTend(ICell, K);
+      ActiveTracerHorizontalAdvectionTendency(L, ICell, K) =
+          WorkTend(L, ICell, K);
    }
 
-   KOKKOS_FUNCTION void FCTMonotonicityCheck(const TeamMember &Team,
+   KOKKOS_FUNCTION void FCTMonotonicityCheck(const TeamMember &Team, const I4 L,
                                              const I4 ICell) const {
       const int KMin = MinLayerCell(ICell);
       const int KMax = MaxLayerCell(ICell);
       parallelForInner(
           Team, Range(KMin, KMax),
-          INNER_LAMBDA(int K) { FCTMonotonicityCheck(ICell, K); });
+          INNER_LAMBDA(int K) { FCTMonotonicityCheck(L, ICell, K); });
    }
-   KOKKOS_FUNCTION void FCTMonotonicityCheck(const I4 ICell, const I4 K) const {
+   KOKKOS_FUNCTION void FCTMonotonicityCheck(const I4 L, const I4 ICell,
+                                             const I4 K) const {
       // Check tracer values against local min,max to detect
       // non-monotone values and write warning if found
-      if (TracerCur(ICell, K) < TracerMin(ICell, K) - Eps) {
+      if (TracerCur(L, ICell, K) < TracerMin(L, ICell, K) - Eps) {
          Kokkos::printf(
              "Horizontal minimum out of bounds on cell %d, level %d "
              "new tracer value %lg is smaller than previous tracer minimum "
              "%lg\n",
-             ICell, K, TracerCur(ICell, K), TracerMin(ICell, K));
+             ICell, K, TracerCur(L, ICell, K), TracerMin(L, ICell, K));
       }
-      if (TracerCur(ICell, K) > TracerMax(ICell, K) + Eps) {
+      if (TracerCur(L, ICell, K) > TracerMax(L, ICell, K) + Eps) {
          Kokkos::printf(
              "Horizontal maximum out of bounds on cell %d, level %d "
              "new tracer value %lg is larger than previous tracer maximum "
              "%lg\n",
-             ICell, K, TracerCur(ICell, K), TracerMax(ICell, K));
+             ICell, K, TracerCur(L, ICell, K), TracerMax(L, ICell, K));
       }
    }
 
@@ -1061,7 +1071,7 @@ class TracerHorzAdvOnCell {
    Array2DReal AdvCoefs;
    Array2DReal AdvCoefs3rd;
    Array3DReal HighOrderFlxHorz;
-   Array2DReal TracerCur;
+   Array3DReal TracerCur;
 
    Array2DI4 EdgesOnCell;
    Array2DI4 CellsOnEdge;
@@ -1075,15 +1085,15 @@ class TracerHorzAdvOnCell {
    Array2DReal HProvInv;
    Array2DReal HNewInv;
    Array2DReal HProv;
-   Array2DReal TracerMax;
-   Array2DReal TracerMin;
-   Array2DReal HighOrderFlx;
-   Array2DReal LowOrderFlx;
+   Array3DReal TracerMax;
+   Array3DReal TracerMin;
+   Array3DReal HighOrderFlx;
+   Array3DReal LowOrderFlx;
    Array1DI4 MinLayerCell;
    Array1DI4 MaxLayerCell;
-   Array2DReal WorkTend;
-   Array2DReal FlxIn;
-   Array2DReal FlxOut;
+   Array3DReal WorkTend;
+   Array3DReal FlxIn;
+   Array3DReal FlxOut;
    Array3DReal ActiveTracerHorizontalAdvectionEdgeFlux;
    Array3DReal ActiveTracerHorizontalAdvectionTendency;
 };

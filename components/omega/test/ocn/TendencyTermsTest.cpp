@@ -1304,14 +1304,14 @@ class TracerHorzAdvOnCellTest : public TracerHorzAdvOnCell {
    Array2DReal GetHProvInv() const { return HProvInv; };
    Array2DReal GetHProv() const { return HProv; };
    Array2DReal GetHNewInv() const { return HNewInv; };
-   Array2DReal GetTracerCur() const { return TracerCur; };
-   Array2DReal GetTracerMin() const { return TracerMin; };
-   Array2DReal GetTracerMax() const { return TracerMax; };
+   Array3DReal GetTracerCur() const { return TracerCur; };
+   Array3DReal GetTracerMin() const { return TracerMin; };
+   Array3DReal GetTracerMax() const { return TracerMax; };
    Array3DReal GetHighOrderFlxHorz() const { return HighOrderFlxHorz; };
-   Array2DReal GetLowOrderFlx() const { return LowOrderFlx; };
-   Array2DReal GetHighOrderFlx() const { return HighOrderFlx; };
-   Array2DReal GetFlxIn() const { return FlxIn; };
-   Array2DReal GetFlxOut() const { return FlxOut; };
+   Array3DReal GetLowOrderFlx() const { return LowOrderFlx; };
+   Array3DReal GetHighOrderFlx() const { return HighOrderFlx; };
+   Array3DReal GetFlxIn() const { return FlxIn; };
+   Array3DReal GetFlxOut() const { return FlxOut; };
 };
 
 int testFCTTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
@@ -1440,7 +1440,8 @@ int testFCTTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
           KOKKOS_LAMBDA(const int ICell, const int K) {
              TrHorzAdvOnC.FCTTracerCurFill(L, ICell, K, TrCell);
           });
-      const Array2DReal TracerCur = TrHorzAdvOnC.GetTracerCur();
+      const Array2DReal TracerCur = Kokkos::subview(
+          TrHorzAdvOnC.GetTracerCur(), L, Kokkos::ALL, Kokkos::ALL);
       const Array2DReal Tracers =
           Kokkos::subview(TrCell, L, Kokkos::ALL, Kokkos::ALL);
       deepCopy(TracerSubView, Tracers);
@@ -1480,10 +1481,11 @@ int testFCTTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
           {Mesh->NEdgesHaloH(1)},
           KOKKOS_LAMBDA(const int IEdge, const TeamMember &Team) {
              TrHorzAdvOnC.FCTHighAndLowOrderFlux(
-                 Team, IEdge, FluxPseudoThickEdge, NormalVelocity);
+                 Team, L, IEdge, FluxPseudoThickEdge, NormalVelocity);
           });
 
-      Array2DReal LowOrderFlx = TrHorzAdvOnC.GetLowOrderFlx();
+      Array2DReal LowOrderFlx = Kokkos::subview(TrHorzAdvOnC.GetLowOrderFlx(),
+                                                L, Kokkos::ALL, Kokkos::ALL);
       const auto DvEdge       = Mesh->DvEdge;
 
       parallelFor(
@@ -1529,7 +1531,7 @@ int testFCTTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
           {Mesh->NEdgesHaloH(1)},
           KOKKOS_LAMBDA(const int IEdge, const TeamMember &Team) {
              TrHorzAdvOnC.FCTHighAndLowOrderFlux(
-                 Team, IEdge, FluxPseudoThickEdge, NormalVelocity);
+                 Team, L, IEdge, FluxPseudoThickEdge, NormalVelocity);
           });
 
       parallelFor(
@@ -1539,7 +1541,8 @@ int testFCTTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
           });
 
       const Real ATol          = sizeof(Real) == 4 ? 1e-8 : 1e-10;
-      Array2DReal HighOrderFlx = TrHorzAdvOnC.GetHighOrderFlx();
+      Array2DReal HighOrderFlx = Kokkos::subview(TrHorzAdvOnC.GetHighOrderFlx(),
+                                                 L, Kokkos::ALL, Kokkos::ALL);
       Err += computeErrors(FCTErrors, HighOrderFlx, FluxSubView, Mesh, OnEdge);
       Err += checkErrors("TendencyTermsTest", "FCTHighAndLowOrderFlux_High",
                          FCTErrors, Setup.ExpectedFCT_High, RTol, ATol);
@@ -1576,15 +1579,16 @@ int testFCTTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
           {Mesh->NEdgesHaloH(1)},
           KOKKOS_LAMBDA(const int IEdge, const TeamMember &Team) {
              TrHorzAdvOnC.FCTHighAndLowOrderFlux(
-                 Team, IEdge, FluxPseudoThickEdge, NormalVelocity);
+                 Team, L, IEdge, FluxPseudoThickEdge, NormalVelocity);
           });
       parallelForOuter(
           {Mesh->NCellsHaloH(0)},
           KOKKOS_LAMBDA(const int ICell, const TeamMember &Team) {
-             TrHorzAdvOnC.FCTFluxInOut(Team, ICell, Dt, LayerThickness);
+             TrHorzAdvOnC.FCTFluxInOut(Team, L, ICell, Dt, LayerThickness);
           });
 
-      Array2DReal FlxOut = TrHorzAdvOnC.GetFlxOut();
+      Array2DReal FlxOut = Kokkos::subview(TrHorzAdvOnC.GetFlxOut(), L,
+                                           Kokkos::ALL, Kokkos::ALL);
       Err += computeErrors(FCTErrors, FlxOut, CellSubView, Mesh, OnCell);
       Err += checkErrors("TendencyTermsTest", "FCTFluxOut", FCTErrors,
                          Setup.ExpectedFCTErrors, RTol);
@@ -1594,12 +1598,14 @@ int testFCTTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
       Err = 0;
    }
    {
+      const int L = 0;
       parallelFor(
           {Mesh->NEdgesHaloH(0), NVertLayers},
           KOKKOS_LAMBDA(const int IEdge, const int K) {
-             TrHorzAdvOnC.FCTRescaleHighOrderFlux(IEdge, K);
+             TrHorzAdvOnC.FCTRescaleHighOrderFlux(L, IEdge, K);
           });
-      const Array2DReal HighOrderFlx = TrHorzAdvOnC.GetHighOrderFlx();
+      const Array2DReal HighOrderFlx = Kokkos::subview(
+          TrHorzAdvOnC.GetHighOrderFlx(), L, Kokkos::ALL, Kokkos::ALL);
       Err += computeErrors(FCTErrors, HighOrderFlx, ReferenceSolution, Mesh,
                            OnEdge);
       Err += checkErrors("TendencyTermsTest", "FCTRescaleHighOrderFlux",
@@ -1637,17 +1643,17 @@ int testFCTTracerHorzAdvOnCell(int NVertLayers, int NTracers, Real RTol) {
           {Mesh->NEdgesHaloH(1)},
           KOKKOS_LAMBDA(const int IEdge, const TeamMember &Team) {
              TrHorzAdvOnC.FCTHighAndLowOrderFlux(
-                 Team, IEdge, FluxPseudoThickEdge, NormalVelocity);
+                 Team, L, IEdge, FluxPseudoThickEdge, NormalVelocity);
           });
       parallelForOuter(
           {Mesh->NCellsHaloH(0)},
           KOKKOS_LAMBDA(const int ICell, const TeamMember &Team) {
-             TrHorzAdvOnC.FCTFluxInOut(Team, ICell, Dt, LayerThickness);
+             TrHorzAdvOnC.FCTFluxInOut(Team, L, ICell, Dt, LayerThickness);
           });
       parallelForOuter(
           {Mesh->NCellsOwned},
           KOKKOS_LAMBDA(const int ICell, const TeamMember &Team) {
-             TrHorzAdvOnC.FCTAccumulateHighOrderFlux(Team, ICell, Dt, Tend,
+             TrHorzAdvOnC.FCTAccumulateHighOrderFlux(Team, L, ICell, Dt, Tend,
                                                      LayerThickness);
           });
 
