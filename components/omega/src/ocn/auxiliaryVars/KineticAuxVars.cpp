@@ -1,6 +1,7 @@
 #include "KineticAuxVars.h"
 #include "DataTypes.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 
 #include <limits>
 
@@ -8,10 +9,12 @@ namespace OMEGA {
 
 KineticAuxVars::KineticAuxVars(const std::string &AuxStateSuffix,
                                const HorzMesh *Mesh, const VertCoord *VCoord)
-    : KineticEnergyCell("KineticEnergyCell" + AuxStateSuffix, Mesh->NCellsSize,
-                        VCoord->NVertLayers),
-      VelocityDivCell("VelocityDivCell" + AuxStateSuffix, Mesh->NCellsSize,
-                      VCoord->NVertLayers),
+    : KineticEnergyCell(
+          makeArray<Array2DReal>("KineticEnergyCell" + AuxStateSuffix,
+                                 Mesh->NCellsSize, VCoord->NVertLayers)),
+      VelocityDivCell(makeArray<Array2DReal>("VelocityDivCell" + AuxStateSuffix,
+                                             Mesh->NCellsSize,
+                                             VCoord->NVertLayers)),
       NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       EdgeSignOnCell(Mesh->EdgeSignOnCell), DcEdge(Mesh->DcEdge),
       DvEdge(Mesh->DvEdge), AreaCell(Mesh->AreaCell),

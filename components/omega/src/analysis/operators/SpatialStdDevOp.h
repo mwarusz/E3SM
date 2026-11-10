@@ -22,6 +22,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AnalysisOperator.h"
+#include "OmegaKokkos.h"
 #include "Reductions.h"
 #include "SpatialWeights.h"
 
@@ -59,7 +60,7 @@ template <typename ArrayT> class SpatialStdDevOp : public AnalysisOperator {
       InstanceName                = OutputFieldName;
 
       // Allocate output data array (single scalar value)
-      OutputData = Array1DReal(OutputNames[0], 1);
+      OutputData = makeArray<Array1DReal>(OutputNames[0], 1);
 
       // Create scalar dimension for output Field
       I4 NDims = 1;

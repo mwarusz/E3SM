@@ -345,7 +345,8 @@ int main(int argc, char *argv[]) {
 
          const Real Sentinel = 42.0_Real;
 
-         Array2DReal SynthCell("SynthCell", DefMesh->NCellsSize, NVertLayers);
+         Array2DReal SynthCell = makeArray<Array2DReal>(
+             "SynthCell", DefMesh->NCellsSize, NVertLayers);
          deepCopy(SynthCell, Sentinel);
          DefVertCoord->applyCellLayerMask(SynthCell, DefMesh->NCellsAll);
 
@@ -401,7 +402,8 @@ int main(int argc, char *argv[]) {
 
          const Real Sentinel = 42.0_Real;
 
-         Array2DReal SynthVtx("SynthVtx", DefMesh->NVerticesSize, NVertLayers);
+         Array2DReal SynthVtx = makeArray<Array2DReal>(
+             "SynthVtx", DefMesh->NVerticesSize, NVertLayers);
          deepCopy(SynthVtx, Sentinel);
          DefVertCoord->applyVertexLayerMask(SynthVtx, DefMesh->NVerticesAll);
 

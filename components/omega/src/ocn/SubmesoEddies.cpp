@@ -1,6 +1,7 @@
 #include "SubmesoEddies.h"
 #include "Field.h"
 #include "GlobalConstants.h"
+#include "OmegaKokkos.h"
 
 namespace OMEGA {
 
@@ -70,10 +71,12 @@ void SubmesoEddies::init() {
 } // end init
 
 SubmesoEddies::SubmesoEddies(const HorzMesh *Mesh, const VertCoord *VCoord)
-    : Mesh(Mesh), VCoord(VCoord), TimeScale("TimeScale", Mesh->NEdgesSize),
-      GradBuoyEdgeInterface("GradBuoyEdgeInterface", Mesh->NEdgesSize,
-                            VCoord->NVertLayersP1),
-      EddyVelocity("EddyVelocity", Mesh->NEdgesSize, VCoord->NVertLayers) {
+    : Mesh(Mesh), VCoord(VCoord),
+      TimeScale(makeArray<Array1DReal>("TimeScale", Mesh->NEdgesSize)),
+      GradBuoyEdgeInterface(makeArray<Array2DReal>(
+          "GradBuoyEdgeInterface", Mesh->NEdgesSize, VCoord->NVertLayersP1)),
+      EddyVelocity(makeArray<Array2DReal>("EddyVelocity", Mesh->NEdgesSize,
+                                          VCoord->NVertLayers)) {
 
    // define fields for IO
    defineFields();

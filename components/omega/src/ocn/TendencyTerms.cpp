@@ -15,6 +15,7 @@
 #include "Error.h"
 #include "HorzMesh.h"
 #include "HorzOperators.h"
+#include "OmegaKokkos.h"
 #include "TendencyTerms.h"
 #include "Tracers.h"
 
@@ -105,19 +106,22 @@ TracerHorzAdvOnCell::TracerHorzAdvOnCell(const HorzMesh *Mesh,
                                          const VertAdv *VAdv)
     : HorzontalMesh(Mesh), VerticalCoord(VCoord),
       NVertLayers(VCoord->NVertLayers),
-      NAdvCellsForEdge("NumberOfCellsContribToAdvectionAtEdge",
-                       Mesh->NEdgesAll),
-      AdvCellsForEdge("IndexOfCellsContributingToAdvection", Mesh->NEdgesAll,
-                      Mesh->MaxEdges2 + 2),
-      AdvMaskHighOrder("MaskForHighOrderAdvectionTerms", Mesh->NEdgesAll,
-                       VCoord->NVertLayers),
+      NAdvCellsForEdge(makeArray<Array1DI4>(
+          "NumberOfCellsContribToAdvectionAtEdge", Mesh->NEdgesAll)),
+      AdvCellsForEdge(
+          makeArray<Array2DI4>("IndexOfCellsContributingToAdvection",
+                               Mesh->NEdgesAll, Mesh->MaxEdges2 + 2)),
+      AdvMaskHighOrder(makeArray<Array2DI4>("MaskForHighOrderAdvectionTerms",
+                                            Mesh->NEdgesAll,
+                                            VCoord->NVertLayers)),
       CellsOnCell(Mesh->CellsOnCell),
-      AdvCoefs("CommonAdvectionCoefficients", Mesh->MaxEdges2 + 2,
-               Mesh->NEdgesAll),
-      AdvCoefs3rd("CommonAdvectionCoeffsForHighOrder", Mesh->MaxEdges2 + 2,
-                  Mesh->NEdgesAll),
-      HighOrderFlxHorz("HigherOrderHorizontalFlux", Tracers::getNumTracers(),
-                       Mesh->NEdgesAll, VCoord->NVertLayers),
+      AdvCoefs(makeArray<Array2DReal>("CommonAdvectionCoefficients",
+                                      Mesh->MaxEdges2 + 2, Mesh->NEdgesAll)),
+      AdvCoefs3rd(makeArray<Array2DReal>("CommonAdvectionCoeffsForHighOrder",
+                                         Mesh->MaxEdges2 + 2, Mesh->NEdgesAll)),
+      HighOrderFlxHorz(makeArray<Array3DReal>(
+          "HigherOrderHorizontalFlux", Tracers::getNumTracers(),
+          Mesh->NEdgesAll, VCoord->NVertLayers)),
       TracerCur(), NEdgesOnCell(Mesh->NEdgesOnCell),
       EdgesOnCell(Mesh->EdgesOnCell), CellsOnEdge(Mesh->CellsOnEdge),
       MinLayerEdgeBot(VCoord->MinLayerEdgeBot),
@@ -256,7 +260,8 @@ void TracerHorzAdvOnCell::init() {
    }
 
    SecondDerivativeOnCell secondDerivativeOnCell(Mesh);
-   Array3DReal DerivTwo("DerivTwo", MaxEdges2 + 2, 2, NEdgesAll);
+   Array3DReal DerivTwo =
+       makeArray<Array3DReal>("DerivTwo", MaxEdges2 + 2, 2, NEdgesAll);
    parallelFor(
        {NCellsAll},
        KOKKOS_LAMBDA(int ICell) { secondDerivativeOnCell(DerivTwo, ICell); });
@@ -268,18 +273,22 @@ void TracerHorzAdvOnCell::init() {
        {NEdgesAll}, KOKKOS_LAMBDA(int IEdge) { masksAndCoefficients(IEdge); });
    if (FCT) {
       const int NVertsFCT = NVertLayers + 1;
-      HProvInv =
-          Array2DReal("FCTProvesionalLayerThickness", NCellsSize, NVertsFCT);
-      HNewInv = Array2DReal("FCTProvesionalNewInverse", NCellsSize, NVertsFCT);
-      HProv   = Array2DReal("FCTProvesionalThickness", NCellsSize, NVertsFCT);
-      TracerCur    = Array2DReal("TracerCur", NCellsSize, NVertsFCT),
-      TracerMax    = Array2DReal("FCTTracerMax", NCellsSize, NVertsFCT);
-      TracerMin    = Array2DReal("FCTTracerMin", NCellsSize, NVertsFCT);
-      HighOrderFlx = Array2DReal("FCTHighOrderFlx", NEdgesSize, NVertsFCT);
-      LowOrderFlx  = Array2DReal("FCTLowOrderFlx", NEdgesSize, NVertsFCT);
-      WorkTend     = Array2DReal("WorkTend", NCellsSize, NVertsFCT);
-      FlxIn        = Array2DReal("FlxIn", NCellsSize, NVertsFCT);
-      FlxOut       = Array2DReal("FlxOut", NCellsSize, NVertsFCT);
+      HProvInv  = makeArray<Array2DReal>("FCTProvesionalLayerThickness",
+                                         NCellsSize, NVertsFCT);
+      HNewInv   = makeArray<Array2DReal>("FCTProvesionalNewInverse", NCellsSize,
+                                         NVertsFCT);
+      HProv     = makeArray<Array2DReal>("FCTProvesionalThickness", NCellsSize,
+                                         NVertsFCT);
+      TracerCur = makeArray<Array2DReal>("TracerCur", NCellsSize, NVertsFCT),
+      TracerMax = makeArray<Array2DReal>("FCTTracerMax", NCellsSize, NVertsFCT);
+      TracerMin = makeArray<Array2DReal>("FCTTracerMin", NCellsSize, NVertsFCT);
+      HighOrderFlx =
+          makeArray<Array2DReal>("FCTHighOrderFlx", NEdgesSize, NVertsFCT);
+      LowOrderFlx =
+          makeArray<Array2DReal>("FCTLowOrderFlx", NEdgesSize, NVertsFCT);
+      WorkTend = makeArray<Array2DReal>("WorkTend", NCellsSize, NVertsFCT);
+      FlxIn    = makeArray<Array2DReal>("FlxIn", NCellsSize, NVertsFCT);
+      FlxOut   = makeArray<Array2DReal>("FlxOut", NCellsSize, NVertsFCT);
       deepCopy(HProvInv, 0.0);
       deepCopy(HNewInv, 0.0);
       deepCopy(HProv, 0.0);
@@ -294,12 +303,12 @@ void TracerHorzAdvOnCell::init() {
       if (ComputeBudgets) {
          // Sized like the NEdges and NCells dimensions they are written with
          const int NTracers = Tracers::getNumTracers();
-         ActiveTracerHorizontalAdvectionEdgeFlux =
-             Array3DReal("FCTActiveTracerHorizontalAdvectionEdgeFlux", NTracers,
-                         NEdgesSize, NVertLayers);
-         ActiveTracerHorizontalAdvectionTendency =
-             Array3DReal("FCTActiveTracerHorizontalAdvectionTendency", NTracers,
-                         NCellsSize, NVertLayers);
+         ActiveTracerHorizontalAdvectionEdgeFlux = makeArray<Array3DReal>(
+             "FCTActiveTracerHorizontalAdvectionEdgeFlux", NTracers, NEdgesSize,
+             NVertLayers);
+         ActiveTracerHorizontalAdvectionTendency = makeArray<Array3DReal>(
+             "FCTActiveTracerHorizontalAdvectionTendency", NTracers, NCellsSize,
+             NVertLayers);
          deepCopy(ActiveTracerHorizontalAdvectionEdgeFlux, 0.0);
          deepCopy(ActiveTracerHorizontalAdvectionTendency, 0.0);
          const std::string GroupName = "AuxiliaryState";

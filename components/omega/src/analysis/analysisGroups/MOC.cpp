@@ -10,6 +10,7 @@
 
 #include "analysisGroups/MOC.h"
 #include "AnalysisOperator.h"
+#include "OmegaKokkos.h"
 #include <iostream>
 #include <set>
 
@@ -336,7 +337,8 @@ std::string MOC::buildMOCChain(const std::string &RegionName,
           );
 
       // Allocate and attach the boundary array
-      Array1DReal BinBoundData(BinBoundaryFieldName + "_data", NBounds);
+      Array1DReal BinBoundData =
+          makeArray<Array1DReal>(BinBoundaryFieldName + "_data", NBounds);
       BinBoundField->attachData<Array1DReal>(BinBoundData);
 
       // Compute and populate the real bin boundary values

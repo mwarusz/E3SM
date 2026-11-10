@@ -1,6 +1,7 @@
 #include "VelocityDel2AuxVars.h"
 #include "DataTypes.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 
 #include <limits>
 
@@ -9,12 +10,14 @@ namespace OMEGA {
 VelocityDel2AuxVars::VelocityDel2AuxVars(const std::string &AuxStateSuffix,
                                          const HorzMesh *Mesh,
                                          const VertCoord *VCoord)
-    : Del2Edge("VelDel2Edge" + AuxStateSuffix, Mesh->NEdgesSize,
-               VCoord->NVertLayers),
-      Del2DivCell("VelDel2DivCell" + AuxStateSuffix, Mesh->NCellsSize,
-                  VCoord->NVertLayers),
-      Del2RelVortVertex("VelDel2RelVortVertex" + AuxStateSuffix,
-                        Mesh->NVerticesSize, VCoord->NVertLayers),
+    : Del2Edge(makeArray<Array2DReal>("VelDel2Edge" + AuxStateSuffix,
+                                      Mesh->NEdgesSize, VCoord->NVertLayers)),
+      Del2DivCell(makeArray<Array2DReal>("VelDel2DivCell" + AuxStateSuffix,
+                                         Mesh->NCellsSize,
+                                         VCoord->NVertLayers)),
+      Del2RelVortVertex(
+          makeArray<Array2DReal>("VelDel2RelVortVertex" + AuxStateSuffix,
+                                 Mesh->NVerticesSize, VCoord->NVertLayers)),
       NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       EdgeSignOnCell(Mesh->EdgeSignOnCell), DcEdge(Mesh->DcEdge),
       DvEdge(Mesh->DvEdge), AreaCell(Mesh->AreaCell),

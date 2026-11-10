@@ -37,6 +37,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AnalysisOperator.h"
+#include "OmegaKokkos.h"
 #include "Reductions.h"
 #include "mpi.h"
 
@@ -160,11 +161,12 @@ template <typename ArrayT> class BinnedAccumulatorOp : public AnalysisOperator {
 
       // Allocate output and local accumulation arrays
       if (InputRank == 1) {
-         OutputData = OutputArrayT("BinnedAccum_out", NumBins);
-         LocalAccum = OutputArrayT("BinnedAccum_local", NumBins);
+         OutputData = makeArray<OutputArrayT>("BinnedAccum_out", NumBins);
+         LocalAccum = makeArray<OutputArrayT>("BinnedAccum_local", NumBins);
       } else {
-         OutputData = OutputArrayT("BinnedAccum_out", NumBins, Dim1);
-         LocalAccum = OutputArrayT("BinnedAccum_local", NumBins, Dim1);
+         OutputData = makeArray<OutputArrayT>("BinnedAccum_out", NumBins, Dim1);
+         LocalAccum =
+             makeArray<OutputArrayT>("BinnedAccum_local", NumBins, Dim1);
       }
 
       // Attach output data array to Field

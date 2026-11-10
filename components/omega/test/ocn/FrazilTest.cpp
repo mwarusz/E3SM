@@ -696,11 +696,14 @@ void testComputeFrazilColumn() {
    const Real ConservTempWarm    = 0.0_Real;
    const Real ConservTempWarm2   = -1.9_Real;
 
-   Array2DReal AbsSalinity("AbsSalinity", Mesh->NCellsSize, NVertLayers);
-   Array2DReal ConservTemp("ConservTemp", Mesh->NCellsSize, NVertLayers);
-   Array2DReal Pressure("Pressure", Mesh->NCellsSize, NVertLayers);
-   Array2DReal PseudoThickness("PseudoThickness", Mesh->NCellsSize,
-                               NVertLayers);
+   Array2DReal AbsSalinity =
+       makeArray<Array2DReal>("AbsSalinity", Mesh->NCellsSize, NVertLayers);
+   Array2DReal ConservTemp =
+       makeArray<Array2DReal>("ConservTemp", Mesh->NCellsSize, NVertLayers);
+   Array2DReal Pressure =
+       makeArray<Array2DReal>("Pressure", Mesh->NCellsSize, NVertLayers);
+   Array2DReal PseudoThickness =
+       makeArray<Array2DReal>("PseudoThickness", Mesh->NCellsSize, NVertLayers);
 
    deepCopy(AbsSalinity, AbsSalinityCold);
    deepCopy(ConservTemp, ConservTempWarm);
@@ -827,11 +830,14 @@ void testComputeFrazilDepthLimit() {
    const Real ConservTempWarm    = 0.0_Real;
    const Real ConservTempWarm2   = -1.9_Real;
 
-   Array2DReal AbsSalinity("AbsSalinity", Mesh->NCellsSize, NVertLayers);
-   Array2DReal ConservTemp("ConservTemp", Mesh->NCellsSize, NVertLayers);
-   Array2DReal Pressure("Pressure", Mesh->NCellsSize, NVertLayers);
-   Array2DReal PseudoThickness("PseudoThickness", Mesh->NCellsSize,
-                               NVertLayers);
+   Array2DReal AbsSalinity =
+       makeArray<Array2DReal>("AbsSalinity", Mesh->NCellsSize, NVertLayers);
+   Array2DReal ConservTemp =
+       makeArray<Array2DReal>("ConservTemp", Mesh->NCellsSize, NVertLayers);
+   Array2DReal Pressure =
+       makeArray<Array2DReal>("Pressure", Mesh->NCellsSize, NVertLayers);
+   Array2DReal PseudoThickness =
+       makeArray<Array2DReal>("PseudoThickness", Mesh->NCellsSize, NVertLayers);
 
    deepCopy(AbsSalinity, AbsSalinityCold);
    deepCopy(ConservTemp, ConservTempWarm);

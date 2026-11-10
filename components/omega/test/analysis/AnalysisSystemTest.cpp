@@ -18,6 +18,7 @@
 #include "IOStream.h"
 #include "Logging.h"
 #include "OceanState.h"
+#include "OmegaKokkos.h"
 #include "PGrad.h"
 #include "Tendencies.h"
 #include "TimeStepper.h"
@@ -269,7 +270,8 @@ void createFactoryTestField(const std::string &FieldName, const HorzMesh *Mesh,
                      "", -1.0e30, 1.0e30, 2, DimNames);
 
    // Allocate and attach data with known values
-   Array2DReal TestData(FieldName + "_data", NCells, NVertLayers);
+   Array2DReal TestData =
+       makeArray<Array2DReal>(FieldName + "_data", NCells, NVertLayers);
    TestField->attachData<Array2DReal>(TestData);
 
    // Fill with simple pattern: value = Cell + K
@@ -665,7 +667,8 @@ void testMaskedMOCChainConstruction(const HorzMesh *Mesh,
        RegionMaskName, "Synthetic test region mask for MOC chain testing", "",
        "", 0, 1, 1, DimNamesCells);
 
-   Array1DI4 RegionMaskData(RegionMaskName + "_data", NCells);
+   Array1DI4 RegionMaskData =
+       makeArray<Array1DI4>(RegionMaskName + "_data", NCells);
    RegionMaskField->attachData<Array1DI4>(RegionMaskData);
    // Fill region mask using global cell IDs
    auto RegionMaskHost = Kokkos::create_mirror_view(RegionMaskData);
@@ -681,7 +684,8 @@ void testMaskedMOCChainConstruction(const HorzMesh *Mesh,
        TransectMaskName, "Synthetic test transect mask for MOC chain testing",
        "", "", 0, 1, 1, DimNamesEdges);
 
-   Array1DI4 TransectMaskData(TransectMaskName + "_data", NEdges);
+   Array1DI4 TransectMaskData =
+       makeArray<Array1DI4>(TransectMaskName + "_data", NEdges);
    TransectMaskField->attachData<Array1DI4>(TransectMaskData);
 
    auto TransectEdgeSignField =
@@ -689,7 +693,8 @@ void testMaskedMOCChainConstruction(const HorzMesh *Mesh,
                      "Synthetic test transect edge sign for MOC chain testing",
                      "", "", -1, 1, 1, DimNamesEdges);
 
-   Array1DI4 TransectEdgeSignData(TransectEdgeSignName + "_data", NEdges);
+   Array1DI4 TransectEdgeSignData =
+       makeArray<Array1DI4>(TransectEdgeSignName + "_data", NEdges);
    TransectEdgeSignField->attachData<Array1DI4>(TransectEdgeSignData);
 
    // Fill transect mask using global edge IDs
@@ -784,7 +789,8 @@ void testSampledReductionUpstreamCompute(const HorzMesh *Mesh,
    auto TestField =
        Field::create(FieldName, "Test field for sampled upstream compute", "m",
                      "", -1.0e30, 1.0e30, 1, DimNames);
-   Array1DReal TestData(FieldName + "_data", Mesh->NCellsSize);
+   Array1DReal TestData =
+       makeArray<Array1DReal>(FieldName + "_data", Mesh->NCellsSize);
    Kokkos::deep_copy(TestData, 1.0_Real);
    TestField->attachData<Array1DReal>(TestData);
 
@@ -885,7 +891,8 @@ Array2DReal createUniformTimeMeanField(const std::string &FieldName,
        Field::create(FieldName, "Restart test field for TimeMeanOp", "m", "",
                      -1.0e30, 1.0e30, 2, DimNames);
 
-   Array2DReal TestData(FieldName + "_data", NCells, NVertLayers);
+   Array2DReal TestData =
+       makeArray<Array2DReal>(FieldName + "_data", NCells, NVertLayers);
    TestField->attachData<Array2DReal>(TestData);
 
    auto TestDataHost = createHostMirrorCopy(TestData);

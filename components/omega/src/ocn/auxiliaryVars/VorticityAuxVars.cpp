@@ -1,6 +1,7 @@
 #include "VorticityAuxVars.h"
 #include "DataTypes.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 
 #include <limits>
 
@@ -9,16 +10,21 @@ namespace OMEGA {
 VorticityAuxVars::VorticityAuxVars(const std::string &AuxStateSuffix,
                                    const HorzMesh *Mesh,
                                    const VertCoord *VCoord)
-    : RelVortVertex("RelVortVertex" + AuxStateSuffix, Mesh->NVerticesSize,
-                    VCoord->NVertLayers),
-      NormRelVortVertex("NormRelVortVertex" + AuxStateSuffix,
-                        Mesh->NVerticesSize, VCoord->NVertLayers),
-      NormPlanetVortVertex("NormPlanetVortVertex" + AuxStateSuffix,
-                           Mesh->NVerticesSize, VCoord->NVertLayers),
-      NormRelVortEdge("NormRelVortEdge" + AuxStateSuffix, Mesh->NEdgesSize,
-                      VCoord->NVertLayers),
-      NormPlanetVortEdge("NormPlanetVortEdge" + AuxStateSuffix,
-                         Mesh->NEdgesSize, VCoord->NVertLayers),
+    : RelVortVertex(makeArray<Array2DReal>("RelVortVertex" + AuxStateSuffix,
+                                           Mesh->NVerticesSize,
+                                           VCoord->NVertLayers)),
+      NormRelVortVertex(
+          makeArray<Array2DReal>("NormRelVortVertex" + AuxStateSuffix,
+                                 Mesh->NVerticesSize, VCoord->NVertLayers)),
+      NormPlanetVortVertex(
+          makeArray<Array2DReal>("NormPlanetVortVertex" + AuxStateSuffix,
+                                 Mesh->NVerticesSize, VCoord->NVertLayers)),
+      NormRelVortEdge(makeArray<Array2DReal>("NormRelVortEdge" + AuxStateSuffix,
+                                             Mesh->NEdgesSize,
+                                             VCoord->NVertLayers)),
+      NormPlanetVortEdge(
+          makeArray<Array2DReal>("NormPlanetVortEdge" + AuxStateSuffix,
+                                 Mesh->NEdgesSize, VCoord->NVertLayers)),
       VertexDegree(Mesh->VertexDegree), CellsOnVertex(Mesh->CellsOnVertex),
       EdgesOnVertex(Mesh->EdgesOnVertex),
       EdgeSignOnVertex(Mesh->EdgeSignOnVertex), DcEdge(Mesh->DcEdge),

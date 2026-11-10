@@ -1,6 +1,7 @@
 #include "SfcStressForcingVars.h"
 #include "DataTypes.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 
 #include <limits>
 
@@ -8,9 +9,12 @@ namespace OMEGA {
 
 SfcStressForcingVars::SfcStressForcingVars(const std::string &Suffix,
                                            const HorzMesh *Mesh)
-    : NormalStressEdge("NormalStressEdge" + Suffix, Mesh->NEdgesSize),
-      ZonalStressCell("SfcStressZonal" + Suffix, Mesh->NCellsSize),
-      MeridStressCell("SfcStressMeridional" + Suffix, Mesh->NCellsSize),
+    : NormalStressEdge(makeArray<Array1DReal>("NormalStressEdge" + Suffix,
+                                              Mesh->NEdgesSize)),
+      ZonalStressCell(
+          makeArray<Array1DReal>("SfcStressZonal" + Suffix, Mesh->NCellsSize)),
+      MeridStressCell(makeArray<Array1DReal>("SfcStressMeridional" + Suffix,
+                                             Mesh->NCellsSize)),
       CellsOnEdge(Mesh->CellsOnEdge), AngleEdge(Mesh->AngleEdge), Interp(Mesh) {
 }
 

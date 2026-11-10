@@ -317,9 +317,14 @@ LinearIdxWrapper(F, std::array<int, Rank>) -> LinearIdxWrapper<F, Rank>;
 namespace OMEGA {
 template <class T, class... ArgTypes>
 T makeArray(const std::string &Label, ArgTypes... Args) {
+   static_assert(T::rank >= 1 && T::rank <= 5,
+                 "makeArray supports ranks 1-5");
    using ValT = typename T::non_const_value_type;
 
    T Arr = T(Kokkos::view_alloc(Label, Kokkos::WithoutInitializing), Args...);
+
+   if (Arr.size() == 0)
+      return Arr;
 
    if constexpr (T::rank == 1) {
       parallelFor(
@@ -366,6 +371,7 @@ T makeArray(const std::string &Label, ArgTypes... Args) {
           });
    }
 
+   ExecSpace().fence();
    return Arr;
 }
 } // namespace OMEGA

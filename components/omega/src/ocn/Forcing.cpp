@@ -34,8 +34,10 @@ Forcing::Forcing(const std::string &Name, const HorzMesh *Mesh, Halo *MeshHalo)
     : Name(stripDefault(Name)), SfcStressForcing(stripDefault(Name), Mesh),
       TracerForcing(stripDefault(Name), Mesh),
       ShortwavePenForcing(stripDefault(Name), Mesh),
-      WindSpeed10mCell("WindSpeed10m" + stripDefault(Name), Mesh->NCellsSize),
-      IceFractionCell("IceFraction" + stripDefault(Name), Mesh->NCellsSize),
+      WindSpeed10mCell(makeArray<Array1DReal>(
+          "WindSpeed10m" + stripDefault(Name), Mesh->NCellsSize)),
+      IceFractionCell(makeArray<Array1DReal>("IceFraction" + stripDefault(Name),
+                                             Mesh->NCellsSize)),
       Mesh(Mesh), MeshHalo(MeshHalo) {
    deepCopy(WindSpeed10mCell, 0.0_Real);
    deepCopy(IceFractionCell, 0.0_Real);

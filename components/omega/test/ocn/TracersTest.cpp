@@ -260,7 +260,7 @@ int main(int argc, char *argv[]) {
 
       // Reference device array of new time level
       Array3DReal RefArray =
-          Array3DReal("RefArray", NTracers, NCellsSize, NVertLayers);
+          makeArray<Array3DReal>("RefArray", NTracers, NCellsSize, NVertLayers);
 
       RefArray = Tracers::getAll(1);
 

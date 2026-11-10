@@ -187,8 +187,10 @@ int main(int argc, char *argv[]) {
 
       // Tests for computePressure
 
-      Array2DReal PseudoThickness("PseudoThickness", NCellsSize, NVertLayers);
-      Array1DReal SurfacePressure("SurfacePressure", NCellsSize);
+      Array2DReal PseudoThickness =
+          makeArray<Array2DReal>("PseudoThickness", NCellsSize, NVertLayers);
+      Array1DReal SurfacePressure =
+          makeArray<Array1DReal>("SurfacePressure", NCellsSize);
 
       /// Initialize pseudo-thickness and surface pressure so that resulting
       /// interface pressure is the number of layers above plus one
@@ -279,9 +281,12 @@ int main(int argc, char *argv[]) {
 
       // Tests for computeGeomZHeight
 
-      Array2DReal SpecVol("SpecVol", NCellsSize, NVertLayers);
-      Array1DReal BottomGeomDepth("BottomGeomDepth", NCellsSize);
-      Array1DReal MaxLyrCellReal("MaxLyrCellReal", NCellsSize);
+      Array2DReal SpecVol =
+          makeArray<Array2DReal>("SpecVol", NCellsSize, NVertLayers);
+      Array1DReal BottomGeomDepth =
+          makeArray<Array1DReal>("BottomGeomDepth", NCellsSize);
+      Array1DReal MaxLyrCellReal =
+          makeArray<Array1DReal>("MaxLyrCellReal", NCellsSize);
       deepCopy(MaxLyrCellReal, DefVertCoord->MaxLayerCell);
 
       auto &BotDepth = DefVertCoord->BottomGeomDepth;
@@ -388,8 +393,10 @@ int main(int argc, char *argv[]) {
       }
 
       // Tests for computeGeopotential
-      Array1DReal TidalPotential("TidalPotential", NCellsSize);
-      Array1DReal SelfAttractionLoading("SelfAttractionLoading", NCellsSize);
+      Array1DReal TidalPotential =
+          makeArray<Array1DReal>("TidalPotential", NCellsSize);
+      Array1DReal SelfAttractionLoading =
+          makeArray<Array1DReal>("SelfAttractionLoading", NCellsSize);
 
       auto &GeomZMid = DefVertCoord->GeomZMid;
 

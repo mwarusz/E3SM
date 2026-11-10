@@ -307,20 +307,26 @@ void initFieldTest() {
    HostArray2DR4 Data2DR4H("Test2DR4H", NVerticesSize, NVertLayers);
    HostArray2DR8 Data2DR8H("Test2DR8H", NCellsSize, NVertLayers);
 
-   Array1DI4 Data1DI4("Test1DI4", NCellsSize);
-   Array1DI8 Data1DI8("Test1DI8", NEdgesSize);
-   Array1DR4 Data1DR4("Test1DR4", NVerticesSize);
-   Array1DR8 Data1DR8("Test1DR8", NVertLayers);
+   Array1DI4 Data1DI4 = makeArray<Array1DI4>("Test1DI4", NCellsSize);
+   Array1DI8 Data1DI8 = makeArray<Array1DI8>("Test1DI8", NEdgesSize);
+   Array1DR4 Data1DR4 = makeArray<Array1DR4>("Test1DR4", NVerticesSize);
+   Array1DR8 Data1DR8 = makeArray<Array1DR8>("Test1DR8", NVertLayers);
 
-   Array2DI4 Data2DI4("Test2DI4", NCellsSize, NVertLayers);
-   Array2DI8 Data2DI8("Test2DI8", NEdgesSize, NVertLayers);
-   Array2DR4 Data2DR4("Test2DR4", NVerticesSize, NVertLayers);
-   Array2DR8 Data2DR8("Test2DR8", NEdgesSize, NVertLayers);
+   Array2DI4 Data2DI4 =
+       makeArray<Array2DI4>("Test2DI4", NCellsSize, NVertLayers);
+   Array2DI8 Data2DI8 =
+       makeArray<Array2DI8>("Test2DI8", NEdgesSize, NVertLayers);
+   Array2DR4 Data2DR4 =
+       makeArray<Array2DR4>("Test2DR4", NVerticesSize, NVertLayers);
+   Array2DR8 Data2DR8 =
+       makeArray<Array2DR8>("Test2DR8", NEdgesSize, NVertLayers);
 
-   Array3DI4 Data3DI4("Test3DI4", NCellsSize, NVertLayers, NTracers);
-   Array4DI8 Data4DI8("Test4DI8", NCellsSize, NVertLayers, NTracers, NTime);
-   Array5DR4 Data5DR4("Test5DR4", NCellsSize, NVertLayers, NTracers, NTime,
-                      NStuff);
+   Array3DI4 Data3DI4 =
+       makeArray<Array3DI4>("Test3DI4", NCellsSize, NVertLayers, NTracers);
+   Array4DI8 Data4DI8 = makeArray<Array4DI8>("Test4DI8", NCellsSize,
+                                             NVertLayers, NTracers, NTime);
+   Array5DR4 Data5DR4 = makeArray<Array5DR4>(
+       "Test5DR4", NCellsSize, NVertLayers, NTracers, NTime, NStuff);
 
    // Attach arrays before populating so the fill-on-attach does not overwrite
    // the reference values written below. Kokkos views share backing memory, so

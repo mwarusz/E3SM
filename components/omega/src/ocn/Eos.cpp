@@ -11,6 +11,7 @@
 #include "DataTypes.h"
 #include "Error.h"
 #include "HorzMesh.h"
+#include "OmegaKokkos.h"
 
 namespace OMEGA {
 
@@ -44,18 +45,20 @@ Eos::Eos(const std::string &Name, ///< [in] Name for eos object
       ComputeSpecVolConstant(VCoord), ComputeBruntVaisalaFreqSqLinear(VCoord),
       ComputeBruntVaisalaFreqSqTeos10(VCoord), Name(Name), Mesh(Mesh),
       VCoord(VCoord) {
-   SpecVol = Array2DReal("SpecVol", Mesh->NCellsSize, VCoord->NVertLayers);
-   SpecVolDisplaced =
-       Array2DReal("SpecVolDisplaced", Mesh->NCellsSize, VCoord->NVertLayers);
-   BruntVaisalaFreqSq = Array2DReal("BruntVaisalaFreqSq", Mesh->NCellsSize,
-                                    VCoord->NVertLayersP1);
-   SpecVolDCt =
-       Array2DReal("SpecVolDCt", Mesh->NCellsSize, VCoord->NVertLayers);
-   SpecVolDSa =
-       Array2DReal("SpecVolDSa", Mesh->NCellsSize, VCoord->NVertLayers);
-   SpecVolDP = Array2DReal("SpecVolDP", Mesh->NCellsSize, VCoord->NVertLayers);
+   SpecVol =
+       makeArray<Array2DReal>("SpecVol", Mesh->NCellsSize, VCoord->NVertLayers);
+   SpecVolDisplaced = makeArray<Array2DReal>(
+       "SpecVolDisplaced", Mesh->NCellsSize, VCoord->NVertLayers);
+   BruntVaisalaFreqSq = makeArray<Array2DReal>(
+       "BruntVaisalaFreqSq", Mesh->NCellsSize, VCoord->NVertLayersP1);
+   SpecVolDCt = makeArray<Array2DReal>("SpecVolDCt", Mesh->NCellsSize,
+                                       VCoord->NVertLayers);
+   SpecVolDSa = makeArray<Array2DReal>("SpecVolDSa", Mesh->NCellsSize,
+                                       VCoord->NVertLayers);
+   SpecVolDP  = makeArray<Array2DReal>("SpecVolDP", Mesh->NCellsSize,
+                                       VCoord->NVertLayers);
    DepthMeanSpecificVolume =
-       Array1DReal("DepthMeanSpecificVolume", Mesh->NCellsSize);
+       makeArray<Array1DReal>("DepthMeanSpecificVolume", Mesh->NCellsSize);
 
    defineFields();
 }

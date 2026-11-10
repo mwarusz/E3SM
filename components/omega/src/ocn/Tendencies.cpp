@@ -18,6 +18,7 @@
 #include "HorzOperators.h"
 #include "KPPMix.h"
 #include "OceanState.h"
+#include "OmegaKokkos.h"
 #include "PGrad.h"
 #include "Pacer.h"
 #include "Tendencies.h"
@@ -454,7 +455,7 @@ void Tendencies::readConfig(Config *OmegaConfig ///< [in] Omega config
 
       this->SurfaceTracerRestoring.NTracersToRestore =
           static_cast<I4>(TracerIdsToRestoreVec.size());
-      this->SurfaceTracerRestoring.TracerIdsToRestore = Array1DI4(
+      this->SurfaceTracerRestoring.TracerIdsToRestore = makeArray<Array1DI4>(
           "TracerIdsToRestore", this->SurfaceTracerRestoring.NTracersToRestore);
       deepCopy(this->SurfaceTracerRestoring.TracerIdsToRestore,
                HostArray1DI4(TracerIdsToRestoreVec.data(),
@@ -652,21 +653,21 @@ Tendencies::Tendencies(const std::string &Name_, ///< [in] Name for tendencies
    }
 
    // Tendency arrays
-   PseudoThicknessTend = Array2DReal("PseudoThicknessTend", Mesh->NCellsSize,
-                                     VCoord->NVertLayers);
-   NormalVelocityTend =
-       Array2DReal("NormalVelocityTend", Mesh->NEdgesSize, VCoord->NVertLayers);
-   TracerTend = Array3DReal("TracerTend", NTracersIn, Mesh->NCellsSize,
-                            VCoord->NVertLayers);
+   PseudoThicknessTend = makeArray<Array2DReal>(
+       "PseudoThicknessTend", Mesh->NCellsSize, VCoord->NVertLayers);
+   NormalVelocityTend = makeArray<Array2DReal>(
+       "NormalVelocityTend", Mesh->NEdgesSize, VCoord->NVertLayers);
+   TracerTend = makeArray<Array3DReal>("TracerTend", NTracersIn,
+                                       Mesh->NCellsSize, VCoord->NVertLayers);
    // Provisional tracers are only needed for flux-corrected vertical advection
    if (VAdv->VertAdvChoice == VertAdvOption::FCT) {
-      ProvTracers = Array3DReal("ProvTracers", NTracersIn, Mesh->NCellsSize,
-                                VCoord->NVertLayers);
+      ProvTracers = makeArray<Array3DReal>(
+          "ProvTracers", NTracersIn, Mesh->NCellsSize, VCoord->NVertLayers);
    }
-   KPPNonLocalTracerTempTendDiag = Array2DReal(
+   KPPNonLocalTracerTempTendDiag = makeArray<Array2DReal>(
        "KPPNonLocalTracerTempTendDiag", Mesh->NCellsSize, VCoord->NVertLayers);
-   KPPNonLocalTracerTempColumnSumDiag =
-       Array1DReal("KPPNonLocalTracerTempColumnSumDiag", Mesh->NCellsSize);
+   KPPNonLocalTracerTempColumnSumDiag = makeArray<Array1DReal>(
+       "KPPNonLocalTracerTempColumnSumDiag", Mesh->NCellsSize);
    deepCopy(KPPNonLocalTracerTempTendDiag, 0.0_Real);
    deepCopy(KPPNonLocalTracerTempColumnSumDiag, 0.0_Real);
 

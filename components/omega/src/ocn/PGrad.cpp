@@ -183,22 +183,22 @@ PressureGrad::PressureGrad(
    // Working arrays for the FiniteVolume scheme, allocated only when that
    // scheme is selected so that a Centered run pays nothing for them
    if (PressureGradChoice == PressureGradType::FiniteVolume) {
-      ReconSlopeCt =
-          Array2DReal("PGradReconSlopeCt", Mesh->NCellsSize, NVertLayers);
-      ReconSlopeSa =
-          Array2DReal("PGradReconSlopeSa", Mesh->NCellsSize, NVertLayers);
-      DeltaZIncr =
-          Array2DReal("PGradDeltaZIncr", Mesh->NEdgesSize, NVertLayers);
-      DeltaZMoment =
-          Array2DReal("PGradDeltaZMoment", Mesh->NEdgesSize, NVertLayers);
-      DeltaZFixedP =
-          Array2DReal("PGradDeltaZFixedP", Mesh->NEdgesSize, NVertLayersP1);
+      ReconSlopeCt = makeArray<Array2DReal>("PGradReconSlopeCt",
+                                            Mesh->NCellsSize, NVertLayers);
+      ReconSlopeSa = makeArray<Array2DReal>("PGradReconSlopeSa",
+                                            Mesh->NCellsSize, NVertLayers);
+      DeltaZIncr   = makeArray<Array2DReal>("PGradDeltaZIncr", Mesh->NEdgesSize,
+                                            NVertLayers);
+      DeltaZMoment = makeArray<Array2DReal>("PGradDeltaZMoment",
+                                            Mesh->NEdgesSize, NVertLayers);
+      DeltaZFixedP = makeArray<Array2DReal>("PGradDeltaZFixedP",
+                                            Mesh->NEdgesSize, NVertLayersP1);
    }
 
    // Temporary: initialization of tidal potential and SAL
-   TidalPotential = Array1DReal("TidalPotential", Mesh->NCellsSize);
+   TidalPotential = makeArray<Array1DReal>("TidalPotential", Mesh->NCellsSize);
    SelfAttractionLoading =
-       Array1DReal("SelfAttractionLoading", Mesh->NCellsSize);
+       makeArray<Array1DReal>("SelfAttractionLoading", Mesh->NCellsSize);
 
 } // end constructor
 

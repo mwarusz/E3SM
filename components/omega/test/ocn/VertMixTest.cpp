@@ -155,10 +155,12 @@ void testGradRichNum() {
    VertMix *TestVertMix = VertMix::getInstance();
 
    /// Create and fill ocean state arrays
-   auto NormalVelEdge = Array2DReal("NormalVelEdge", NEdgesAll, NVertLayers);
-   auto TangVelEdge   = Array2DReal("TangVelEdge", NEdgesAll, NVertLayers);
-   auto BruntVaisalaFreqSqCell =
-       Array2DReal("BruntVaisalaFreqSqCell", NCellsSize, NVertLayersP1);
+   auto NormalVelEdge =
+       makeArray<Array2DReal>("NormalVelEdge", NEdgesAll, NVertLayers);
+   auto TangVelEdge =
+       makeArray<Array2DReal>("TangVelEdge", NEdgesAll, NVertLayers);
+   auto BruntVaisalaFreqSqCell = makeArray<Array2DReal>(
+       "BruntVaisalaFreqSqCell", NCellsSize, NVertLayersP1);
    /// Use deep copy to initialize results
    deepCopy(NormalVelEdge, NV);
    deepCopy(TangVelEdge, TV);
@@ -329,8 +331,9 @@ void testOneTwoOneFilter() {
 
    /// Create and fill ocean state arrays
    auto GradRichNumSmoothed =
-       Array2DReal("GradRichNumSmoothed", NCellsSize, NVertLayersP1);
-   auto GradRichNum = Array2DReal("GradRichNum", NCellsSize, NVertLayersP1);
+       makeArray<Array2DReal>("GradRichNumSmoothed", NCellsSize, NVertLayersP1);
+   auto GradRichNum =
+       makeArray<Array2DReal>("GradRichNum", NCellsSize, NVertLayersP1);
    /// Use deep copy to initialize results
    deepCopy(GradRichNumSmoothed, 1.0);
    deepCopy(GradRichNum, 1.0);
@@ -424,10 +427,12 @@ void testBackVertMix() {
    VertMix *TestVertMix = VertMix::getInstance();
 
    /// Create and fill ocean state arrays
-   auto NormalVelEdge = Array2DReal("NormalVelEdge", NEdgesSize, NVertLayers);
-   auto TangVelEdge   = Array2DReal("TangVelEdge", NEdgesSize, NVertLayers);
-   auto BruntVaisalaFreqSqCell =
-       Array2DReal("BruntVaisalaFreqSqCell", NCellsSize, NVertLayersP1);
+   auto NormalVelEdge =
+       makeArray<Array2DReal>("NormalVelEdge", NEdgesSize, NVertLayers);
+   auto TangVelEdge =
+       makeArray<Array2DReal>("TangVelEdge", NEdgesSize, NVertLayers);
+   auto BruntVaisalaFreqSqCell = makeArray<Array2DReal>(
+       "BruntVaisalaFreqSqCell", NCellsSize, NVertLayersP1);
 
    /// Use deep copy initialize with reference or zero values
    deepCopy(NormalVelEdge, NV);
@@ -554,12 +559,12 @@ void testConvVertMix() {
    VertMix *TestVertMix = VertMix::getInstance();
 
    /// Create and fill ocean state arrays
-   auto BruntVaisalaFreqSqIn =
-       Array2DReal("BruntVaisalaFreqSqIn", NCellsSize, NVertLayersP1);
+   auto BruntVaisalaFreqSqIn = makeArray<Array2DReal>(
+       "BruntVaisalaFreqSqIn", NCellsSize, NVertLayersP1);
    auto VertDiffOut =
-       Array2DReal("VertDiffOut", Mesh->NCellsAll, NVertLayersP1);
+       makeArray<Array2DReal>("VertDiffOut", Mesh->NCellsAll, NVertLayersP1);
    auto VertViscOut =
-       Array2DReal("VertViscOut", Mesh->NCellsAll, NVertLayersP1);
+       makeArray<Array2DReal>("VertViscOut", Mesh->NCellsAll, NVertLayersP1);
 
    /// Use deep copy to initialize with the ref value
    deepCopy(BruntVaisalaFreqSqIn, 0.0);
@@ -685,12 +690,12 @@ void testShearVertMix() {
    VertMix *TestVertMix = VertMix::getInstance();
 
    /// Create and fill ocean state arrays
-   auto GradRichNumSmoothedIn =
-       Array2DReal("GradRichNumSmoothedIn", NCellsSize, NVertLayersP1);
+   auto GradRichNumSmoothedIn = makeArray<Array2DReal>(
+       "GradRichNumSmoothedIn", NCellsSize, NVertLayersP1);
    auto VertDiffOut =
-       Array2DReal("VertDiffOut", Mesh->NCellsAll, NVertLayersP1);
+       makeArray<Array2DReal>("VertDiffOut", Mesh->NCellsAll, NVertLayersP1);
    auto VertViscOut =
-       Array2DReal("VertViscOut", Mesh->NCellsAll, NVertLayersP1);
+       makeArray<Array2DReal>("VertViscOut", Mesh->NCellsAll, NVertLayersP1);
 
    /// Use Kokkos::deep_copy to fill the entire view with the ref value
    deepCopy(GradRichNumSmoothedIn, 0.0);
@@ -834,10 +839,12 @@ void testTotalVertMix() {
    VertMix *TestVertMix = VertMix::getInstance();
 
    /// Create and fill ocean state arrays
-   auto NormalVelEdge = Array2DReal("NormalVelEdge", NEdgesAll, NVertLayers);
-   auto TangVelEdge   = Array2DReal("TangVelEdge", NEdgesAll, NVertLayers);
-   auto BruntVaisalaFreqSqCell =
-       Array2DReal("BruntVaisalaFreqSqCell", NCellsSize, NVertLayersP1);
+   auto NormalVelEdge =
+       makeArray<Array2DReal>("NormalVelEdge", NEdgesAll, NVertLayers);
+   auto TangVelEdge =
+       makeArray<Array2DReal>("TangVelEdge", NEdgesAll, NVertLayers);
+   auto BruntVaisalaFreqSqCell = makeArray<Array2DReal>(
+       "BruntVaisalaFreqSqCell", NCellsSize, NVertLayersP1);
 
    /// Use deep copy to initialize with the ref value
    deepCopy(NormalVelEdge, NV);
@@ -1092,11 +1099,11 @@ void testInteriorSnapshotForMatchBoth() {
    deepCopy(KPPInstance->OSBLDepthIndex, 0);
 
    auto NormalVelEdge =
-       Array2DReal("NormalVelEdgeInterior", NEdgesAll, NVertLayers);
+       makeArray<Array2DReal>("NormalVelEdgeInterior", NEdgesAll, NVertLayers);
    auto TangVelEdge =
-       Array2DReal("TangVelEdgeInterior", NEdgesAll, NVertLayers);
-   auto BruntVaisalaFreqSqCell = Array2DReal("BruntVaisalaFreqSqCellInterior",
-                                             Mesh->NCellsSize, NVertLayersP1);
+       makeArray<Array2DReal>("TangVelEdgeInterior", NEdgesAll, NVertLayers);
+   auto BruntVaisalaFreqSqCell = makeArray<Array2DReal>(
+       "BruntVaisalaFreqSqCellInterior", Mesh->NCellsSize, NVertLayersP1);
    deepCopy(NormalVelEdge, NV);
    deepCopy(TangVelEdge, TV);
    // Strongly negative BVF everywhere so convective mixing definitely

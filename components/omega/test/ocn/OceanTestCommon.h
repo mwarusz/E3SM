@@ -626,7 +626,7 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
       {
          auto &DcEdge = Mesh->DcEdge;
          auto &DvEdge = Mesh->DvEdge;
-         AreaElement  = Array1DReal("AreaEdge", Mesh->NEdgesOwned);
+         AreaElement  = makeArray<Array1DReal>("AreaEdge", Mesh->NEdgesOwned);
          parallelFor(
              {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge) {
                 AreaElement(IEdge) = DcEdge(IEdge) * DvEdge(IEdge) / 2;
@@ -646,11 +646,11 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
 
    // Compute element-wise errors
    if constexpr (Array::rank == 1) {
-      LInfElement = Array("LInfElement", NElementsOwned);
-      L2Element   = Array("L2Element", NElementsOwned);
+      LInfElement = makeArray<Array>("LInfElement", NElementsOwned);
+      L2Element   = makeArray<Array>("L2Element", NElementsOwned);
 
-      LInfScaleElement = Array("LInfScaleElement", NElementsOwned);
-      L2ScaleElement   = Array("L2ScaleElement", NElementsOwned);
+      LInfScaleElement = makeArray<Array>("LInfScaleElement", NElementsOwned);
+      L2ScaleElement   = makeArray<Array>("L2ScaleElement", NElementsOwned);
 
       parallelFor(
           {NElementsOwned}, KOKKOS_LAMBDA(int IElement) {
@@ -671,11 +671,14 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
    if constexpr (Array::rank == 2) {
       const int NVertLayers = NumFieldElement.extent_int(1);
 
-      LInfElement = Array("LInfElement", NElementsOwned, NVertLayers);
-      L2Element   = Array("L2Element", NElementsOwned, NVertLayers);
+      LInfElement =
+          makeArray<Array>("LInfElement", NElementsOwned, NVertLayers);
+      L2Element = makeArray<Array>("L2Element", NElementsOwned, NVertLayers);
 
-      LInfScaleElement = Array("LInfScaleElement", NElementsOwned, NVertLayers);
-      L2ScaleElement   = Array("L2ScaleElement", NElementsOwned, NVertLayers);
+      LInfScaleElement =
+          makeArray<Array>("LInfScaleElement", NElementsOwned, NVertLayers);
+      L2ScaleElement =
+          makeArray<Array>("L2ScaleElement", NElementsOwned, NVertLayers);
 
       parallelFor(
           {NElementsOwned, NVertLayers}, KOKKOS_LAMBDA(int IElement, int K) {
@@ -699,13 +702,15 @@ int computeErrors(ErrorMeasures &ErrorMeasures, const Array &NumFieldElement,
       const int NTracers    = NumFieldElement.extent_int(0);
       const int NVertLayers = NumFieldElement.extent_int(2);
 
-      LInfElement = Array("LInfElement", NTracers, NElementsOwned, NVertLayers);
-      L2Element   = Array("L2Element", NTracers, NElementsOwned, NVertLayers);
+      LInfElement = makeArray<Array>("LInfElement", NTracers, NElementsOwned,
+                                     NVertLayers);
+      L2Element =
+          makeArray<Array>("L2Element", NTracers, NElementsOwned, NVertLayers);
 
-      LInfScaleElement =
-          Array("LInfScaleElement", NTracers, NElementsOwned, NVertLayers);
-      L2ScaleElement =
-          Array("L2ScaleElement", NTracers, NElementsOwned, NVertLayers);
+      LInfScaleElement = makeArray<Array>("LInfScaleElement", NTracers,
+                                          NElementsOwned, NVertLayers);
+      L2ScaleElement   = makeArray<Array>("L2ScaleElement", NTracers,
+                                          NElementsOwned, NVertLayers);
 
       parallelFor(
           {NTracers, NElementsOwned, NVertLayers},

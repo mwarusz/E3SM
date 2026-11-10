@@ -15,6 +15,7 @@
 #include "IOStream.h"
 #include "Logging.h"
 #include "OceanState.h"
+#include "OmegaKokkos.h"
 #include "TimeStepper.h"
 #include "VertAdv.h"
 #include "VertCoord.h"
@@ -121,7 +122,7 @@ template <typename ArrayType> struct TestHelper {
           FieldName, "Test field for multi-type validation", TestUnits,
           TestStdName, ValidMin, ValidMax, 1, DimNames);
 
-      ArrayType TestData(FieldName + "_data", Dims[0]);
+      ArrayType TestData = makeArray<ArrayType>(FieldName + "_data", Dims[0]);
       TestField->template attachData<ArrayType>(TestData, false);
 
       auto TestDataHost = Kokkos::create_mirror_view(TestData);
@@ -156,7 +157,8 @@ template <typename ArrayType> struct TestHelper {
           FieldName, "Test field for multi-type validation", TestUnits,
           TestStdName, ValidMin, ValidMax, 2, DimNames);
 
-      ArrayType TestData(FieldName + "_data", Dims[0], Dims[1]);
+      ArrayType TestData =
+          makeArray<ArrayType>(FieldName + "_data", Dims[0], Dims[1]);
       TestField->template attachData<ArrayType>(TestData, false);
 
       auto TestDataHost = Kokkos::create_mirror_view(TestData);
@@ -193,7 +195,8 @@ template <typename ArrayType> struct TestHelper {
           FieldName, "Test field for multi-type validation", TestUnits,
           TestStdName, ValidMin, ValidMax, 3, DimNames);
 
-      ArrayType TestData(FieldName + "_data", Dims[0], Dims[1], Dims[2]);
+      ArrayType TestData =
+          makeArray<ArrayType>(FieldName + "_data", Dims[0], Dims[1], Dims[2]);
       TestField->template attachData<ArrayType>(TestData, false);
 
       auto TestDataHost = Kokkos::create_mirror_view(TestData);
@@ -948,7 +951,8 @@ void testTimeMeanOpInterfaceField(const MachEnv *Env, const HorzMesh *Mesh,
    auto TestField =
        Field::create(FieldName, "Test interface field for TimeMeanOp", "", "",
                      -1.0e30, 1.0e30, 2, {"NCells", "NVertLayersP1"});
-   ArrayType TestData(FieldName + "_data", Dims[0], Dims[1]);
+   ArrayType TestData =
+       makeArray<ArrayType>(FieldName + "_data", Dims[0], Dims[1]);
    TestField->attachData<ArrayType>(TestData);
 
    const int NumSteps        = 5;
@@ -1026,7 +1030,8 @@ HostArray2DReal createEntityField(const std::string &FieldName,
    std::vector<std::string> DimNames = {HorizDim, VertDim};
    auto TestField = Field::create(FieldName, "Weighted statistics test field",
                                   "m", "", -1.0e30, 1.0e30, 2, DimNames);
-   Array2DReal Data(FieldName + "_data", NEntities, NVert);
+   Array2DReal Data =
+       makeArray<Array2DReal>(FieldName + "_data", NEntities, NVert);
    TestField->attachData<Array2DReal>(Data);
 
    auto DataHost  = Kokkos::create_mirror_view(Data);
@@ -1150,7 +1155,8 @@ void testWeightedStats(const MachEnv *Env, const HorzMesh *Mesh,
       auto TestField =
           Field::create("TestWeightedEdge1D", "Weighted statistics test field",
                         "m", "", -1.0e30, 1.0e30, 1, DimNames);
-      Array1DReal Data("TestWeightedEdge1D_data", Mesh->NEdgesSize);
+      Array1DReal Data =
+          makeArray<Array1DReal>("TestWeightedEdge1D_data", Mesh->NEdgesSize);
       TestField->attachData<Array1DReal>(Data);
       auto DataHost  = Kokkos::create_mirror_view(Data);
       const Real NaN = std::numeric_limits<Real>::quiet_NaN();
@@ -1219,7 +1225,8 @@ void testInheritedMetadata(const MachEnv *Env, const HorzMesh *Mesh,
    std::vector<std::string> DimNames = Helper::getDimNames();
    auto BareField = Field::create(BareName, "Test field without units", "", "",
                                   -1.0e30, 1.0e30, 2, DimNames);
-   Array2DR8 BareData(BareName + "_data", Dims[0], Dims[1]);
+   Array2DR8 BareData =
+       makeArray<Array2DR8>(BareName + "_data", Dims[0], Dims[1]);
    BareField->attachData<Array2DR8>(BareData);
 
    auto BareMaxOp =
@@ -1246,7 +1253,8 @@ void testDerivedUnits(const MachEnv *Env, const HorzMesh *Mesh,
                                const std::string &StdName) {
       auto NewField = Field::create(Name, "Derived units test field", Units,
                                                 StdName, -1.0e30, 1.0e30, 1, DimNames);
-      Array1DReal Data(Name + "_data", Mesh->NCellsSize);
+      Array1DReal Data =
+          makeArray<Array1DReal>(Name + "_data", Mesh->NCellsSize);
       NewField->attachData<Array1DReal>(Data);
    };
    createUnitsField("TestUnitsVelocity", "m s-1", "upward_sea_water_velocity");
@@ -1441,7 +1449,8 @@ void testTimeMeanOpSamplingInterval(const MachEnv *Env, const HorzMesh *Mesh,
       auto TestField              = Field::create(
           FieldName, "Test field for SamplingInterval", TestUnits, TestStdName,
           -1.0e30, 1.0e30, 2, {"NCells", "NVertLayers"});
-      ArrayType TestData(FieldName + "_data", Dims[0], Dims[1]);
+      ArrayType TestData =
+          makeArray<ArrayType>(FieldName + "_data", Dims[0], Dims[1]);
       TestField->attachData<ArrayType>(TestData);
 
       Config OpConfig = makeOpConfig(opParam("Period", PeriodLabel));
@@ -1551,7 +1560,8 @@ Real runOneDaySampledMean(const std::string &FieldSuffix,
    auto TestField              = Field::create(
        FieldName, "Test field for a 1Day SamplingInterval", TestUnits,
        TestStdName, -1.0e30, 1.0e30, 2, {"NCells", "NVertLayers"});
-   ArrayType TestData(FieldName + "_data", Dims[0], Dims[1]);
+   ArrayType TestData =
+       makeArray<ArrayType>(FieldName + "_data", Dims[0], Dims[1]);
    TestField->attachData<ArrayType>(TestData);
 
    Config OpConfig = makeOpConfig(opParam("Period", std::string("1Day")));
@@ -2035,7 +2045,7 @@ void testPrefixSumOpType(const std::string &TypeName, const MachEnv *Env,
           Field::create(FwdName, "Test 1D field for PrefixSum forward", "units",
                         "", static_cast<ScalarT>(-1000),
                         static_cast<ScalarT>(1000), 1, {"NVertLayers"});
-      ArrayType FwdData(FwdName + "_data", NVertLayers);
+      ArrayType FwdData = makeArray<ArrayType>(FwdName + "_data", NVertLayers);
       auto FwdHost = Kokkos::create_mirror_view(FwdData);
       for (I4 k = 0; k < NVertLayers; ++k) {
          FwdHost(k) = static_cast<ScalarT>(k + 1); // 1, 2, 3, ...
@@ -2075,7 +2085,7 @@ void testPrefixSumOpType(const std::string &TypeName, const MachEnv *Env,
           Field::create(RevName, "Test 1D field for PrefixSum reverse", "units",
                         "", static_cast<ScalarT>(-1000),
                         static_cast<ScalarT>(1000), 1, {"NVertLayers"});
-      ArrayType RevData(RevName + "_data", NVertLayers);
+      ArrayType RevData = makeArray<ArrayType>(RevName + "_data", NVertLayers);
       auto RevHost = Kokkos::create_mirror_view(RevData);
       for (I4 k = 0; k < NVertLayers; ++k) {
          RevHost(k) = static_cast<ScalarT>(k + 1); // 1, 2, 3, ...
@@ -2127,7 +2137,8 @@ void testPrefixSumOpType(const std::string &TypeName, const MachEnv *Env,
                         static_cast<ScalarT>(-1000), static_cast<ScalarT>(1000),
                         2, {"TestBins", "NVertLayers"});
       // Allocate and initialize data: value = (bin_idx + 1) * (level + 1)
-      ArrayType TestData(FieldName + "_data", NBins, NVertLayers);
+      ArrayType TestData =
+          makeArray<ArrayType>(FieldName + "_data", NBins, NVertLayers);
       auto TestHost = Kokkos::create_mirror_view(TestData);
       for (I4 i = 0; i < NBins; ++i) {
          for (I4 j = 0; j < NVertLayers; ++j) {
@@ -2234,7 +2245,8 @@ void testPrefixSumOpWithBCType(const std::string &TypeName, const MachEnv *Env,
                                 "", static_cast<ScalarT>(-1e30),
                                 static_cast<ScalarT>(1e30), 1, {"NVertLayers"});
 
-   Array1DReal BCData(BCFieldName + "_data", NVertLayers);
+   Array1DReal BCData =
+       makeArray<Array1DReal>(BCFieldName + "_data", NVertLayers);
    BCField->template attachData<Array1DReal>(BCData, false);
 
    auto BCHost = Kokkos::create_mirror_view(BCData);
@@ -2249,7 +2261,8 @@ void testPrefixSumOpWithBCType(const std::string &TypeName, const MachEnv *Env,
        static_cast<ScalarT>(-1e30), static_cast<ScalarT>(1e30), 2,
        {"TestBins", "NVertLayers"});
 
-   ArrayType InputData(InputFieldName + "_data", NBins, NVertLayers);
+   ArrayType InputData =
+       makeArray<ArrayType>(InputFieldName + "_data", NBins, NVertLayers);
    auto InputHost = Kokkos::create_mirror_view(InputData);
    for (I4 i = 0; i < NBins; ++i) {
       for (I4 k = 0; k < NVertLayers; ++k) {
@@ -2338,7 +2351,7 @@ void testCoordinateBinningOp(const MachEnv *Env, const HorzMesh *Mesh,
        Field::create(FieldName, "Test coordinate field for binning", "degrees",
                      "", -180.0, 180.0, 1, {"NCells"});
 
-   Array1DR8 TestData(FieldName + "_data", NCells);
+   Array1DR8 TestData = makeArray<Array1DR8>(FieldName + "_data", NCells);
    TestField->attachData<Array1DR8>(TestData, false);
 
    auto TestDataHost = Kokkos::create_mirror_view(TestData);
@@ -2419,7 +2432,8 @@ void testBinnedAccumulatorOp(const MachEnv *Env, const HorzMesh *Mesh,
    auto BinField = Field::create(BinIndexFieldName, "Test bin indices", "1", "",
                                  0, NumBins, 1, {"NCells"});
 
-   Array1DI4 BinData(BinIndexFieldName + "_data", NCells);
+   Array1DI4 BinData =
+       makeArray<Array1DI4>(BinIndexFieldName + "_data", NCells);
    BinField->attachData<Array1DI4>(BinData, false);
 
    auto BinDataHost = Kokkos::create_mirror_view(BinData);
@@ -2436,7 +2450,8 @@ void testBinnedAccumulatorOp(const MachEnv *Env, const HorzMesh *Mesh,
        Field::create(ValueFieldName, "Test values for accumulation", "m3/s", "",
                      -1e30, 1e30, 2, {"NCells", "NVertLayers"});
 
-   Array2DR8 ValueData(ValueFieldName + "_data", NCells, NVertLayers);
+   Array2DR8 ValueData =
+       makeArray<Array2DR8>(ValueFieldName + "_data", NCells, NVertLayers);
    ValueField->attachData<Array2DR8>(ValueData, false);
 
    auto ValueDataHost = Kokkos::create_mirror_view(ValueData);
@@ -2536,8 +2551,8 @@ void testPseudoToGeometricOpType(const std::string &TypeName,
       SpecVolField = Field::create("SpecVol", "Test specific volume", "m^3/kg",
                                    "", 0.0, 10.0, 2, {"NCells", "NVertLayers"});
 
-      Array2DReal SpecVolDataNew("SpecVol_data", Mesh->NCellsSize,
-                                 VCoord->NVertLayers);
+      Array2DReal SpecVolDataNew = makeArray<Array2DReal>(
+          "SpecVol_data", Mesh->NCellsSize, VCoord->NVertLayers);
       SpecVolField->attachData<Array2DReal>(SpecVolDataNew, false);
    }
 
@@ -2725,7 +2740,8 @@ void testExtractRegionOpType(const std::string &TypeName, const MachEnv *Env,
    auto MaskField = Field::create(MaskFieldName, "Test regional mask", "1", "",
                                   0, 1, 1, {"NCells"});
 
-   Array1DI4 MaskData(MaskFieldName + "_data", Mesh->NCellsSize);
+   Array1DI4 MaskData =
+       makeArray<Array1DI4>(MaskFieldName + "_data", Mesh->NCellsSize);
    MaskField->attachData<Array1DI4>(MaskData, false);
 
    auto MaskDataHost = Kokkos::create_mirror_view(MaskData);
@@ -3011,7 +3027,8 @@ void testHorzMeanOp(const MachEnv *Env, const HorzMesh *Mesh,
    // This is the opposite of the legacy Value != 0 path, confirming the mask
    // takes full control when attached.
    // -------------------------------------------------------------------------
-   Array1DI4 RegMaskData("HorzMeanTestRegMask", Mesh->NCellsSize);
+   Array1DI4 RegMaskData =
+       makeArray<Array1DI4>("HorzMeanTestRegMask", Mesh->NCellsSize);
    auto RegMaskHost = Kokkos::create_mirror_view(RegMaskData);
    for (I4 i = 0; i < Mesh->NCellsSize; ++i) {
       I4 GID         = CellIDH(i) - 1; // 0-based global id
@@ -3079,8 +3096,8 @@ void testHorzMeanOp(const MachEnv *Env, const HorzMesh *Mesh,
        InterfaceFieldName, "Interface input for HorzMean", "m", "",
        -std::numeric_limits<Real>::max(), std::numeric_limits<Real>::max(), 2,
        {"NCells", "NVertLayersP1"});
-   Array2DR8 InterfaceData(InterfaceFieldName + "_data", Mesh->NCellsSize,
-                           NVertP1);
+   Array2DR8 InterfaceData = makeArray<Array2DR8>(InterfaceFieldName + "_data",
+                                                  Mesh->NCellsSize, NVertP1);
    auto InterfaceDataH = Kokkos::create_mirror_view(InterfaceData);
    for (I4 i = 0; i < Mesh->NCellsSize; ++i) {
       I4 GID = CellIDH(i) - 1; // 0-based global id
@@ -3177,7 +3194,8 @@ void testTransectAccumulatorOp(const MachEnv *Env, const HorzMesh *Mesh,
        Field::create(TransportFieldName, "Test transport for transect", "m3/s",
                      "", -1e30, 1e30, 2, {"NEdges", "NVertLayers"});
 
-   Array2DR8 TransportData(TransportFieldName + "_data", NEdges, NVertLayers);
+   Array2DR8 TransportData =
+       makeArray<Array2DR8>(TransportFieldName + "_data", NEdges, NVertLayers);
    TransportField->attachData<Array2DR8>(TransportData, false);
 
    auto TransportDataHost = Kokkos::create_mirror_view(TransportData);
@@ -3195,7 +3213,7 @@ void testTransectAccumulatorOp(const MachEnv *Env, const HorzMesh *Mesh,
    auto MaskField = Field::create(MaskFieldName, "Test transect mask", "1", "",
                                   0, 1, 1, {"NEdges"});
 
-   Array1DI4 MaskData(MaskFieldName + "_data", NEdges);
+   Array1DI4 MaskData = makeArray<Array1DI4>(MaskFieldName + "_data", NEdges);
    MaskField->attachData<Array1DI4>(MaskData, false);
 
    auto MaskDataHost = Kokkos::create_mirror_view(MaskData);
@@ -3210,7 +3228,7 @@ void testTransectAccumulatorOp(const MachEnv *Env, const HorzMesh *Mesh,
    auto SignField = Field::create(SignFieldName, "Test transect sign", "1", "",
                                   -1, 1, 1, {"NEdges"});
 
-   Array1DI4 SignData(SignFieldName + "_data", NEdges);
+   Array1DI4 SignData = makeArray<Array1DI4>(SignFieldName + "_data", NEdges);
    SignField->attachData<Array1DI4>(SignData, false);
 
    auto SignDataHost = Kokkos::create_mirror_view(SignData);

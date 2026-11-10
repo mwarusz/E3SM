@@ -195,7 +195,8 @@ int testDivergence(Real RTol) {
    const int NVertLayers = 16;
 
    // Prepare operator input
-   Array2DReal VecEdge("VecEdge", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal VecEdge =
+       makeArray<Array2DReal>("VecEdge", Mesh->NEdgesSize, NVertLayers);
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
           VecField[0] = Setup.exactVecX(X, Y);
@@ -204,13 +205,15 @@ int testDivergence(Real RTol) {
        VecEdge, EdgeComponent::Normal, Geom, Mesh);
 
    // Compute exact result
-   Array2DReal ExactDivCell("ExactDivCell", Mesh->NCellsOwned, NVertLayers);
+   Array2DReal ExactDivCell =
+       makeArray<Array2DReal>("ExactDivCell", Mesh->NCellsOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.exactDivVec(X, Y); },
        ExactDivCell, Geom, Mesh, OnCell, ExchangeHalos::No);
 
    // Compute numerical result
-   Array2DReal NumDivCell("NumDivCell", Mesh->NCellsOwned, NVertLayers);
+   Array2DReal NumDivCell =
+       makeArray<Array2DReal>("NumDivCell", Mesh->NCellsOwned, NVertLayers);
    DivergenceOnCell DivergenceCell(Mesh);
    parallelFor(
        {Mesh->NCellsOwned, NVertLayers}, KOKKOS_LAMBDA(int ICell, int K) {
@@ -239,7 +242,8 @@ int testGradient(Real RTol) {
    const int NVertLayers = 16;
 
    // Prepare operator input
-   Array2DReal ScalarCell("ScalarCell", Mesh->NCellsSize, NVertLayers);
+   Array2DReal ScalarCell =
+       makeArray<Array2DReal>("ScalarCell", Mesh->NCellsSize, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real Coord1, Real Coord2) {
           return Setup.exactScalar(Coord1, Coord2);
@@ -247,7 +251,8 @@ int testGradient(Real RTol) {
        ScalarCell, Geom, Mesh, OnCell);
 
    // Compute exact result
-   Array2DReal ExactGradEdge("ExactGradEdge", Mesh->NEdgesOwned, NVertLayers);
+   Array2DReal ExactGradEdge =
+       makeArray<Array2DReal>("ExactGradEdge", Mesh->NEdgesOwned, NVertLayers);
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
           VecField[0] = Setup.exactGradScalarX(X, Y);
@@ -257,7 +262,8 @@ int testGradient(Real RTol) {
 
    // Compute numerical result
    GradientOnEdge GradientEdge(Mesh);
-   Array2DReal NumGradEdge("NumGradEdge", Mesh->NEdgesOwned, NVertLayers);
+   Array2DReal NumGradEdge =
+       makeArray<Array2DReal>("NumGradEdge", Mesh->NEdgesOwned, NVertLayers);
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int K) {
           GradientEdge(NumGradEdge, IEdge, K, ScalarCell);
@@ -284,7 +290,8 @@ int testCurl(Real RTol) {
    const int NVertLayers = 16;
 
    // Prepare operator input
-   Array2DReal VecEdge("VecEdge", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal VecEdge =
+       makeArray<Array2DReal>("VecEdge", Mesh->NEdgesSize, NVertLayers);
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
           VecField[0] = Setup.exactVecX(X, Y);
@@ -293,15 +300,15 @@ int testCurl(Real RTol) {
        VecEdge, EdgeComponent::Normal, Geom, Mesh);
 
    // Compute exact result
-   Array2DReal ExactCurlVertex("ExactCurlVertex", Mesh->NVerticesOwned,
-                               NVertLayers);
+   Array2DReal ExactCurlVertex = makeArray<Array2DReal>(
+       "ExactCurlVertex", Mesh->NVerticesOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.exactCurlVec(X, Y); },
        ExactCurlVertex, Geom, Mesh, OnVertex, ExchangeHalos::No);
 
    // Compute numerical result
-   Array2DReal NumCurlVertex("NumCurlVertex", Mesh->NVerticesOwned,
-                             NVertLayers);
+   Array2DReal NumCurlVertex = makeArray<Array2DReal>(
+       "NumCurlVertex", Mesh->NVerticesOwned, NVertLayers);
    CurlOnVertex CurlVertex(Mesh);
    parallelFor(
        {Mesh->NVerticesOwned, NVertLayers}, KOKKOS_LAMBDA(int IVertex, int K) {
@@ -331,7 +338,8 @@ int testTangentRecon(Real RTol) {
    const int NVertLayers = 16;
 
    // Prepare operator input
-   Array2DReal VecEdge("VecEdge", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal VecEdge =
+       makeArray<Array2DReal>("VecEdge", Mesh->NEdgesSize, NVertLayers);
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
           VecField[0] = Setup.exactVecX(X, Y);
@@ -340,7 +348,8 @@ int testTangentRecon(Real RTol) {
        VecEdge, EdgeComponent::Normal, Geom, Mesh);
 
    // Compute exact result
-   Array2DReal ExactReconEdge("ExactReconEdge", Mesh->NEdgesOwned, NVertLayers);
+   Array2DReal ExactReconEdge =
+       makeArray<Array2DReal>("ExactReconEdge", Mesh->NEdgesOwned, NVertLayers);
 
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
@@ -351,7 +360,8 @@ int testTangentRecon(Real RTol) {
        ExchangeHalos::No);
 
    // Compute numerical result
-   Array2DReal NumReconEdge("NumReconEdge", Mesh->NEdgesOwned, NVertLayers);
+   Array2DReal NumReconEdge =
+       makeArray<Array2DReal>("NumReconEdge", Mesh->NEdgesOwned, NVertLayers);
    TangentialReconOnEdge TanReconEdge(Mesh);
    parallelFor(
        {Mesh->NEdgesOwned, NVertLayers}, KOKKOS_LAMBDA(int IEdge, int K) {
@@ -394,7 +404,7 @@ int testVectorRecon(Real RTol) {
    // Prepare operator input: edge-normal component of the exact vector field
    // (VectorReconOnCell currently only supports a single vertical
    // layer, so we use rank-1 arrays here)
-   Array1DReal VecEdge("VecEdge", Mesh->NEdgesSize);
+   Array1DReal VecEdge = makeArray<Array1DReal>("VecEdge", Mesh->NEdgesSize);
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real Lon, Real Lat) {
           VecField[0] = Setup.exactVecX(Lon, Lat);
@@ -403,7 +413,8 @@ int testVectorRecon(Real RTol) {
        VecEdge, EdgeComponent::Normal, Geom, Mesh);
 
    // Compute exact magnitude of the vector field at cell centers
-   Array1DReal ExactMagCell("ExactMagCell", Mesh->NCellsOwned);
+   Array1DReal ExactMagCell =
+       makeArray<Array1DReal>("ExactMagCell", Mesh->NCellsOwned);
    Err += setScalar(
        KOKKOS_LAMBDA(Real Lon, Real Lat) {
           return vecMagnitude(Setup.exactVecX(Lon, Lat),
@@ -412,8 +423,8 @@ int testVectorRecon(Real RTol) {
        ExactMagCell, Geom, Mesh, OnCell, ExchangeHalos::No);
 
    // Compute numerical reconstruction at cell centers
-   Array1DReal UReconX("UReconX", Mesh->NCellsOwned);
-   Array1DReal UReconY("UReconY", Mesh->NCellsOwned);
+   Array1DReal UReconX = makeArray<Array1DReal>("UReconX", Mesh->NCellsOwned);
+   Array1DReal UReconY = makeArray<Array1DReal>("UReconY", Mesh->NCellsOwned);
    VectorReconOnCell ReconCell(Mesh);
    parallelFor(
        {Mesh->NCellsOwned}, KOKKOS_LAMBDA(int ICell) {
@@ -421,7 +432,8 @@ int testVectorRecon(Real RTol) {
        });
 
    // Magnitude of the numerical reconstruction
-   Array1DReal NumMagCell("NumMagCell", Mesh->NCellsOwned);
+   Array1DReal NumMagCell =
+       makeArray<Array1DReal>("NumMagCell", Mesh->NCellsOwned);
    parallelFor(
        {Mesh->NCellsOwned}, KOKKOS_LAMBDA(int ICell) {
           NumMagCell(ICell) = vecMagnitude(UReconX(ICell), UReconY(ICell));
@@ -447,7 +459,8 @@ int testInterpCellToEdge(Real RTol) {
    const auto &Mesh = HorzMesh::getDefault();
 
    // Prepare operator input
-   Array1DReal ScalarCell("ScalarCell", Mesh->NCellsSize);
+   Array1DReal ScalarCell =
+       makeArray<Array1DReal>("ScalarCell", Mesh->NCellsSize);
    Err += setScalar(
        KOKKOS_LAMBDA(Real Coord1, Real Coord2) {
           return Setup.exactScalar(Coord1, Coord2);
@@ -455,7 +468,8 @@ int testInterpCellToEdge(Real RTol) {
        ScalarCell, Geom, Mesh, OnCell);
 
    // Compute exact result
-   Array1DReal ExactScalarEdge("ExactScalarEdge", Mesh->NEdgesOwned);
+   Array1DReal ExactScalarEdge =
+       makeArray<Array1DReal>("ExactScalarEdge", Mesh->NEdgesOwned);
    Err += setScalar(
        KOKKOS_LAMBDA(Real Coord1, Real Coord2) {
           return Setup.exactScalar(Coord1, Coord2);
@@ -463,8 +477,10 @@ int testInterpCellToEdge(Real RTol) {
        ExactScalarEdge, Geom, Mesh, OnEdge, ExchangeHalos::No);
 
    // Compute numerical result
-   Array1DReal IsoNumScalarEdge("IsoNumScalarEdge", Mesh->NEdgesOwned);
-   Array1DReal AnisoNumScalarEdge("AnisoNumScalarEdge", Mesh->NEdgesOwned);
+   Array1DReal IsoNumScalarEdge =
+       makeArray<Array1DReal>("IsoNumScalarEdge", Mesh->NEdgesOwned);
+   Array1DReal AnisoNumScalarEdge =
+       makeArray<Array1DReal>("AnisoNumScalarEdge", Mesh->NEdgesOwned);
    InterpCellToEdge Interp(Mesh);
    parallelFor(
        {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge) {
@@ -558,27 +574,29 @@ int testsecondderivativeoncellDeterminePlanerPatchGeometry(Real RTol) {
       if (1 < cellsOnEdge[e].size())
          dcEdge[e] = CtoC;
    }
-   Array2DI4 EdgesOnCell("EdgesOnCell", 12, 6);
+   Array2DI4 EdgesOnCell = makeArray<Array2DI4>("EdgesOnCell", 12, 6);
    auto EdgesOnCellH = createHostMirrorCopy(EdgesOnCell);
    for (int c = 0; c < 12; ++c)
       for (int i = 0; i < 6; ++i)
          EdgesOnCellH(c, i) = edgesOnCell[c][i];
    OMEGA::deepCopy(EdgesOnCell, EdgesOnCellH);
 
-   Array2DI4 CellsOnEdge("CellsOnEdge", cellsOnEdge.size(), 2);
+   Array2DI4 CellsOnEdge =
+       makeArray<Array2DI4>("CellsOnEdge", cellsOnEdge.size(), 2);
    auto CellsOnEdgeH = createHostMirrorCopy(CellsOnEdge);
    for (unsigned e = 0; e < cellsOnEdge.size(); ++e)
       for (unsigned i = 0; i < cellsOnEdge[e].size(); ++i)
          CellsOnEdgeH(e, i) = cellsOnEdge[e][i];
    OMEGA::deepCopy(CellsOnEdge, CellsOnEdgeH);
 
-   Array1DReal AngleEdge("AndleEdge", angleEdge.size());
+   Array1DReal AngleEdge =
+       makeArray<Array1DReal>("AndleEdge", angleEdge.size());
    auto AngleEdgeH = createHostMirrorCopy(AngleEdge);
    for (unsigned e = 0; e < angleEdge.size(); ++e)
       AngleEdgeH(e) = angleEdge[e];
    OMEGA::deepCopy(AngleEdge, AngleEdgeH);
 
-   Array1DReal DcEdge("DcEdge", dcEdge.size());
+   Array1DReal DcEdge = makeArray<Array1DReal>("DcEdge", dcEdge.size());
    auto DcEdgeH = createHostMirrorCopy(DcEdge);
    for (unsigned e = 0; e < dcEdge.size(); ++e)
       DcEdgeH(e) = dcEdge[e];
@@ -600,9 +618,9 @@ int testsecondderivativeoncellDeterminePlanerPatchGeometry(Real RTol) {
    for (int ICell = 3; ICell < 7; ICell += 3) {
       const I4 NEdges   = 6;
       const I4 MaxEdges = 7;
-      Array1DReal XP("XP", MaxEdges);
-      Array1DReal YP("YP", MaxEdges);
-      Array1DReal Angle2D("Array2D", MaxEdges);
+      Array1DReal XP      = makeArray<Array1DReal>("XP", MaxEdges);
+      Array1DReal YP      = makeArray<Array1DReal>("YP", MaxEdges);
+      Array1DReal Angle2D = makeArray<Array1DReal>("Array2D", MaxEdges);
       const Array1DI4 edgesOnCell =
           Kokkos::subview(EdgesOnCell, ICell, Kokkos::ALL);
       Kokkos::parallel_for(
@@ -667,8 +685,8 @@ int testsecondderivativeoncellLeastSquaresFit(Real RTol) {
          SecondDerivativeOnCell::LeastSquaresFit(XP, YP, NEdges, B);
       }
    };
-   Array1DReal XP("XP", NEdges);
-   Array1DReal YP("YP", NEdges);
+   Array1DReal XP = makeArray<Array1DReal>("XP", NEdges);
+   Array1DReal YP = makeArray<Array1DReal>("YP", NEdges);
    auto XPH = createHostMirrorCopy(XP);
    auto YPH = createHostMirrorCopy(YP);
    for (int i = 0; i < NEdges; ++i) {
@@ -678,7 +696,7 @@ int testsecondderivativeoncellLeastSquaresFit(Real RTol) {
    }
    OMEGA::deepCopy(XP, XPH);
    OMEGA::deepCopy(YP, YPH);
-   Array2DReal B("B", MaxMaxEdges, MaxMaxEdges);
+   Array2DReal B = makeArray<Array2DReal>("B", MaxMaxEdges, MaxMaxEdges);
    Kokkos::parallel_for(
        1, KOKKOS_LAMBDA(int /* dummy */) {
           SecondDerivativeOnCellTest::Test(XP, YP, NEdges, B);
@@ -806,9 +824,9 @@ int testsecondderivativeoncellDetermineSphericalPatchGeometry(Real RTol) {
       for (int J = 0; J < 2; ++J)
          X[I][J] = C[I][J] - T[J];
 
-   Array1DReal XCell("XCell", 12);
-   Array1DReal YCell("YCell", 12);
-   Array1DReal ZCell("ZCell", 12);
+   Array1DReal XCell = makeArray<Array1DReal>("XCell", 12);
+   Array1DReal YCell = makeArray<Array1DReal>("YCell", 12);
+   Array1DReal ZCell = makeArray<Array1DReal>("ZCell", 12);
    auto XCellH = createHostMirrorCopy(XCell);
    auto YCellH = createHostMirrorCopy(YCell);
    auto ZCellH = createHostMirrorCopy(ZCell);
@@ -838,9 +856,9 @@ int testsecondderivativeoncellDetermineSphericalPatchGeometry(Real RTol) {
    OMEGA::deepCopy(YCell, YCellH);
    OMEGA::deepCopy(ZCell, ZCellH);
 
-   Array1DReal XVertex("XVertex", 38);
-   Array1DReal YVertex("YVertex", 38);
-   Array1DReal ZVertex("ZVertex", 38);
+   Array1DReal XVertex = makeArray<Array1DReal>("XVertex", 38);
+   Array1DReal YVertex = makeArray<Array1DReal>("YVertex", 38);
+   Array1DReal ZVertex = makeArray<Array1DReal>("ZVertex", 38);
    auto XVertexH = createHostMirrorCopy(XVertex);
    auto YVertexH = createHostMirrorCopy(YVertex);
    auto ZVertexH = createHostMirrorCopy(ZVertex);
@@ -856,34 +874,36 @@ int testsecondderivativeoncellDetermineSphericalPatchGeometry(Real RTol) {
    OMEGA::deepCopy(YVertex, YVertexH);
    OMEGA::deepCopy(ZVertex, ZVertexH);
 
-   Array2DI4 EdgesOnCell("EdgesOnCell", 12, 6);
+   Array2DI4 EdgesOnCell = makeArray<Array2DI4>("EdgesOnCell", 12, 6);
    auto EdgesOnCellH = createHostMirrorCopy(EdgesOnCell);
    for (int c = 0; c < 12; ++c)
       for (int i = 0; i < 6; ++i)
          EdgesOnCellH(c, i) = edgesOnCell[c][i];
    OMEGA::deepCopy(EdgesOnCell, EdgesOnCellH);
 
-   Array2DI4 VerticesOnEdge("VerticesOnEdge", NEdges, 2);
+   Array2DI4 VerticesOnEdge = makeArray<Array2DI4>("VerticesOnEdge", NEdges, 2);
    auto VerticesOnEdgeH = createHostMirrorCopy(VerticesOnEdge);
    for (int c = 0; c < NEdges; ++c)
       for (int i = 0; i < 2; ++i)
          VerticesOnEdgeH(c, i) = verticesOnEdge[c][i];
    OMEGA::deepCopy(VerticesOnEdge, VerticesOnEdgeH);
 
-   Array2DI4 CellsOnEdge("CellsOnEdge", cellsOnEdge.size(), 2);
+   Array2DI4 CellsOnEdge =
+       makeArray<Array2DI4>("CellsOnEdge", cellsOnEdge.size(), 2);
    auto CellsOnEdgeH = createHostMirrorCopy(CellsOnEdge);
    for (unsigned e = 0; e < cellsOnEdge.size(); ++e)
       for (unsigned i = 0; i < cellsOnEdge[e].size(); ++i)
          CellsOnEdgeH(e, i) = cellsOnEdge[e][i];
    OMEGA::deepCopy(CellsOnEdge, CellsOnEdgeH);
 
-   Array1DReal AngleEdge("AndleEdge", angleEdge.size());
+   Array1DReal AngleEdge =
+       makeArray<Array1DReal>("AndleEdge", angleEdge.size());
    auto AngleEdgeH = createHostMirrorCopy(AngleEdge);
    for (unsigned e = 0; e < angleEdge.size(); ++e)
       AngleEdgeH(e) = angleEdge[e];
    OMEGA::deepCopy(AngleEdge, AngleEdgeH);
 
-   Array1DReal DcEdge("DcEdge", dcEdge.size());
+   Array1DReal DcEdge = makeArray<Array1DReal>("DcEdge", dcEdge.size());
    auto DcEdgeH = createHostMirrorCopy(DcEdge);
    for (unsigned e = 0; e < dcEdge.size(); ++e)
       DcEdgeH(e) = dcEdge[e];
@@ -906,10 +926,10 @@ int testsecondderivativeoncellDetermineSphericalPatchGeometry(Real RTol) {
    };
    {
       const I4 NEdges = 6;
-      Array1DReal XP("XP", NEdges);
-      Array1DReal YP("YP", NEdges);
-      Array1DReal Angle2D("Angle2D", NEdges);
-      Array1DI4 CellList("CellList", NEdges + 1);
+      Array1DReal XP      = makeArray<Array1DReal>("XP", NEdges);
+      Array1DReal YP      = makeArray<Array1DReal>("YP", NEdges);
+      Array1DReal Angle2D = makeArray<Array1DReal>("Angle2D", NEdges);
+      Array1DI4 CellList  = makeArray<Array1DI4>("CellList", NEdges + 1);
       auto CellListH = createHostMirrorCopy(CellList);
       {
          const I4 List[NEdges + 1] = {3, 0, 2, 5, 6, 4, 1};
@@ -981,7 +1001,8 @@ int testsecondderivativeoncellconstructor(Real RTol) {
    const auto NEdgesAll   = Mesh->NEdgesAll;
    const auto NCellsOwned = Mesh->NCellsOwned;
 
-   Array3DReal DerivTwo("DerivTwo", MaxEdges2, 2, NEdgesAll);
+   Array3DReal DerivTwo =
+       makeArray<Array3DReal>("DerivTwo", MaxEdges2, 2, NEdgesAll);
    SecondDerivativeOnCell DerivativeOnCell(Mesh);
    parallelFor(
        {NCellsOwned},

@@ -176,9 +176,12 @@ void testEosLinear() {
    TestEos->EosChoice = EosType::LinearEos;
 
    /// Create and fill ocean state arrays
-   Array2DReal SArray = Array2DReal("SArray", NCellsSize, NVertLayers);
-   Array2DReal TArray = Array2DReal("TArray", NCellsSize, NVertLayers);
-   Array2DReal PArray = Array2DReal("PArray", NCellsSize, NVertLayers);
+   Array2DReal SArray =
+       makeArray<Array2DReal>("SArray", NCellsSize, NVertLayers);
+   Array2DReal TArray =
+       makeArray<Array2DReal>("TArray", NCellsSize, NVertLayers);
+   Array2DReal PArray =
+       makeArray<Array2DReal>("PArray", NCellsSize, NVertLayers);
    /// Use Kokkos::deep_copy to fill the entire view with the ref value
    deepCopy(SArray, Sa);
    deepCopy(TArray, Ct);
@@ -246,9 +249,12 @@ void testEosLinearDisplaced() {
    TestEos->EosChoice = EosType::LinearEos;
 
    /// Create and fill ocean state arrays
-   Array2DReal SArray = Array2DReal("SArray", NCellsSize, NVertLayers);
-   Array2DReal TArray = Array2DReal("TArray", NCellsSize, NVertLayers);
-   Array2DReal PArray = Array2DReal("PArray", NCellsSize, NVertLayers);
+   Array2DReal SArray =
+       makeArray<Array2DReal>("SArray", NCellsSize, NVertLayers);
+   Array2DReal TArray =
+       makeArray<Array2DReal>("TArray", NCellsSize, NVertLayers);
+   Array2DReal PArray =
+       makeArray<Array2DReal>("PArray", NCellsSize, NVertLayers);
    /// Use Kokkos::deep_copy to fill the entire view with the ref value
    deepCopy(SArray, Sa);
    deepCopy(TArray, Ct);
@@ -317,9 +323,12 @@ void testEosConstant() {
    TestEos->EosChoice = EosType::ConstantEos;
 
    /// Create and fill ocean state arrays
-   Array2DReal SArray = Array2DReal("SArray", NCellsAll, NVertLayers);
-   Array2DReal TArray = Array2DReal("TArray", NCellsAll, NVertLayers);
-   Array2DReal PArray = Array2DReal("PArray", NCellsAll, NVertLayers);
+   Array2DReal SArray =
+       makeArray<Array2DReal>("SArray", NCellsAll, NVertLayers);
+   Array2DReal TArray =
+       makeArray<Array2DReal>("TArray", NCellsAll, NVertLayers);
+   Array2DReal PArray =
+       makeArray<Array2DReal>("PArray", NCellsAll, NVertLayers);
    deepCopy(SArray, Sa);
    deepCopy(TArray, Ct);
    deepCopy(PArray, P);
@@ -380,8 +389,8 @@ void testDepthMeanSpecificVolume() {
    const auto VCoord = VertCoord::getDefault();
    Eos *TestEos      = Eos::getInstance();
 
-   Array2DReal LayerThickness("LayerThickness", Mesh->NCellsSize,
-                              VCoord->NVertLayers);
+   Array2DReal LayerThickness = makeArray<Array2DReal>(
+       "LayerThickness", Mesh->NCellsSize, VCoord->NVertLayers);
 
    deepCopy(TestEos->SpecVol, 2._Real);
    deepCopy(LayerThickness, 3._Real);
@@ -428,9 +437,12 @@ void testBruntVaisalaFreqSqLinear() {
    TestEos->EosChoice = EosType::LinearEos;
 
    /// Create and fill ocean state arrays
-   Array2DReal SArray = Array2DReal("SArray", NCellsSize, NVertLayers);
-   Array2DReal TArray = Array2DReal("TArray", NCellsSize, NVertLayers);
-   Array2DReal PArray = Array2DReal("PArray", NCellsSize, NVertLayers);
+   Array2DReal SArray =
+       makeArray<Array2DReal>("SArray", NCellsSize, NVertLayers);
+   Array2DReal TArray =
+       makeArray<Array2DReal>("TArray", NCellsSize, NVertLayers);
+   Array2DReal PArray =
+       makeArray<Array2DReal>("PArray", NCellsSize, NVertLayers);
    /// Use deep copy to initialize results to zero
    deepCopy(TestEos->SpecVol, 0.0);
    deepCopy(TestEos->BruntVaisalaFreqSq, 0.0);
@@ -549,9 +561,12 @@ void testEosTeos10() {
    TestEos->EosChoice = EosType::Teos10Eos;
 
    /// Create and fill ocean state arrays
-   Array2DReal SArray = Array2DReal("SArray", NCellsSize, NVertLayers);
-   Array2DReal TArray = Array2DReal("TArray", NCellsSize, NVertLayers);
-   Array2DReal PArray = Array2DReal("PArray", NCellsSize, NVertLayers);
+   Array2DReal SArray =
+       makeArray<Array2DReal>("SArray", NCellsSize, NVertLayers);
+   Array2DReal TArray =
+       makeArray<Array2DReal>("TArray", NCellsSize, NVertLayers);
+   Array2DReal PArray =
+       makeArray<Array2DReal>("PArray", NCellsSize, NVertLayers);
    /// Use Kokkos::deep_copy to fill the entire view with the ref value
    deepCopy(SArray, Sa);
    deepCopy(TArray, Ct);
@@ -619,9 +634,12 @@ void testEosTeos10Displaced() {
    TestEos->EosChoice = EosType::Teos10Eos;
 
    /// Create and fill ocean state arrays
-   Array2DReal SArray = Array2DReal("SArray", NCellsSize, NVertLayers);
-   Array2DReal TArray = Array2DReal("TArray", NCellsSize, NVertLayers);
-   Array2DReal PArray = Array2DReal("PArray", NCellsSize, NVertLayers);
+   Array2DReal SArray =
+       makeArray<Array2DReal>("SArray", NCellsSize, NVertLayers);
+   Array2DReal TArray =
+       makeArray<Array2DReal>("TArray", NCellsSize, NVertLayers);
+   Array2DReal PArray =
+       makeArray<Array2DReal>("PArray", NCellsSize, NVertLayers);
    /// Use Kokkos::deep_copy to fill the entire view with the ref value
    deepCopy(SArray, Sa);
    deepCopy(TArray, Ct);
@@ -690,9 +708,12 @@ void testBruntVaisalaFreqSqTeos10() {
    TestEos->EosChoice = EosType::Teos10Eos;
 
    /// Create and fill ocean state arrays
-   Array2DReal SArray = Array2DReal("SArray", NCellsSize, NVertLayers);
-   Array2DReal TArray = Array2DReal("TArray", NCellsSize, NVertLayers);
-   Array2DReal PArray = Array2DReal("PArray", NCellsSize, NVertLayers);
+   Array2DReal SArray =
+       makeArray<Array2DReal>("SArray", NCellsSize, NVertLayers);
+   Array2DReal TArray =
+       makeArray<Array2DReal>("TArray", NCellsSize, NVertLayers);
+   Array2DReal PArray =
+       makeArray<Array2DReal>("PArray", NCellsSize, NVertLayers);
    /// Use deep copy to initialize results to zero
    deepCopy(TestEos->BruntVaisalaFreqSq, 0.0);
    deepCopy(TestEos->SpecVol, 0.0);
@@ -823,9 +844,12 @@ void testEosTeos10Derivs() {
    TestEos->EosChoice = EosType::Teos10Eos;
 
    /// Create the ocean state arrays
-   Array2DReal SArray = Array2DReal("SArray", NCellsSize, NVertLayers);
-   Array2DReal TArray = Array2DReal("TArray", NCellsSize, NVertLayers);
-   Array2DReal PArray = Array2DReal("PArray", NCellsSize, NVertLayers);
+   Array2DReal SArray =
+       makeArray<Array2DReal>("SArray", NCellsSize, NVertLayers);
+   Array2DReal TArray =
+       makeArray<Array2DReal>("TArray", NCellsSize, NVertLayers);
+   Array2DReal PArray =
+       makeArray<Array2DReal>("PArray", NCellsSize, NVertLayers);
    deepCopy(TestEos->SpecVol, 0.0);
    deepCopy(TestEos->SpecVolDCt, 0.0);
    deepCopy(TestEos->SpecVolDSa, 0.0);
@@ -984,9 +1008,12 @@ void testEosLinearDerivs() {
    TestEos->EosChoice = EosType::LinearEos;
 
    /// Create and fill ocean state arrays
-   Array2DReal SArray = Array2DReal("SArray", NCellsSize, NVertLayers);
-   Array2DReal TArray = Array2DReal("TArray", NCellsSize, NVertLayers);
-   Array2DReal PArray = Array2DReal("PArray", NCellsSize, NVertLayers);
+   Array2DReal SArray =
+       makeArray<Array2DReal>("SArray", NCellsSize, NVertLayers);
+   Array2DReal TArray =
+       makeArray<Array2DReal>("TArray", NCellsSize, NVertLayers);
+   Array2DReal PArray =
+       makeArray<Array2DReal>("PArray", NCellsSize, NVertLayers);
    deepCopy(SArray, Sa);
    deepCopy(TArray, Ct);
    deepCopy(PArray, P);
@@ -1074,9 +1101,12 @@ void testEosConstantDerivs() {
    TestEos->EosChoice = EosType::ConstantEos;
 
    /// Create and fill ocean state arrays
-   Array2DReal SArray = Array2DReal("SArray", NCellsSize, NVertLayers);
-   Array2DReal TArray = Array2DReal("TArray", NCellsSize, NVertLayers);
-   Array2DReal PArray = Array2DReal("PArray", NCellsSize, NVertLayers);
+   Array2DReal SArray =
+       makeArray<Array2DReal>("SArray", NCellsSize, NVertLayers);
+   Array2DReal TArray =
+       makeArray<Array2DReal>("TArray", NCellsSize, NVertLayers);
+   Array2DReal PArray =
+       makeArray<Array2DReal>("PArray", NCellsSize, NVertLayers);
    deepCopy(SArray, Sa);
    deepCopy(TArray, Ct);
    deepCopy(PArray, P);

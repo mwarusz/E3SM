@@ -5,6 +5,7 @@
 #include "IOStream.h"
 #include "OceanDriver.h"
 #include "OceanTestCommon.h"
+#include "OmegaKokkos.h"
 #include "Pacer.h"
 #include "TimeStepper.h"
 #include "auxiliaryVars/MixedLayerAuxVars.h"
@@ -200,10 +201,10 @@ std::pair<Array2DReal, Array2DReal> setupVerticalCoord() {
        });
 
    // for this test we also need vertical coordinates on edges
-   Array2DReal GeomZMidEdge("GeomZMidEdge", Mesh->NEdgesSize,
-                            VCoord->NVertLayers);
-   Array2DReal GeomZInterfaceEdge("GeomZInterfaceEdge", Mesh->NEdgesSize,
-                                  VCoord->NVertLayersP1);
+   Array2DReal GeomZMidEdge = makeArray<Array2DReal>(
+       "GeomZMidEdge", Mesh->NEdgesSize, VCoord->NVertLayers);
+   Array2DReal GeomZInterfaceEdge = makeArray<Array2DReal>(
+       "GeomZInterfaceEdge", Mesh->NEdgesSize, VCoord->NVertLayersP1);
 
    const auto &LonEdgeH = Mesh->LonEdgeH;
    const auto &LatEdgeH = Mesh->LatEdgeH;
@@ -247,8 +248,8 @@ Array2DReal computePseudoThickOnEdges() {
    const auto &MaxLayerEdgeTop = VCoord->MaxLayerEdgeTop;
    const auto &GeomZInterface  = VCoord->GeomZInterface;
 
-   Array2DReal PseudoThick("PseudoThick", Mesh->NCellsSize,
-                           VCoord->NVertLayers);
+   Array2DReal PseudoThick = makeArray<Array2DReal>(
+       "PseudoThick", Mesh->NCellsSize, VCoord->NVertLayers);
 
    parallelForOuter(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell, const TeamMember &Team) {
@@ -263,8 +264,8 @@ Array2DReal computePseudoThickOnEdges() {
               });
        });
 
-   Array2DReal MeanPseudoThickEdge("MeanPseudoThickEdge", Mesh->NEdgesSize,
-                                   VCoord->NVertLayers);
+   Array2DReal MeanPseudoThickEdge = makeArray<Array2DReal>(
+       "MeanPseudoThickEdge", Mesh->NEdgesSize, VCoord->NVertLayers);
 
    parallelForOuter(
        {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
@@ -290,15 +291,16 @@ Array2DReal computeExactGradInterface(const Array2DReal &GeomZInterfaceEdge) {
    const auto &MinLayerEdgeBot = VCoord->MinLayerEdgeBot;
    const auto &MaxLayerEdgeTop = VCoord->MaxLayerEdgeTop;
 
-   Array1DI4 MaxLayerEdgeTopP1("MaxLayerEdgeTopP1", Mesh->NEdgesSize);
+   Array1DI4 MaxLayerEdgeTopP1 =
+       makeArray<Array1DI4>("MaxLayerEdgeTopP1", Mesh->NEdgesSize);
 
    parallelFor(
        {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
           MaxLayerEdgeTopP1(IEdge) = MaxLayerEdgeTop(IEdge) + 1;
        });
 
-   Array2DReal ExactGradInterface("ExactGradInterface", Mesh->NEdgesSize,
-                                  VCoord->NVertLayersP1);
+   Array2DReal ExactGradInterface = makeArray<Array2DReal>(
+       "ExactGradInterface", Mesh->NEdgesSize, VCoord->NVertLayersP1);
    deepCopy(ExactGradInterface, FillValueReal);
 
    setVectorEdge(
@@ -332,7 +334,8 @@ Array1DReal computeExactGradML(const Array2DReal &GeomZInterfaceEdge,
    auto *VCoord                = VertCoord::getDefault();
    const auto &MinLayerEdgeBot = VCoord->MinLayerEdgeBot;
 
-   Array1DReal ExactGradML("ExactGradML", Mesh->NEdgesSize);
+   Array1DReal ExactGradML =
+       makeArray<Array1DReal>("ExactGradML", Mesh->NEdgesSize);
 
    setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], int IEdge, Real Lon, Real Lat) {
@@ -360,7 +363,8 @@ Array1DReal computeExactBVML(const Array2DReal &GeomZInterfaceEdge,
    auto *VCoord                = VertCoord::getDefault();
    const auto &MinLayerEdgeBot = VCoord->MinLayerEdgeBot;
 
-   Array1DReal ExactBVML("ExactBVML", Mesh->NEdgesSize);
+   Array1DReal ExactBVML =
+       makeArray<Array1DReal>("ExactBVML", Mesh->NEdgesSize);
 
    setScalar(
        KOKKOS_LAMBDA(int IEdge, Real Lon, Real Lat) {
@@ -395,9 +399,10 @@ Error testDenMixedLayerDepth(bool SetupExact) {
 
    MixedLayerAuxVars MixedLayerAux("", Mesh, VCoord);
 
-   Array2DReal ReferenceSpecVol("ReferenceSpecVol", Mesh->NCellsAll,
-                                VCoord->NVertLayers);
-   Array1DReal ExactMixLayerDepth("ExactMixLayerDepth", Mesh->NCellsAll);
+   Array2DReal ReferenceSpecVol = makeArray<Array2DReal>(
+       "ReferenceSpecVol", Mesh->NCellsAll, VCoord->NVertLayers);
+   Array1DReal ExactMixLayerDepth =
+       makeArray<Array1DReal>("ExactMixLayerDepth", Mesh->NCellsAll);
 
    const Real DenThreshold = MixedLayerAux.DenThreshold;
 
@@ -473,7 +478,8 @@ Error testBuoyancyGrad(const Array2DReal &MeanPseudoThickEdge,
    const auto &MaxLayerCell = VCoord->MaxLayerCell;
 
    // Compute specific volume
-   Array2DReal SpecVol("SpecVol", Mesh->NCellsSize, VCoord->NVertLayers);
+   Array2DReal SpecVol =
+       makeArray<Array2DReal>("SpecVol", Mesh->NCellsSize, VCoord->NVertLayers);
    setScalar(
        KOKKOS_LAMBDA(int ICell, int K, Real Lon, Real Lat, Real Z) {
           return specVol(Lon, Lat, Z);
@@ -482,13 +488,15 @@ Error testBuoyancyGrad(const Array2DReal &MeanPseudoThickEdge,
        GeomZMid);
 
    // Compute squared Brunt-Vaisala frequency
-   Array1DI4 MaxLayerCellP1("MaxLayerCellP1", Mesh->NCellsSize);
+   Array1DI4 MaxLayerCellP1 =
+       makeArray<Array1DI4>("MaxLayerCellP1", Mesh->NCellsSize);
    parallelFor(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
           MaxLayerCellP1(ICell) = MaxLayerCell(ICell) + 1;
        });
 
-   Array2DReal BVFreqSq("BVFreqSq", Mesh->NCellsSize, VCoord->NVertLayersP1);
+   Array2DReal BVFreqSq = makeArray<Array2DReal>("BVFreqSq", Mesh->NCellsSize,
+                                                 VCoord->NVertLayersP1);
    setScalar(
        KOKKOS_LAMBDA(int ICell, int K, Real Lon, Real Lat, Real Z) {
           return bruntVaisalaFreqSq(Lon, Lat, Z);
@@ -550,13 +558,16 @@ Error testEddyVelocity(const Array2DReal &GeomZInterfaceEdge,
    SubEddies->LfMin = LfMin;
    const Real DsMax = SubEddies->DsMax;
 
-   Array1DReal DenMixLayerDepth("DenMixLayerDepth", Mesh->NCellsSize);
-   Array1DI4 DenMixLayerIndex("DenMixLayerIndex", Mesh->NCellsSize);
+   Array1DReal DenMixLayerDepth =
+       makeArray<Array1DReal>("DenMixLayerDepth", Mesh->NCellsSize);
+   Array1DI4 DenMixLayerIndex =
+       makeArray<Array1DI4>("DenMixLayerIndex", Mesh->NCellsSize);
    const auto &TimeScale = SubEddies->TimeScale;
    const Real Ce         = SubEddies->Ce;
 
    // Pick initial mixed layer indices arbitrarily
-   Array1DI4 DenMixLayerIndexTmp("DenMixLayerIndexTmp", Mesh->NCellsSize);
+   Array1DI4 DenMixLayerIndexTmp =
+       makeArray<Array1DI4>("DenMixLayerIndexTmp", Mesh->NCellsSize);
    parallelFor(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
           const int KMax = MaxLayerCell(ICell);
@@ -587,10 +598,12 @@ Error testEddyVelocity(const Array2DReal &GeomZInterfaceEdge,
    SubEddies->GradBuoyEdgeInterface =
        computeExactGradInterface(GeomZInterfaceEdge);
 
-   Array2DReal BVFreqSq("BVFreqSq", Mesh->NCellsSize, VCoord->NVertLayersP1);
+   Array2DReal BVFreqSq = makeArray<Array2DReal>("BVFreqSq", Mesh->NCellsSize,
+                                                 VCoord->NVertLayersP1);
 
    // Compute exact Brunt-Vaisala frequency
-   Array1DI4 MaxLayerCellP1("MaxLayerCellP1", Mesh->NCellsSize);
+   Array1DI4 MaxLayerCellP1 =
+       makeArray<Array1DI4>("MaxLayerCellP1", Mesh->NCellsSize);
    parallelFor(
        {Mesh->NCellsAll}, KOKKOS_LAMBDA(int ICell) {
           MaxLayerCellP1(ICell) = MaxLayerCell(ICell) + 1;
@@ -617,8 +630,8 @@ Error testEddyVelocity(const Array2DReal &GeomZInterfaceEdge,
    Array1DReal MeanBV = computeExactBVML(GeomZInterfaceEdge, DenMixLayerDepth);
 
    // Compute exact eddy velocity
-   Array2DReal ExactEddyVelocity("ExactEddyVelocity", Mesh->NEdgesSize,
-                                 VCoord->NVertLayers);
+   Array2DReal ExactEddyVelocity = makeArray<Array2DReal>(
+       "ExactEddyVelocity", Mesh->NEdgesSize, VCoord->NVertLayers);
    deepCopy(ExactEddyVelocity, FillValueReal);
 
    parallelForOuter(

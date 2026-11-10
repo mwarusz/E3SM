@@ -160,8 +160,10 @@ int main(int argc, char *argv[]) {
 
       HostArray1DI4 Init1DI4CellH("Init1DI4CellH", DefDecomp->NCellsSize);
       HostArray1DI4 Test1DI4CellH("Test1DI4CellH", DefDecomp->NCellsSize);
-      Array1DI4 Init1DI4Cell("Init1DI4Cell", DefDecomp->NCellsSize);
-      Array1DI4 Test1DI4Cell("Test1DI4Cell", DefDecomp->NCellsSize);
+      Array1DI4 Init1DI4Cell =
+          makeArray<Array1DI4>("Init1DI4Cell", DefDecomp->NCellsSize);
+      Array1DI4 Test1DI4Cell =
+          makeArray<Array1DI4>("Test1DI4Cell", DefDecomp->NCellsSize);
 
       NumOwned      = DefDecomp->NCellsOwned;
       NumAll        = DefDecomp->NCellsAll;
@@ -182,8 +184,10 @@ int main(int argc, char *argv[]) {
 
       HostArray1DI4 Init1DI4EdgeH("Init1DI4EdgeH", DefDecomp->NEdgesSize);
       HostArray1DI4 Test1DI4EdgeH("Test1DI4EdgeH", DefDecomp->NEdgesSize);
-      Array1DI4 Init1DI4Edge("Init1DI4Edge", DefDecomp->NEdgesSize);
-      Array1DI4 Test1DI4Edge("Test1DI4Edge", DefDecomp->NEdgesSize);
+      Array1DI4 Init1DI4Edge =
+          makeArray<Array1DI4>("Init1DI4Edge", DefDecomp->NEdgesSize);
+      Array1DI4 Test1DI4Edge =
+          makeArray<Array1DI4>("Test1DI4Edge", DefDecomp->NEdgesSize);
 
       NumOwned      = DefDecomp->NEdgesOwned;
       NumAll        = DefDecomp->NEdgesAll;
@@ -205,8 +209,10 @@ int main(int argc, char *argv[]) {
                                     DefDecomp->NVerticesSize);
       HostArray1DI4 Test1DI4VertexH("Test1DI4VertexH",
                                     DefDecomp->NVerticesSize);
-      Array1DI4 Init1DI4Vertex("Init1DI4Vertex", DefDecomp->NVerticesSize);
-      Array1DI4 Test1DI4Vertex("Test1DI4Vertex", DefDecomp->NVerticesSize);
+      Array1DI4 Init1DI4Vertex =
+          makeArray<Array1DI4>("Init1DI4Vertex", DefDecomp->NVerticesSize);
+      Array1DI4 Test1DI4Vertex =
+          makeArray<Array1DI4>("Test1DI4Vertex", DefDecomp->NVerticesSize);
 
       NumOwned        = DefDecomp->NVerticesOwned;
       NumAll          = DefDecomp->NVerticesAll;
@@ -276,44 +282,52 @@ int main(int argc, char *argv[]) {
       HostArray5DR4 Test5DR4H("Test5DR4H", N5, N4, N3, NumAll, N2);
       HostArray5DR8 Test5DR8H("Test5DR8H", N5, N4, N3, NumAll, N2);
 
-      Array1DI8 Init1DI8("Init1DI8", NumAll);
-      Array1DR4 Init1DR4("Init1DR4", NumAll);
-      Array1DR8 Init1DR8("Init1DR8", NumAll);
-      Array2DI4 Init2DI4("Init2DI4", NumAll, N2);
-      Array2DI8 Init2DI8("Init2DI8", NumAll, N2);
-      Array2DR4 Init2DR4("Init2DR4", NumAll, N2);
-      Array2DR8 Init2DR8("Init2DR8", NumAll, N2);
-      Array3DI4 Init3DI4("Init3DI4", N3, NumAll, N2);
-      Array3DI8 Init3DI8("Init3DI8", N3, NumAll, N2);
-      Array3DR4 Init3DR4("Init3DR4", N3, NumAll, N2);
-      Array3DR8 Init3DR8("Init3DR8", N3, NumAll, N2);
-      Array4DI4 Init4DI4("Init4DI4", N4, N3, NumAll, N2);
-      Array4DI8 Init4DI8("Init4DI8", N4, N3, NumAll, N2);
-      Array4DR4 Init4DR4("Init4DR4", N4, N3, NumAll, N2);
-      Array4DR8 Init4DR8("Init4DR8", N4, N3, NumAll, N2);
-      Array5DI4 Init5DI4("Init5DI4", N5, N4, N3, NumAll, N2);
-      Array5DI8 Init5DI8("Init5DI8", N5, N4, N3, NumAll, N2);
-      Array5DR4 Init5DR4("Init5DR4", N5, N4, N3, NumAll, N2);
-      Array5DR8 Init5DR8("Init5DR8", N5, N4, N3, NumAll, N2);
-      Array1DI8 Test1DI8("Test1DI8", NumAll);
-      Array1DR4 Test1DR4("Test1DR4", NumAll);
-      Array1DR8 Test1DR8("Test1DR8", NumAll);
-      Array2DI4 Test2DI4("Test2DI4", NumAll, N2);
-      Array2DI8 Test2DI8("Test2DI8", NumAll, N2);
-      Array2DR4 Test2DR4("Test2DR4", NumAll, N2);
-      Array2DR8 Test2DR8("Test2DR8", NumAll, N2);
-      Array3DI4 Test3DI4("Test3DI4", N3, NumAll, N2);
-      Array3DI8 Test3DI8("Test3DI8", N3, NumAll, N2);
-      Array3DR4 Test3DR4("Test3DR4", N3, NumAll, N2);
-      Array3DR8 Test3DR8("Test3DR8", N3, NumAll, N2);
-      Array4DI4 Test4DI4("Test4DI4", N4, N3, NumAll, N2);
-      Array4DI8 Test4DI8("Test4DI8", N4, N3, NumAll, N2);
-      Array4DR4 Test4DR4("Test4DR4", N4, N3, NumAll, N2);
-      Array4DR8 Test4DR8("Test4DR8", N4, N3, NumAll, N2);
-      Array5DI4 Test5DI4("Test5DI4", N5, N4, N3, NumAll, N2);
-      Array5DI8 Test5DI8("Test5DI8", N5, N4, N3, NumAll, N2);
-      Array5DR4 Test5DR4("Test5DR4", N5, N4, N3, NumAll, N2);
-      Array5DR8 Test5DR8("Test5DR8", N5, N4, N3, NumAll, N2);
+      Array1DI8 Init1DI8 = makeArray<Array1DI8>("Init1DI8", NumAll);
+      Array1DR4 Init1DR4 = makeArray<Array1DR4>("Init1DR4", NumAll);
+      Array1DR8 Init1DR8 = makeArray<Array1DR8>("Init1DR8", NumAll);
+      Array2DI4 Init2DI4 = makeArray<Array2DI4>("Init2DI4", NumAll, N2);
+      Array2DI8 Init2DI8 = makeArray<Array2DI8>("Init2DI8", NumAll, N2);
+      Array2DR4 Init2DR4 = makeArray<Array2DR4>("Init2DR4", NumAll, N2);
+      Array2DR8 Init2DR8 = makeArray<Array2DR8>("Init2DR8", NumAll, N2);
+      Array3DI4 Init3DI4 = makeArray<Array3DI4>("Init3DI4", N3, NumAll, N2);
+      Array3DI8 Init3DI8 = makeArray<Array3DI8>("Init3DI8", N3, NumAll, N2);
+      Array3DR4 Init3DR4 = makeArray<Array3DR4>("Init3DR4", N3, NumAll, N2);
+      Array3DR8 Init3DR8 = makeArray<Array3DR8>("Init3DR8", N3, NumAll, N2);
+      Array4DI4 Init4DI4 = makeArray<Array4DI4>("Init4DI4", N4, N3, NumAll, N2);
+      Array4DI8 Init4DI8 = makeArray<Array4DI8>("Init4DI8", N4, N3, NumAll, N2);
+      Array4DR4 Init4DR4 = makeArray<Array4DR4>("Init4DR4", N4, N3, NumAll, N2);
+      Array4DR8 Init4DR8 = makeArray<Array4DR8>("Init4DR8", N4, N3, NumAll, N2);
+      Array5DI4 Init5DI4 =
+          makeArray<Array5DI4>("Init5DI4", N5, N4, N3, NumAll, N2);
+      Array5DI8 Init5DI8 =
+          makeArray<Array5DI8>("Init5DI8", N5, N4, N3, NumAll, N2);
+      Array5DR4 Init5DR4 =
+          makeArray<Array5DR4>("Init5DR4", N5, N4, N3, NumAll, N2);
+      Array5DR8 Init5DR8 =
+          makeArray<Array5DR8>("Init5DR8", N5, N4, N3, NumAll, N2);
+      Array1DI8 Test1DI8 = makeArray<Array1DI8>("Test1DI8", NumAll);
+      Array1DR4 Test1DR4 = makeArray<Array1DR4>("Test1DR4", NumAll);
+      Array1DR8 Test1DR8 = makeArray<Array1DR8>("Test1DR8", NumAll);
+      Array2DI4 Test2DI4 = makeArray<Array2DI4>("Test2DI4", NumAll, N2);
+      Array2DI8 Test2DI8 = makeArray<Array2DI8>("Test2DI8", NumAll, N2);
+      Array2DR4 Test2DR4 = makeArray<Array2DR4>("Test2DR4", NumAll, N2);
+      Array2DR8 Test2DR8 = makeArray<Array2DR8>("Test2DR8", NumAll, N2);
+      Array3DI4 Test3DI4 = makeArray<Array3DI4>("Test3DI4", N3, NumAll, N2);
+      Array3DI8 Test3DI8 = makeArray<Array3DI8>("Test3DI8", N3, NumAll, N2);
+      Array3DR4 Test3DR4 = makeArray<Array3DR4>("Test3DR4", N3, NumAll, N2);
+      Array3DR8 Test3DR8 = makeArray<Array3DR8>("Test3DR8", N3, NumAll, N2);
+      Array4DI4 Test4DI4 = makeArray<Array4DI4>("Test4DI4", N4, N3, NumAll, N2);
+      Array4DI8 Test4DI8 = makeArray<Array4DI8>("Test4DI8", N4, N3, NumAll, N2);
+      Array4DR4 Test4DR4 = makeArray<Array4DR4>("Test4DR4", N4, N3, NumAll, N2);
+      Array4DR8 Test4DR8 = makeArray<Array4DR8>("Test4DR8", N4, N3, NumAll, N2);
+      Array5DI4 Test5DI4 =
+          makeArray<Array5DI4>("Test5DI4", N5, N4, N3, NumAll, N2);
+      Array5DI8 Test5DI8 =
+          makeArray<Array5DI8>("Test5DI8", N5, N4, N3, NumAll, N2);
+      Array5DR4 Test5DR4 =
+          makeArray<Array5DR4>("Test5DR4", N5, N4, N3, NumAll, N2);
+      Array5DR8 Test5DR8 =
+          makeArray<Array5DR8>("Test5DR8", N5, N4, N3, NumAll, N2);
 
       I8 I8Val = 1000000000;
       R4 R4Val = 0.1234;

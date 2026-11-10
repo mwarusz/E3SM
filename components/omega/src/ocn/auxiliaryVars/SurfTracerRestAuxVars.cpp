@@ -1,6 +1,7 @@
 #include "SurfTracerRestAuxVars.h"
 #include "DataTypes.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 
 #include <limits>
 
@@ -9,9 +10,9 @@ namespace OMEGA {
 SurfTracerRestAuxVars::SurfTracerRestAuxVars(const std::string &AuxStateSuffix,
                                              const HorzMesh *Mesh,
                                              const I4 NTracers)
-    : TracersMonthlySurfClimoCell("TracersMonthlySurfClimoCell" +
-                                      AuxStateSuffix,
-                                  NTracers, Mesh->NCellsSize) {}
+    : TracersMonthlySurfClimoCell(
+          makeArray<Array2DReal>("TracersMonthlySurfClimoCell" + AuxStateSuffix,
+                                 NTracers, Mesh->NCellsSize)) {}
 
 void SurfTracerRestAuxVars::registerFields(
     const std::string &AuxGroupName, // name of Auxiliary field group

@@ -343,8 +343,8 @@ globalSum(const Kokkos::View<T, ML, MS> Array, ///< [in] array to be summed
          }
       }
    } else { // on device
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -404,8 +404,8 @@ globalSum(const Kokkos::View<T, ML, MS> Array, ///< [in] array to be summed
       }
    } else { // on device
       // Transfer some info on device
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -465,8 +465,8 @@ globalSum(const Kokkos::View<T, ML, MS> Array, ///< [in] array to be summed
       }
    } else { // on device
       // Transfer some info on device
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -628,8 +628,8 @@ globalSum(const Kokkos::View<T, ML, MS> Arr1, ///< [in] first  array in product
       }
    } else { // on device
       // Transfer some info on device
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -697,8 +697,8 @@ globalSum(const Kokkos::View<T, ML, MS> Arr1, // [in] first  array in product
       }
    } else { // on device
       // Transfer some info on device
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -768,8 +768,8 @@ globalSum(const Kokkos::View<T, ML, MS> Arr1, // [in] first  array in product
       }
    } else { // on device
       // Transfer some info on device
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -989,8 +989,8 @@ localMinVal(const Kokkos::View<T, ML, MS> Array, ///< [in] array to find min
          }
       }
    } else { // on device
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -1058,8 +1058,8 @@ localMinVal(const Kokkos::View<T, ML, MS> Arr1, ///< [in] 1st array in product
          }
       }
    } else { // on device
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -1292,8 +1292,8 @@ localMaxVal(const Kokkos::View<T, ML, MS> Array, ///< [in] array to find max
          }
       }
    } else { // on device
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -1362,8 +1362,8 @@ localMaxVal(const Kokkos::View<T, ML, MS> Arr1, ///< [in] 1st array in product
          }
       }
    } else { // on device
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -1698,8 +1698,8 @@ globalMaskedSum(const Kokkos::View<T1, ML1, MS1> Arr1,
       const int Arr1Rank = Arr1.rank;
       const int Arr2Rank = Arr2.rank;
 
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides1);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -1818,8 +1818,8 @@ globalMaskedSum(const Kokkos::View<T1, ML1, MS1> Arr1,
       const int Arr1Rank = Arr1.rank;
       const int Arr2Rank = Arr2.rank;
 
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides1);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -1941,8 +1941,8 @@ globalMaskedSum(const Kokkos::View<T1, ML1, MS1> Arr1,
       const int Arr1Rank = Arr1.rank;
       const int Arr2Rank = Arr2.rank;
 
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides1);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -2074,8 +2074,8 @@ globalMaskedSum(const Kokkos::View<T1, ML1, MS1> Arr1,
       const int Arr1Rank = Arr1.rank;
       const int Arr2Rank = Arr2.rank;
 
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides1);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -2213,8 +2213,8 @@ localMaskedMin(
       const int Arr1Rank = Arr1.rank;
       const int Arr2Rank = Arr2.rank;
 
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides1);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);
@@ -2451,8 +2451,8 @@ localMaskedMax(const Kokkos::View<T1, ML1, MS1> Arr1, ///< [in] 1st array
       const int Arr1Rank = Arr1.rank;
       const int Arr2Rank = Arr2.rank;
 
-      Array1DI4 DevRange("IRange", 10);
-      Array1DI8 DevStrides("Strides", 5);
+      Array1DI4 DevRange   = makeArray<Array1DI4>("IRange", 10);
+      Array1DI8 DevStrides = makeArray<Array1DI8>("Strides", 5);
       copyReduceInfoToDevice(DevRange, DevStrides, IRange, Strides1);
       OMEGA_SCOPE(LocStrides, DevStrides);
       OMEGA_SCOPE(LocRange, DevRange);

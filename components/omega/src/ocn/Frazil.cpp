@@ -10,6 +10,7 @@
 #include "Error.h"
 #include "Field.h"
 #include "Logging.h"
+#include "OmegaKokkos.h"
 #include "TimeStepper.h"
 
 #include <limits>
@@ -96,21 +97,22 @@ Frazil::Frazil(const HorzMesh *Mesh, const VertCoord *VCoord)
       NChunks((VCoord->NVertLayers + VecLength - 1) / VecLength), MeshPtr(Mesh),
       VCoordPtr(VCoord) {
 
-   FrazilTTend =
-       Array2DReal("FrazilTTend", Mesh->NCellsSize, VCoord->NVertLayers);
-   FrazilSTend =
-       Array2DReal("FrazilSTend", Mesh->NCellsSize, VCoord->NVertLayers);
-   FrazilHTend =
-       Array2DReal("FrazilHTend", Mesh->NCellsSize, VCoord->NVertLayers);
+   FrazilTTend = makeArray<Array2DReal>("FrazilTTend", Mesh->NCellsSize,
+                                        VCoord->NVertLayers);
+   FrazilSTend = makeArray<Array2DReal>("FrazilSTend", Mesh->NCellsSize,
+                                        VCoord->NVertLayers);
+   FrazilHTend = makeArray<Array2DReal>("FrazilHTend", Mesh->NCellsSize,
+                                        VCoord->NVertLayers);
 
-   AccMIce          = Array1DReal("AccMIce", Mesh->NCellsSize);
-   AccEIce          = Array1DReal("AccEIce", Mesh->NCellsSize);
-   AccMLiq          = Array1DReal("AccMLiq", Mesh->NCellsSize);
-   AccELiq          = Array1DReal("AccELiq", Mesh->NCellsSize);
-   AccMSalt         = Array1DReal("AccMSalt", Mesh->NCellsSize);
-   FrazilMassFlux   = Array1DReal("FrazilMassFlux", Mesh->NCellsSize);
-   FrazilSaltFlux   = Array1DReal("FrazilSaltFlux", Mesh->NCellsSize);
-   FrazilEnergyFlux = Array1DReal("FrazilEnergyFlux", Mesh->NCellsSize);
+   AccMIce        = makeArray<Array1DReal>("AccMIce", Mesh->NCellsSize);
+   AccEIce        = makeArray<Array1DReal>("AccEIce", Mesh->NCellsSize);
+   AccMLiq        = makeArray<Array1DReal>("AccMLiq", Mesh->NCellsSize);
+   AccELiq        = makeArray<Array1DReal>("AccELiq", Mesh->NCellsSize);
+   AccMSalt       = makeArray<Array1DReal>("AccMSalt", Mesh->NCellsSize);
+   FrazilMassFlux = makeArray<Array1DReal>("FrazilMassFlux", Mesh->NCellsSize);
+   FrazilSaltFlux = makeArray<Array1DReal>("FrazilSaltFlux", Mesh->NCellsSize);
+   FrazilEnergyFlux =
+       makeArray<Array1DReal>("FrazilEnergyFlux", Mesh->NCellsSize);
 
    deepCopy(FrazilTTend, 0.0_Real);
    deepCopy(FrazilSTend, 0.0_Real);

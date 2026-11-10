@@ -1,5 +1,6 @@
 #include "ShortwavePenForcingVars.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 
 #include <limits>
 
@@ -7,10 +8,10 @@ namespace OMEGA {
 
 ShortwavePenForcingVars::ShortwavePenForcingVars(const std::string &Suffix,
                                                  const HorzMesh *Mesh)
-    : ExtinctionCoeffRedCell("ExtinctionCoeffRedCell" + Suffix,
-                             Mesh->NCellsSize),
-      ExtinctionCoeffBlueCell("ExtinctionCoeffBlueCell" + Suffix,
-                              Mesh->NCellsSize) {}
+    : ExtinctionCoeffRedCell(makeArray<Array1DReal>(
+          "ExtinctionCoeffRedCell" + Suffix, Mesh->NCellsSize)),
+      ExtinctionCoeffBlueCell(makeArray<Array1DReal>(
+          "ExtinctionCoeffBlueCell" + Suffix, Mesh->NCellsSize)) {}
 
 void ShortwavePenForcingVars::registerFields(
     const std::string &GroupName, const std::string &MeshName) const {

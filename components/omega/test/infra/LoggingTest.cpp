@@ -14,6 +14,7 @@
 
 #include "Logging.h"
 #include "MachEnv.h"
+#include "OmegaKokkos.h"
 
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/ringbuffer_sink.h"
@@ -141,8 +142,8 @@ int testKokkosDataTypes(bool LogEnabled) {
 
    Kokkos::initialize();
    {
-      Array1DReal test1d("test1dD", d1);
-      Array2DReal test2d("test2dD", d1, d2);
+      Array1DReal test1d = makeArray<Array1DReal>("test1dD", d1);
+      Array2DReal test2d = makeArray<Array2DReal>("test2dD", d1, d2);
 
       TestRun = true;
 

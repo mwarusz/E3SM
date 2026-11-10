@@ -36,6 +36,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AnalysisOperator.h"
+#include "OmegaKokkos.h"
 #include "Reductions.h"
 #include "mpi.h"
 
@@ -169,8 +170,8 @@ class TransectAccumulatorOp : public AnalysisOperator {
       );
 
       // Allocate output and local accumulation arrays (both 1D)
-      OutputData = OutputArrayT("TransectAccum_out", NVertLayers);
-      LocalAccum = OutputArrayT("TransectAccum_local", NVertLayers);
+      OutputData = makeArray<OutputArrayT>("TransectAccum_out", NVertLayers);
+      LocalAccum = makeArray<OutputArrayT>("TransectAccum_local", NVertLayers);
 
       // Attach output data array to Field
       OutputField->template attachData<OutputArrayT>(OutputData);

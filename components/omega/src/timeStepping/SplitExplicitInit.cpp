@@ -151,27 +151,27 @@ void SplitExplicitInit::allocateScratch(SplitExplicitScratch &Scratch,
    if (!VCoord)
       LOG_CRITICAL("Invalid vertical coordinate");
 
-   Scratch.NormalBarotropicVelocitySubcycleCur = Array1DReal(
+   Scratch.NormalBarotropicVelocitySubcycleCur = makeArray<Array1DReal>(
        "NormalBarotropicVelocitySubcycleCur" + Name, Mesh->NEdgesSize);
-   Scratch.NormalBarotropicVelocitySubcyclePre = Array1DReal(
+   Scratch.NormalBarotropicVelocitySubcyclePre = makeArray<Array1DReal>(
        "NormalBarotropicVelocitySubcyclePre" + Name, Mesh->NEdgesSize);
-   Scratch.NormalBarotropicVelocitySubcycleCor = Array1DReal(
+   Scratch.NormalBarotropicVelocitySubcycleCor = makeArray<Array1DReal>(
        "NormalBarotropicVelocitySubcycleCor" + Name, Mesh->NEdgesSize);
-   Scratch.BarotropicPressureAnomalySubcycleCur = Array1DReal(
+   Scratch.BarotropicPressureAnomalySubcycleCur = makeArray<Array1DReal>(
        "BarotropicPressureAnomalySubcycleCur" + Name, Mesh->NCellsSize);
-   Scratch.BarotropicPressureAnomalySubcyclePre = Array1DReal(
+   Scratch.BarotropicPressureAnomalySubcyclePre = makeArray<Array1DReal>(
        "BarotropicPressureAnomalySubcyclePre" + Name, Mesh->NCellsSize);
-   Scratch.BarotropicPressureAnomalySubcycleCor = Array1DReal(
+   Scratch.BarotropicPressureAnomalySubcycleCor = makeArray<Array1DReal>(
        "BarotropicPressureAnomalySubcycleCor" + Name, Mesh->NCellsSize);
    Scratch.BarotropicForcing =
-       Array1DReal("BarotropicForcing" + Name, Mesh->NEdgesSize);
+       makeArray<Array1DReal>("BarotropicForcing" + Name, Mesh->NEdgesSize);
    Scratch.BarotropicFlux =
-       Array1DReal("BarotropicFlux" + Name, Mesh->NEdgesSize);
-   Scratch.BaroclinicPseudoThicknessEdge =
-       Array1DReal("BaroclinicPseudoThicknessEdge" + Name, Mesh->NEdgesSize);
-   Scratch.IterVelocityTend = Array2DReal(
+       makeArray<Array1DReal>("BarotropicFlux" + Name, Mesh->NEdgesSize);
+   Scratch.BaroclinicPseudoThicknessEdge = makeArray<Array1DReal>(
+       "BaroclinicPseudoThicknessEdge" + Name, Mesh->NEdgesSize);
+   Scratch.IterVelocityTend = makeArray<Array2DReal>(
        "IterVelocityTend" + Name, Mesh->NEdgesSize, VCoord->NVertLayers);
-   Scratch.TransportVelocityAdd = Array2DReal(
+   Scratch.TransportVelocityAdd = makeArray<Array2DReal>(
        "TransportVelocityAdd" + Name, Mesh->NEdgesSize, VCoord->NVertLayers);
 
    parallelFor(

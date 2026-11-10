@@ -415,22 +415,31 @@ CplToOcnFields::CplToOcnFields(const std::string &Suffix, const HorzMesh *Mesh)
       SurfacePressureH("SurfacePressure" + Suffix, Mesh->NCellsOwned) {}
 
 OcnToCplFields::OcnToCplFields(const std::string &Suffix, const HorzMesh *Mesh)
-    : AvgSfcTemperature("AvgSfcTemperature" + Suffix, Mesh->NCellsOwned),
-      AvgSfcSalinity("AvgSfcSalinity" + Suffix, Mesh->NCellsOwned),
-      AvgSfcNormalVelocity("AvgSfcNormalVelocity" + Suffix, Mesh->NEdgesSize),
+    : AvgSfcTemperature(makeArray<Array1DReal>("AvgSfcTemperature" + Suffix,
+                                               Mesh->NCellsOwned)),
+      AvgSfcSalinity(
+          makeArray<Array1DReal>("AvgSfcSalinity" + Suffix, Mesh->NCellsOwned)),
+      AvgSfcNormalVelocity(makeArray<Array1DReal>(
+          "AvgSfcNormalVelocity" + Suffix, Mesh->NEdgesSize)),
       AvgSfcVelocityZonalH("AvgSfcVelocityZonal" + Suffix, Mesh->NCellsOwned),
       AvgSfcVelocityMeridH("AvgSfcVelocityMeridional" + Suffix,
                            Mesh->NCellsOwned),
-      AvgSfcSshGrad("AvgSfcSshGrad" + Suffix, Mesh->NEdgesSize),
+      AvgSfcSshGrad(
+          makeArray<Array1DReal>("AvgSfcSshGrad" + Suffix, Mesh->NEdgesSize)),
       AvgSfcSshGradZonalH("AvgSfcSshGradZonal" + Suffix, Mesh->NCellsOwned),
       AvgSfcSshGradMeridH("AvgSfcSshGradMeridional" + Suffix,
                           Mesh->NCellsOwned),
-      AvgExtraEnergy("AvgExtraEnergy" + Suffix, Mesh->NCellsOwned),
+      AvgExtraEnergy(
+          makeArray<Array1DReal>("AvgExtraEnergy" + Suffix, Mesh->NCellsOwned)),
       InstSshCellH("InstSshCellH" + Suffix, Mesh->NCellsOwned),
-      InSituTempScratch("InSituTempScratch" + Suffix, Mesh->NCellsOwned),
-      PracSalinityScratch("PracSalinityScratch" + Suffix, Mesh->NCellsOwned),
-      ReconZonalScratch("ReconZonalScratch" + Suffix, Mesh->NCellsOwned),
-      ReconMeridScratch("ReconMeridScratch" + Suffix, Mesh->NCellsOwned) {
+      InSituTempScratch(makeArray<Array1DReal>("InSituTempScratch" + Suffix,
+                                               Mesh->NCellsOwned)),
+      PracSalinityScratch(makeArray<Array1DReal>("PracSalinityScratch" + Suffix,
+                                                 Mesh->NCellsOwned)),
+      ReconZonalScratch(makeArray<Array1DReal>("ReconZonalScratch" + Suffix,
+                                               Mesh->NCellsOwned)),
+      ReconMeridScratch(makeArray<Array1DReal>("ReconMeridScratch" + Suffix,
+                                               Mesh->NCellsOwned)) {
 
    // Kokkok views created with a label are zero-initialized by default.
    // We reset the fields here anyway to be explicit about the fact that the

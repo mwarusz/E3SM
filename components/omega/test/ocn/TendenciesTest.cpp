@@ -263,7 +263,7 @@ int testTendencies() {
    auto &NormalStressEdge = DefForcing->SfcStressForcing.NormalStressEdge;
 
    const bool OrigSfcStressEnabled = DefTendencies->SfcStressForcing.Enabled;
-   Array2DReal BaselineNormalVelocityTend(
+   Array2DReal BaselineNormalVelocityTend = makeArray<Array2DReal>(
        "BaselineNormalVelocityTend", Mesh->NEdgesSize, VCoord->NVertLayers);
 
    DefTendencies->SfcStressForcing.Enabled = false;
@@ -287,8 +287,8 @@ int testTendencies() {
                                        ThickTimeLevel, VelTimeLevel,
                                        TracerTimeLevel, Time, Interval);
 
-   Array2DReal NormalVelocityTendDiff("NormalVelocityTendDiff",
-                                      Mesh->NEdgesSize, VCoord->NVertLayers);
+   Array2DReal NormalVelocityTendDiff = makeArray<Array2DReal>(
+       "NormalVelocityTendDiff", Mesh->NEdgesSize, VCoord->NVertLayers);
    deepCopy(NormalVelocityTendDiff, 0._Real);
 
    OMEGA_SCOPE(LocNormalVelocityTendDiff, NormalVelocityTendDiff);
@@ -393,11 +393,11 @@ int testTendencies() {
 
       LOG_INFO("TendenciesTest: minLayerCell = {}", FrazilTestLayer);
 
-      Array2DReal BaselinePseudoThicknessTend(
+      Array2DReal BaselinePseudoThicknessTend = makeArray<Array2DReal>(
           "BaselinePseudoThicknessTend", Mesh->NCellsSize, VCoord->NVertLayers);
-      Array3DReal BaselineTracerTend("BaselineTracerTend",
-                                     Tracers::getNumTracers(), Mesh->NCellsSize,
-                                     VCoord->NVertLayers);
+      Array3DReal BaselineTracerTend =
+          makeArray<Array3DReal>("BaselineTracerTend", Tracers::getNumTracers(),
+                                 Mesh->NCellsSize, VCoord->NVertLayers);
 
       const bool OrigFrazilEnabled = DefTendencies->FrazilTerm.Enabled;
 
@@ -417,12 +417,12 @@ int testTendencies() {
                                           ThickTimeLevel, VelTimeLevel,
                                           TracerTimeLevel, Time, Interval);
 
-      Array2DReal PseudoThicknessTendDiff(
+      Array2DReal PseudoThicknessTendDiff = makeArray<Array2DReal>(
           "PseudoThicknessTendDiff", Mesh->NCellsSize, VCoord->NVertLayers);
-      Array2DReal TempTracerTendDiff("TempTracerTendDiff", Mesh->NCellsSize,
-                                     VCoord->NVertLayers);
-      Array2DReal SaltTracerTendDiff("SaltTracerTendDiff", Mesh->NCellsSize,
-                                     VCoord->NVertLayers);
+      Array2DReal TempTracerTendDiff = makeArray<Array2DReal>(
+          "TempTracerTendDiff", Mesh->NCellsSize, VCoord->NVertLayers);
+      Array2DReal SaltTracerTendDiff = makeArray<Array2DReal>(
+          "SaltTracerTendDiff", Mesh->NCellsSize, VCoord->NVertLayers);
 
       OMEGA_SCOPE(LocPseudoThicknessTendDiff, PseudoThicknessTendDiff);
       OMEGA_SCOPE(LocTempTracerTendDiff, TempTracerTendDiff);

@@ -20,6 +20,7 @@
 #include "Logging.h"
 #include "MachEnv.h"
 #include "OceanTestCommon.h"
+#include "OmegaKokkos.h"
 #include "Pacer.h"
 #include "TimeStepper.h"
 #include "forcingVars/SfcStressForcingVars.h"
@@ -81,8 +82,8 @@ int testSfcStressForcingVars(Real RTol) {
 
    // Compute exact result
 
-   Array1DReal ExactNormalStressEdge("ExactNormalStressEdge",
-                                     Mesh->NEdgesOwned);
+   Array1DReal ExactNormalStressEdge =
+       makeArray<Array1DReal>("ExactNormalStressEdge", Mesh->NEdgesOwned);
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
           VecField[0] = Setup.sfcStressX(X, Y);

@@ -18,6 +18,7 @@
 #include "HorzMesh.h"
 #include "HorzOperators.h"
 #include "KPPMix.h"
+#include "OmegaKokkos.h"
 #include "TimeStepper.h"
 #include "TriDiagSolvers.h"
 
@@ -67,20 +68,22 @@ VertMix::VertMix(const std::string &Name, ///< [in] Name for VertMix object
       ComputeGradRichardsonNum(Mesh, VCoord), ComputeOneTwoOneFilter(VCoord),
       Name(Name), Mesh(Mesh), VCoord(VCoord), VelVertMixSetup(Mesh, VCoord),
       TracerVertMixSetup(Mesh, VCoord) {
-   VertDiff = Array2DReal("VertDiff", Mesh->NCellsSize, VCoord->NVertLayersP1);
-   VertVisc = Array2DReal("VertVisc", Mesh->NCellsSize, VCoord->NVertLayersP1);
-   GradRichNum =
-       Array2DReal("GradRichNum", Mesh->NCellsSize, VCoord->NVertLayersP1);
-   GradRichNumSmoothed = Array2DReal("GradRichNumSmoothed", Mesh->NCellsSize,
-                                     VCoord->NVertLayersP1);
-   InteriorVertDiff =
-       Array2DReal("InteriorVertDiff", Mesh->NCellsSize, VCoord->NVertLayersP1);
-   InteriorVertVisc =
-       Array2DReal("InteriorVertVisc", Mesh->NCellsSize, VCoord->NVertLayersP1);
+   VertDiff            = makeArray<Array2DReal>("VertDiff", Mesh->NCellsSize,
+                                                VCoord->NVertLayersP1);
+   VertVisc            = makeArray<Array2DReal>("VertVisc", Mesh->NCellsSize,
+                                                VCoord->NVertLayersP1);
+   GradRichNum         = makeArray<Array2DReal>("GradRichNum", Mesh->NCellsSize,
+                                                VCoord->NVertLayersP1);
+   GradRichNumSmoothed = makeArray<Array2DReal>(
+       "GradRichNumSmoothed", Mesh->NCellsSize, VCoord->NVertLayersP1);
+   InteriorVertDiff = makeArray<Array2DReal>(
+       "InteriorVertDiff", Mesh->NCellsSize, VCoord->NVertLayersP1);
+   InteriorVertVisc = makeArray<Array2DReal>(
+       "InteriorVertVisc", Mesh->NCellsSize, VCoord->NVertLayersP1);
 
    // TODO: Temporary handling of TangentialVelocity
-   TangentialVelocity =
-       Array2DReal("TangentialVelocity", Mesh->NEdgesSize, VCoord->NVertLayers);
+   TangentialVelocity = makeArray<Array2DReal>(
+       "TangentialVelocity", Mesh->NEdgesSize, VCoord->NVertLayers);
 
    defineFields();
 }

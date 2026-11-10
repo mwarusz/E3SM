@@ -226,7 +226,8 @@ int main(int argc, char **argv) {
       // optional read, then add it to the InitialState stream. Reading the
       // stream should succeed and leave the array at its fill value rather than
       // failing because the variable is missing from the file.
-      Array1DReal OptTestData("OptionalTestField", NCellsSize);
+      Array1DReal OptTestData =
+          makeArray<Array1DReal>("OptionalTestField", NCellsSize);
       auto OptTestField = Field::create("OptionalTestField", // field name
                                         "optional read test field", // long name
                                         "none",                     // units
@@ -260,7 +261,8 @@ int main(int argc, char **argv) {
 
       // Overwrite salinity array with values associated with global cell
       // ID to test proper indexing of IO
-      Array2DReal Test("Test", NCellsSize, NVertLayers);
+      Array2DReal Test =
+          makeArray<Array2DReal>("Test", NCellsSize, NVertLayers);
       Array2DReal Salt = Tracers::getByIndex(0, Tracers::IndxSalt);
 
       parallelFor(

@@ -1,6 +1,7 @@
 #include "TransportAuxVars.h"
 #include "DataTypes.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 
 #include <limits>
 
@@ -9,8 +10,9 @@ namespace OMEGA {
 TransportAuxVars::TransportAuxVars(const std::string &AuxStateSuffix,
                                    const HorzMesh *Mesh,
                                    const VertCoord *VCoord)
-    : NormalTransportVelocity("NormalTransportVelocity" + AuxStateSuffix,
-                              Mesh->NEdgesSize, VCoord->NVertLayers) {}
+    : NormalTransportVelocity(
+          makeArray<Array2DReal>("NormalTransportVelocity" + AuxStateSuffix,
+                                 Mesh->NEdgesSize, VCoord->NVertLayers)) {}
 
 void TransportAuxVars::registerFields(
     const std::string &AuxGroupName, // name of Auxiliary field group

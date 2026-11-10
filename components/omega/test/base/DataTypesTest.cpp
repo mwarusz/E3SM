@@ -20,7 +20,76 @@
 #include "Pacer.h"
 #include "mpi.h"
 
+#include <array>
+#include <string>
+
 using namespace OMEGA;
+
+template <class Array>
+void checkMakeArray(const Array &Data, const std::string &Label,
+                    const std::array<int, Array::rank> &Extents) {
+   if (Data.label() != Label)
+      ABORT_ERROR("makeArray: incorrect label for {}", Label);
+
+   size_t ExpectedSize = 1;
+   for (int Dim = 0; Dim < Array::rank; ++Dim) {
+      if (Data.extent_int(Dim) != Extents[Dim])
+         ABORT_ERROR("makeArray: incorrect extent for {}", Label);
+      ExpectedSize *= Extents[Dim];
+   }
+   if (Data.size() != ExpectedSize)
+      ABORT_ERROR("makeArray: incorrect size for {}", Label);
+
+   Kokkos::fence();
+   auto Host    = createHostMirrorCopy(Data);
+   const int N0 = Data.extent_int(0);
+   const int N1 = Array::rank > 1 ? Data.extent_int(1) : 1;
+   const int N2 = Array::rank > 2 ? Data.extent_int(2) : 1;
+   const int N3 = Array::rank > 3 ? Data.extent_int(3) : 1;
+   const int N4 = Array::rank > 4 ? Data.extent_int(4) : 1;
+   for (int I = 0; I < N0; ++I)
+      for (int J = 0; J < N1; ++J)
+         for (int K = 0; K < N2; ++K)
+            for (int L = 0; L < N3; ++L)
+               for (int M = 0; M < N4; ++M) {
+                  typename Array::non_const_value_type Value;
+                  if constexpr (Array::rank == 1)
+                     Value = Host(I);
+                  else if constexpr (Array::rank == 2)
+                     Value = Host(I, J);
+                  else if constexpr (Array::rank == 3)
+                     Value = Host(I, J, K);
+                  else if constexpr (Array::rank == 4)
+                     Value = Host(I, J, K, L);
+                  else
+                     Value = Host(I, J, K, L, M);
+                  if (Value != 0)
+                     ABORT_ERROR("makeArray: nonzero value in {}", Label);
+               }
+}
+
+template <typename Scalar> void testMakeArray() {
+   checkMakeArray(makeArray<Array1D_t<Scalar>>("rank1", 2), "rank1", {2});
+   checkMakeArray(makeArray<Array2D_t<Scalar>>("rank2", 2, 3), "rank2", {2, 3});
+   checkMakeArray(makeArray<Array3D_t<Scalar>>("rank3", 2, 3, 4), "rank3",
+                  {2, 3, 4});
+   checkMakeArray(makeArray<Array4D_t<Scalar>>("rank4", 2, 3, 4, 3), "rank4",
+                  {2, 3, 4, 3});
+   checkMakeArray(makeArray<Array5D_t<Scalar>>("rank5", 2, 3, 4, 3, 2), "rank5",
+                  {2, 3, 4, 3, 2});
+
+   if (makeArray<Array1D_t<Scalar>>("empty1", 0).size() != 0 ||
+       makeArray<Array2D_t<Scalar>>("empty2", 0, 3).size() != 0 ||
+       makeArray<Array2D_t<Scalar>>("empty2inner", 2, 0).size() != 0 ||
+       makeArray<Array3D_t<Scalar>>("empty3", 0, 3, 4).size() != 0 ||
+       makeArray<Array3D_t<Scalar>>("empty3inner", 2, 3, 0).size() != 0 ||
+       makeArray<Array4D_t<Scalar>>("empty4", 0, 3, 4, 3).size() != 0 ||
+       makeArray<Array4D_t<Scalar>>("empty4inner", 2, 3, 4, 0).size() != 0 ||
+       makeArray<Array5D_t<Scalar>>("empty5", 0, 3, 4, 3, 2).size() != 0 ||
+       makeArray<Array5D_t<Scalar>>("empty5inner", 2, 3, 4, 3, 0).size() != 0)
+      ABORT_ERROR("makeArray: nonempty array with a zero extent");
+   Kokkos::fence();
+}
 
 int main(int argc, char *argv[]) {
 
@@ -37,6 +106,12 @@ int main(int argc, char *argv[]) {
    LOG_INFO("------ DataTypes Unit Tests ------");
 
    {
+      testMakeArray<I4>();
+      testMakeArray<I8>();
+      testMakeArray<R4>();
+      testMakeArray<R8>();
+      testMakeArray<Real>();
+
       int SizeTmp = 0;
 
       // Check expected size (in bytes) for data types
@@ -80,7 +155,7 @@ int main(int argc, char *argv[]) {
       int NumExtra    = 2;
 
       // Test for 1DI4
-      Array1DI4 TstArr1DI4("TstArr1DI4", NumCells);
+      Array1DI4 TstArr1DI4 = makeArray<Array1DI4>("TstArr1DI4", NumCells);
       HostArray1DI4 RefArr1DI4("RefArr1DI4", NumCells);
 
       for (int i = 0; i < NumCells; ++i) {
@@ -103,7 +178,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 1DI4 test: FAIL");
 
       // Test for 2DI4
-      Array2DI4 TstArr2DI4("TstArr2DI4", NumCells, NumVertLyrs);
+      Array2DI4 TstArr2DI4 =
+          makeArray<Array2DI4>("TstArr2DI4", NumCells, NumVertLyrs);
       HostArray2DI4 RefArr2DI4("RefArr2DI4", NumCells, NumVertLyrs);
 
       for (int j = 0; j < NumCells; ++j) {
@@ -132,7 +208,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 2DI4 test: FAIL");
 
       // Test for 3DI4
-      Array3DI4 TstArr3DI4("TstArr3DI4", NumTracers, NumCells, NumVertLyrs);
+      Array3DI4 TstArr3DI4 =
+          makeArray<Array3DI4>("TstArr3DI4", NumTracers, NumCells, NumVertLyrs);
       HostArray3DI4 RefArr3DI4("RefArr3DI4", NumTracers, NumCells, NumVertLyrs);
 
       for (int k = 0; k < NumTracers; ++k) {
@@ -167,8 +244,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 3DI4 test: FAIL");
 
       // Test for 4DI4
-      Array4DI4 TstArr4DI4("TstArr4DI4", NumTimeLvls, NumTracers, NumCells,
-                           NumVertLyrs);
+      Array4DI4 TstArr4DI4 = makeArray<Array4DI4>(
+          "TstArr4DI4", NumTimeLvls, NumTracers, NumCells, NumVertLyrs);
       HostArray4DI4 RefArr4DI4("RefArr4DI4", NumTimeLvls, NumTracers, NumCells,
                                NumVertLyrs);
 
@@ -208,8 +285,9 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 4DI4 test: FAIL");
 
       // Test for 5DI4
-      Array5DI4 TstArr5DI4("TstArr5DI4", NumExtra, NumTimeLvls, NumTracers,
-                           NumCells, NumVertLyrs);
+      Array5DI4 TstArr5DI4 =
+          makeArray<Array5DI4>("TstArr5DI4", NumExtra, NumTimeLvls, NumTracers,
+                               NumCells, NumVertLyrs);
       HostArray5DI4 RefArr5DI4("RefArr5DI4", NumExtra, NumTimeLvls, NumTracers,
                                NumCells, NumVertLyrs);
 
@@ -254,7 +332,7 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 5DI4 test: FAIL");
 
       // Test for 1DI8
-      Array1DI8 TstArr1DI8("TstArr1DI8", NumCells);
+      Array1DI8 TstArr1DI8 = makeArray<Array1DI8>("TstArr1DI8", NumCells);
       HostArray1DI8 RefArr1DI8("RefArr1DI8", NumCells);
 
       for (int i = 0; i < NumCells; ++i) {
@@ -277,7 +355,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 1DI8 test: FAIL");
 
       // Test for 2DI8
-      Array2DI8 TstArr2DI8("TstArr2DI8", NumCells, NumVertLyrs);
+      Array2DI8 TstArr2DI8 =
+          makeArray<Array2DI8>("TstArr2DI8", NumCells, NumVertLyrs);
       HostArray2DI8 RefArr2DI8("RefArr2DI8", NumCells, NumVertLyrs);
 
       for (int j = 0; j < NumCells; ++j) {
@@ -306,7 +385,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 2DI8 test: FAIL");
 
       // Test for 3DI8
-      Array3DI8 TstArr3DI8("TstArr3DI8", NumTracers, NumCells, NumVertLyrs);
+      Array3DI8 TstArr3DI8 =
+          makeArray<Array3DI8>("TstArr3DI8", NumTracers, NumCells, NumVertLyrs);
       HostArray3DI8 RefArr3DI8("RefArr3DI8", NumTracers, NumCells, NumVertLyrs);
 
       for (int k = 0; k < NumTracers; ++k) {
@@ -341,8 +421,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 3DI8 test: FAIL");
 
       // Test for 4DI8
-      Array4DI8 TstArr4DI8("TstArr4DI8", NumTimeLvls, NumTracers, NumCells,
-                           NumVertLyrs);
+      Array4DI8 TstArr4DI8 = makeArray<Array4DI8>(
+          "TstArr4DI8", NumTimeLvls, NumTracers, NumCells, NumVertLyrs);
       HostArray4DI8 RefArr4DI8("RefArr4DI8", NumTimeLvls, NumTracers, NumCells,
                                NumVertLyrs);
 
@@ -382,8 +462,9 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 4DI8 test: FAIL");
 
       // Test for 5DI8
-      Array5DI8 TstArr5DI8("TstArr5DI8", NumExtra, NumTimeLvls, NumTracers,
-                           NumCells, NumVertLyrs);
+      Array5DI8 TstArr5DI8 =
+          makeArray<Array5DI8>("TstArr5DI8", NumExtra, NumTimeLvls, NumTracers,
+                               NumCells, NumVertLyrs);
       HostArray5DI8 RefArr5DI8("RefArr5DI8", NumExtra, NumTimeLvls, NumTracers,
                                NumCells, NumVertLyrs);
 
@@ -428,7 +509,7 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 5DI8 test: FAIL");
 
       // Test for 1DR4
-      Array1DR4 TstArr1DR4("TstArr1DR4", NumCells);
+      Array1DR4 TstArr1DR4 = makeArray<Array1DR4>("TstArr1DR4", NumCells);
       HostArray1DR4 RefArr1DR4("RefArr1DR4", NumCells);
 
       for (int i = 0; i < NumCells; ++i) {
@@ -451,7 +532,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 1DR4 test: FAIL");
 
       // Test for 2DR4
-      Array2DR4 TstArr2DR4("TstArr2DR4", NumCells, NumVertLyrs);
+      Array2DR4 TstArr2DR4 =
+          makeArray<Array2DR4>("TstArr2DR4", NumCells, NumVertLyrs);
       HostArray2DR4 RefArr2DR4("RefArr2DR4", NumCells, NumVertLyrs);
 
       for (int j = 0; j < NumCells; ++j) {
@@ -480,7 +562,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 2DR4 test: FAIL");
 
       // Test for 3DR4
-      Array3DR4 TstArr3DR4("TstArr3DR4", NumTracers, NumCells, NumVertLyrs);
+      Array3DR4 TstArr3DR4 =
+          makeArray<Array3DR4>("TstArr3DR4", NumTracers, NumCells, NumVertLyrs);
       HostArray3DR4 RefArr3DR4("RefArr3DR4", NumTracers, NumCells, NumVertLyrs);
 
       for (int k = 0; k < NumTracers; ++k) {
@@ -515,8 +598,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 3DR4 test: FAIL");
 
       // Test for 4DR4
-      Array4DR4 TstArr4DR4("TstArr4DR4", NumTimeLvls, NumTracers, NumCells,
-                           NumVertLyrs);
+      Array4DR4 TstArr4DR4 = makeArray<Array4DR4>(
+          "TstArr4DR4", NumTimeLvls, NumTracers, NumCells, NumVertLyrs);
       HostArray4DR4 RefArr4DR4("RefArr4DR4", NumTimeLvls, NumTracers, NumCells,
                                NumVertLyrs);
 
@@ -556,8 +639,9 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 4DR4 test: FAIL");
 
       // Test for 5DR4
-      Array5DR4 TstArr5DR4("TstArr5DR4", NumExtra, NumTimeLvls, NumTracers,
-                           NumCells, NumVertLyrs);
+      Array5DR4 TstArr5DR4 =
+          makeArray<Array5DR4>("TstArr5DR4", NumExtra, NumTimeLvls, NumTracers,
+                               NumCells, NumVertLyrs);
       HostArray5DR4 RefArr5DR4("RefArr5DR4", NumExtra, NumTimeLvls, NumTracers,
                                NumCells, NumVertLyrs);
 
@@ -602,7 +686,7 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 5DR4 test: FAIL");
 
       // Test for 1DR8
-      Array1DR8 TstArr1DR8("TstArr1DR8", NumCells);
+      Array1DR8 TstArr1DR8 = makeArray<Array1DR8>("TstArr1DR8", NumCells);
       HostArray1DR8 RefArr1DR8("RefArr1DR8", NumCells);
 
       for (int i = 0; i < NumCells; ++i) {
@@ -625,7 +709,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 1DR8 test: FAIL");
 
       // Test for 2DR8
-      Array2DR8 TstArr2DR8("TstArr2DR8", NumCells, NumVertLyrs);
+      Array2DR8 TstArr2DR8 =
+          makeArray<Array2DR8>("TstArr2DR8", NumCells, NumVertLyrs);
       HostArray2DR8 RefArr2DR8("RefArr2DR8", NumCells, NumVertLyrs);
 
       for (int j = 0; j < NumCells; ++j) {
@@ -654,7 +739,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 2DR8 test: FAIL");
 
       // Test for 3DR8
-      Array3DR8 TstArr3DR8("TstArr3DR8", NumTracers, NumCells, NumVertLyrs);
+      Array3DR8 TstArr3DR8 =
+          makeArray<Array3DR8>("TstArr3DR8", NumTracers, NumCells, NumVertLyrs);
       HostArray3DR8 RefArr3DR8("RefArr3DR8", NumTracers, NumCells, NumVertLyrs);
 
       for (int k = 0; k < NumTracers; ++k) {
@@ -689,8 +775,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 3DR8 test: FAIL");
 
       // Test for 4DR8
-      Array4DR8 TstArr4DR8("TstArr4DR8", NumTimeLvls, NumTracers, NumCells,
-                           NumVertLyrs);
+      Array4DR8 TstArr4DR8 = makeArray<Array4DR8>(
+          "TstArr4DR8", NumTimeLvls, NumTracers, NumCells, NumVertLyrs);
       HostArray4DR8 RefArr4DR8("RefArr4DR8", NumTimeLvls, NumTracers, NumCells,
                                NumVertLyrs);
 
@@ -730,8 +816,9 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 4DR8 test: FAIL");
 
       // Test for 5DR8
-      Array5DR8 TstArr5DR8("TstArr5DR8", NumExtra, NumTimeLvls, NumTracers,
-                           NumCells, NumVertLyrs);
+      Array5DR8 TstArr5DR8 =
+          makeArray<Array5DR8>("TstArr5DR8", NumExtra, NumTimeLvls, NumTracers,
+                               NumCells, NumVertLyrs);
       HostArray5DR8 RefArr5DR8("RefArr5DR8", NumExtra, NumTimeLvls, NumTracers,
                                NumCells, NumVertLyrs);
 
@@ -776,7 +863,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 5DR8 test: FAIL");
 
       // Test for 1DReal
-      Array1DReal TstArr1DReal("TstArr1DReal", NumCells);
+      Array1DReal TstArr1DReal =
+          makeArray<Array1DReal>("TstArr1DReal", NumCells);
       HostArray1DReal RefArr1DReal("RefArr1DReal", NumCells);
 
       for (int i = 0; i < NumCells; ++i) {
@@ -799,7 +887,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 1DReal test: FAIL");
 
       // Test for 2DReal
-      Array2DReal TstArr2DReal("TstArr2DReal", NumCells, NumVertLyrs);
+      Array2DReal TstArr2DReal =
+          makeArray<Array2DReal>("TstArr2DReal", NumCells, NumVertLyrs);
       HostArray2DReal RefArr2DReal("RefArr2DReal", NumCells, NumVertLyrs);
 
       for (int j = 0; j < NumCells; ++j) {
@@ -828,8 +917,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 2DReal test: FAIL");
 
       // Test for 3DReal
-      Array3DReal TstArr3DReal("TstArr3DReal", NumTracers, NumCells,
-                               NumVertLyrs);
+      Array3DReal TstArr3DReal = makeArray<Array3DReal>(
+          "TstArr3DReal", NumTracers, NumCells, NumVertLyrs);
       HostArray3DReal RefArr3DReal("RefArr3DReal", NumTracers, NumCells,
                                    NumVertLyrs);
 
@@ -865,8 +954,8 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 3DReal test: FAIL");
 
       // Test for 4DReal
-      Array4DReal TstArr4DReal("TstArr4DReal", NumTimeLvls, NumTracers,
-                               NumCells, NumVertLyrs);
+      Array4DReal TstArr4DReal = makeArray<Array4DReal>(
+          "TstArr4DReal", NumTimeLvls, NumTracers, NumCells, NumVertLyrs);
       HostArray4DReal RefArr4DReal("RefArr4DReal", NumTimeLvls, NumTracers,
                                    NumCells, NumVertLyrs);
 
@@ -906,8 +995,9 @@ int main(int argc, char *argv[]) {
          ABORT_ERROR("DataTypesTest: Kokkos 4DReal test: FAIL");
 
       // Test for 5DReal
-      Array5DReal TstArr5DReal("TstArr5DReal", NumExtra, NumTimeLvls,
-                               NumTracers, NumCells, NumVertLyrs);
+      Array5DReal TstArr5DReal =
+          makeArray<Array5DReal>("TstArr5DReal", NumExtra, NumTimeLvls,
+                                 NumTracers, NumCells, NumVertLyrs);
       HostArray5DReal RefArr5DReal("RefArr5DReal", NumExtra, NumTimeLvls,
                                    NumTracers, NumCells, NumVertLyrs);
 

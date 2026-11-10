@@ -5,6 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "RungeKutta4Stepper.h"
+#include "OmegaKokkos.h"
 #include "Pacer.h"
 
 namespace OMEGA {
@@ -68,8 +69,8 @@ void RungeKutta4Stepper::finalizeInit() {
    if (!ProvisState)
       LOG_CRITICAL("Error creating Provis state");
 
-   ProvisTracers =
-       Array3DReal("ProvisTracers", NTracers, NCellsSize, NVertLayers);
+   ProvisTracers = makeArray<Array3DReal>("ProvisTracers", NTracers, NCellsSize,
+                                          NVertLayers);
 }
 
 //------------------------------------------------------------------------------

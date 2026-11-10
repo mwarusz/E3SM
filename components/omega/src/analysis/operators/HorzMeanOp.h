@@ -38,6 +38,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AnalysisOperator.h"
+#include "OmegaKokkos.h"
 #include "Reductions.h"
 
 #include <limits>
@@ -104,7 +105,7 @@ template <typename ArrayT> class HorzMeanOp : public AnalysisOperator {
       NVertSize = VertDim->getLengthGlobal();
 
       // Allocate 1D output data array (always Real type)
-      OutputData = Array1DReal(OutputNames[0], NVertSize);
+      OutputData = makeArray<Array1DReal>(OutputNames[0], NVertSize);
 
       // Register output Field with metadata over the vertical dimension. A
       // horizontal mean has the units and standard name of the field it
@@ -221,8 +222,8 @@ template <typename ArrayT> class HorzMeanOp : public AnalysisOperator {
       // kept as device arrays so that when a device-aware globalSum overload
       // becomes available the host sync below can be removed entirely.
       if (LocalNum.size() == 0) {
-         LocalNum = Array1DReal("HorzMeanLocalNum", NVert);
-         LocalDen = Array1DReal("HorzMeanLocalDen", NVert);
+         LocalNum = makeArray<Array1DReal>("HorzMeanLocalNum", NVert);
+         LocalDen = makeArray<Array1DReal>("HorzMeanLocalDen", NVert);
       }
 
       // Local device references captured by value into the kernel.

@@ -1,6 +1,7 @@
 #include "MixedLayerAuxVars.h"
 #include "DataTypes.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 
 #include <limits>
 
@@ -9,10 +10,13 @@ namespace OMEGA {
 MixedLayerAuxVars::MixedLayerAuxVars(const std::string &AuxStateSuffix,
                                      const HorzMesh *Mesh,
                                      const VertCoord *VCoord)
-    : DenMixLayerDepth("DenMixLayerDepth" + AuxStateSuffix, Mesh->NCellsSize),
-      DenMixLayerIndex("DenMixLayerIndex" + AuxStateSuffix, Mesh->NCellsSize),
-      ReferencePressure("ReferencePressure" + AuxStateSuffix, Mesh->NCellsSize,
-                        VCoord->NVertLayers),
+    : DenMixLayerDepth(makeArray<Array1DReal>(
+          "DenMixLayerDepth" + AuxStateSuffix, Mesh->NCellsSize)),
+      DenMixLayerIndex(makeArray<Array1DI4>("DenMixLayerIndex" + AuxStateSuffix,
+                                            Mesh->NCellsSize)),
+      ReferencePressure(
+          makeArray<Array2DReal>("ReferencePressure" + AuxStateSuffix,
+                                 Mesh->NCellsSize, VCoord->NVertLayers)),
       MinLayerCell(VCoord->MinLayerCell), MaxLayerCell(VCoord->MaxLayerCell),
       GeomZInterface(VCoord->GeomZInterface), GeomZMid(VCoord->GeomZMid) {
    deepCopy(ReferencePressure, ReferencePressureVal);

@@ -1,5 +1,6 @@
 #include "TriDiagSolvers.h"
 #include "../ocn/OceanTestCommon.h"
+#include "OmegaKokkos.h"
 
 using namespace OMEGA;
 
@@ -14,10 +15,10 @@ void initTridiagonalTest() {
 
 int testCorrectness(int NBatch, int NRow) {
 
-   Array2DReal DL("DL", NBatch, NRow);
-   Array2DReal D("D", NBatch, NRow);
-   Array2DReal DU("DU", NBatch, NRow);
-   Array2DReal X("X", NBatch, NRow);
+   Array2DReal DL = makeArray<Array2DReal>("DL", NBatch, NRow);
+   Array2DReal D  = makeArray<Array2DReal>("D", NBatch, NRow);
+   Array2DReal DU = makeArray<Array2DReal>("DU", NBatch, NRow);
+   Array2DReal X  = makeArray<Array2DReal>("X", NBatch, NRow);
 
    // Create prescribed tridiagonal matrix A = (DL, D, DU) and prescribed vector
    // X
@@ -31,7 +32,7 @@ int testCorrectness(int NBatch, int NRow) {
        });
 
    // compute A X
-   Array2DReal AX("AX", NBatch, NRow);
+   Array2DReal AX = makeArray<Array2DReal>("AX", NBatch, NRow);
    parallelFor(
        {NBatch, NRow}, KOKKOS_LAMBDA(int I, int K) {
           AX(I, K) = D(I, K) * X(I, K);
@@ -67,9 +68,9 @@ int testCorrectness(int NBatch, int NRow) {
 
 int testDiffusionCorrectness(int NBatch, int NRow) {
 
-   Array2DReal G("G", NBatch, NRow);
-   Array2DReal H("H", NBatch, NRow);
-   Array2DReal X("X", NBatch, NRow);
+   Array2DReal G = makeArray<Array2DReal>("G", NBatch, NRow);
+   Array2DReal H = makeArray<Array2DReal>("H", NBatch, NRow);
+   Array2DReal X = makeArray<Array2DReal>("X", NBatch, NRow);
 
    // Create prescribed tridiagonal matrix for a diffusion problem
    // using the parametrization A = (G, H) and prescribed vector X
@@ -81,7 +82,7 @@ int testDiffusionCorrectness(int NBatch, int NRow) {
        });
 
    // compute A X
-   Array2DReal AX("AX", NBatch, NRow);
+   Array2DReal AX = makeArray<Array2DReal>("AX", NBatch, NRow);
    parallelFor(
        {NBatch, NRow}, KOKKOS_LAMBDA(int I, int K) {
           const Real DL = K == 0 ? 0 : -G(I, K - 1);
@@ -143,8 +144,8 @@ Real runDiffManufactured(int NCells) {
 
    const int NSteps = std::ceil(TimeEnd / TimeStep);
 
-   Array1DReal XVertex("XVertex", NVertices);
-   Array1DReal Diffusivity("Diffusivity", NVertices);
+   Array1DReal XVertex     = makeArray<Array1DReal>("XVertex", NVertices);
+   Array1DReal Diffusivity = makeArray<Array1DReal>("Diffusivity", NVertices);
    parallelFor(
        {NVertices}, KOKKOS_LAMBDA(int IVertex) {
           const Real XVertexUni = IVertex * (1._Real / NCells);
@@ -153,9 +154,9 @@ Real runDiffManufactured(int NCells) {
           Diffusivity(IVertex) = manufacturedDiffusivity(XVertex(IVertex), 0);
        });
 
-   Array1DReal XCell("XCell", NCells);
-   Array1DReal PseudoThick("PseudoThick", NCells);
-   Array1DReal U("U", NCells);
+   Array1DReal XCell       = makeArray<Array1DReal>("XCell", NCells);
+   Array1DReal PseudoThick = makeArray<Array1DReal>("PseudoThick", NCells);
+   Array1DReal U           = makeArray<Array1DReal>("U", NCells);
 
    // Create initial condition
    parallelFor(
@@ -280,8 +281,8 @@ Real runDiffusionStability(bool UseGeneralSolver, Real DiffValue) {
    const Real DX = 1.0 / NCells;
 
    // Create discontinuous diffusivity with DiffValue in [0.3, 0.7] else 0
-   Array1DReal XVertex("XVertex", NVertices);
-   Array1DReal Diffusivity("Diffusivity", NVertices);
+   Array1DReal XVertex     = makeArray<Array1DReal>("XVertex", NVertices);
+   Array1DReal Diffusivity = makeArray<Array1DReal>("Diffusivity", NVertices);
    parallelFor(
        {NVertices}, KOKKOS_LAMBDA(int IVertex) {
           XVertex(IVertex) = IVertex * DX;
@@ -289,9 +290,9 @@ Real runDiffusionStability(bool UseGeneralSolver, Real DiffValue) {
               Kokkos::abs(XVertex(IVertex) - 0.5) < 0.2 ? DiffValue : 0;
        });
 
-   Array1DReal XCell("XCell", NCells);
-   Array1DReal PseudoThick("PseudoThick", NCells);
-   Array1DReal U("U", NCells);
+   Array1DReal XCell       = makeArray<Array1DReal>("XCell", NCells);
+   Array1DReal PseudoThick = makeArray<Array1DReal>("PseudoThick", NCells);
+   Array1DReal U           = makeArray<Array1DReal>("U", NCells);
 
    // Create initial condition
    parallelFor(
@@ -493,10 +494,10 @@ int tridiagonalTest() {
 
 void testPerformance(int NBatch, int NRow, int NRep) {
 
-   Array2DReal DL("DL", NBatch, NRow);
-   Array2DReal D("D", NBatch, NRow);
-   Array2DReal DU("DU", NBatch, NRow);
-   Array2DReal X("X", NBatch, NRow);
+   Array2DReal DL = makeArray<Array2DReal>("DL", NBatch, NRow);
+   Array2DReal D  = makeArray<Array2DReal>("D", NBatch, NRow);
+   Array2DReal DU = makeArray<Array2DReal>("DU", NBatch, NRow);
+   Array2DReal X  = makeArray<Array2DReal>("X", NBatch, NRow);
 
    parallelFor(
        {NBatch, NRow}, KOKKOS_LAMBDA(int I, int K) {
@@ -527,9 +528,9 @@ void testPerformance(int NBatch, int NRow, int NRep) {
 
 void testDiffusionPerformance(int NBatch, int NRow, int NRep) {
 
-   Array2DReal G("G", NBatch, NRow);
-   Array2DReal H("H", NBatch, NRow);
-   Array2DReal X("X", NBatch, NRow);
+   Array2DReal G = makeArray<Array2DReal>("G", NBatch, NRow);
+   Array2DReal H = makeArray<Array2DReal>("H", NBatch, NRow);
+   Array2DReal X = makeArray<Array2DReal>("X", NBatch, NRow);
 
    parallelFor(
        {NBatch, NRow}, KOKKOS_LAMBDA(int I, int K) {

@@ -34,6 +34,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AnalysisOperator.h"
+#include "OmegaKokkos.h"
 #include "Reductions.h"
 
 namespace OMEGA {
@@ -131,7 +132,7 @@ template <typename ArrayT> class CoordinateBinningOp : public AnalysisOperator {
       ArraySize = InputData.extent(0);
 
       // Allocate output data array (bin indices for each cell)
-      OutputData = OutputArrayT(OutputNames[0] + "_out", ArraySize);
+      OutputData = makeArray<OutputArrayT>(OutputNames[0] + "_out", ArraySize);
 
       // Attach output data array to Field
       OutputField->template attachData<OutputArrayT>(OutputData);

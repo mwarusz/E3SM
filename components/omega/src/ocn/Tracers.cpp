@@ -12,6 +12,7 @@
 #include "Error.h"
 #include "IO.h"
 #include "Logging.h"
+#include "OmegaKokkos.h"
 #include "TimeStepper.h"
 
 namespace OMEGA {
@@ -119,8 +120,8 @@ void Tracers::init() {
    // Allocate tracers data array and assign to tracers arrays
    for (I4 TimeIndex = 0; TimeIndex < NTimeLevels; ++TimeIndex) {
       TracerArrays[TimeIndex] =
-          Array3DReal("TracerTime" + std::to_string(TimeIndex), NumTracers,
-                      NCellsSize, NVertLayers);
+          makeArray<Array3DReal>("TracerTime" + std::to_string(TimeIndex),
+                                 NumTracers, NCellsSize, NVertLayers);
       TracerArraysH[TimeIndex] =
           HostArray3DReal("TracerHTime" + std::to_string(TimeIndex), NumTracers,
                           NCellsSize, NVertLayers);

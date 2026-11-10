@@ -37,6 +37,7 @@
 
 #include "AnalysisOperator.h"
 
+#include "OmegaKokkos.h"
 namespace OMEGA {
 
 /// ExtractRegionOp applies a named regional mask from the Field registry to
@@ -244,7 +245,7 @@ template <typename ArrayT> class ExtractRegionOp : public AnalysisOperator {
       if (InputField->hasRegionalMask()) {
          Array1DI4 InputMask = InputField->getRegionalMask();
          Array1DI4 IntersectionMask =
-             Array1DI4("IntersectionMask", RegionalMask.extent(0));
+             makeArray<Array1DI4>("IntersectionMask", RegionalMask.extent(0));
          OMEGA_SCOPE(LocInputMask, InputMask);
          OMEGA_SCOPE(LocRegionalMask, RegionalMask);
          OMEGA_SCOPE(LocIntersectionMask, IntersectionMask);

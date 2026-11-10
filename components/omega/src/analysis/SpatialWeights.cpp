@@ -70,7 +70,7 @@ void SpatialWeights::init(const std::string &InName, const HorzMesh *InMesh,
       NEntities  = Mesh->NEdgesSize;
       EntityMask = VCoord->EdgeMask;
       // The area associated with an edge is the product of its two lengths
-      EntityArea = Array1DReal("SpatialWeightsAreaEdge", NEntities);
+      EntityArea = makeArray<Array1DReal>("SpatialWeightsAreaEdge", NEntities);
       OMEGA_SCOPE(LocArea, EntityArea);
       OMEGA_SCOPE(LocDcEdge, Mesh->DcEdge);
       OMEGA_SCOPE(LocDvEdge, Mesh->DvEdge);
@@ -94,14 +94,16 @@ void SpatialWeights::init(const std::string &InName, const HorzMesh *InMesh,
 
    I4 NVertLayers = VCoord->NVertLayers;
 
-   Terms = Array1DReal("SpatialWeightsTerms_" + InputName, NEntities);
+   Terms =
+       makeArray<Array1DReal>("SpatialWeightsTerms_" + InputName, NEntities);
 
    if (Horizontal) {
       // Area weights for entities that are active at the surface
       NVert       = 1;
-      AreaWeights = Array1DReal("SpatialWeightsArea_" + InputName, NEntities);
-      Active =
-          Array2DReal("SpatialWeightsActive_" + InputName, NEntities, NVert);
+      AreaWeights =
+          makeArray<Array1DReal>("SpatialWeightsArea_" + InputName, NEntities);
+      Active = makeArray<Array2DReal>("SpatialWeightsActive_" + InputName,
+                                      NEntities, NVert);
       OMEGA_SCOPE(LocWeights, AreaWeights);
       OMEGA_SCOPE(LocActive, Active);
       OMEGA_SCOPE(LocArea, Area);
@@ -125,12 +127,12 @@ void SpatialWeights::init(const std::string &InName, const HorzMesh *InMesh,
                      "expected NVertLayers or NVertLayersP1",
                      InputName, VertDimName);
       }
-      MassWeights =
-          Array2DReal("SpatialWeightsMass_" + InputName, NEntities, NVert);
-      Active =
-          Array2DReal("SpatialWeightsActive_" + InputName, NEntities, NVert);
-      Layer = Array2DReal("SpatialWeightsLayer_" + InputName, NEntities,
-                          NVertLayers);
+      MassWeights = makeArray<Array2DReal>("SpatialWeightsMass_" + InputName,
+                                           NEntities, NVert);
+      Active      = makeArray<Array2DReal>("SpatialWeightsActive_" + InputName,
+                                           NEntities, NVert);
+      Layer       = makeArray<Array2DReal>("SpatialWeightsLayer_" + InputName,
+                                           NEntities, NVertLayers);
 
       // A layer is active where the entity mask says so; an interface is
       // active if either adjacent layer is

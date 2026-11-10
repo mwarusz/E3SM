@@ -1,5 +1,6 @@
 #include "PseudoThicknessAuxVars.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 
 #include <limits>
 
@@ -8,12 +9,15 @@ namespace OMEGA {
 PseudoThicknessAuxVars::PseudoThicknessAuxVars(
     const std::string &AuxStateSuffix, const HorzMesh *Mesh,
     const VertCoord *VCoord)
-    : FluxPseudoThickEdge("FluxPseudoThickEdge" + AuxStateSuffix,
-                          Mesh->NEdgesSize, VCoord->NVertLayers),
-      MeanPseudoThickEdge("MeanPseudoThickEdge" + AuxStateSuffix,
-                          Mesh->NEdgesSize, VCoord->NVertLayers),
-      ProvPseudoThickness("ProvPseudoThickness" + AuxStateSuffix,
-                          Mesh->NCellsSize, VCoord->NVertLayers),
+    : FluxPseudoThickEdge(
+          makeArray<Array2DReal>("FluxPseudoThickEdge" + AuxStateSuffix,
+                                 Mesh->NEdgesSize, VCoord->NVertLayers)),
+      MeanPseudoThickEdge(
+          makeArray<Array2DReal>("MeanPseudoThickEdge" + AuxStateSuffix,
+                                 Mesh->NEdgesSize, VCoord->NVertLayers)),
+      ProvPseudoThickness(
+          makeArray<Array2DReal>("ProvPseudoThickness" + AuxStateSuffix,
+                                 Mesh->NCellsSize, VCoord->NVertLayers)),
       AreaCell(Mesh->AreaCell), DvEdge(Mesh->DvEdge),
       NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       EdgeSignOnCell(Mesh->EdgeSignOnCell), CellsOnEdge(Mesh->CellsOnEdge),

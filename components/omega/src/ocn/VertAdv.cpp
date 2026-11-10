@@ -11,6 +11,7 @@
 #include "VertAdv.h"
 #include "Error.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 #include "Tracers.h"
 
 #include <limits>
@@ -69,15 +70,16 @@ VertAdv::VertAdv(const std::string &Name_,  //< [in] name for new VertAdv
    NTracers      = Tracers::getNumTracers();
 
    // Allocate member arrays
-   VerticalPseudoVelocity =
-       Array2DReal("VerticalPseudoVelocity", NCellsSize, NVertLayersP1);
-   VerticalTransportPseudoVelocity = Array2DReal(
+   VerticalPseudoVelocity = makeArray<Array2DReal>("VerticalPseudoVelocity",
+                                                   NCellsSize, NVertLayersP1);
+   VerticalTransportPseudoVelocity = makeArray<Array2DReal>(
        "VerticalTransportPseudoVelocity", NCellsSize, NVertLayersP1);
-   TotalVerticalPseudoVelocity =
-       Array2DReal("TotalVerticalPseudoVelocity", NCellsSize, NVertLayersP1);
-   TotalVerticalTransportPseudoVelocity = Array2DReal(
+   TotalVerticalPseudoVelocity = makeArray<Array2DReal>(
+       "TotalVerticalPseudoVelocity", NCellsSize, NVertLayersP1);
+   TotalVerticalTransportPseudoVelocity = makeArray<Array2DReal>(
        "TotalVerticalTransportPseudoVelocity", NCellsSize, NVertLayersP1);
-   VertFlux = Array3DReal("VertFlux", NTracers, NCellsSize, NVertLayersP1);
+   VertFlux =
+       makeArray<Array3DReal>("VertFlux", NTracers, NCellsSize, NVertLayersP1);
 
    // Allocate host copies
    VerticalPseudoVelocityH = createHostMirrorCopy(VerticalPseudoVelocity);
@@ -91,8 +93,8 @@ VertAdv::VertAdv(const std::string &Name_,  //< [in] name for new VertAdv
 
    // Low-order flux array only needed for flux-corrected transport
    if (VertAdvChoice == VertAdvOption::FCT) {
-      LowOrderVertFlux =
-          Array3DReal("LowOrderVertFlux", NTracers, NCellsSize, NVertLayersP1);
+      LowOrderVertFlux  = makeArray<Array3DReal>("LowOrderVertFlux", NTracers,
+                                                 NCellsSize, NVertLayersP1);
       LowOrderVertFluxH = createHostMirrorCopy(LowOrderVertFlux);
    }
 

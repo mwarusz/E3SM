@@ -71,33 +71,38 @@ KPPMix::KPPMix(const std::string &InName, const HorzMesh *InMesh,
     : Name(InName), Mesh(InMesh), VCoord(InVCoord) {
 
    // Allocate output arrays
-   VertDiff  = Array2DReal("VertDiff", Mesh->NCellsSize, VCoord->NVertLayersP1);
-   VertVisc  = Array2DReal("VertVisc", Mesh->NCellsSize, VCoord->NVertLayersP1);
-   OSBLDepth = Array1DReal("OSBLDepth", Mesh->NCellsSize);
-   OSBLDepthIndex = Array1DI4("OSBLDepthIndex", Mesh->NCellsSize);
-   VertNonLocalFlux =
-       Array2DReal("VertNonLocalFlux", Mesh->NCellsSize, VCoord->NVertLayersP1);
-   BulkRichardsonNumber = Array2DReal("BulkRichardsonNumber", Mesh->NCellsSize,
-                                      VCoord->NVertLayersP1);
-   BulkRichardsonShear  = Array2DReal("BulkRichardsonShear", Mesh->NCellsSize,
-                                      VCoord->NVertLayersP1);
-   UnresolvedShear =
-       Array2DReal("UnresolvedShear", Mesh->NCellsSize, VCoord->NVertLayersP1);
-   BuoyancyJump =
-       Array2DReal("BuoyancyJump", Mesh->NCellsSize, VCoord->NVertLayersP1);
-   TurbulentVelocityScale = Array2DReal(
+   VertDiff         = makeArray<Array2DReal>("VertDiff", Mesh->NCellsSize,
+                                             VCoord->NVertLayersP1);
+   VertVisc         = makeArray<Array2DReal>("VertVisc", Mesh->NCellsSize,
+                                             VCoord->NVertLayersP1);
+   OSBLDepth        = makeArray<Array1DReal>("OSBLDepth", Mesh->NCellsSize);
+   OSBLDepthIndex   = makeArray<Array1DI4>("OSBLDepthIndex", Mesh->NCellsSize);
+   VertNonLocalFlux = makeArray<Array2DReal>(
+       "VertNonLocalFlux", Mesh->NCellsSize, VCoord->NVertLayersP1);
+   BulkRichardsonNumber = makeArray<Array2DReal>(
+       "BulkRichardsonNumber", Mesh->NCellsSize, VCoord->NVertLayersP1);
+   BulkRichardsonShear = makeArray<Array2DReal>(
+       "BulkRichardsonShear", Mesh->NCellsSize, VCoord->NVertLayersP1);
+   UnresolvedShear = makeArray<Array2DReal>("UnresolvedShear", Mesh->NCellsSize,
+                                            VCoord->NVertLayersP1);
+   BuoyancyJump    = makeArray<Array2DReal>("BuoyancyJump", Mesh->NCellsSize,
+                                            VCoord->NVertLayersP1);
+   TurbulentVelocityScale = makeArray<Array2DReal>(
        "TurbulentVelocityScale", Mesh->NCellsSize, VCoord->NVertLayersP1);
-   PotentialDensity =
-       Array2DReal("PotentialDensity", Mesh->NCellsSize, VCoord->NVertLayers);
+   PotentialDensity = makeArray<Array2DReal>(
+       "PotentialDensity", Mesh->NCellsSize, VCoord->NVertLayers);
    SurfaceFrictionVelocity =
-       Array1DReal("SurfaceFrictionVelocity", Mesh->NCellsSize);
-   SurfaceBuoyancyFlux = Array1DReal("SurfaceBuoyancyFlux", Mesh->NCellsSize);
-   RefPressure =
-       Array2DReal("KPP-RefPressure", Mesh->NCellsSize, VCoord->NVertLayers);
-   TangentialVelocity = Array2DReal("KPP-TangentialVelocity", Mesh->NEdgesSize,
-                                    VCoord->NVertLayers);
-   LangmuirFactor     = Array1DReal("KPP-LangmuirFactor", Mesh->NCellsSize);
-   OSBLDepthSmooth    = Array1DReal("KPP-OSBLDepthSmooth", Mesh->NCellsSize);
+       makeArray<Array1DReal>("SurfaceFrictionVelocity", Mesh->NCellsSize);
+   SurfaceBuoyancyFlux =
+       makeArray<Array1DReal>("SurfaceBuoyancyFlux", Mesh->NCellsSize);
+   RefPressure = makeArray<Array2DReal>("KPP-RefPressure", Mesh->NCellsSize,
+                                        VCoord->NVertLayers);
+   TangentialVelocity = makeArray<Array2DReal>(
+       "KPP-TangentialVelocity", Mesh->NEdgesSize, VCoord->NVertLayers);
+   LangmuirFactor =
+       makeArray<Array1DReal>("KPP-LangmuirFactor", Mesh->NCellsSize);
+   OSBLDepthSmooth =
+       makeArray<Array1DReal>("KPP-OSBLDepthSmooth", Mesh->NCellsSize);
 
    // Default to a no-op enhancement so Stage 2 is well-defined even if
    // called before Stage 1 (e.g. standalone unit tests) has computed it.

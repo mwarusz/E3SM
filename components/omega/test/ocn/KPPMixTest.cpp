@@ -522,7 +522,8 @@ void testOSBLIndex() {
 
    // Single column of five 10 m layers, interfaces at 0,-10,...,-50 m.
    constexpr I4 NLayers = 5;
-   Array2DReal ZInterface("KPPMixTest-OSBLIndexZ", 1, NLayers + 1);
+   Array2DReal ZInterface =
+       makeArray<Array2DReal>("KPPMixTest-OSBLIndexZ", 1, NLayers + 1);
    parallelFor(
        "KPPMixTest-OSBLIndexInit", {NLayers + 1},
        KOKKOS_LAMBDA(I4 K) { ZInterface(0, K) = -10.0_Real * K; });
@@ -596,10 +597,11 @@ void testWindOnlyCoefficients() {
    KPPMix *KPPInstance  = KPPMix::getInstance();
    setCoefficientTestGeometry();
 
-   Array2DReal Density("KPPMixTest-Density", Mesh->NCellsSize,
-                       VCoord->NVertLayers);
-   Array1DReal UStar("KPPMixTest-UStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-B0", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>(
+       "KPPMixTest-Density", Mesh->NCellsSize, VCoord->NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-UStar", Mesh->NCellsSize);
+   Array1DReal B0 = makeArray<Array1DReal>("KPPMixTest-B0", Mesh->NCellsSize);
    deepCopy(Density, RhoSw);
    deepCopy(UStar, 0.02_Real);
    deepCopy(B0, 0.0_Real);
@@ -643,10 +645,12 @@ void testConvectionOnlyCoefficients() {
    KPPMix *KPPInstance  = KPPMix::getInstance();
    setCoefficientTestGeometry();
 
-   Array2DReal Density("KPPMixTest-ConvDensity", Mesh->NCellsSize,
-                       VCoord->NVertLayers);
-   Array1DReal UStar("KPPMixTest-ConvUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-ConvB0", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>(
+       "KPPMixTest-ConvDensity", Mesh->NCellsSize, VCoord->NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-ConvUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-ConvB0", Mesh->NCellsSize);
    deepCopy(Density, RhoSw);
    deepCopy(UStar, 0.0_Real);
    deepCopy(B0, -1.0e-7_Real);
@@ -688,10 +692,12 @@ void testNonLocalProfileModes() {
    KPPMix *KPPInstance  = KPPMix::getInstance();
    setCoefficientTestGeometry();
 
-   Array2DReal Density("KPPMixTest-ProfileDensity", Mesh->NCellsSize,
-                       VCoord->NVertLayers);
-   Array1DReal UStar("KPPMixTest-ProfileUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-ProfileB0", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>(
+       "KPPMixTest-ProfileDensity", Mesh->NCellsSize, VCoord->NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-ProfileUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-ProfileB0", Mesh->NCellsSize);
    deepCopy(Density, RhoSw);
    deepCopy(UStar, 0.02_Real);
    deepCopy(B0, 0.0_Real);
@@ -738,14 +744,16 @@ void testMatchBothInteriorCoefficients() {
    const I4 NVertLayers = VCoord->NVertLayers;
    setCoefficientTestGeometry();
 
-   Array2DReal Density("KPPMixTest-MatchDensity", Mesh->NCellsSize,
-                       NVertLayers);
-   Array1DReal UStar("KPPMixTest-MatchUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-MatchB0", Mesh->NCellsSize);
-   Array2DReal InteriorDiff("KPPMixTest-InteriorDiff", Mesh->NCellsSize,
-                            NVertLayers + 1);
-   Array2DReal InteriorVisc("KPPMixTest-InteriorVisc", Mesh->NCellsSize,
-                            NVertLayers + 1);
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-MatchDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-MatchUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-MatchB0", Mesh->NCellsSize);
+   Array2DReal InteriorDiff = makeArray<Array2DReal>(
+       "KPPMixTest-InteriorDiff", Mesh->NCellsSize, NVertLayers + 1);
+   Array2DReal InteriorVisc = makeArray<Array2DReal>(
+       "KPPMixTest-InteriorVisc", Mesh->NCellsSize, NVertLayers + 1);
    constexpr Real ExpectedInteriorDiff = 2.0e-3_Real;
    constexpr Real ExpectedInteriorVisc = 4.0e-3_Real;
    deepCopy(Density, RhoSw);
@@ -799,10 +807,12 @@ void testEnhancedDiffusion() {
    const I4 NVertLayers = VCoord->NVertLayers;
    setCoefficientTestGeometry();
 
-   Array2DReal Density("KPPMixTest-EnhancedDensity", Mesh->NCellsSize,
-                       NVertLayers);
-   Array1DReal UStar("KPPMixTest-EnhancedUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-EnhancedB0", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-EnhancedDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-EnhancedUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-EnhancedB0", Mesh->NCellsSize);
    deepCopy(Density, RhoSw);
    deepCopy(UStar, 0.02_Real);
    deepCopy(B0, 0.0_Real);
@@ -867,10 +877,10 @@ void testEnhancedDiffusion() {
       }
    }
 
-   Array2DReal InteriorDiff("KPPMixTest-EnhancedInteriorDiff", Mesh->NCellsSize,
-                            NVertLayers + 1);
-   Array2DReal InteriorVisc("KPPMixTest-EnhancedInteriorVisc", Mesh->NCellsSize,
-                            NVertLayers + 1);
+   Array2DReal InteriorDiff = makeArray<Array2DReal>(
+       "KPPMixTest-EnhancedInteriorDiff", Mesh->NCellsSize, NVertLayers + 1);
+   Array2DReal InteriorVisc = makeArray<Array2DReal>(
+       "KPPMixTest-EnhancedInteriorVisc", Mesh->NCellsSize, NVertLayers + 1);
    constexpr Real InteriorDiffValue = 2.0e-3_Real;
    constexpr Real InteriorViscValue = 4.0e-3_Real;
    deepCopy(InteriorDiff, InteriorDiffValue);
@@ -932,10 +942,12 @@ void testStableAndZeroForcing() {
    KPPMix *KPPInstance  = KPPMix::getInstance();
    setCoefficientTestGeometry();
 
-   Array2DReal Density("KPPMixTest-StableDensity", Mesh->NCellsSize,
-                       VCoord->NVertLayers);
-   Array1DReal UStar("KPPMixTest-StableUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-StableB0", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>(
+       "KPPMixTest-StableDensity", Mesh->NCellsSize, VCoord->NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-StableUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-StableB0", Mesh->NCellsSize);
    deepCopy(Density, RhoSw);
    deepCopy(UStar, 0.02_Real);
    deepCopy(B0, 1.0e-7_Real);
@@ -973,9 +985,12 @@ void testCoefficientVerticalDomainEdges() {
    const I4 NVertLayers = VCoord->NVertLayers;
    setCoefficientTestGeometry();
 
-   Array2DReal Density("KPPMixTest-EdgeDensity", Mesh->NCellsSize, NVertLayers);
-   Array1DReal UStar("KPPMixTest-EdgeUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-EdgeB0", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-EdgeDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-EdgeUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-EdgeB0", Mesh->NCellsSize);
    deepCopy(Density, -99.0_Real);
    deepCopy(UStar, 0.02_Real);
    deepCopy(B0, 0.0_Real);
@@ -1046,10 +1061,12 @@ void testCoefficientInvalidWetBounds() {
    const I4 NVertLayers = VCoord->NVertLayers;
    setCoefficientTestGeometry();
 
-   Array2DReal Density("KPPMixTest-InvalidBoundsDensity", Mesh->NCellsSize,
-                       NVertLayers);
-   Array1DReal UStar("KPPMixTest-InvalidBoundsUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-InvalidBoundsB0", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>(
+       "KPPMixTest-InvalidBoundsDensity", Mesh->NCellsSize, NVertLayers);
+   Array1DReal UStar = makeArray<Array1DReal>("KPPMixTest-InvalidBoundsUStar",
+                                              Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-InvalidBoundsB0", Mesh->NCellsSize);
    deepCopy(Density, -99.0_Real);
    deepCopy(UStar, 0.02_Real);
    deepCopy(B0, -1.0e-7_Real);
@@ -1157,15 +1174,21 @@ void testOSBLDepth() {
    setCoefficientTestGeometry();
    VCoord->minMaxLayerEdge(Halo::getDefault());
 
-   Array2DReal Density("KPPMixTest-BLDDensity", Mesh->NCellsSize, NVertLayers);
-   Array2DReal NormalVelocity("KPPMixTest-BLDNormalVelocity", Mesh->NEdgesSize,
-                              NVertLayers);
-   Array2DReal TangentialVelocity("KPPMixTest-BLDTangentialVelocity",
-                                  Mesh->NEdgesSize, NVertLayers);
-   Array1DReal UStar("KPPMixTest-BLDUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-BLDB0", Mesh->NCellsSize);
-   Array2DReal BVF("KPPMixTest-BLDBVF", Mesh->NCellsSize, NVertLayers + 1);
-   Array1DReal IceFraction("KPPMixTest-BLDIce", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-BLDDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+
+   Array2DReal NormalVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-BLDNormalVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal TangentialVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-BLDTangentialVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-BLDUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-BLDB0", Mesh->NCellsSize);
+   Array2DReal BVF = makeArray<Array2DReal>("KPPMixTest-BLDBVF",
+                                            Mesh->NCellsSize, NVertLayers + 1);
+   Array1DReal IceFraction =
+       makeArray<Array1DReal>("KPPMixTest-BLDIce", Mesh->NCellsSize);
    Array1DReal Wind;
 
    deepCopy(NormalVelocity, 0.0_Real);
@@ -1416,17 +1439,21 @@ void testBoundaryLayerNonuniformThickness() {
    KPPMix *KPPInstance  = KPPMix::getInstance();
    const I4 NVertLayers = VCoord->NVertLayers;
 
-   Array2DReal Density("KPPMixTest-NonuniformDensity", Mesh->NCellsSize,
-                       NVertLayers);
-   Array2DReal NormalVelocity("KPPMixTest-NonuniformNormalVelocity",
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-NonuniformDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+   Array2DReal NormalVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-NonuniformNormalVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal TangentialVelocity =
+       makeArray<Array2DReal>("KPPMixTest-NonuniformTangentialVelocity",
                               Mesh->NEdgesSize, NVertLayers);
-   Array2DReal TangentialVelocity("KPPMixTest-NonuniformTangentialVelocity",
-                                  Mesh->NEdgesSize, NVertLayers);
-   Array1DReal UStar("KPPMixTest-NonuniformUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-NonuniformB0", Mesh->NCellsSize);
-   Array2DReal BVF("KPPMixTest-NonuniformBVF", Mesh->NCellsSize,
-                   NVertLayers + 1);
-   Array1DReal IceFraction("KPPMixTest-NonuniformIce", Mesh->NCellsSize);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-NonuniformUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-NonuniformB0", Mesh->NCellsSize);
+   Array2DReal BVF = makeArray<Array2DReal>("KPPMixTest-NonuniformBVF",
+                                            Mesh->NCellsSize, NVertLayers + 1);
+   Array1DReal IceFraction =
+       makeArray<Array1DReal>("KPPMixTest-NonuniformIce", Mesh->NCellsSize);
    Array1DReal Wind;
 
    OMEGA_SCOPE(GeomZInterface, VCoord->GeomZInterface);
@@ -1584,17 +1611,21 @@ void testBoundaryLayerHorizontalThicknessVariation() {
    KPPMix *KPPInstance  = KPPMix::getInstance();
    const I4 NVertLayers = VCoord->NVertLayers;
 
-   Array2DReal Density("KPPMixTest-HorizontalDensity", Mesh->NCellsSize,
-                       NVertLayers);
-   Array2DReal NormalVelocity("KPPMixTest-HorizontalNormalVelocity",
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-HorizontalDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+   Array2DReal NormalVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-HorizontalNormalVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal TangentialVelocity =
+       makeArray<Array2DReal>("KPPMixTest-HorizontalTangentialVelocity",
                               Mesh->NEdgesSize, NVertLayers);
-   Array2DReal TangentialVelocity("KPPMixTest-HorizontalTangentialVelocity",
-                                  Mesh->NEdgesSize, NVertLayers);
-   Array1DReal UStar("KPPMixTest-HorizontalUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-HorizontalB0", Mesh->NCellsSize);
-   Array2DReal BVF("KPPMixTest-HorizontalBVF", Mesh->NCellsSize,
-                   NVertLayers + 1);
-   Array1DReal IceFraction("KPPMixTest-HorizontalIce", Mesh->NCellsSize);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-HorizontalUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-HorizontalB0", Mesh->NCellsSize);
+   Array2DReal BVF = makeArray<Array2DReal>("KPPMixTest-HorizontalBVF",
+                                            Mesh->NCellsSize, NVertLayers + 1);
+   Array1DReal IceFraction =
+       makeArray<Array1DReal>("KPPMixTest-HorizontalIce", Mesh->NCellsSize);
    Array1DReal Wind;
 
    OMEGA_SCOPE(GeomZInterface, VCoord->GeomZInterface);
@@ -1729,15 +1760,21 @@ void testSshOffsetInvariance() {
    KPPMix *KPPInstance  = KPPMix::getInstance();
    const I4 NVertLayers = VCoord->NVertLayers;
 
-   Array2DReal Density("KPPMixTest-SshDensity", Mesh->NCellsSize, NVertLayers);
-   Array2DReal NormalVelocity("KPPMixTest-SshNormalVelocity", Mesh->NEdgesSize,
-                              NVertLayers);
-   Array2DReal TangentialVelocity("KPPMixTest-SshTangentialVelocity",
-                                  Mesh->NEdgesSize, NVertLayers);
-   Array1DReal UStar("KPPMixTest-SshUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-SshB0", Mesh->NCellsSize);
-   Array2DReal BVF("KPPMixTest-SshBVF", Mesh->NCellsSize, NVertLayers + 1);
-   Array1DReal IceFraction("KPPMixTest-SshIce", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-SshDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+
+   Array2DReal NormalVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-SshNormalVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal TangentialVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-SshTangentialVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-SshUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-SshB0", Mesh->NCellsSize);
+   Array2DReal BVF = makeArray<Array2DReal>("KPPMixTest-SshBVF",
+                                            Mesh->NCellsSize, NVertLayers + 1);
+   Array1DReal IceFraction =
+       makeArray<Array1DReal>("KPPMixTest-SshIce", Mesh->NCellsSize);
    Array1DReal Wind;
 
    deepCopy(NormalVelocity, 0.0_Real);
@@ -1840,20 +1877,24 @@ void testBoundaryLayerEdgeFallbacks() {
    setCoefficientTestGeometry();
    VCoord->minMaxLayerEdge(Halo::getDefault());
 
-   Array2DReal Density("KPPMixTest-EdgeFallbackDensity", Mesh->NCellsSize,
-                       NVertLayers);
-   Array2DReal NormalVelocity("KPPMixTest-EdgeFallbackNormalVelocity",
+   Array2DReal Density = makeArray<Array2DReal>(
+       "KPPMixTest-EdgeFallbackDensity", Mesh->NCellsSize, NVertLayers);
+   Array2DReal NormalVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-EdgeFallbackNormalVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal TangentialVelocity =
+       makeArray<Array2DReal>("KPPMixTest-EdgeFallbackTangentialVelocity",
                               Mesh->NEdgesSize, NVertLayers);
-   Array2DReal TangentialVelocity("KPPMixTest-EdgeFallbackTangentialVelocity",
-                                  Mesh->NEdgesSize, NVertLayers);
-   Array1DReal UStar("KPPMixTest-EdgeFallbackUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-EdgeFallbackB0", Mesh->NCellsSize);
-   Array2DReal BVF("KPPMixTest-EdgeFallbackBVF", Mesh->NCellsSize,
-                   NVertLayers + 1);
-   Array1DReal IceFraction("KPPMixTest-EdgeFallbackIce", Mesh->NCellsSize);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-EdgeFallbackUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-EdgeFallbackB0", Mesh->NCellsSize);
+   Array2DReal BVF = makeArray<Array2DReal>("KPPMixTest-EdgeFallbackBVF",
+                                            Mesh->NCellsSize, NVertLayers + 1);
+   Array1DReal IceFraction =
+       makeArray<Array1DReal>("KPPMixTest-EdgeFallbackIce", Mesh->NCellsSize);
    Array1DReal Wind;
-   Array1DReal OriginalDcEdge("KPPMixTest-OriginalDcEdge",
-                              Mesh->DcEdge.extent(0));
+   Array1DReal OriginalDcEdge = makeArray<Array1DReal>(
+       "KPPMixTest-OriginalDcEdge", Mesh->DcEdge.extent(0));
    deepCopy(OriginalDcEdge, Mesh->DcEdge);
 
    deepCopy(Density, RhoSw);
@@ -1911,17 +1952,22 @@ void testBoundaryLayerLangmuir() {
    setCoefficientTestGeometry();
    VCoord->minMaxLayerEdge(Halo::getDefault());
 
-   Array2DReal Density("KPPMixTest-LangmuirDensity", Mesh->NCellsSize,
-                       NVertLayers);
-   Array2DReal NormalVelocity("KPPMixTest-LangmuirNormalVelocity",
-                              Mesh->NEdgesSize, NVertLayers);
-   Array2DReal TangentialVelocity("KPPMixTest-LangmuirTangentialVelocity",
-                                  Mesh->NEdgesSize, NVertLayers);
-   Array1DReal UStar("KPPMixTest-LangmuirUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-LangmuirB0", Mesh->NCellsSize);
-   Array2DReal BVF("KPPMixTest-LangmuirBVF", Mesh->NCellsSize, NVertLayers + 1);
-   Array1DReal IceFraction("KPPMixTest-LangmuirIce", Mesh->NCellsSize);
-   Array1DReal Wind("KPPMixTest-LangmuirWind", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-LangmuirDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+   Array2DReal NormalVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-LangmuirNormalVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal TangentialVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-LangmuirTangentialVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-LangmuirUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-LangmuirB0", Mesh->NCellsSize);
+   Array2DReal BVF = makeArray<Array2DReal>("KPPMixTest-LangmuirBVF",
+                                            Mesh->NCellsSize, NVertLayers + 1);
+   Array1DReal IceFraction =
+       makeArray<Array1DReal>("KPPMixTest-LangmuirIce", Mesh->NCellsSize);
+   Array1DReal Wind =
+       makeArray<Array1DReal>("KPPMixTest-LangmuirWind", Mesh->NCellsSize);
 
    constexpr Real TestUStar = 0.02_Real;
    constexpr Real TestB0    = -1.0e-7_Real;
@@ -1962,11 +2008,12 @@ void testBoundaryLayerLangmuir() {
    KPPInstance->UseLangmuirTurbulence = false;
    KPPInstance->computeOSBLDepth(Density, NormalVelocity, TangentialVelocity,
                                  UStar, B0, BVF, IceFraction, Wind);
-   Array1DReal DisabledBLD("KPPMixTest-LangmuirDisabledBLD", Mesh->NCellsSize);
-   Array2DReal DisabledRi("KPPMixTest-LangmuirDisabledRi", Mesh->NCellsSize,
-                          NVertLayers + 1);
-   Array2DReal DisabledVt2("KPPMixTest-LangmuirDisabledVt2", Mesh->NCellsSize,
-                           NVertLayers + 1);
+   Array1DReal DisabledBLD = makeArray<Array1DReal>(
+       "KPPMixTest-LangmuirDisabledBLD", Mesh->NCellsSize);
+   Array2DReal DisabledRi = makeArray<Array2DReal>(
+       "KPPMixTest-LangmuirDisabledRi", Mesh->NCellsSize, NVertLayers + 1);
+   Array2DReal DisabledVt2 = makeArray<Array2DReal>(
+       "KPPMixTest-LangmuirDisabledVt2", Mesh->NCellsSize, NVertLayers + 1);
    deepCopy(DisabledBLD, KPPInstance->OSBLDepth);
    deepCopy(DisabledRi, KPPInstance->BulkRichardsonNumber);
    deepCopy(DisabledVt2, KPPInstance->UnresolvedShear);
@@ -1978,11 +2025,12 @@ void testBoundaryLayerLangmuir() {
    KPPInstance->IceFractionThresholdForLangmuir = 0.05_Real;
    KPPInstance->computeOSBLDepth(Density, NormalVelocity, TangentialVelocity,
                                  UStar, B0, BVF, IceFraction, Wind);
-   Array1DReal EnabledBLD("KPPMixTest-LangmuirEnabledBLD", Mesh->NCellsSize);
-   Array2DReal EnabledRi("KPPMixTest-LangmuirEnabledRi", Mesh->NCellsSize,
-                         NVertLayers + 1);
-   Array2DReal EnabledVt2("KPPMixTest-LangmuirEnabledVt2", Mesh->NCellsSize,
-                          NVertLayers + 1);
+   Array1DReal EnabledBLD = makeArray<Array1DReal>(
+       "KPPMixTest-LangmuirEnabledBLD", Mesh->NCellsSize);
+   Array2DReal EnabledRi = makeArray<Array2DReal>(
+       "KPPMixTest-LangmuirEnabledRi", Mesh->NCellsSize, NVertLayers + 1);
+   Array2DReal EnabledVt2 = makeArray<Array2DReal>(
+       "KPPMixTest-LangmuirEnabledVt2", Mesh->NCellsSize, NVertLayers + 1);
    deepCopy(EnabledBLD, KPPInstance->OSBLDepth);
    deepCopy(EnabledRi, KPPInstance->BulkRichardsonNumber);
    deepCopy(EnabledVt2, KPPInstance->UnresolvedShear);
@@ -2062,17 +2110,20 @@ void testBoundaryLayerSmoothing() {
    setCoefficientTestGeometry();
    VCoord->minMaxLayerEdge(Halo::getDefault());
 
-   Array2DReal Density("KPPMixTest-SmoothingDensity", Mesh->NCellsSize,
-                       NVertLayers);
-   Array2DReal NormalVelocity("KPPMixTest-SmoothingNormalVelocity",
-                              Mesh->NEdgesSize, NVertLayers);
-   Array2DReal TangentialVelocity("KPPMixTest-SmoothingTangentialVelocity",
-                                  Mesh->NEdgesSize, NVertLayers);
-   Array1DReal UStar("KPPMixTest-SmoothingUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-SmoothingB0", Mesh->NCellsSize);
-   Array2DReal BVF("KPPMixTest-SmoothingBVF", Mesh->NCellsSize,
-                   NVertLayers + 1);
-   Array1DReal IceFraction("KPPMixTest-SmoothingIce", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-SmoothingDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+   Array2DReal NormalVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-SmoothingNormalVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal TangentialVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-SmoothingTangentialVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-SmoothingUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-SmoothingB0", Mesh->NCellsSize);
+   Array2DReal BVF = makeArray<Array2DReal>("KPPMixTest-SmoothingBVF",
+                                            Mesh->NCellsSize, NVertLayers + 1);
+   Array1DReal IceFraction =
+       makeArray<Array1DReal>("KPPMixTest-SmoothingIce", Mesh->NCellsSize);
    Array1DReal Wind;
 
    constexpr Real TestUStar = 0.02_Real;
@@ -2114,7 +2165,8 @@ void testBoundaryLayerSmoothing() {
    KPPInstance->UseOSBLSmoothing      = false;
    KPPInstance->computeOSBLDepth(Density, NormalVelocity, TangentialVelocity,
                                  UStar, B0, BVF, IceFraction, Wind);
-   Array1DReal UnsmoothedBLD("KPPMixTest-UnsmoothedBLD", Mesh->NCellsSize);
+   Array1DReal UnsmoothedBLD =
+       makeArray<Array1DReal>("KPPMixTest-UnsmoothedBLD", Mesh->NCellsSize);
    deepCopy(UnsmoothedBLD, KPPInstance->OSBLDepth);
    const auto UnsmoothedBLDH = createHostMirrorCopy(UnsmoothedBLD);
 
@@ -2187,16 +2239,20 @@ void testEnabledFullCall() {
    setCoefficientTestGeometry();
    VCoord->minMaxLayerEdge(Halo::getDefault());
 
-   Array2DReal Density("KPPMixTest-FullCallDensity", Mesh->NCellsSize,
-                       NVertLayers);
-   Array2DReal NormalVelocity("KPPMixTest-FullCallNormalVelocity",
-                              Mesh->NEdgesSize, NVertLayers);
-   Array2DReal TangentialVelocity("KPPMixTest-FullCallTangentialVelocity",
-                                  Mesh->NEdgesSize, NVertLayers);
-   Array1DReal UStar("KPPMixTest-FullCallUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-FullCallB0", Mesh->NCellsSize);
-   Array2DReal BVF("KPPMixTest-FullCallBVF", Mesh->NCellsSize, NVertLayers + 1);
-   Array1DReal IceFraction("KPPMixTest-FullCallIce", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-FullCallDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+   Array2DReal NormalVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-FullCallNormalVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal TangentialVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-FullCallTangentialVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-FullCallUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-FullCallB0", Mesh->NCellsSize);
+   Array2DReal BVF = makeArray<Array2DReal>("KPPMixTest-FullCallBVF",
+                                            Mesh->NCellsSize, NVertLayers + 1);
+   Array1DReal IceFraction =
+       makeArray<Array1DReal>("KPPMixTest-FullCallIce", Mesh->NCellsSize);
    Array1DReal Wind;
 
    parallelFor(
@@ -2220,18 +2276,20 @@ void testEnabledFullCall() {
                                  UStar, B0, BVF, IceFraction, Wind);
    KPPInstance->computeMixingCoefficients(UStar, B0);
 
-   Array1DReal ExpectedBLD("KPPMixTest-ExpectedBLD", Mesh->NCellsSize);
-   Array1DI4 ExpectedBLDIndex("KPPMixTest-ExpectedBLDIndex", Mesh->NCellsSize);
-   Array2DReal ExpectedBulkRi("KPPMixTest-ExpectedBulkRi", Mesh->NCellsSize,
-                              NVertLayers + 1);
-   Array2DReal ExpectedVertDiff("KPPMixTest-ExpectedVertDiff", Mesh->NCellsSize,
-                                NVertLayers + 1);
-   Array2DReal ExpectedVertVisc("KPPMixTest-ExpectedVertVisc", Mesh->NCellsSize,
-                                NVertLayers + 1);
-   Array2DReal ExpectedNonLocal("KPPMixTest-ExpectedNonLocal", Mesh->NCellsSize,
-                                NVertLayers + 1);
-   Array2DReal ExpectedTurbVel("KPPMixTest-ExpectedTurbVel", Mesh->NCellsSize,
-                               NVertLayers + 1);
+   Array1DReal ExpectedBLD =
+       makeArray<Array1DReal>("KPPMixTest-ExpectedBLD", Mesh->NCellsSize);
+   Array1DI4 ExpectedBLDIndex =
+       makeArray<Array1DI4>("KPPMixTest-ExpectedBLDIndex", Mesh->NCellsSize);
+   Array2DReal ExpectedBulkRi = makeArray<Array2DReal>(
+       "KPPMixTest-ExpectedBulkRi", Mesh->NCellsSize, NVertLayers + 1);
+   Array2DReal ExpectedVertDiff = makeArray<Array2DReal>(
+       "KPPMixTest-ExpectedVertDiff", Mesh->NCellsSize, NVertLayers + 1);
+   Array2DReal ExpectedVertVisc = makeArray<Array2DReal>(
+       "KPPMixTest-ExpectedVertVisc", Mesh->NCellsSize, NVertLayers + 1);
+   Array2DReal ExpectedNonLocal = makeArray<Array2DReal>(
+       "KPPMixTest-ExpectedNonLocal", Mesh->NCellsSize, NVertLayers + 1);
+   Array2DReal ExpectedTurbVel = makeArray<Array2DReal>(
+       "KPPMixTest-ExpectedTurbVel", Mesh->NCellsSize, NVertLayers + 1);
    deepCopy(ExpectedBLD, KPPInstance->OSBLDepth);
    deepCopy(ExpectedBLDIndex, KPPInstance->OSBLDepthIndex);
    deepCopy(ExpectedBulkRi, KPPInstance->BulkRichardsonNumber);
@@ -2309,16 +2367,20 @@ void testDisabledFullCall() {
    KPPMix *KPPInstance  = KPPMix::getInstance();
    const I4 NVertLayers = VCoord->NVertLayers;
 
-   Array2DReal Density("KPPMixTest-DisabledDensity", Mesh->NCellsSize,
-                       NVertLayers);
-   Array2DReal NormalVelocity("KPPMixTest-DisabledNormalVelocity",
-                              Mesh->NEdgesSize, NVertLayers);
-   Array2DReal TangentialVelocity("KPPMixTest-DisabledTangentialVelocity",
-                                  Mesh->NEdgesSize, NVertLayers);
-   Array1DReal UStar("KPPMixTest-DisabledUStar", Mesh->NCellsSize);
-   Array1DReal B0("KPPMixTest-DisabledB0", Mesh->NCellsSize);
-   Array2DReal BVF("KPPMixTest-DisabledBVF", Mesh->NCellsSize, NVertLayers + 1);
-   Array1DReal IceFraction("KPPMixTest-DisabledIce", Mesh->NCellsSize);
+   Array2DReal Density = makeArray<Array2DReal>("KPPMixTest-DisabledDensity",
+                                                Mesh->NCellsSize, NVertLayers);
+   Array2DReal NormalVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-DisabledNormalVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal TangentialVelocity = makeArray<Array2DReal>(
+       "KPPMixTest-DisabledTangentialVelocity", Mesh->NEdgesSize, NVertLayers);
+   Array1DReal UStar =
+       makeArray<Array1DReal>("KPPMixTest-DisabledUStar", Mesh->NCellsSize);
+   Array1DReal B0 =
+       makeArray<Array1DReal>("KPPMixTest-DisabledB0", Mesh->NCellsSize);
+   Array2DReal BVF = makeArray<Array2DReal>("KPPMixTest-DisabledBVF",
+                                            Mesh->NCellsSize, NVertLayers + 1);
+   Array1DReal IceFraction =
+       makeArray<Array1DReal>("KPPMixTest-DisabledIce", Mesh->NCellsSize);
    deepCopy(Density, RhoSw);
    deepCopy(NormalVelocity, 0.0_Real);
    deepCopy(TangentialVelocity, 0.0_Real);

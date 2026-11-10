@@ -58,7 +58,7 @@ Error testHiparFor1DFor1D(int N1) {
       }
    }
 
-   Array2DI4 A("A2", N1, N2);
+   Array2DI4 A = makeArray<Array2DI4>("A2", N1, N2);
    parallelForOuter(
        {N1}, KOKKOS_LAMBDA(int J1, const TeamMember &Team) {
           parallelForInner(
@@ -91,8 +91,8 @@ Error testHiparFor1DReduce1D(int N1) {
       RefMaxH(J1) = Max;
    }
 
-   Array1DI4 Sum1("Sum11", N1);
-   Array1DI4 Max1("Max11", N1);
+   Array1DI4 Sum1 = makeArray<Array1DI4>("Sum11", N1);
+   Array1DI4 Max1 = makeArray<Array1DI4>("Max11", N1);
    parallelForOuter(
        {N1}, KOKKOS_LAMBDA(int J1, const TeamMember &Team) {
           I4 Sum;
@@ -122,8 +122,8 @@ Error testHiparFor1DReduce1D(int N1) {
                    errorMsg("parallelFor1DReduce1D Max FAIL", N1));
    }
 
-   Array1DI4 Sum2("Sum21", N1);
-   Array1DI4 Max2("Max21", N1);
+   Array1DI4 Sum2 = makeArray<Array1DI4>("Sum21", N1);
+   Array1DI4 Max2 = makeArray<Array1DI4>("Max21", N1);
    parallelForOuter(
        {N1}, KOKKOS_LAMBDA(int J1, const TeamMember &Team) {
           I4 Sum, Max;
@@ -160,7 +160,7 @@ Error testHiparFor1DScan1D(int N1) {
       }
    }
 
-   Array2DI4 RSum("RSum2", N1, N2);
+   Array2DI4 RSum = makeArray<Array2DI4>("RSum2", N1, N2);
    parallelForOuter(
        {N1}, KOKKOS_LAMBDA(int J1, const TeamMember &Team) {
           parallelScanInner(
@@ -295,7 +295,7 @@ Error testHiparFor1DSearch1D(int N2) {
    auto DataD = createDeviceMirrorCopy(DataH);
 
    HostArray1DI4 RefIdxH("RefIdxH", N1);
-   Array1DI4 IdxD("IdxD", N1);
+   Array1DI4 IdxD = makeArray<Array1DI4>("IdxD", N1);
 
    // test searching full range
 
@@ -388,7 +388,7 @@ Error testHiparLaunchConfig1D(int N1, int N2) {
       }
    }
 
-   Array2DReal OutD("OutD", N1, N2 - 3);
+   Array2DReal OutD = makeArray<Array2DReal>("OutD", N1, N2 - 3);
 
 #ifdef OMEGA_TARGET_DEVICE
    const int TeamSize = 32;
@@ -471,10 +471,10 @@ Error testHiparFor1DMultiple1D(int N1, int N2) {
       RefDH(J1) = SumAccum;
    }
 
-   Array2DI4 A("A2", N1, N2P1);
-   Array2DI4 B("B2", N1, N2);
-   Array2DI4 C("C2", N1, N2);
-   Array1DI4 D("D1", N1);
+   Array2DI4 A = makeArray<Array2DI4>("A2", N1, N2P1);
+   Array2DI4 B = makeArray<Array2DI4>("B2", N1, N2);
+   Array2DI4 C = makeArray<Array2DI4>("C2", N1, N2);
+   Array1DI4 D = makeArray<Array1DI4>("D1", N1);
 
    parallelForOuter(
        {N1}, KOKKOS_LAMBDA(int J1, const TeamMember &Team) {
@@ -532,7 +532,7 @@ Error testHiparFor2DFor1D(int N1, int N2) {
       }
    }
 
-   Array3DI4 A("A3", N1, N2, N3);
+   Array3DI4 A = makeArray<Array3DI4>("A3", N1, N2, N3);
    parallelForOuter(
        {N1, N2}, KOKKOS_LAMBDA(int J1, int J2, const TeamMember &Team) {
           parallelForInner(
@@ -569,8 +569,8 @@ Error testHiparFor2DReduce1D(int N1, int N2) {
       }
    }
 
-   Array2DI4 Sum1("Sum12", N1, N2);
-   Array2DI4 Max1("Max12", N1, N2);
+   Array2DI4 Sum1 = makeArray<Array2DI4>("Sum12", N1, N2);
+   Array2DI4 Max1 = makeArray<Array2DI4>("Max12", N1, N2);
    parallelForOuter(
        {N1, N2}, KOKKOS_LAMBDA(int J1, int J2, const TeamMember &Team) {
           I4 Sum;
@@ -602,8 +602,8 @@ Error testHiparFor2DReduce1D(int N1, int N2) {
                    errorMsg("parallelFor2DReduce1D Max FAIL", N1, N2));
    }
 
-   Array2DI4 Sum2("Sum22", N1, N2);
-   Array2DI4 Max2("Max22", N1, N2);
+   Array2DI4 Sum2 = makeArray<Array2DI4>("Sum22", N1, N2);
+   Array2DI4 Max2 = makeArray<Array2DI4>("Max22", N1, N2);
    parallelForOuter(
        {N1, N2}, KOKKOS_LAMBDA(int J1, int J2, const TeamMember &Team) {
           I4 Sum, Max;
@@ -642,7 +642,7 @@ Error testHiparFor2DScan1D(int N1, int N2) {
       }
    }
 
-   Array3DI4 RSum("RSum3", N1, N2, N3);
+   Array3DI4 RSum = makeArray<Array3DI4>("RSum3", N1, N2, N3);
    parallelForOuter(
        {N1, N2}, KOKKOS_LAMBDA(int J1, int J2, const TeamMember &Team) {
           parallelScanInner(
@@ -789,10 +789,10 @@ Error testHiparFor2DMultiple1D(int N1, int N2, int N3) {
       }
    }
 
-   Array3DI4 A("A3", N1, N2, N3P1);
-   Array3DI4 B("B3", N1, N2, N3);
-   Array3DI4 C("C3", N1, N2, N3);
-   Array2DI4 D("D2", N1, N2);
+   Array3DI4 A = makeArray<Array3DI4>("A3", N1, N2, N3P1);
+   Array3DI4 B = makeArray<Array3DI4>("B3", N1, N2, N3);
+   Array3DI4 C = makeArray<Array3DI4>("C3", N1, N2, N3);
+   Array2DI4 D = makeArray<Array2DI4>("D2", N1, N2);
 
    parallelForOuter(
        {N1, N2}, KOKKOS_LAMBDA(int J1, int J2, const TeamMember &Team) {

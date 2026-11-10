@@ -330,14 +330,14 @@ int testKineticAuxVars(const Array2DReal &PseudoThicknessCell,
 
    // Compute exact result
 
-   Array2DReal ExactKineticEnergyCell("ExactKineticEnergyCell",
-                                      Mesh->NCellsOwned, NVertLayers);
+   Array2DReal ExactKineticEnergyCell = makeArray<Array2DReal>(
+       "ExactKineticEnergyCell", Mesh->NCellsOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.kineticEnergy(X, Y); },
        ExactKineticEnergyCell, Geom, Mesh, OnCell, ExchangeHalos::No);
 
-   Array2DReal ExactVelocityDivCell("ExactVelocityDivCell", Mesh->NCellsOwned,
-                                    NVertLayers);
+   Array2DReal ExactVelocityDivCell = makeArray<Array2DReal>(
+       "ExactVelocityDivCell", Mesh->NCellsOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.divergence(X, Y); },
        ExactVelocityDivCell, Geom, Mesh, OnCell, ExchangeHalos::No);
@@ -385,7 +385,8 @@ int testPseudoThicknessAuxVars(const Array2DReal &PseudoThickCell,
 
    // Compute exact result
 
-   Array2DReal ExactThickEdge("ExactThickEdge", Mesh->NEdgesOwned, NVertLayers);
+   Array2DReal ExactThickEdge =
+       makeArray<Array2DReal>("ExactThickEdge", Mesh->NEdgesOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.pseudoThickness(X, Y); },
        ExactThickEdge, Geom, Mesh, OnEdge, ExchangeHalos::No);
@@ -436,22 +437,22 @@ int testVorticityAuxVars(const Array2DReal &PseudoThickCell,
 
    // Compute exact results for vertex variables
 
-   Array2DReal ExactRelVortVertex("ExactRelVortVertex", Mesh->NVerticesOwned,
-                                  NVertLayers);
+   Array2DReal ExactRelVortVertex = makeArray<Array2DReal>(
+       "ExactRelVortVertex", Mesh->NVerticesOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.relativeVorticity(X, Y); },
        ExactRelVortVertex, Geom, Mesh, OnVertex, ExchangeHalos::No);
 
-   Array2DReal ExactNormRelVortVertex("ExactNormRelVortVertex",
-                                      Mesh->NVerticesOwned, NVertLayers);
+   Array2DReal ExactNormRelVortVertex = makeArray<Array2DReal>(
+       "ExactNormRelVortVertex", Mesh->NVerticesOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) {
           return Setup.normalizedRelativeVorticity(X, Y);
        },
        ExactNormRelVortVertex, Geom, Mesh, OnVertex, ExchangeHalos::No);
 
-   Array2DReal ExactNormPlanetVortVertex("ExactNormPlanetVortVertex",
-                                         Mesh->NVerticesOwned, NVertLayers);
+   Array2DReal ExactNormPlanetVortVertex = makeArray<Array2DReal>(
+       "ExactNormPlanetVortVertex", Mesh->NVerticesOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) {
           return Setup.normalizedPlanetaryVorticity(X, Y);
@@ -496,16 +497,16 @@ int testVorticityAuxVars(const Array2DReal &PseudoThickCell,
 
    // Compute exact results for edge variables
 
-   Array2DReal ExactNormRelVortEdge("ExactNormRelVortEdge", Mesh->NEdgesOwned,
-                                    NVertLayers);
+   Array2DReal ExactNormRelVortEdge = makeArray<Array2DReal>(
+       "ExactNormRelVortEdge", Mesh->NEdgesOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) {
           return Setup.normalizedRelativeVorticity(X, Y);
        },
        ExactNormRelVortEdge, Geom, Mesh, OnEdge, ExchangeHalos::No);
 
-   Array2DReal ExactNormPlanetVortEdge("ExactNormPlanetVortEdge",
-                                       Mesh->NEdgesOwned, NVertLayers);
+   Array2DReal ExactNormPlanetVortEdge = makeArray<Array2DReal>(
+       "ExactNormPlanetVortEdge", Mesh->NEdgesOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) {
           return Setup.normalizedPlanetaryVorticity(X, Y);
@@ -554,21 +555,22 @@ int testVelocityDel2AuxVars(Real RTol) {
 
    // Use analytical expressions to compute inputs
 
-   Array2DReal ExactVelocityDivCell("ExactVelocityDivCell", Mesh->NCellsSize,
-                                    NVertLayers);
+   Array2DReal ExactVelocityDivCell = makeArray<Array2DReal>(
+       "ExactVelocityDivCell", Mesh->NCellsSize, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.divergence(X, Y); },
        ExactVelocityDivCell, Geom, Mesh, OnCell);
 
-   Array2DReal ExactRelVortVertex("ExactRelVortVertex", Mesh->NVerticesSize,
-                                  NVertLayers);
+   Array2DReal ExactRelVortVertex = makeArray<Array2DReal>(
+       "ExactRelVortVertex", Mesh->NVerticesSize, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.relativeVorticity(X, Y); },
        ExactRelVortVertex, Geom, Mesh, OnVertex);
 
    // Compute exact Del2
 
-   Array2DReal ExactDel2Edge("ExactDel2Edge", Mesh->NEdgesOwned, NVertLayers);
+   Array2DReal ExactDel2Edge =
+       makeArray<Array2DReal>("ExactDel2Edge", Mesh->NEdgesOwned, NVertLayers);
    Err += setVectorEdge(
        KOKKOS_LAMBDA(Real(&VecField)[2], Real X, Real Y) {
           VecField[0] = Setup.velocityDel2X(X, Y);
@@ -596,8 +598,8 @@ int testVelocityDel2AuxVars(Real RTol) {
 
    // Compute exact Del2Div
 
-   Array2DReal ExactDel2DivCell("ExactDel2DivCell", Mesh->NCellsOwned,
-                                NVertLayers);
+   Array2DReal ExactDel2DivCell = makeArray<Array2DReal>(
+       "ExactDel2DivCell", Mesh->NCellsOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.velocityDel2Div(X, Y); },
        ExactDel2DivCell, Geom, Mesh, OnCell, ExchangeHalos::No);
@@ -621,8 +623,8 @@ int testVelocityDel2AuxVars(Real RTol) {
 
    // Compute exact Del2RelVort
 
-   Array2DReal ExactDel2RelVortVertex("ExactDel2RelVortVertex",
-                                      Mesh->NVerticesOwned, NVertLayers);
+   Array2DReal ExactDel2RelVortVertex = makeArray<Array2DReal>(
+       "ExactDel2RelVortVertex", Mesh->NVerticesOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.velocityDel2Curl(X, Y); },
        ExactDel2RelVortVertex, Geom, Mesh, OnVertex, ExchangeHalos::No);
@@ -664,22 +666,22 @@ int testTracerAuxVars(const Array2DReal &PseudoThickCell,
 
    // Set input arrays
 
-   Array3DReal TracersOnCell("TracersOnCell", NTracers, Mesh->NCellsSize,
-                             NVertLayers);
+   Array3DReal TracersOnCell = makeArray<Array3DReal>(
+       "TracersOnCell", NTracers, Mesh->NCellsSize, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.tracer(X, Y); },
        TracersOnCell, Geom, Mesh, OnCell);
 
-   Array2DReal PseudoThickEdge("PseudoThickEdge", Mesh->NEdgesSize,
-                               NVertLayers);
+   Array2DReal PseudoThickEdge =
+       makeArray<Array2DReal>("PseudoThickEdge", Mesh->NEdgesSize, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.pseudoThickness(X, Y); },
        PseudoThickEdge, Geom, Mesh, OnEdge);
 
    // Compute exact Del2TracerCell
 
-   Array3DReal ExactDel2TrCell("ExactDel2TrCell", NTracers, Mesh->NCellsOwned,
-                               NVertLayers);
+   Array3DReal ExactDel2TrCell = makeArray<Array3DReal>(
+       "ExactDel2TrCell", NTracers, Mesh->NCellsOwned, NVertLayers);
    Err += setScalar(
        KOKKOS_LAMBDA(Real X, Real Y) { return Setup.del2Tracer(X, Y); },
        ExactDel2TrCell, Geom, Mesh, OnCell, ExchangeHalos::No);
@@ -772,9 +774,10 @@ int auxVarsTest(const std::string &mesh = DefaultMeshFile) {
 
    const auto &Mesh = HorzMesh::getDefault();
 
-   Array2DReal PseudoThickCell("PseudoThickCell", Mesh->NCellsSize,
-                               NVertLayers);
-   Array2DReal NormalVelEdge("NormalVelEdge", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal PseudoThickCell =
+       makeArray<Array2DReal>("PseudoThickCell", Mesh->NCellsSize, NVertLayers);
+   Array2DReal NormalVelEdge =
+       makeArray<Array2DReal>("NormalVelEdge", Mesh->NEdgesSize, NVertLayers);
    Err += initState(PseudoThickCell, NormalVelEdge, Mesh);
 
    const Real RTol = sizeof(Real) == 4 ? 1e-2 : 2e-4;

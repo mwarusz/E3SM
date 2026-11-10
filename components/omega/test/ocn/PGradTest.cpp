@@ -645,8 +645,10 @@ void setupTwoColumnState(HorzMesh *Mesh,    ///< [in] Horizontal mesh
    VCoord->NVertLayers   = NVertLayers;
    VCoord->NVertLayersP1 = NVertLayers + 1;
 
-   Array2DReal SpecVolOld("SpecVolOld", Mesh->NCellsSize, NVertLayers);
-   Array1DReal SurfacePressure("SurfacePressure", Mesh->NCellsSize);
+   Array2DReal SpecVolOld =
+       makeArray<Array2DReal>("SpecVolOld", Mesh->NCellsSize, NVertLayers);
+   Array1DReal SurfacePressure =
+       makeArray<Array1DReal>("SurfacePressure", Mesh->NCellsSize);
 
    auto &MinLayerCell = VCoord->MinLayerCell;
    auto &MaxLayerCell = VCoord->MaxLayerCell;
@@ -840,7 +842,8 @@ Real setupProfileState(HorzMesh *Mesh,    ///< [in] Horizontal mesh
           DcEdge(i)         = DC;
        });
 
-   Array1DReal SurfacePressure("SurfacePressure", Mesh->NCellsSize);
+   Array1DReal SurfacePressure =
+       makeArray<Array1DReal>("SurfacePressure", Mesh->NCellsSize);
    Array2DReal PseudoThick = State->getPseudoThickness(0);
    Array2DReal Temp        = Tracers::getByName(0, "Temperature");
    Array2DReal Salinity    = Tracers::getByName(0, "Salinity");
@@ -948,7 +951,8 @@ void setupSlopingFloorState(HorzMesh *Mesh,    ///< [in] Horizontal mesh
           DcEdge(i)         = DC;
        });
 
-   Array1DReal SurfacePressure("SurfacePressure", Mesh->NCellsSize);
+   Array1DReal SurfacePressure =
+       makeArray<Array1DReal>("SurfacePressure", Mesh->NCellsSize);
    Array2DReal PseudoThick = State->getPseudoThickness(0);
    Array2DReal Temp        = Tracers::getByName(0, "Temperature");
    Array2DReal Salinity    = Tracers::getByName(0, "Salinity");
@@ -1260,7 +1264,8 @@ Real runFiniteVolume(HorzMesh *Mesh, VertCoord *VCoord, OceanState *State,
        Error(FVPGrad ? ErrorCode::Success : ErrorCode::Fail, ""),
        "PGradTest: could not create the TestFV pressure gradient");
 
-   Array2DReal Tend("TendFV", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal Tend =
+       makeArray<Array2DReal>("TendFV", Mesh->NEdgesSize, NVertLayers);
    deepCopy(Tend, 0.0_Real);
 
    Array2DReal PseudoThick = State->getPseudoThickness(0);
@@ -1320,7 +1325,8 @@ Real runFiniteVolume(HorzMesh *Mesh, VertCoord *VCoord, OceanState *State,
 Real runCentered(HorzMesh *Mesh, VertCoord *VCoord, OceanState *State,
                  Eos *EqState, I4 NVertLayers) {
 
-   Array2DReal Tend("TendCentered", Mesh->NEdgesSize, NVertLayers);
+   Array2DReal Tend =
+       makeArray<Array2DReal>("TendCentered", Mesh->NEdgesSize, NVertLayers);
    deepCopy(Tend, 0.0_Real);
 
    Array2DReal PseudoThick = State->getPseudoThickness(0);
@@ -1877,7 +1883,8 @@ int testCenteredIdentity(HorzMesh *Mesh,    ///< [in] Horizontal mesh
       setupTwoColumnState(Mesh, VCoord, State, EqState, NVertLayers, DC,
                           TiltFactor, ZBottom);
 
-      Array2DReal Tend("TendCentered", Mesh->NEdgesSize, NVertLayers);
+      Array2DReal Tend =
+          makeArray<Array2DReal>("TendCentered", Mesh->NEdgesSize, NVertLayers);
       deepCopy(Tend, 0.0_Real);
 
       Array2DReal PseudoThick = State->getPseudoThickness(0);
@@ -2076,8 +2083,8 @@ int testPGradConfig(const HorzMesh *Mesh,   ///< [in] Horizontal mesh
    OceanState *State       = OceanState::getDefault();
    Eos *EqState            = Eos::getInstance();
    Array2DReal PseudoThick = State->getPseudoThickness(0);
-   Array2DReal TendFV("TendFiniteVolume", Mesh->NEdgesSize,
-                      VCoord->NVertLayers);
+   Array2DReal TendFV      = makeArray<Array2DReal>(
+       "TendFiniteVolume", Mesh->NEdgesSize, VCoord->NVertLayers);
    deepCopy(TendFV, 0.0_Real);
 
    Array2DReal ConservTemp = Tracers::getByName(0, "Temperature");
@@ -2090,7 +2097,8 @@ int testPGradConfig(const HorzMesh *Mesh,   ///< [in] Horizontal mesh
        TendFV, VCoord->PressureMid, VCoord->PressureInterface, EqState->SpecVol,
        VCoord->GeomZInterface, PseudoThick, ConservTemp, AbsSalinity, EqState);
 
-   Array2DReal TendCtr("TendCentered", Mesh->NEdgesSize, VCoord->NVertLayers);
+   Array2DReal TendCtr = makeArray<Array2DReal>(
+       "TendCentered", Mesh->NEdgesSize, VCoord->NVertLayers);
    deepCopy(TendCtr, 0.0_Real);
    PressureGrad::getDefault()->computePressureGrad(
        TendCtr, VCoord->PressureMid, VCoord->PressureInterface,
@@ -2173,7 +2181,8 @@ int main(int argc, char *argv[]) {
       Eos *DefEos          = Eos::getInstance();
 
       // create arrays: Tend on edges, Pressure/Geopotential/SpecVol on cells
-      Array2DReal Tend("Tend", DefMesh->NEdgesSize, VCoord->NVertLayers);
+      Array2DReal Tend = makeArray<Array2DReal>("Tend", DefMesh->NEdgesSize,
+                                                VCoord->NVertLayers);
 
       I4 NEdgesAll = DefMesh->NEdgesAll;
 

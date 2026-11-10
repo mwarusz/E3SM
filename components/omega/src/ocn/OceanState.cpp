@@ -124,10 +124,10 @@ OceanState::OceanState(
 
    // Create device arrays and copy host data
    for (int I = 0; I < NTimeLevels; I++) {
-      PseudoThickness[I] = Array2DReal("PseudoThickness" + std::to_string(I),
-                                       NCellsSize, NVertLayers);
-      NormalVelocity[I]  = Array2DReal("NormalVelocity" + std::to_string(I),
-                                       NEdgesSize, NVertLayers);
+      PseudoThickness[I] = makeArray<Array2DReal>(
+          "PseudoThickness" + std::to_string(I), NCellsSize, NVertLayers);
+      NormalVelocity[I] = makeArray<Array2DReal>(
+          "NormalVelocity" + std::to_string(I), NEdgesSize, NVertLayers);
    }
 
    // The split velocity and barotropic pressure are only carried by the
@@ -149,12 +149,12 @@ OceanState::OceanState(
          BarotropicPressureAnomalyH[I] = HostArray1DReal(
              "BarotropicPressureAnomaly" + std::to_string(I), NCellsSize);
 
-         NormalBaroclinicVelocity[I] =
-             Array2DReal("NormalBaroclinicVelocity" + std::to_string(I),
-                         NEdgesSize, NVertLayers);
-         NormalBarotropicVelocity[I] = Array1DReal(
+         NormalBaroclinicVelocity[I] = makeArray<Array2DReal>(
+             "NormalBaroclinicVelocity" + std::to_string(I), NEdgesSize,
+             NVertLayers);
+         NormalBarotropicVelocity[I] = makeArray<Array1DReal>(
              "NormalBarotropicVelocity" + std::to_string(I), NEdgesSize);
-         BarotropicPressureAnomaly[I] = Array1DReal(
+         BarotropicPressureAnomaly[I] = makeArray<Array1DReal>(
              "BarotropicPressureAnomaly" + std::to_string(I), NCellsSize);
 
          deepCopy(NormalBaroclinicVelocityH[I], 0.);

@@ -2,6 +2,7 @@
 #include "DataTypes.h"
 #include "Error.h"
 #include "HorzMesh.h"
+#include "OmegaKokkos.h"
 #include "VertCoord.h"
 
 namespace OMEGA {
@@ -38,11 +39,13 @@ SecondDerivativeOnCell::SecondDerivativeOnCell(HorzMesh const *Mesh)
       DvEdge(Mesh->DvEdge), DcEdge(Mesh->DcEdge), AngleEdge(Mesh->AngleEdge),
       AreaCell(Mesh->AreaCell), EdgeSignOnCell(Mesh->EdgeSignOnCell),
       XVertex(Mesh->XVertex), YVertex(Mesh->YVertex), ZVertex(Mesh->ZVertex),
-      ThetaAbs("SphereAngle", NCellsAll), XPCell("XP", NCellsAll, MaxEdges),
-      YPCell("YP", NCellsAll, MaxEdges),
-      Angle2DCell("Angle2D", NCellsAll, MaxEdges),
-      BCell("WorkSpaceForLeastSquares", NCellsAll, 6, MaxEdges),
-      CellListCell("CellList", NCellsAll, MaxEdges) {}
+      ThetaAbs(makeArray<Array1DReal>("SphereAngle", NCellsAll)),
+      XPCell(makeArray<Array2DReal>("XP", NCellsAll, MaxEdges)),
+      YPCell(makeArray<Array2DReal>("YP", NCellsAll, MaxEdges)),
+      Angle2DCell(makeArray<Array2DReal>("Angle2D", NCellsAll, MaxEdges)),
+      BCell(makeArray<Array3DReal>("WorkSpaceForLeastSquares", NCellsAll, 6,
+                                   MaxEdges)),
+      CellListCell(makeArray<Array2DI4>("CellList", NCellsAll, MaxEdges)) {}
 
 MasksAndCoefficients::MasksAndCoefficients(
     HorzMesh const *Mesh, VertCoord const *VCoord, const Array3DReal DerivTwo,
@@ -53,8 +56,10 @@ MasksAndCoefficients::MasksAndCoefficients(
                                      // Mesh->NEdgesOwned, Mesh->NEdgesAll+1),
       NAdvCellsForEdge(NAdvCellsForEdge), AdvCellsForEdge(AdvCellsForEdge),
       NEdgesOnEdge(Mesh->NEdgesOnEdge), NEdgesOnCell(Mesh->NEdgesOnCell),
-      CellIndx("CellIndx", Mesh->NEdgesAll, Mesh->MaxEdges2 + 2),
-      CellIndxSorted("CellIndxSorted", Mesh->NEdgesAll, 2, Mesh->MaxEdges2 + 2),
+      CellIndx(makeArray<Array2DI4>("CellIndx", Mesh->NEdgesAll,
+                                    Mesh->MaxEdges2 + 2)),
+      CellIndxSorted(makeArray<Array3DI4>("CellIndxSorted", Mesh->NEdgesAll, 2,
+                                          Mesh->MaxEdges2 + 2)),
       CellID(Mesh->CellID), AdvMaskHighOrder(AdvMaskHighOrder),
       EdgesOnEdge(Mesh->EdgesOnEdge), CellsOnCell(Mesh->CellsOnCell),
       CellsOnEdge(Mesh->CellsOnEdge), DcEdge(Mesh->DcEdge),

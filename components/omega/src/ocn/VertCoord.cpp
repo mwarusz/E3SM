@@ -144,27 +144,30 @@ VertCoord::VertCoord(const std::string &Name_, //< [in] Name for new VertCoord
    VerticesOnEdge = Decomp->VerticesOnEdge;
 
    // Allocate device arrays
-   MaxLayerCell    = Array1DI4("MaxLayerCell", NCellsSize);
-   MinLayerCell    = Array1DI4("MinLayerCell", NCellsSize);
-   BottomGeomDepth = Array1DReal("BottomGeomDepth", NCellsSize);
-   SurfacePressure = Array1DReal("SurfacePressure", NCellsSize);
+   MaxLayerCell    = makeArray<Array1DI4>("MaxLayerCell", NCellsSize);
+   MinLayerCell    = makeArray<Array1DI4>("MinLayerCell", NCellsSize);
+   BottomGeomDepth = makeArray<Array1DReal>("BottomGeomDepth", NCellsSize);
+   SurfacePressure = makeArray<Array1DReal>("SurfacePressure", NCellsSize);
    PressureInterface =
-       Array2DReal("PressureInterface", NCellsSize, NVertLayersP1);
-   PressureMid    = Array2DReal("PressureMid", NCellsSize, NVertLayers);
-   GeomZInterface = Array2DReal("GeomZInterface", NCellsSize, NVertLayersP1);
-   GeomZMid       = Array2DReal("GeomZMid", NCellsSize, NVertLayers);
-   SshCell        = Array1DReal("SshCell", NCellsSize);
-   TotalPseudoThickness = Array1DReal("TotalPseudoThickness", NCellsSize);
+       makeArray<Array2DReal>("PressureInterface", NCellsSize, NVertLayersP1);
+   PressureMid = makeArray<Array2DReal>("PressureMid", NCellsSize, NVertLayers);
+   GeomZInterface =
+       makeArray<Array2DReal>("GeomZInterface", NCellsSize, NVertLayersP1);
+   GeomZMid = makeArray<Array2DReal>("GeomZMid", NCellsSize, NVertLayers);
+   SshCell  = makeArray<Array1DReal>("SshCell", NCellsSize);
+   TotalPseudoThickness =
+       makeArray<Array1DReal>("TotalPseudoThickness", NCellsSize);
    deepCopy(SshCell, 0._Real);
    deepCopy(TotalPseudoThickness, 0._Real);
 
-   GeopotentialMid = Array2DReal("GeopotentialMid", NCellsSize, NVertLayers);
+   GeopotentialMid =
+       makeArray<Array2DReal>("GeopotentialMid", NCellsSize, NVertLayers);
    PseudoThicknessTarget =
-       Array2DReal("PseudoThicknessTarget", NCellsSize, NVertLayers);
+       makeArray<Array2DReal>("PseudoThicknessTarget", NCellsSize, NVertLayers);
    RefPseudoThickness =
-       Array2DReal("RefPseudoThickness", NCellsSize, NVertLayers);
+       makeArray<Array2DReal>("RefPseudoThickness", NCellsSize, NVertLayers);
    VertCoordMovementWeights =
-       Array1DReal("VertCoordMovementWeights", NVertLayers);
+       makeArray<Array1DReal>("VertCoordMovementWeights", NVertLayers);
 
    // Make host copies for device arrays not being read from file
    PressureInterfaceH     = createHostMirrorCopy(PressureInterface);
@@ -785,10 +788,10 @@ void VertCoord::initSurfacePressure(Halo *MeshHalo) {
 // MaxLayerCell
 void VertCoord::minMaxLayerEdge(Halo *MeshHalo) {
 
-   MinLayerEdgeTop = Array1DI4("MinLayerEdgeTop", NEdgesSize);
-   MinLayerEdgeBot = Array1DI4("MinLayerEdgeBot", NEdgesSize);
-   MaxLayerEdgeTop = Array1DI4("MaxLayerEdgeTop", NEdgesSize);
-   MaxLayerEdgeBot = Array1DI4("MaxLayerEdgeBot", NEdgesSize);
+   MinLayerEdgeTop = makeArray<Array1DI4>("MinLayerEdgeTop", NEdgesSize);
+   MinLayerEdgeBot = makeArray<Array1DI4>("MinLayerEdgeBot", NEdgesSize);
+   MaxLayerEdgeTop = makeArray<Array1DI4>("MaxLayerEdgeTop", NEdgesSize);
+   MaxLayerEdgeBot = makeArray<Array1DI4>("MaxLayerEdgeBot", NEdgesSize);
 
    OMEGA_SCOPE(LocNVertLayersP1, NVertLayersP1);
    OMEGA_SCOPE(LocCellsOnEdge, CellsOnEdge);
@@ -863,10 +866,10 @@ void VertCoord::minMaxLayerEdge(Halo *MeshHalo) {
 // MaxLayerCell
 void VertCoord::minMaxLayerVertex(Halo *MeshHalo) {
 
-   MinLayerVertexTop = Array1DI4("MinLayerVertexTop", NVerticesSize);
-   MinLayerVertexBot = Array1DI4("MinLayerVertexBot", NVerticesSize);
-   MaxLayerVertexTop = Array1DI4("MaxLayerVertexTop", NVerticesSize);
-   MaxLayerVertexBot = Array1DI4("MaxLayerVertexBot", NVerticesSize);
+   MinLayerVertexTop = makeArray<Array1DI4>("MinLayerVertexTop", NVerticesSize);
+   MinLayerVertexBot = makeArray<Array1DI4>("MinLayerVertexBot", NVerticesSize);
+   MaxLayerVertexTop = makeArray<Array1DI4>("MaxLayerVertexTop", NVerticesSize);
+   MaxLayerVertexBot = makeArray<Array1DI4>("MaxLayerVertexBot", NVerticesSize);
 
    OMEGA_SCOPE(LocNVertLayersP1, NVertLayersP1);
    OMEGA_SCOPE(LocVertexDegree, VertexDegree);
@@ -967,8 +970,9 @@ void VertCoord::minMaxLayerVertex(Halo *MeshHalo) {
 void VertCoord::setMasks() {
 
    // EdgeMask & BoundaryEdge
-   EdgeMask     = Array2DReal("EdgeMask", NEdgesSize, NVertLayers);
-   BoundaryEdge = Array2DReal("BoundaryEdge", NEdgesSize, NVertLayers);
+   EdgeMask = makeArray<Array2DReal>("EdgeMask", NEdgesSize, NVertLayers);
+   BoundaryEdge =
+       makeArray<Array2DReal>("BoundaryEdge", NEdgesSize, NVertLayers);
 
    OMEGA_SCOPE(LocEdgeMask, EdgeMask);
    OMEGA_SCOPE(LocBoundaryEdge, BoundaryEdge);
@@ -996,8 +1000,10 @@ void VertCoord::setMasks() {
 
    // BoundaryCell & BoundaryVertex
    //              = 1 in inactive layers, 0 otherwise.
-   BoundaryCell   = Array2DReal("BoundaryCell", NCellsSize, NVertLayers);
-   BoundaryVertex = Array2DReal("BoundaryVertex", NVerticesSize, NVertLayers);
+   BoundaryCell =
+       makeArray<Array2DReal>("BoundaryCell", NCellsSize, NVertLayers);
+   BoundaryVertex =
+       makeArray<Array2DReal>("BoundaryVertex", NVerticesSize, NVertLayers);
 
    OMEGA_SCOPE(LocBoundaryCell, BoundaryCell);
    OMEGA_SCOPE(LocBoundaryVertex, BoundaryVertex);
@@ -1030,7 +1036,7 @@ void VertCoord::setMasks() {
    BoundaryVertexH = createHostMirrorCopy(BoundaryVertex);
 
    // CellMask
-   CellMask = Array2DReal("CellMask", NCellsSize, NVertLayers);
+   CellMask = makeArray<Array2DReal>("CellMask", NCellsSize, NVertLayers);
 
    OMEGA_SCOPE(LocCellMask, CellMask);
    OMEGA_SCOPE(LocMinLyrCell, MinLayerCell);
@@ -1051,7 +1057,8 @@ void VertCoord::setMasks() {
    CellMaskH = createHostMirrorCopy(CellMask);
 
    // VertexMask
-   VertexMask = Array2DReal("VertexMask", NVerticesSize, NVertLayers);
+   VertexMask =
+       makeArray<Array2DReal>("VertexMask", NVerticesSize, NVertLayers);
 
    OMEGA_SCOPE(LocVrtxMask, VertexMask);
    OMEGA_SCOPE(LocMinLyrVrtxTop, MinLayerVertexTop);

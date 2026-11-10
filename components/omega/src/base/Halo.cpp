@@ -14,6 +14,7 @@
 
 #include "Halo.h"
 #include "Error.h"
+#include "OmegaKokkos.h"
 #include "mpi.h"
 #include <algorithm>
 #include <iterator>
@@ -57,7 +58,7 @@ Halo::ExchList::ExchList(
    // Allocate member vectors and arrays based on number of halo layers
    NHalo.resize(HaloLayers);
    OffsetsH = HostArray1DI4("OffsetsH", HaloLayers);
-   Offsets  = Array1DI4("Offsets", HaloLayers);
+   Offsets  = makeArray<Array1DI4>("Offsets", HaloLayers);
 
    // Count the total number of elements in the list, set the number of
    // elements in each halo layer, and set the offsets for each layer
@@ -76,7 +77,7 @@ Halo::ExchList::ExchList(
 
    // Allocate host and device arrays for storing lists of indices
    IndexH = HostArray1DI4("IndexH", NTot);
-   Index  = Array1DI4("Index", NTot);
+   Index  = makeArray<Array1DI4>("Index", NTot);
 
    // Copy List into member IndexH array on host
    for (int IHalo = 0; IHalo < HaloLayers; ++IHalo) {
@@ -119,8 +120,8 @@ Halo::Neighbor::Neighbor(
    RecvLists[1] = ExchList(RecvEdge);
    RecvLists[2] = ExchList(RecvVrtx);
 
-   SendBuffer = Array1DR8("SendBuffer", 0);
-   RecvBuffer = Array1DR8("RecvBuffer", 0);
+   SendBuffer = makeArray<Array1DR8>("SendBuffer", 0);
+   RecvBuffer = makeArray<Array1DR8>("RecvBuffer", 0);
 
    SendBufferH = HostArray1DR8("SendBufferH", 0);
    RecvBufferH = HostArray1DR8("RecvBufferH", 0);

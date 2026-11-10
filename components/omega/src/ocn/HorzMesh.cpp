@@ -407,7 +407,7 @@ void HorzMesh::computeEdgeSign() {
    EdgeSignOnCellH = createHostMirrorCopy(EdgeSignOnCell);
 
    EdgeSignOnVertex =
-       Array2DReal("EdgeSignOnVertex", NVerticesSize, VertexDegree);
+       makeArray<Array2DReal>("EdgeSignOnVertex", NVerticesSize, VertexDegree);
 
    OMEGA_SCOPE(o_VertexDegree, VertexDegree);
    OMEGA_SCOPE(o_EdgesOnVertex, EdgesOnVertex);
@@ -743,7 +743,8 @@ void HorzMesh::defineMeshFields() {
    // Coordinate arrays
    // Cell coords
    std::string FieldName = "XCell";
-   XCell = Array1DReal("XCell", NCellsSize); // allocate space and init to zero
+   XCell                 = makeArray<Array1DReal>(
+       "XCell", NCellsSize); // allocate space and init to zero
    int NDims = 1;
    std::vector<std::string> DimNames(NDims);
    DimNames[0] = "NCells";
@@ -762,7 +763,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, XCell);
 
    FieldName = "YCell";
-   YCell = Array1DReal("YCell", NCellsSize); // allocate space and init to zero
+   YCell     = makeArray<Array1DReal>(
+       "YCell", NCellsSize); // allocate space and init to zero
    auto YCellField =
        Field::create(FieldName,                           // field name
                      "Y Coordinates of cell centers (m)", // long Name
@@ -778,7 +780,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, YCell);
 
    FieldName = "ZCell";
-   ZCell = Array1DReal("ZCell", NCellsSize); // allocate space and init to zero
+   ZCell     = makeArray<Array1DReal>(
+       "ZCell", NCellsSize); // allocate space and init to zero
    auto ZCellField =
        Field::create(FieldName,                           // field name
                      "Z Coordinates of cell centers (m)", // long Name
@@ -794,7 +797,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, ZCell);
 
    FieldName = "LatCell";
-   LatCell = Array1DReal("LatCell", NCellsSize); // allocate space init to zero
+   LatCell   = makeArray<Array1DReal>("LatCell",
+                                      NCellsSize); // allocate space init to zero
    auto LatCellField =
        Field::create(FieldName,                              // field name
                      "Latitude coordinates of cell centers", // long Name
@@ -810,7 +814,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, LatCell);
 
    FieldName = "LonCell";
-   LonCell = Array1DReal("LonCell", NCellsSize); // allocate space init to zero
+   LonCell   = makeArray<Array1DReal>("LonCell",
+                                      NCellsSize); // allocate space init to zero
    auto LonCellField =
        Field::create(FieldName,                               // field name
                      "Longitude coordinates of cell centers", // long Name
@@ -828,7 +833,8 @@ void HorzMesh::defineMeshFields() {
    // Edge coords
    DimNames[0] = "NEdges";
    FieldName   = "XEdge";
-   XEdge = Array1DReal("XEdge", NEdgesSize); // allocate space init to zero
+   XEdge       = makeArray<Array1DReal>("XEdge",
+                                        NEdgesSize); // allocate space init to zero
    auto XEdgeField =
        Field::create(FieldName,                         // field name
                      "X Coordinates of cell edges (m)", // long Name
@@ -844,7 +850,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, XEdge);
 
    FieldName = "YEdge";
-   YEdge     = Array1DReal("YEdge", NEdgesSize); // allocate space init to zero
+   YEdge     = makeArray<Array1DReal>("YEdge",
+                                      NEdgesSize); // allocate space init to zero
    auto YEdgeField =
        Field::create(FieldName,                         // field name
                      "Y Coordinates of cell edges (m)", // long Name
@@ -860,7 +867,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, YEdge);
 
    FieldName = "ZEdge";
-   ZEdge     = Array1DReal("ZEdge", NEdgesSize); // allocate space init to zero
+   ZEdge     = makeArray<Array1DReal>("ZEdge",
+                                      NEdgesSize); // allocate space init to zero
    auto ZEdgeField =
        Field::create(FieldName,                         // field name
                      "Z Coordinates of cell edges (m)", // long Name
@@ -876,7 +884,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, ZEdge);
 
    FieldName = "LatEdge";
-   LatEdge = Array1DReal("LatEdge", NEdgesSize); // allocate space init to zero
+   LatEdge   = makeArray<Array1DReal>("LatEdge",
+                                      NEdgesSize); // allocate space init to zero
    auto LatEdgeField =
        Field::create(FieldName,                            // field name
                      "Latitude coordinates of cell edges", // long Name
@@ -892,7 +901,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, LatEdge);
 
    FieldName = "LonEdge";
-   LonEdge = Array1DReal("LonEdge", NEdgesSize); // allocate space init to zero
+   LonEdge   = makeArray<Array1DReal>("LonEdge",
+                                      NEdgesSize); // allocate space init to zero
    auto LonEdgeField =
        Field::create(FieldName,                             // field name
                      "Longitude coordinates of cell edges", // long Name
@@ -910,7 +920,7 @@ void HorzMesh::defineMeshFields() {
    // Vertex coordinates
    DimNames[0] = "NVertices";
    FieldName   = "XVertex";
-   XVertex     = Array1DReal("XVertex", NVerticesSize); // allocate space
+   XVertex = makeArray<Array1DReal>("XVertex", NVerticesSize); // allocate space
    auto XVertexField =
        Field::create(FieldName,                            // field name
                      "X Coordinates of cell vertices (m)", // long Name
@@ -926,7 +936,7 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, XVertex);
 
    FieldName = "YVertex";
-   YVertex   = Array1DReal("YVertex", NVerticesSize); // allocate space
+   YVertex = makeArray<Array1DReal>("YVertex", NVerticesSize); // allocate space
    auto YVertexField =
        Field::create(FieldName,                            // field name
                      "Y Coordinates of cell vertices (m)", // long Name
@@ -942,7 +952,7 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, YVertex);
 
    FieldName = "ZVertex";
-   ZVertex   = Array1DReal("ZVertex", NVerticesSize); // allocate space
+   ZVertex = makeArray<Array1DReal>("ZVertex", NVerticesSize); // allocate space
    auto ZVertexField =
        Field::create(FieldName,                            // field name
                      "Z Coordinates of cell vertices (m)", // long Name
@@ -958,7 +968,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, ZVertex);
 
    FieldName = "LatVertex";
-   LatVertex = Array1DReal("LatVertex", NVerticesSize); // allocate space
+   LatVertex =
+       makeArray<Array1DReal>("LatVertex", NVerticesSize); // allocate space
    auto LatVertexField =
        Field::create(FieldName,                               // field name
                      "Latitude coordinates of cell vertices", // long Name
@@ -974,7 +985,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, LatVertex);
 
    FieldName = "LonVertex";
-   LonVertex = Array1DReal("LonVertex", NVerticesSize); // allocate space
+   LonVertex =
+       makeArray<Array1DReal>("LonVertex", NVerticesSize); // allocate space
    auto LonVertexField =
        Field::create(FieldName,                                // field name
                      "Longitude coordinates of cell vertices", // long Name
@@ -993,7 +1005,7 @@ void HorzMesh::defineMeshFields() {
    // Mesh areas, lengths, and angles
    DimNames[0]        = "NCells";
    FieldName          = "AreaCell";
-   AreaCell           = Array1DReal("AreaCell", NCellsSize); // allocate space
+   AreaCell = makeArray<Array1DReal>("AreaCell", NCellsSize); // allocate space
    auto AreaCellField = Field::create(FieldName,             // field name
                                       "Area of each cell (m2)", // long name
                                       "m2",                     // units
@@ -1008,7 +1020,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, AreaCell);
 
    FieldName   = "MeshDensity";
-   MeshDensity = Array1DReal("MeshDensity", NCellsSize); // allocate space
+   MeshDensity =
+       makeArray<Array1DReal>("MeshDensity", NCellsSize); // allocate space
    auto MeshDensityField =
        Field::create(FieldName, // field name
                      "Value of density function used to generate mesh cell at"
@@ -1026,7 +1039,8 @@ void HorzMesh::defineMeshFields() {
 
    DimNames[0]  = "NVertices";
    FieldName    = "AreaTriangle";
-   AreaTriangle = Array1DReal("AreaTriangle", NVerticesSize); // allocate space
+   AreaTriangle =
+       makeArray<Array1DReal>("AreaTriangle", NVerticesSize); // allocate space
    auto AreaTriangleField =
        Field::create(FieldName, // field name
                      "Area of each triangle in the dual grid (m2)", // lng name
@@ -1043,7 +1057,7 @@ void HorzMesh::defineMeshFields() {
 
    DimNames[0] = "NEdges";
    FieldName   = "DvEdge";
-   DvEdge      = Array1DReal("DvEdge", NEdgesSize); // allocate space
+   DvEdge      = makeArray<Array1DReal>("DvEdge", NEdgesSize); // allocate space
    auto DvEdgeField =
        Field::create(FieldName, // field name
                      "Length of each edge, computed as the distance between"
@@ -1060,7 +1074,7 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, DvEdge);
 
    FieldName = "DcEdge";
-   DcEdge    = Array1DReal("DcEdge", NEdgesSize); // allocate space
+   DcEdge    = makeArray<Array1DReal>("DcEdge", NEdgesSize); // allocate space
    auto DcEdgeField =
        Field::create(FieldName, // field name
                      "Length of each edge, computed as the distance between"
@@ -1077,7 +1091,8 @@ void HorzMesh::defineMeshFields() {
    Field::attachFieldData<Array1DReal>(FieldName, DcEdge);
 
    FieldName = "AngleEdge";
-   AngleEdge = Array1DReal("AngleEdge", NEdgesSize); // allocate space
+   AngleEdge =
+       makeArray<Array1DReal>("AngleEdge", NEdgesSize); // allocate space
    auto AngleEdgeField =
        Field::create(FieldName, // field name
                      "Angle the edge normal makes with local eastward direction"
@@ -1099,7 +1114,7 @@ void HorzMesh::defineMeshFields() {
    DimNames[1] = "VertexDegree";
    FieldName   = "KiteAreasOnVertex";
    KiteAreasOnVertex =
-       Array2DReal("KiteAreasOnVertex", NVerticesSize, VertexDegree);
+       makeArray<Array2DReal>("KiteAreasOnVertex", NVerticesSize, VertexDegree);
    auto KiteAreasOnVertexField =
        Field::create(FieldName, // field name
                      "Area of the portions of each dual cell that are part of "
@@ -1119,7 +1134,8 @@ void HorzMesh::defineMeshFields() {
    DimNames[0]   = "NEdges";
    DimNames[1]   = "MaxEdges2";
    FieldName     = "WeightsOnEdge";
-   WeightsOnEdge = Array2DReal("KiteAreasOnVertex", NEdgesSize, MaxEdges2);
+   WeightsOnEdge =
+       makeArray<Array2DReal>("KiteAreasOnVertex", NEdgesSize, MaxEdges2);
    auto WeightsOnEdgeField =
        Field::create(FieldName, // field name
                      "Reconstruction weights associated with each of the"
@@ -1140,7 +1156,7 @@ void HorzMesh::defineMeshFields() {
    DimNames.resize(1);
    DimNames[0] = "NEdges";
    FieldName   = "FEdge";
-   FEdge       = Array1DReal("FEdge", NEdgesSize);
+   FEdge       = makeArray<Array1DReal>("FEdge", NEdgesSize);
    auto FEdgeField =
        Field::create(FieldName,                                   // field name
                      "Coriolis parameter at edges (radians s-1)", // long name
@@ -1157,7 +1173,7 @@ void HorzMesh::defineMeshFields() {
 
    DimNames[0] = "NVertices";
    FieldName   = "FVertex";
-   FVertex     = Array1DReal("FVertex", NVerticesSize);
+   FVertex     = makeArray<Array1DReal>("FVertex", NVerticesSize);
    auto FVertexField =
        Field::create(FieldName, // field name
                      "Coriolis parameter at vertices (radians s-1)",
@@ -1174,7 +1190,7 @@ void HorzMesh::defineMeshFields() {
 
    DimNames[0] = "NCells";
    FieldName   = "FCell";
-   FCell       = Array1DReal("FCell", NCellsSize);
+   FCell       = makeArray<Array1DReal>("FCell", NCellsSize);
    auto FCellField =
        Field::create(FieldName, // field name
                      "Coriolis parameter at cell centers (radians s-1)",
@@ -1201,7 +1217,7 @@ void HorzMesh::defineMeshFields() {
       DimNames[2] = "MaxEdges2";
       FieldName   = "ReconWeightsCell";
       ReconWeightsCell =
-          Array3DReal("ReconWeightsCell", NCellsSize, 3, MaxEdges2);
+          makeArray<Array3DReal>("ReconWeightsCell", NCellsSize, 3, MaxEdges2);
       auto ReconWeightsCellField = Field::create(
           FieldName, // field name
           "weights to reconstruct Cartesian vector field from edge-"
@@ -1223,11 +1239,12 @@ void HorzMesh::defineMeshFields() {
    // file, we do not create field metadata, though the definitions are
    // included here in comments in case they are needed later.
 
-   EdgeSignOnCell = Array2DReal("EdgeSignOnCell", NCellsSize, MaxEdges);
+   EdgeSignOnCell =
+       makeArray<Array2DReal>("EdgeSignOnCell", NCellsSize, MaxEdges);
    EdgeSignOnVertex =
-       Array2DReal("EdgeSignOnVertex", NVerticesSize, VertexDegree);
-   MeshScalingDel2 = Array1DReal("MeshScalingDel2", NEdgesSize);
-   MeshScalingDel4 = Array1DReal("MeshScalingDel4", NEdgesSize);
+       makeArray<Array2DReal>("EdgeSignOnVertex", NVerticesSize, VertexDegree);
+   MeshScalingDel2 = makeArray<Array1DReal>("MeshScalingDel2", NEdgesSize);
+   MeshScalingDel4 = makeArray<Array1DReal>("MeshScalingDel4", NEdgesSize);
 
    // Sign vectors
    //

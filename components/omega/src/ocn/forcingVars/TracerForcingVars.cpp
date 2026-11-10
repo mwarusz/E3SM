@@ -1,6 +1,7 @@
 #include "TracerForcingVars.h"
 #include "Eos.h"
 #include "Field.h"
+#include "OmegaKokkos.h"
 #include "Tracers.h"
 #include "VertCoord.h"
 
@@ -10,24 +11,37 @@ namespace OMEGA {
 
 TracerForcingVars::TracerForcingVars(const std::string &Suffix,
                                      const HorzMesh *Mesh)
-    : SnowFluxCell("SnowFlux" + Suffix, Mesh->NCellsSize),
-      RainFluxCell("RainFlux" + Suffix, Mesh->NCellsSize),
-      EvaporationFluxCell("EvaporationFlux" + Suffix, Mesh->NCellsSize),
-      SeaIceFreshWaterFluxCell("SeaIceFreshWaterFlux" + Suffix,
-                               Mesh->NCellsSize),
-      IceRunoffFluxCell("IceRunoffFlux" + Suffix, Mesh->NCellsSize),
-      RiverRunoffFluxCell("RiverRunoffFlux" + Suffix, Mesh->NCellsSize),
-      LatentHeatFluxEvapCell("LatentHeatFluxEvap" + Suffix, Mesh->NCellsSize),
-      SensibleHeatFluxCell("SensibleHeatFlux" + Suffix, Mesh->NCellsSize),
-      LongWaveHeatFluxUpCell("LongWaveHeatFluxUp" + Suffix, Mesh->NCellsSize),
-      LongWaveHeatFluxDownCell("LongWaveHeatFluxDown" + Suffix,
-                               Mesh->NCellsSize),
-      SeaIceHeatFluxCell("SeaIceHeatFlux" + Suffix, Mesh->NCellsSize),
-      ShortWaveHeatFluxCell("ShortWaveHeatFlux" + Suffix, Mesh->NCellsSize),
-      SeaIceSaltFluxCell("SeaIceSaltFlux" + Suffix, Mesh->NCellsSize),
-      ExtraEnergyCell("ExtraEnergy" + Suffix, Mesh->NCellsSize),
-      SurfaceTracerFluxCell("SurfaceTracerFlux" + Suffix,
-                            Tracers::getNumTracers(), Mesh->NCellsSize) {
+    : SnowFluxCell(
+          makeArray<Array1DReal>("SnowFlux" + Suffix, Mesh->NCellsSize)),
+      RainFluxCell(
+          makeArray<Array1DReal>("RainFlux" + Suffix, Mesh->NCellsSize)),
+      EvaporationFluxCell(
+          makeArray<Array1DReal>("EvaporationFlux" + Suffix, Mesh->NCellsSize)),
+      SeaIceFreshWaterFluxCell(makeArray<Array1DReal>(
+          "SeaIceFreshWaterFlux" + Suffix, Mesh->NCellsSize)),
+      IceRunoffFluxCell(
+          makeArray<Array1DReal>("IceRunoffFlux" + Suffix, Mesh->NCellsSize)),
+      RiverRunoffFluxCell(
+          makeArray<Array1DReal>("RiverRunoffFlux" + Suffix, Mesh->NCellsSize)),
+      LatentHeatFluxEvapCell(makeArray<Array1DReal>(
+          "LatentHeatFluxEvap" + Suffix, Mesh->NCellsSize)),
+      SensibleHeatFluxCell(makeArray<Array1DReal>("SensibleHeatFlux" + Suffix,
+                                                  Mesh->NCellsSize)),
+      LongWaveHeatFluxUpCell(makeArray<Array1DReal>(
+          "LongWaveHeatFluxUp" + Suffix, Mesh->NCellsSize)),
+      LongWaveHeatFluxDownCell(makeArray<Array1DReal>(
+          "LongWaveHeatFluxDown" + Suffix, Mesh->NCellsSize)),
+      SeaIceHeatFluxCell(
+          makeArray<Array1DReal>("SeaIceHeatFlux" + Suffix, Mesh->NCellsSize)),
+      ShortWaveHeatFluxCell(makeArray<Array1DReal>("ShortWaveHeatFlux" + Suffix,
+                                                   Mesh->NCellsSize)),
+      SeaIceSaltFluxCell(
+          makeArray<Array1DReal>("SeaIceSaltFlux" + Suffix, Mesh->NCellsSize)),
+      ExtraEnergyCell(
+          makeArray<Array1DReal>("ExtraEnergy" + Suffix, Mesh->NCellsSize)),
+      SurfaceTracerFluxCell(makeArray<Array2DReal>("SurfaceTracerFlux" + Suffix,
+                                                   Tracers::getNumTracers(),
+                                                   Mesh->NCellsSize)) {
    deepCopy(SnowFluxCell, 0.0_Real);
    deepCopy(RainFluxCell, 0.0_Real);
    deepCopy(EvaporationFluxCell, 0.0_Real);

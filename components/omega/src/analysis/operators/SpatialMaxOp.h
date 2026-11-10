@@ -24,6 +24,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AnalysisOperator.h"
+#include "OmegaKokkos.h"
 #include "Reductions.h"
 
 namespace OMEGA {
@@ -57,7 +58,7 @@ template <typename ArrayT> class SpatialMaxOp : public AnalysisOperator {
       InstanceName                = OutputFieldName;
 
       // Allocate output data array (single scalar value)
-      OutputData = Array1D_t<ScalarT>(OutputNames[0], 1);
+      OutputData = makeArray<Array1D_t<ScalarT>>(OutputNames[0], 1);
 
       // Create scalar dimension for output Field
       I4 NDims = 1;
@@ -160,7 +161,7 @@ template <typename ArrayT> class SpatialMaxOp : public AnalysisOperator {
          // For 1D arrays, use horizontal-only mask (k=0 column of 2D mask)
          // Copy to contiguous 1D array to avoid LayoutStride incompatibility
          if (Mask1D.size() == 0)
-            Mask1D = Array1D_t<Real>("Mask1D", MaskArray.extent(0));
+            Mask1D = makeArray<Array1D_t<Real>>("Mask1D", MaskArray.extent(0));
 
          auto LocalMaskArray = MaskArray;
          auto LocalMask1D    = Mask1D;

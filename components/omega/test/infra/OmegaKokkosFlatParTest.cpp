@@ -49,7 +49,7 @@ Error testParallelFor1D() {
       RefAH(J1) = f1(J1, N1);
    }
 
-   Array1DI4 A("A1", N1);
+   Array1DI4 A = makeArray<Array1DI4>("A1", N1);
    parallelFor({N1}, KOKKOS_LAMBDA(int J1) { A(J1) = f1(J1, N1); });
 
    if (!arraysEqual(A, RefAH)) {
@@ -124,7 +124,7 @@ Error testParallelFor2D() {
       }
    }
 
-   Array2DI4 A("A2", N1, N2);
+   Array2DI4 A = makeArray<Array2DI4>("A2", N1, N2);
    parallelFor(
        {N1, N2},
        KOKKOS_LAMBDA(int J1, int J2) { A(J1, J2) = f2(J1, J2, N1, N2); });
@@ -211,7 +211,7 @@ Error testParallelFor3D() {
       }
    }
 
-   Array3DI4 A("A3", N1, N2, N3);
+   Array3DI4 A = makeArray<Array3DI4>("A3", N1, N2, N3);
    parallelFor(
        {N1, N2, N3}, KOKKOS_LAMBDA(int J1, int J2, int J3) {
           A(J1, J2, J3) = f3(J1, J2, J3, N1, N2, N3);
@@ -305,7 +305,7 @@ Error testParallelFor4D() {
       }
    }
 
-   Array4DI4 A("A4", N1, N2, N3, N4);
+   Array4DI4 A = makeArray<Array4DI4>("A4", N1, N2, N3, N4);
    parallelFor(
        {N1, N2, N3, N4}, KOKKOS_LAMBDA(int J1, int J2, int J3, int J4) {
           A(J1, J2, J3, J4) = f4(J1, J2, J3, J4, N1, N2, N3, N4);
@@ -407,7 +407,7 @@ Error testParallelFor5D() {
       }
    }
 
-   Array5DI4 A("A5", N1, N2, N3, N4, N5);
+   Array5DI4 A = makeArray<Array5DI4>("A5", N1, N2, N3, N4, N5);
    parallelFor(
        {N1, N2, N3, N4, N5},
        KOKKOS_LAMBDA(int J1, int J2, int J3, int J4, int J5) {
