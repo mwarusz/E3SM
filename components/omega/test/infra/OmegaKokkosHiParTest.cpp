@@ -206,7 +206,7 @@ Error testHiparReduce1DReduce1D(int N1) {
               },
               SumInner);
 
-          Kokkos::single(PerTeam(Team), [&]() { AccumOuter += SumInner; });
+          singleInner(Team, [&]() { AccumOuter += SumInner; });
        },
        Sum1);
 
@@ -249,7 +249,7 @@ Error testHiparReduce1DReduce1D(int N1) {
               },
               SumInner, Kokkos::Max<I4>(MaxInner));
 
-          Kokkos::single(PerTeam(Team), [&]() { AccumSumOuter += SumInner; });
+          singleInner(Team, [&]() { AccumSumOuter += SumInner; });
           AccumMaxOuter = Kokkos::max(AccumMaxOuter, MaxInner);
        },
        Sum2, Kokkos::Max<I4>(Max2));
@@ -691,7 +691,7 @@ Error testHiparReduce2DReduce1D(int N1, int N2) {
               },
               SumInner);
 
-          Kokkos::single(PerTeam(Team), [&]() { AccumOuter += SumInner; });
+          singleInner(Team, [&]() { AccumOuter += SumInner; });
        },
        Sum1);
 
@@ -736,7 +736,7 @@ Error testHiparReduce2DReduce1D(int N1, int N2) {
               },
               SumInner, Kokkos::Max<I4>(MaxInner));
 
-          Kokkos::single(PerTeam(Team), [&]() { AccumSumOuter += SumInner; });
+          singleInner(Team, [&]() { AccumSumOuter += SumInner; });
           AccumMaxOuter = Kokkos::max(AccumMaxOuter, MaxInner);
        },
        Sum2, Kokkos::Max<I4>(Max2));

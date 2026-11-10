@@ -585,17 +585,11 @@ void PressureGrad::computePressureGrad(
       parallelForOuter(
           "pgrad-centered", {NEdgesAll},
           KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
-             const int KMin   = LocMinLayerEdgeBot(IEdge);
-             const int KMax   = LocMaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocCenteredPGrad(Tend, IEdge, KChunk, PressureMid,
-                                     PressureInterface, GeomZInterface,
-                                     LocTidalPotential,
-                                     LocSelfAttractionLoading, SpecVol);
-                 });
+             auto TendIEdge = Kokkos::subview(Tend, IEdge, Kokkos::ALL);
+             LocCenteredPGrad(Team, TendIEdge, IEdge, PressureMid,
+                              PressureInterface, GeomZInterface,
+                              LocTidalPotential, LocSelfAttractionLoading,
+                              SpecVol);
           });
 
    } else {
@@ -616,17 +610,10 @@ void PressureGrad::computePressureGrad(
       parallelForOuter(
           "pgrad-finitevolume", {NEdgesAll},
           KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
-             const int KMin   = LocMinLayerEdgeBot(IEdge);
-             const int KMax   = LocMaxLayerEdgeTop(IEdge);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocFiniteVolumePGrad(Tend, IEdge, KChunk, PressureInterface,
-                                         LocDeltaZFixedP, LocDeltaZMoment,
-                                         LocTidalPotential,
-                                         LocSelfAttractionLoading);
-                 });
+             auto TendIEdge = Kokkos::subview(Tend, IEdge, Kokkos::ALL);
+             LocFiniteVolumePGrad(Team, TendIEdge, IEdge, PressureInterface,
+                                  LocDeltaZFixedP, LocDeltaZMoment,
+                                  LocTidalPotential, LocSelfAttractionLoading);
           });
    }
 } // end compute pressure gradient
@@ -640,21 +627,13 @@ void PressureGrad::computeBarotropicPressureGrad(
 ) const {
 
    OMEGA_SCOPE(LocBarotropicPGrad, BarotropicPGrad);
-   OMEGA_SCOPE(LocMinLayerEdgeBot, MinLayerEdgeBot);
-   OMEGA_SCOPE(LocMaxLayerEdgeTop, MaxLayerEdgeTop);
 
    parallelForOuter(
        "pgrad-barotropic", {NEdgesAll},
        KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
-          const int KMin   = LocMinLayerEdgeBot(IEdge);
-          const int KMax   = LocMaxLayerEdgeTop(IEdge);
-          const int KRange = vertRangeChunked(KMin, KMax);
-
-          parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 LocBarotropicPGrad(Tend, IEdge, KChunk, BtrPressAnomaly,
-                                    DepthMeanSpecVol);
-              });
+          auto TendIEdge = Kokkos::subview(Tend, IEdge, Kokkos::ALL);
+          LocBarotropicPGrad(Team, TendIEdge, IEdge, BtrPressAnomaly,
+                             DepthMeanSpecVol);
        });
 } // end compute barotropic pressure gradient
 

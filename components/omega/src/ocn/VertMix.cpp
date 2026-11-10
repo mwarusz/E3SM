@@ -279,53 +279,42 @@ void VertMix::computeVertMix(const Array2DReal &NormalVelocity,
    parallelForOuter(
        "VertMix-BackAndRich", {Mesh->NCellsAll},
        KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-          const int KMin   = MinLayerCell(ICell);
-          const int KMax   = MaxLayerCell(ICell) + 1;
-          const int KRange = vertRangeChunked(KMin, KMax);
+          const int KMin = MinLayerCell(ICell);
+          const int KMax = MaxLayerCell(ICell) + 1;
 
           parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 const int KStart = chunkStart(KChunk, KMin);
-                 const int KLen   = chunkLength(KChunk, KStart, KMax);
-                 for (int KVec = 0; KVec < KLen; ++KVec) {
-                    const int K           = KStart + KVec;
-                    LocVertDiff(ICell, K) = LocBackDiff;
-                    LocVertVisc(ICell, K) = LocBackVisc;
-                    LocGradRichNum(ICell, K) =
-                        LocComputeGradRichardsonNum.RiInitValue;
-                    LocGradRichNumSmoothed(ICell, K) =
-                        LocComputeGradRichardsonNum.RiInitValue;
-                 }
+              Team, Range{KMin, KMax}, INNER_LAMBDA(int K) {
+                 LocVertDiff(ICell, K) = LocBackDiff;
+                 LocVertVisc(ICell, K) = LocBackVisc;
+                 LocGradRichNum(ICell, K) =
+                     LocComputeGradRichardsonNum.RiInitValue;
+                 LocGradRichNumSmoothed(ICell, K) =
+                     LocComputeGradRichardsonNum.RiInitValue;
               });
        });
    /// Second, compute shear mixing if enabled
    if (LocComputeVertMixShear.Enabled) {
       /// Compute Richardson number
       parallelForOuter(
-          "VertMix-ComputeRi", {Mesh->NCellsAll},
+          "VertMix-ComputeRi",
+          LaunchConfig({Mesh->NCellsAll},
+                       TeamScratch<Real>(2 * VCoord->NVertLayers)),
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell) + 1;
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeGradRichardsonNum(
-                        LocGradRichNum, ICell, KChunk, NormalVelocity,
-                        TangentialVelocity, BruntVaisalaFreqSq);
-                 });
+             LocComputeGradRichardsonNum(Team, LocGradRichNum, ICell,
+                                         NormalVelocity, TangentialVelocity,
+                                         BruntVaisalaFreqSq);
 
              teamBarrier(Team);
 
              // Fill Richardson number at vertical boundaries using the
              // closest valid value. This is equivalent to doing one-sided
              // differencing at the boundary.
-             Kokkos::single(
-                 PerTeam(Team), INNER_LAMBDA() {
+             singleInner(
+                 Team, INNER_LAMBDA() {
                     LocGradRichNum(ICell, MinLayerCell(ICell)) =
-                        LocGradRichNum(ICell, KMin);
+                        LocGradRichNum(ICell, MinLayerCell(ICell) + 1);
                     LocGradRichNum(ICell, MaxLayerCell(ICell) + 1) =
-                        LocGradRichNum(ICell, KMax);
+                        LocGradRichNum(ICell, MaxLayerCell(ICell));
                  });
           });
       /// Smooth Richardson number with 1-2-1 filter the number of times
@@ -342,15 +331,8 @@ void VertMix::computeVertMix(const Array2DReal &NormalVelocity,
       parallelForOuter(
           "VertMix-Shear", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell) + 1;
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeVertMixShear(LocVertDiff, LocVertVisc, ICell,
-                                           KChunk, LocGradRichNumSmoothed);
-                 });
+             LocComputeVertMixShear(Team, LocVertDiff, LocVertVisc, ICell,
+                                    LocGradRichNumSmoothed);
           });
    }
 
@@ -395,16 +377,8 @@ void VertMix::computeVertMix(const Array2DReal &NormalVelocity,
       parallelForOuter(
           "VertMix-Conv", {Mesh->NCellsAll},
           KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
-             const int KMin   = MinLayerCell(ICell) + 1;
-             const int KMax   = MaxLayerCell(ICell);
-             const int KRange = vertRangeChunked(KMin, KMax);
-
-             parallelForInner(
-                 Team, KRange, INNER_LAMBDA(int KChunk) {
-                    LocComputeVertMixConv(LocVertDiff, LocVertVisc, ICell,
-                                          KChunk, BruntVaisalaFreqSq,
-                                          KPPBoundaryLayerIndex);
-                 });
+             LocComputeVertMixConv(Team, LocVertDiff, LocVertVisc, ICell,
+                                   BruntVaisalaFreqSq, KPPBoundaryLayerIndex);
           });
    }
    /// Finally, zero viscosity/diffusivity at surface and bottom boundaries
@@ -748,22 +722,13 @@ void VertMix::VertMixImplicit(OceanState *State, AuxiliaryState *AuxState,
 
    // TODO: Temporary handling of computation of tangential velocity
    // Compute tangential velocity
-   OMEGA_SCOPE(MinLayerEdgeBot, VCoord->MinLayerEdgeBot);
-   OMEGA_SCOPE(MaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
    OMEGA_SCOPE(LocTangentialVelocity, TangentialVelocity);
 
-   TangentialReconOnEdge TanReconEdge(Mesh);
+   TangentialReconOnEdge TanReconEdge(Mesh, VCoord);
 
    parallelForOuter(
        {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          const int KMin   = MinLayerEdgeBot(IEdge);
-          const int KMax   = MaxLayerEdgeTop(IEdge);
-          const int KRange = vertRangeChunked(KMin, KMax);
-          parallelForInner(
-              Team, KRange, INNER_LAMBDA(int KChunk) {
-                 TanReconEdge(LocTangentialVelocity, IEdge, KChunk,
-                              NormalVelEdge);
-              });
+          TanReconEdge(Team, LocTangentialVelocity, IEdge, NormalVelEdge);
        });
 
    // Refresh kinetic energy for the implicit bottom drag

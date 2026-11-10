@@ -350,9 +350,7 @@ void SplitExplicitRK2Stepper::updateBaroclinicVelocityWithBarotropicForcing(
                     LocSplitFactor * (FluxSum / ThicknessSum) * InvDtSeconds;
              }
 
-             Kokkos::single(
-                 PerTeam(Team),
-                 INNER_LAMBDA() { BtrForcing(IEdge) = Forcing; });
+             singleInner(Team, INNER_LAMBDA() { BtrForcing(IEdge) = Forcing; });
           }
 
           // Update the baroclinic velocity to the stage midpoint, removing the
