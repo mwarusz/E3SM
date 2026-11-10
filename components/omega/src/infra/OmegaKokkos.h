@@ -314,5 +314,61 @@ LinearIdxWrapper(F, std::array<int, Rank>) -> LinearIdxWrapper<F, Rank>;
 // Hierarchical parallelism wrappers
 #include "OmegaKokkosHiPar.h"
 
+namespace OMEGA {
+template <class T, class... ArgTypes>
+T makeArray(const std::string &Label, ArgTypes... Args) {
+   using ValT = typename T::non_const_value_type;
+
+   T Arr = T(Kokkos::view_alloc(Label, Kokkos::WithoutInitializing), Args...);
+
+   if constexpr (T::rank == 1) {
+      parallelFor(
+          {Arr.extent_int(0)}, KOKKOS_LAMBDA(int I) { Arr(I) = ValT{}; });
+   }
+
+   if constexpr (T::rank == 2) {
+      parallelForOuter(
+          {Arr.extent_int(0)}, KOKKOS_LAMBDA(int I, const TeamMember &Team) {
+             parallelForInner(
+                 Team, Arr.extent_int(1),
+                 INNER_LAMBDA(int K) { Arr(I, K) = ValT{}; });
+          });
+   }
+
+   if constexpr (T::rank == 3) {
+      parallelForOuter(
+          {Arr.extent_int(0), Arr.extent_int(1)},
+          KOKKOS_LAMBDA(int I, int J, const TeamMember &Team) {
+             parallelForInner(
+                 Team, Arr.extent_int(2),
+                 INNER_LAMBDA(int K) { Arr(I, J, K) = ValT{}; });
+          });
+   }
+
+   if constexpr (T::rank == 4) {
+      parallelForOuter(
+          {Arr.extent_int(0), Arr.extent_int(1), Arr.extent_int(2)},
+          KOKKOS_LAMBDA(int Q, int I, int J, const TeamMember &Team) {
+             parallelForInner(
+                 Team, Arr.extent_int(3),
+                 INNER_LAMBDA(int K) { Arr(Q, I, J, K) = ValT{}; });
+          });
+   }
+
+   if constexpr (T::rank == 5) {
+      parallelForOuter(
+          {Arr.extent_int(0), Arr.extent_int(1), Arr.extent_int(2),
+           Arr.extent_int(3)},
+          KOKKOS_LAMBDA(int P, int Q, int I, int J, const TeamMember &Team) {
+             parallelForInner(
+                 Team, Arr.extent_int(4),
+                 INNER_LAMBDA(int K) { Arr(P, Q, I, J, K) = ValT{}; });
+          });
+   }
+
+   return Arr;
+}
+} // namespace OMEGA
+
 //===----------------------------------------------------------------------===//
 #endif
