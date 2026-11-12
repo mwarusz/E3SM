@@ -149,6 +149,8 @@ void SubmesoEddies::computeBuoyGrad(const Array2DReal &SpecVol,
                                     const Array2DReal &MeanPseudoThickEdge,
                                     const Array2DReal &GeomZMid,
                                     const Array2DReal &BruntVaisalaFreqSq) {
+   Pacer::start("Submeso:computeBuoyGrad", 2);
+
    OMEGA_SCOPE(GradBuoyEdgeInterface, this->GradBuoyEdgeInterface);
 
    const auto &DcEdge      = Mesh->DcEdge;
@@ -278,12 +280,16 @@ void SubmesoEddies::computeBuoyGrad(const Array2DReal &SpecVol,
                  });
           }
        });
+
+   Pacer::stop("Submeso:computeBuoyGrad", 2);
 }
 
 void SubmesoEddies::computeEddyVelocity(
     const Array1DReal &DenMixLayerDepth, const Array1DI4 &DenMixLayerIndex,
     const Array2DReal &BruntVaisalaFreqSq,
     const Array2DReal &MeanPseudoThickEdge) {
+
+   Pacer::start("Submeso:computeEddyVelocity", 2);
 
    OMEGA_SCOPE(GradBuoyEdgeInterface, this->GradBuoyEdgeInterface);
    OMEGA_SCOPE(TimeScale, this->TimeScale);
@@ -407,6 +413,8 @@ void SubmesoEddies::computeEddyVelocity(
                  });
           }
        });
+
+   Pacer::stop("Submeso:computeEddyVelocity", 2);
 }
 
 } // end namespace OMEGA
