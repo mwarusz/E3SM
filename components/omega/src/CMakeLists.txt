@@ -65,10 +65,13 @@ target_link_directories(
 	${OMEGA_BUILD_DIR}/external/GSW-C
 )
 
+find_package(Boost REQUIRED)
+
 target_link_libraries(
     OmegaLibFlags
     INTERFACE
     yaml-cpp::yaml-cpp
+    Boost::headers
 )
 
 target_link_libraries(
