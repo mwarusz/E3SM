@@ -485,7 +485,8 @@ int initUpdateHaloAndHostArrays() {
 
    OceanState *DefState = OceanState::getDefault();
    I4 CurTimeLevel      = 0;
-   DefState->exchangeHalo(CurTimeLevel);
+   Halo *BarotropicHalo = TimeStepper::getDefault()->getBarotropicHalo();
+   DefState->exchangeHalo(CurTimeLevel, BarotropicHalo);
 
    // Enforce layer masks on state and tracer variables: fully-inactive layers
    // get FillValueReal, boundary layers get 0, active layers keep their

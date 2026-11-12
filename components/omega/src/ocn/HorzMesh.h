@@ -82,6 +82,8 @@ class HorzMesh {
    std::string MeshName;     ///< name of this mesh
    std::string MeshFileName; ///< name (and full path) of input mesh file
 
+   Decomp *MeshDecomp; ///< decomposition of this mesh
+
    // Global attributes
    bool OnSphere;     ///< true if mesh is spherical
    bool OnPlane;      ///< true if mesh is on a Cartesian plane

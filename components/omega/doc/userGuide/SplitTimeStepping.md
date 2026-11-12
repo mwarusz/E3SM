@@ -41,6 +41,7 @@ options for `SplitExplicitRK2` and `UnsplitRK2`:
     ModeSplitShare:
       BtrTimeStepper: Predictor-Corrector
       BtrTimeStep: 0000_00:00:20
+      BarotropicHaloWidth: 6
       NTimeStepIteration: 2
       NBclCoriolisIteration: 2
       ReinitSplitVelocity: false
@@ -57,6 +58,7 @@ fall back to their defaults:
 | ------------------ | ----------- | ------- |
 | BtrTimeStepper | scheme for the barotropic subcycle; `Predictor-Corrector` is the only option | Predictor-Corrector |
 | BtrTimeStep | barotropic time step, in the same format as `TimeStep`; must be positive and shorter than it | required |
+| BarotropicHaloWidth | number of cell halo layers used by the barotropic subcycle; must be at least 3 | 6 |
 | NTimeStepIteration | positive integer number of predictor-corrector iterations per time step | 2 |
 | NBclCoriolisIteration | positive integer number of Coriolis iterations in the baroclinic velocity update; forced to 1 for `UnsplitRK2` | 2 |
 | ReinitSplitVelocity | recompute the velocity split at every time step; has no effect for `UnsplitRK2` | false |

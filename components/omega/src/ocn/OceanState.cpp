@@ -65,9 +65,12 @@ int OceanState::init() {
    // pressure fields; every other stepper leaves them unallocated.
    const bool UseModeSplit = DefTimeStepper->isSplit();
 
+   Decomp *BarotropicDecomp = DefTimeStepper->getBarotropicDecomp();
+
    // Create the default state and set pointer to it
-   OceanState::DefaultOceanState = create(
-       "Default", DefHorzMesh, DefHalo, NVertLayers, NTimeLevels, UseModeSplit);
+   OceanState::DefaultOceanState =
+       create("Default", DefHorzMesh, DefHalo, NVertLayers, NTimeLevels,
+              UseModeSplit, BarotropicDecomp);
 
    // State values are filled by a later read of the initial state or
    // restart file
@@ -84,7 +87,9 @@ OceanState::OceanState(
     Halo *MeshHalo_,          //< [in] Halo for Mesh
     const int NVertLayers_,   //< [in] number of vertical layers
     const int NTimeLevels_,   //< [in] number of time levels
-    const bool UseModeSplit_  //< [in] carry split velocity/barotropic pressure
+    const bool UseModeSplit_, //< [in] carry split velocity/barotropic pressure
+    const Decomp
+        *BarotropicDecomp //< [in] decomposition for barotropic variables
 ) {
 
    UseModeSplit = UseModeSplit_;
@@ -144,18 +149,22 @@ OceanState::OceanState(
          NormalBaroclinicVelocityH[I] =
              HostArray2DReal("NormalBaroclinicVelocity" + std::to_string(I),
                              NEdgesSize, NVertLayers);
-         NormalBarotropicVelocityH[I] = HostArray1DReal(
-             "NormalBarotropicVelocity" + std::to_string(I), NEdgesSize);
-         BarotropicPressureAnomalyH[I] = HostArray1DReal(
-             "BarotropicPressureAnomaly" + std::to_string(I), NCellsSize);
+         NormalBarotropicVelocityH[I] =
+             HostArray1DReal("NormalBarotropicVelocity" + std::to_string(I),
+                             BarotropicDecomp->NEdgesSize);
+         BarotropicPressureAnomalyH[I] =
+             HostArray1DReal("BarotropicPressureAnomaly" + std::to_string(I),
+                             BarotropicDecomp->NCellsSize);
 
          NormalBaroclinicVelocity[I] =
              Array2DReal("NormalBaroclinicVelocity" + std::to_string(I),
                          NEdgesSize, NVertLayers);
-         NormalBarotropicVelocity[I] = Array1DReal(
-             "NormalBarotropicVelocity" + std::to_string(I), NEdgesSize);
-         BarotropicPressureAnomaly[I] = Array1DReal(
-             "BarotropicPressureAnomaly" + std::to_string(I), NCellsSize);
+         NormalBarotropicVelocity[I] =
+             Array1DReal("NormalBarotropicVelocity" + std::to_string(I),
+                         BarotropicDecomp->NEdgesSize);
+         BarotropicPressureAnomaly[I] =
+             Array1DReal("BarotropicPressureAnomaly" + std::to_string(I),
+                         BarotropicDecomp->NCellsSize);
 
          deepCopy(NormalBaroclinicVelocityH[I], 0.);
          deepCopy(NormalBarotropicVelocityH[I], 0.);
@@ -181,13 +190,14 @@ OceanState::OceanState(
 
 /// Create a new state by calling the constructor and put it in the
 /// AllOceanStates map
-OceanState *
-OceanState::create(const std::string &Name, //< [in] Name for new state
-                   HorzMesh *Mesh,          //< [in] HorzMesh for state
-                   Halo *MeshHalo,          //< [in] Halo for Mesh
-                   const int NVertLayers,   //< [in] number of vertical layers
-                   const int NTimeLevels,   //< [in] number of time levels
-                   const bool UseModeSplit  //< [in] carry split velocity fields
+OceanState *OceanState::create(
+    const std::string &Name,   //< [in] Name for new state
+    HorzMesh *Mesh,            //< [in] HorzMesh for state
+    Halo *MeshHalo,            //< [in] Halo for Mesh
+    const int NVertLayers,     //< [in] number of vertical layers
+    const int NTimeLevels,     //< [in] number of time levels
+    const bool UseModeSplit,   //< [in] carry split velocity fields
+    Decomp *InBarotropicDecomp //< [in] decomposition for barotropic fields
 ) {
 
    OMEGA_REQUIRE(Mesh,
@@ -207,10 +217,14 @@ OceanState::create(const std::string &Name, //< [in] Name for new state
       return nullptr;
    }
 
+   Decomp *BarotropicDecomp =
+       InBarotropicDecomp ? InBarotropicDecomp : Mesh->MeshDecomp;
+
    // create a new state on the heap and put it in a map of
    // unique_ptrs, which will manage its lifetime
-   auto *NewOceanState = new OceanState(Name, Mesh, MeshHalo, NVertLayers,
-                                        NTimeLevels, UseModeSplit);
+   auto *NewOceanState =
+       new OceanState(Name, Mesh, MeshHalo, NVertLayers, NTimeLevels,
+                      UseModeSplit, BarotropicDecomp);
    AllOceanStates.emplace(Name, NewOceanState);
 
    return NewOceanState;
@@ -521,32 +535,35 @@ void OceanState::applyLayerMasks(const I4 TimeLevel) {
 //------------------------------------------------------------------------------
 // Perform state halo exchange
 // TimeLevel == [1:new, 0:current, -1:previous, -2:two times ago, ...]
-void OceanState::exchangeHalo(const I4 TimeLevel) {
+void OceanState::exchangeHalo(const I4 TimeLevel, Halo *BarotropicHalo) {
 
    const I4 TimeIndex = getTimeIndex(TimeLevel);
 
    MeshHalo->exchangeFullArrayHalo(PseudoThickness[TimeIndex], OnCell);
    MeshHalo->exchangeFullArrayHalo(NormalVelocity[TimeIndex], OnEdge);
    if (UseModeSplit) {
+      OMEGA_REQUIRE(BarotropicHalo,
+                    "Null Barotropic Halo in State::exchangeHalo");
+
       MeshHalo->exchangeFullArrayHalo(NormalBaroclinicVelocity[TimeIndex],
                                       OnEdge);
-      MeshHalo->exchangeFullArrayHalo(NormalBarotropicVelocity[TimeIndex],
-                                      OnEdge);
-      MeshHalo->exchangeFullArrayHalo(BarotropicPressureAnomaly[TimeIndex],
-                                      OnCell);
+      BarotropicHalo->exchangeFullArrayHalo(NormalBarotropicVelocity[TimeIndex],
+                                            OnEdge);
+      BarotropicHalo->exchangeFullArrayHalo(
+          BarotropicPressureAnomaly[TimeIndex], OnCell);
    }
 
 } // end exchangeHalo
 
 //------------------------------------------------------------------------------
 // Perform time level update
-void OceanState::updateTimeLevels() {
+void OceanState::updateTimeLevels(Halo *BarotropicHalo) {
 
    if (NTimeLevels == 1)
       ABORT_ERROR("OceanState: can't update time levels for NTimeLevels == 1");
 
    // Exchange halo
-   exchangeHalo(1);
+   exchangeHalo(1, BarotropicHalo);
 
    // Update current time index for pseudo-thickness and normal velocity
    CurTimeIndex = (CurTimeIndex + 1) % NTimeLevels;

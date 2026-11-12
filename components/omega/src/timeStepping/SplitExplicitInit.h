@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Halo.h"
 #include "HorzMesh.h"
 #include "OceanState.h"
 #include "SplitExplicitTypes.h"
@@ -22,10 +23,19 @@ class SplitExplicitInit {
    );
 
    static void allocateScratch(
-       SplitExplicitScratch &Scratch, ///< [inout] split-explicit scratch data
-       const HorzMesh *Mesh,          ///< [in] horizontal mesh
-       const VertCoord *VCoord,       ///< [in] vertical coordinate
-       const std::string &Name        ///< [in] owning time stepper name
+       SplitExplicitScratch &Scratch,  ///< [inout] split-explicit scratch data
+       const Decomp *DefDecomp,        ///< [in] default decomposition
+       const Decomp *BarotropicDecomp, ///< [in] barotropic decomposition
+       const VertCoord *VCoord,        ///< [in] vertical coordinate
+       const std::string &Name         ///< [in] owning time stepper name
+   );
+
+   static void transferMeshArrays(
+       SplitExplicitScratch &Scratch,  ///< [inout] split-explicit scratch data
+       const HorzMesh *Mesh,           ///< [in] horizontal mesh
+       const VertCoord *VCoord,        ///< [in] vertical coordinate
+       const Decomp *BarotropicDecomp, ///< [in] barotropic decomposition
+       Halo *BarotropicHalo            ///< [in] barotropic halo exchange
    );
 
    static void

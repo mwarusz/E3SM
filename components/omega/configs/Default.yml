@@ -15,6 +15,7 @@ Omega:
     ModeSplitShare:
       BtrTimeStepper: Predictor-Corrector
       BtrTimeStep: 0000_00:00:20
+      BarotropicHaloWidth: 6
       NTimeStepIteration: 2
       NBclCoriolisIteration: 2
       ReinitSplitVelocity: false
