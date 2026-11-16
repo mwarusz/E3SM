@@ -338,8 +338,8 @@ void Eos::computeBruntVaisalaFreqSq(const Array2DReal &ConservTemp,
              // Fill Brunt-Vaisala frequency at vertical boundaries using the
              // closest valid value. This is equivalent to doing one-sided
              // differencing at the boundary.
-             Kokkos::single(
-                 PerTeam(Team), INNER_LAMBDA() {
+             singleInner(
+                 Team, INNER_LAMBDA() {
                     LocBruntVaisalaFreqSq(ICell, MinLayerCell(ICell)) =
                         LocBruntVaisalaFreqSq(ICell, KMin);
                     LocBruntVaisalaFreqSq(ICell, MaxLayerCell(ICell) + 1) =
@@ -365,8 +365,8 @@ void Eos::computeBruntVaisalaFreqSq(const Array2DReal &ConservTemp,
              // Fill Brunt-Vaisala frequency at vertical boundaries using the
              // closest valid value. This is equivalent to doing one-sided
              // differencing at the boundary.
-             Kokkos::single(
-                 PerTeam(Team), INNER_LAMBDA() {
+             singleInner(
+                 Team, INNER_LAMBDA() {
                     LocBruntVaisalaFreqSq(ICell, MinLayerCell(ICell)) =
                         LocBruntVaisalaFreqSq(ICell, KMin);
                     LocBruntVaisalaFreqSq(ICell, MaxLayerCell(ICell) + 1) =

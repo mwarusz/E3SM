@@ -547,9 +547,9 @@ int testPotVortHAdv(int NVertLayers, Real RTol) {
 
    PotentialVortHAdvOnEdge PotVortHAdvOnE(Mesh, VCoord);
    parallelForOuter(
-       LaunchConfig({Mesh->NEdgesOwned}, TeamScratch<Real>(NVertLayers)),
-       KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          PotVortHAdvOnE(Team, NumPotVortHAdv, IEdge, NormRelVortEdge,
+       {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
+          auto TendIEdge = Kokkos::subview(NumPotVortHAdv, IEdge, Kokkos::ALL);
+          PotVortHAdvOnE(Team, TendIEdge, IEdge, NormRelVortEdge,
                          NormPlanetVortEdge, PseudoThickEdge, NormVelEdge);
        });
 
@@ -698,7 +698,8 @@ int testKEGrad(int NVertLayers, Real RTol) {
    KEGradOnEdge KEGradOnE(Mesh, VCoord);
    parallelForOuter(
        {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          KEGradOnE(Team, NumKEGrad, IEdge, KECell);
+          auto NumKEGradIEdge = Kokkos::subview(NumKEGrad, IEdge, Kokkos::ALL);
+          KEGradOnE(Team, NumKEGradIEdge, IEdge, KECell);
        });
 
    // Compute errors
@@ -746,7 +747,8 @@ int testSSHGrad(int NVertLayers, Real RTol) {
    SSHGradOnEdge SSHGradOnE(Mesh, VCoord);
    parallelForOuter(
        {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          SSHGradOnE(Team, NumSSHGrad, IEdge, SSHCell);
+          auto TendIEdge = Kokkos::subview(NumSSHGrad, IEdge, Kokkos::ALL);
+          SSHGradOnE(Team, TendIEdge, IEdge, SSHCell);
        });
 
    // Compute errors
@@ -808,7 +810,8 @@ int testVelDiff(int NVertLayers, Real RTol) {
 
    parallelForOuter(
        {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          VelDiffOnE(Team, NumVelDiff, IEdge, DivCell, RVortVertex);
+          auto TendIEdge = Kokkos::subview(NumVelDiff, IEdge, Kokkos::ALL);
+          VelDiffOnE(Team, TendIEdge, IEdge, DivCell, RVortVertex);
        });
 
    // Compute errors
@@ -879,7 +882,8 @@ int testVelHyperDiff(int NVertLayers, Real RTol) {
 
    parallelForOuter(
        {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          VelHyperDiffOnE(Team, NumVelHyperDiff, IEdge, DivCell, RVortVertex);
+          auto TendIEdge = Kokkos::subview(NumVelHyperDiff, IEdge, Kokkos::ALL);
+          VelHyperDiffOnE(Team, TendIEdge, IEdge, DivCell, RVortVertex);
        });
 
    // Compute errors
@@ -949,8 +953,10 @@ int testSfcStressForcing(int NVertLayers) {
 
    parallelForOuter(
        {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge, const TeamMember &Team) {
-          SfcStressForcingOnE(Team, NumSfcStressForcing, IEdge,
-                              NormalStressEdge, PseudoThickEdge);
+          auto TendIEdge =
+              Kokkos::subview(NumSfcStressForcing, IEdge, Kokkos::ALL);
+          SfcStressForcingOnE(Team, TendIEdge, IEdge, NormalStressEdge,
+                              PseudoThickEdge);
        });
 
    // Compute errors
@@ -1001,7 +1007,8 @@ int testExplicitBottomDrag(int NVertLayers, Real RTol) {
 
    parallelFor(
        {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(int IEdge) {
-          BottomDragOnE(NumBottomDrag, IEdge, NormalVelEdge, KECell,
+          auto TendIEdge = Kokkos::subview(NumBottomDrag, IEdge, Kokkos::ALL);
+          BottomDragOnE(TendIEdge, IEdge, NormalVelEdge, KECell,
                         PseudoThickEdge);
        });
 
@@ -1180,8 +1187,8 @@ int testBottomDragInactiveEdges(int NVertLayers) {
    parallelFor(
        {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
           if (LocMaxLayerEdgeTop(IEdge) >= 0)
-             BottomDragOnE(RefBottomDrag, IEdge, NormalVelEdge, KECell,
-                           PseudoThickEdge);
+             BottomDragOnE(Kokkos::subview(RefBottomDrag, IEdge, Kokkos::ALL),
+                           IEdge, NormalVelEdge, KECell, PseudoThickEdge);
        });
 
    // What Tendencies actually does: loop over every edge unconditionally
@@ -1189,8 +1196,8 @@ int testBottomDragInactiveEdges(int NVertLayers) {
    deepCopy(NumBottomDrag, 0);
    parallelFor(
        {Mesh->NEdgesAll}, KOKKOS_LAMBDA(int IEdge) {
-          BottomDragOnE(NumBottomDrag, IEdge, NormalVelEdge, KECell,
-                        PseudoThickEdge);
+          BottomDragOnE(Kokkos::subview(NumBottomDrag, IEdge, Kokkos::ALL),
+                        IEdge, NormalVelEdge, KECell, PseudoThickEdge);
        });
 
    // Restore the layer indices before checking, so that returning early on

@@ -288,8 +288,7 @@ void testGradRichNum() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -393,8 +392,7 @@ void testOneTwoOneFilter() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -486,8 +484,7 @@ void testBackVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -524,8 +521,7 @@ void testBackVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -581,10 +577,10 @@ void testConvVertMix() {
    /// Compute only convective vertical viscosity and diffusivity
    OMEGA_SCOPE(ComputeVertMixConv, TestVertMix->ComputeVertMixConv);
    Array1DI4 KPPBoundaryLayerIndex; // Empty, so KPP is disabled for this test
-   parallelFor(
-       "ApplyVertMixConv", {Mesh->NCellsAll, NChunks},
-       KOKKOS_LAMBDA(I4 ICell, I4 KChunk) {
-          ComputeVertMixConv(VertDiffOut, VertViscOut, ICell, KChunk,
+   parallelForOuter(
+       "ApplyVertMixConv", {Mesh->NCellsAll},
+       KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
+          ComputeVertMixConv(Team, VertDiffOut, VertViscOut, ICell,
                              BruntVaisalaFreqSqIn, KPPBoundaryLayerIndex);
        });
 
@@ -618,8 +614,7 @@ void testConvVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -657,8 +652,7 @@ void testConvVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -715,10 +709,10 @@ void testShearVertMix() {
    /// Compute only shear vertical viscosity and diffusivity
    OMEGA_SCOPE(ComputeVertMixShear, TestVertMix->ComputeVertMixShear);
    ComputeVertMixShear.ShearExponent = 3.0;
-   parallelFor(
-       "ApplyVertMixShear", {Mesh->NCellsAll, NChunks},
-       KOKKOS_LAMBDA(I4 ICell, I4 KChunk) {
-          ComputeVertMixShear(VertDiffOut, VertViscOut, ICell, KChunk,
+   parallelForOuter(
+       "ApplyVertMixShear", {Mesh->NCellsAll},
+       KOKKOS_LAMBDA(I4 ICell, const TeamMember &Team) {
+          ComputeVertMixShear(Team, VertDiffOut, VertViscOut, ICell,
                               GradRichNumSmoothedIn);
        });
 
@@ -756,8 +750,7 @@ void testShearVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -799,8 +792,7 @@ void testShearVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -910,8 +902,7 @@ void testTotalVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -954,8 +945,7 @@ void testTotalVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -1009,8 +999,7 @@ void testTotalVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 
@@ -1053,8 +1042,7 @@ void testTotalVertMix() {
               },
               NumMismatchesCol);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { OuterCount += NumMismatchesCol; });
+          singleInner(Team, [&]() { OuterCount += NumMismatchesCol; });
        },
        NumMismatches);
 

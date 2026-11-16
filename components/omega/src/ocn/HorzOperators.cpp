@@ -6,22 +6,37 @@
 
 namespace OMEGA {
 
-DivergenceOnCell::DivergenceOnCell(HorzMesh const *Mesh)
+DivergenceOnCell::DivergenceOnCell(HorzMesh const *Mesh,
+                                   VertCoord const *VCoord)
     : NEdgesOnCell(Mesh->NEdgesOnCell), EdgesOnCell(Mesh->EdgesOnCell),
       DvEdge(Mesh->DvEdge), AreaCell(Mesh->AreaCell),
-      EdgeSignOnCell(Mesh->EdgeSignOnCell) {}
+      EdgeSignOnCell(Mesh->EdgeSignOnCell), MinLayerCell(VCoord->MinLayerCell),
+      MaxLayerCell(VCoord->MaxLayerCell),
+      MinLayerEdgeTop(VCoord->MinLayerEdgeTop),
+      MaxLayerEdgeBot(VCoord->MaxLayerEdgeBot) {}
 
-GradientOnEdge::GradientOnEdge(HorzMesh const *Mesh)
-    : CellsOnEdge(Mesh->CellsOnEdge), DcEdge(Mesh->DcEdge) {}
+GradientOnEdge::GradientOnEdge(HorzMesh const *Mesh, VertCoord const *VCoord)
+    : CellsOnEdge(Mesh->CellsOnEdge), DcEdge(Mesh->DcEdge),
+      MinLayerEdgeBot(VCoord->MinLayerEdgeBot),
+      MaxLayerEdgeTop(VCoord->MaxLayerEdgeTop) {}
 
-CurlOnVertex::CurlOnVertex(HorzMesh const *Mesh)
+CurlOnVertex::CurlOnVertex(HorzMesh const *Mesh, VertCoord const *VCoord)
     : VertexDegree(Mesh->VertexDegree), EdgesOnVertex(Mesh->EdgesOnVertex),
       DcEdge(Mesh->DcEdge), AreaTriangle(Mesh->AreaTriangle),
-      EdgeSignOnVertex(Mesh->EdgeSignOnVertex) {}
+      EdgeSignOnVertex(Mesh->EdgeSignOnVertex),
+      MinLayerVertexTop(VCoord->MinLayerVertexTop),
+      MaxLayerVertexBot(VCoord->MaxLayerVertexBot),
+      MinLayerEdgeTop(VCoord->MinLayerEdgeTop),
+      MaxLayerEdgeBot(VCoord->MaxLayerEdgeBot) {}
 
-TangentialReconOnEdge::TangentialReconOnEdge(HorzMesh const *Mesh)
+TangentialReconOnEdge::TangentialReconOnEdge(HorzMesh const *Mesh,
+                                             VertCoord const *VCoord)
     : NEdgesOnEdge(Mesh->NEdgesOnEdge), EdgesOnEdge(Mesh->EdgesOnEdge),
-      WeightsOnEdge(Mesh->WeightsOnEdge) {}
+      WeightsOnEdge(Mesh->WeightsOnEdge),
+      MinLayerEdgeBot(VCoord->MinLayerEdgeBot),
+      MaxLayerEdgeTop(VCoord->MaxLayerEdgeTop),
+      MinLayerEdgeTop(VCoord->MinLayerEdgeTop),
+      MaxLayerEdgeBot(VCoord->MaxLayerEdgeBot) {}
 
 InterpCellToEdge::InterpCellToEdge(const HorzMesh *Mesh)
     : CellsOnEdge(Mesh->CellsOnEdge), VerticesOnEdge(Mesh->VerticesOnEdge),

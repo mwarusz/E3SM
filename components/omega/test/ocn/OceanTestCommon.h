@@ -517,8 +517,7 @@ Real reduceArray(const Array2DReal &Arr, int Extent0, const VertMin &VMin,
               },
               RInner);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { ROuter.join(AccumOuter, ResInner); });
+          singleInner(Team, [&]() { ROuter.join(AccumOuter, ResInner); });
        },
        ROuter);
 
@@ -558,8 +557,7 @@ Real reduceArray(const Array3DReal &Arr, int Extent0, int Extent1,
               },
               RInner);
 
-          Kokkos::single(PerTeam(Team),
-                         [&]() { ROuter.join(AccumOuter, ResInner); });
+          singleInner(Team, [&]() { ROuter.join(AccumOuter, ResInner); });
        },
        ROuter);
 
