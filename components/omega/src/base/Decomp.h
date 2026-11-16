@@ -46,16 +46,16 @@ namespace OMEGA {
 /// the adjacency graph.
 
 /// Supported partitioning methods
-enum PartMethod {
-   PartMethodUnknown,      ///< Unknown or undefined method
-   PartMethodMetisKWay,    ///< Metis K-way partitioning (default)
-   PartMethodParMetisKWay, ///< parallel version of K-way partitioning
-   PartMethodMetisRB       ///< Metis recursive bisection (not yet supported)
+enum class PartitioningMethod {
+   Unknown,      ///< Unknown or undefined method
+   MetisKWay,    ///< Metis K-way partitioning (default)
+   ParMetisKWay, ///< parallel version of K-way partitioning
+   MetisRB       ///< Metis recursive bisection (not yet supported)
 };
 
 /// Translates an input string for partition method option to the
 /// enum for later use
-PartMethod getPartMethodFromStr(
+PartitioningMethod getPartitioningMethodFromStr(
     const std::string &InMethod ///< [in] choice of partition method
 );
 
@@ -178,11 +178,11 @@ class Decomp {
 
    /// Construct a new decomposition across an input MachEnv with
    /// NPart partitions of a mesh that is read from a mesh file.
-   Decomp(const std::string &Name, ///< [in] Name for new decomposition
-          const MachEnv *InEnv,    ///< [in] MachEnv for the new partition
-          I4 NParts,               ///< [in] num of partitions for new decomp
-          PartMethod Method,       ///< [in] method for partitioning
-          I4 InHaloWidth,          ///< [in] width of halo in new decomp
+   Decomp(const std::string &Name,   ///< [in] Name for new decomposition
+          const MachEnv *InEnv,      ///< [in] MachEnv for the new partition
+          I4 NParts,                 ///< [in] num of partitions for new decomp
+          PartitioningMethod Method, ///< [in] method for partitioning
+          I4 InHaloWidth,            ///< [in] width of halo in new decomp
           const std::string &MeshFileName_ ///< [in] name of file with mesh info
    );
 
@@ -298,11 +298,11 @@ class Decomp {
    // Creates a new decomposition using the constructor and puts it in the
    // AllDecomps map
    static Decomp *
-   create(const std::string &Name, ///< [in] Name for new decomposition
-          const MachEnv *Env,      ///< [in] MachEnv for the new partition
-          I4 NParts,               ///< [in] num of partitions for new decomp
-          PartMethod Method,       ///< [in] method for partitioning
-          I4 HaloWidth,            ///< [in] width of halo in new decomp
+   create(const std::string &Name,   ///< [in] Name for new decomposition
+          const MachEnv *Env,        ///< [in] MachEnv for the new partition
+          I4 NParts,                 ///< [in] num of partitions for new decomp
+          PartitioningMethod Method, ///< [in] method for partitioning
+          I4 HaloWidth,              ///< [in] width of halo in new decomp
           const std::string &MeshFileName ///< [in] name of file with mesh info
    );
 

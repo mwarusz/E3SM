@@ -501,7 +501,7 @@ void Decomp::init(const std::string &InMeshFileName) {
    Err = DecompConfig.get("DecompMethod", DecompMethodStr);
    CHECK_ERROR_ABORT(Err, "Decomp: DecompMethod not found in Decomp Config");
 
-   PartMethod Method = getPartMethodFromStr(DecompMethodStr);
+   PartitioningMethod Method = getPartitioningMethodFromStr(DecompMethodStr);
 
    // If no mesh filename supplied, get the filename from the input
    // HorzMeshIn stream configuration
@@ -548,7 +548,7 @@ Decomp::Decomp(
     const std::string &Name,         //< [in] Name for new decomposition
     const MachEnv *InEnv,            //< [in] MachEnv for the new partition
     I4 NParts,                       //< [in] num of partitions for new decomp
-    PartMethod Method,               //< [in] method for partitioning
+    PartitioningMethod Method,       //< [in] method for partitioning
     I4 InHaloWidth,                  //< [in] width of halo in new decomp
     const std::string &MeshFileName_ //< [in] name of file with mesh info
 ) {
@@ -603,14 +603,14 @@ Decomp::Decomp(
 
       //------------------------------------------------------------------------
       // Serial Metis KWay method
-      case PartMethodMetisKWay:
+      case PartitioningMethod::MetisKWay:
 
          partCellsMetisKWay(InEnv, CellsOnCellInit);
          break;
 
       //------------------------------------------------------------------------
       // Parallel ParMetis KWay method
-      case PartMethodParMetisKWay:
+      case PartitioningMethod::ParMetisKWay:
 
          partCellsParMetisKWay(InEnv, CellsOnCellInit);
          break;
@@ -896,7 +896,7 @@ Decomp *Decomp::create(
     const std::string &Name,        //< [in] Name for new decomposition
     const MachEnv *Env,             //< [in] MachEnv for the new partition
     I4 NParts,                      //< [in] num of partitions for new decomp
-    PartMethod Method,              //< [in] method for partitioning
+    PartitioningMethod Method,      //< [in] method for partitioning
     I4 HaloWidth,                   //< [in] width of halo in new decomp
     const std::string &MeshFileName //< [in] name of file with mesh info
 ) {
@@ -2596,9 +2596,9 @@ void Decomp::rearrangeVertexArrays(
 } // end function rearrangeVertexArrays
 
 //------------------------------------------------------------------------------
-// Utility routine to convert a partition method string into PartMethod enum
+// Utility routine to convert a partition method string into an enum
 
-PartMethod getPartMethodFromStr(const std::string &InMethod) {
+PartitioningMethod getPartitioningMethodFromStr(const std::string &InMethod) {
 
    // convert string to lower case for easier equivalence checking
    std::string MethodComp = InMethod;
@@ -2607,17 +2607,17 @@ PartMethod getPartMethodFromStr(const std::string &InMethod) {
 
    // Check supported methods and return appropriate enum
    if (MethodComp == "metiskway") { // serial Metis KWay
-      return PartMethodMetisKWay;
+      return PartitioningMethod::MetisKWay;
 
    } else if (MethodComp == "parmetiskway") { // parallel ParMetis KWay
-      return PartMethodParMetisKWay;
+      return PartitioningMethod::ParMetisKWay;
 
    } else {
-      return PartMethodUnknown;
+      return PartitioningMethod::Unknown;
 
    } // end branch on method string
 
-} // End getPartMethodFromStr
+} // End getPartitioningMethodFromStr
 
 //------------------------------------------------------------------------------
 // end Decomp methods
