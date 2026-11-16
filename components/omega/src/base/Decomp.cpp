@@ -509,7 +509,8 @@ void Decomp::init(const std::string &InMeshFileName) {
    Err = DecompConfig.get("DecompMethod", DecompMethodStr);
    CHECK_ERROR_ABORT(Err, "Decomp: DecompMethod not found in Decomp Config");
 
-   PartitioningMethod Method = getPartitioningMethodFromStr(DecompMethodStr);
+   PartitioningMethod PartMethod =
+       getPartitioningMethodFromStr(DecompMethodStr);
 
    DecompConfig.get("ReorderMethod", ReorderMethodStr);
    ReorderingMethod ReorderMethod =
@@ -544,7 +545,7 @@ void Decomp::init(const std::string &InMeshFileName) {
 
    // Create the default decomposition and set pointer to it
    Decomp::DefaultDecomp =
-       Decomp::create("Default", DefEnv, NParts, Method, ReorderMethod,
+       Decomp::create("Default", DefEnv, NParts, PartMethod, ReorderMethod,
                       InHaloWidth, MeshFileNameTmp);
 
    TimerFlag = Pacer::stop("Decomp init", 0) && TimerFlag;
@@ -561,7 +562,7 @@ Decomp::Decomp(
     const std::string &Name,         //< [in] Name for new decomposition
     const MachEnv *InEnv,            //< [in] MachEnv for the new partition
     I4 NParts,                       //< [in] num of partitions for new decomp
-    PartitioningMethod Method,       //< [in] method for partitioning
+    PartitioningMethod PartMethod,   //< [in] method for partitioning
     ReorderingMethod ReorderMethod,  //< [in] method for reordering
     I4 InHaloWidth,                  //< [in] width of halo in new decomp
     const std::string &MeshFileName_ //< [in] name of file with mesh info
@@ -613,7 +614,7 @@ Decomp::Decomp(
       partCellsSingleTask();
    } else {
       // Use the mesh adjacency information to create a partition of cells
-      switch (Method) { // branch depending on method chosen
+      switch (PartMethod) { // branch depending on method chosen
 
       //------------------------------------------------------------------------
       // Serial Metis KWay method
@@ -634,7 +635,7 @@ Decomp::Decomp(
       default:
          ABORT_ERROR("Decomp: Unknown or unsupported decomposition method");
 
-      } // End switch on Method
+      } // End switch on PartMethod
    }
    TimerFlag = Pacer::stop("Decomp part cells", 2) && TimerFlag;
 
@@ -922,7 +923,7 @@ Decomp *Decomp::create(
     const std::string &Name,        //< [in] Name for new decomposition
     const MachEnv *Env,             //< [in] MachEnv for the new partition
     I4 NParts,                      //< [in] num of partitions for new decomp
-    PartitioningMethod Method,      //< [in] method for partitioning
+    PartitioningMethod PartMethod,  //< [in] method for partitioning
     ReorderingMethod ReorderMethod, //< [in] method for reordering
     I4 HaloWidth,                   //< [in] width of halo in new decomp
     const std::string &MeshFileName //< [in] name of file with mesh info
@@ -942,7 +943,7 @@ Decomp *Decomp::create(
 
    // create a new decomp on the heap and put it in a map of
    // unique_ptrs, which will manage its lifetime
-   auto *NewDecomp = new Decomp(Name, Env, NParts, Method, ReorderMethod,
+   auto *NewDecomp = new Decomp(Name, Env, NParts, PartMethod, ReorderMethod,
                                 HaloWidth, MeshFileName);
    AllDecomps.emplace(Name, NewDecomp);
 

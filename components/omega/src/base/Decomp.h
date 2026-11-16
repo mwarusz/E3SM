@@ -206,10 +206,10 @@ class Decomp {
 
    /// Construct a new decomposition across an input MachEnv with
    /// NPart partitions of a mesh that is read from a mesh file.
-   Decomp(const std::string &Name,   ///< [in] Name for new decomposition
-          const MachEnv *InEnv,      ///< [in] MachEnv for the new partition
-          I4 NParts,                 ///< [in] num of partitions for new decomp
-          PartitioningMethod Method, ///< [in] method for partitioning
+   Decomp(const std::string &Name, ///< [in] Name for new decomposition
+          const MachEnv *InEnv,    ///< [in] MachEnv for the new partition
+          I4 NParts,               ///< [in] num of partitions for new decomp
+          PartitioningMethod PartMethod,   ///< [in] method for partitioning
           ReorderingMethod ReorderMethod,  ///< [in] method for reordering
           I4 InHaloWidth,                  ///< [in] width of halo in new decomp
           const std::string &MeshFileName_ ///< [in] name of file with mesh info
@@ -327,10 +327,10 @@ class Decomp {
    // Creates a new decomposition using the constructor and puts it in the
    // AllDecomps map
    static Decomp *
-   create(const std::string &Name,   ///< [in] Name for new decomposition
-          const MachEnv *Env,        ///< [in] MachEnv for the new partition
-          I4 NParts,                 ///< [in] num of partitions for new decomp
-          PartitioningMethod Method, ///< [in] method for partitioning
+   create(const std::string &Name, ///< [in] Name for new decomposition
+          const MachEnv *Env,      ///< [in] MachEnv for the new partition
+          I4 NParts,               ///< [in] num of partitions for new decomp
+          PartitioningMethod PartMethod,  ///< [in] method for partitioning
           ReorderingMethod ReorderMethod, ///< [in] method for reordering
           I4 HaloWidth,                   ///< [in] width of halo in new decomp
           const std::string &MeshFileName ///< [in] name of file with mesh info
