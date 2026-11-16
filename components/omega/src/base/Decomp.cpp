@@ -493,6 +493,7 @@ void Decomp::init(const std::string &InMeshFileName) {
 
    I4 InHaloWidth;
    std::string DecompMethodStr;
+   std::string ReorderMethodStr = "RCM";
 
    // Retrieve options from Config
    Config *OmegaConfig = Config::getOmegaConfig();
@@ -509,6 +510,10 @@ void Decomp::init(const std::string &InMeshFileName) {
    CHECK_ERROR_ABORT(Err, "Decomp: DecompMethod not found in Decomp Config");
 
    PartitioningMethod Method = getPartitioningMethodFromStr(DecompMethodStr);
+
+   DecompConfig.get("ReorderMethod", ReorderMethodStr);
+   ReorderingMethod ReorderMethod =
+       getReorderingMethodFromStr(ReorderMethodStr);
 
    // If no mesh filename supplied, get the filename from the input
    // HorzMeshIn stream configuration
@@ -538,8 +543,9 @@ void Decomp::init(const std::string &InMeshFileName) {
    I4 NParts = DefEnv->getNumTasks();
 
    // Create the default decomposition and set pointer to it
-   Decomp::DefaultDecomp = Decomp::create("Default", DefEnv, NParts, Method,
-                                          InHaloWidth, MeshFileNameTmp);
+   Decomp::DefaultDecomp =
+       Decomp::create("Default", DefEnv, NParts, Method, ReorderMethod,
+                      InHaloWidth, MeshFileNameTmp);
 
    TimerFlag = Pacer::stop("Decomp init", 0) && TimerFlag;
    if (!TimerFlag)
@@ -556,6 +562,7 @@ Decomp::Decomp(
     const MachEnv *InEnv,            //< [in] MachEnv for the new partition
     I4 NParts,                       //< [in] num of partitions for new decomp
     PartitioningMethod Method,       //< [in] method for partitioning
+    ReorderingMethod ReorderMethod,  //< [in] method for reordering
     I4 InHaloWidth,                  //< [in] width of halo in new decomp
     const std::string &MeshFileName_ //< [in] name of file with mesh info
 ) {
@@ -857,9 +864,17 @@ Decomp::Decomp(
    }
    TimerFlag = Pacer::stop("Decomp construct global to local", 2) && TimerFlag;
 
-   reorderOwnedCells(InEnv);
-   reorderOwnedEdges(InEnv);
-   reorderOwnedVertices(InEnv);
+   switch (ReorderMethod) {
+   case ReorderingMethod::RCM:
+      reorderOwnedCells(InEnv);
+      reorderOwnedEdges(InEnv);
+      reorderOwnedVertices(InEnv);
+      break;
+   case ReorderingMethod::None:
+      break;
+   default:
+      ABORT_ERROR("Decomp: Unknown or unsupported reordering method");
+   }
 
    // Create device copies of all arrays
 
@@ -908,6 +923,7 @@ Decomp *Decomp::create(
     const MachEnv *Env,             //< [in] MachEnv for the new partition
     I4 NParts,                      //< [in] num of partitions for new decomp
     PartitioningMethod Method,      //< [in] method for partitioning
+    ReorderingMethod ReorderMethod, //< [in] method for reordering
     I4 HaloWidth,                   //< [in] width of halo in new decomp
     const std::string &MeshFileName //< [in] name of file with mesh info
 ) {
@@ -926,8 +942,8 @@ Decomp *Decomp::create(
 
    // create a new decomp on the heap and put it in a map of
    // unique_ptrs, which will manage its lifetime
-   auto *NewDecomp =
-       new Decomp(Name, Env, NParts, Method, HaloWidth, MeshFileName);
+   auto *NewDecomp = new Decomp(Name, Env, NParts, Method, ReorderMethod,
+                                HaloWidth, MeshFileName);
    AllDecomps.emplace(Name, NewDecomp);
 
    TimerFlag = Pacer::stop("Decomp create", 1) && TimerFlag;
@@ -2636,6 +2652,27 @@ PartitioningMethod getPartitioningMethodFromStr(const std::string &InMethod) {
    } // end branch on method string
 
 } // End getPartitioningMethodFromStr
+
+//------------------------------------------------------------------------------
+// Utility routine to convert a reordering method string into an enum
+
+ReorderingMethod getReorderingMethodFromStr(const std::string &InMethod) {
+
+   // convert string to lower case for easier equivalence checking
+   std::string MethodComp = InMethod;
+   std::transform(MethodComp.begin(), MethodComp.end(), MethodComp.begin(),
+                  [](unsigned char c) { return std::tolower(c); });
+
+   // Check supported methods and return appropriate enum
+   if (MethodComp == "rcm") {
+      return ReorderingMethod::RCM;
+   } else if (MethodComp == "none") {
+      return ReorderingMethod::None;
+   } else {
+      return ReorderingMethod::Unknown;
+   }
+
+} // End getReorderingMethodFromStr
 
 static void permuteTo(const HostArray2DI4 &Array,
                       const std::vector<int> &Perm) {

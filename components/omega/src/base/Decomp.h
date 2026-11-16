@@ -27,6 +27,11 @@
 ///    #    - MetisKWay
 ///    #    - ParMetisKway (Parallel implementation of KWay)
 ///    DecompMethod: MetisKWay
+///    # Method to use for reordering owned cells, edges, and vertices
+///    # Currently supported options are:
+///    #    - None
+///    #    - RCM (default)
+///    ReorderMethod: RCM
 /// \EndConfigInput
 //
 //===----------------------------------------------------------------------===//
@@ -64,6 +69,12 @@ enum class ReorderingMethod {
 /// enum for later use
 PartitioningMethod getPartitioningMethodFromStr(
     const std::string &InMethod ///< [in] choice of partition method
+);
+
+/// Translates an input string for reordering method option to the
+/// enum for later use
+ReorderingMethod getReorderingMethodFromStr(
+    const std::string &InMethod ///< [in] choice of reordering method
 );
 
 /// The Decomp class creates and maintains most of the information related
@@ -199,7 +210,8 @@ class Decomp {
           const MachEnv *InEnv,      ///< [in] MachEnv for the new partition
           I4 NParts,                 ///< [in] num of partitions for new decomp
           PartitioningMethod Method, ///< [in] method for partitioning
-          I4 InHaloWidth,            ///< [in] width of halo in new decomp
+          ReorderingMethod ReorderMethod,  ///< [in] method for reordering
+          I4 InHaloWidth,                  ///< [in] width of halo in new decomp
           const std::string &MeshFileName_ ///< [in] name of file with mesh info
    );
 
@@ -319,7 +331,8 @@ class Decomp {
           const MachEnv *Env,        ///< [in] MachEnv for the new partition
           I4 NParts,                 ///< [in] num of partitions for new decomp
           PartitioningMethod Method, ///< [in] method for partitioning
-          I4 HaloWidth,              ///< [in] width of halo in new decomp
+          ReorderingMethod ReorderMethod, ///< [in] method for reordering
+          I4 HaloWidth,                   ///< [in] width of halo in new decomp
           const std::string &MeshFileName ///< [in] name of file with mesh info
    );
 

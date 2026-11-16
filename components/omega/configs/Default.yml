@@ -21,6 +21,7 @@ Omega:
   Decomp:
     HaloWidth: 3
     DecompMethod: MetisKWay
+    ReorderMethod: RCM
   IO:
     IOTasks:  1
     IOStride: 1
