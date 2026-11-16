@@ -53,6 +53,13 @@ enum class PartitioningMethod {
    MetisRB       ///< Metis recursive bisection (not yet supported)
 };
 
+/// Supported reordering methods for cache locality
+enum class ReorderingMethod {
+   Unknown, ///< Unknown or undefined method
+   None,    ///< No reordering
+   RCM      ///< Reverse Cuthill–McKee algorithm
+};
+
 /// Translates an input string for partition method option to the
 /// enum for later use
 PartitioningMethod getPartitioningMethodFromStr(
