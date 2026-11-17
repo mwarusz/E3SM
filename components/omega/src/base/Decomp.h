@@ -194,14 +194,23 @@ class Decomp {
        const std::vector<I4> &EdgesOnVertexInit  ///< [in] edges at each vertex
    );
 
-   void reorderOwnedCells(const MachEnv *InEnv ///< [in] MachEnv with MPI info
+   void reorderElements(ReorderingMethod ReorderMethod, const MachEnv *Env);
+
+   void createElementPermutationsRCM(std::vector<I4> &CellPerm,
+                                     std::vector<I4> &EdgePerm,
+                                     std::vector<I4> &VertexPerm);
+
+   void reorderOwnedCells(const std::vector<I4> &CellPerm,
+                          const MachEnv *InEnv ///< [in] MachEnv with MPI info
    );
 
-   void reorderOwnedEdges(const MachEnv *InEnv ///< [in] MachEnv with MPI info
+   void reorderOwnedEdges(const std::vector<I4> &EdgePerm,
+                          const MachEnv *InEnv ///< [in] MachEnv with MPI info
    );
 
    void
-   reorderOwnedVertices(const MachEnv *InEnv ///< [in] MachEnv with MPI info
+   reorderOwnedVertices(const std::vector<I4> &VertexPerm,
+                        const MachEnv *InEnv ///< [in] MachEnv with MPI info
    );
 
    /// Construct a new decomposition across an input MachEnv with

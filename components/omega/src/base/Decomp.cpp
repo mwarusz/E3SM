@@ -493,7 +493,7 @@ void Decomp::init(const std::string &InMeshFileName) {
 
    I4 InHaloWidth;
    std::string DecompMethodStr;
-   std::string ReorderMethodStr = "RCM";
+   std::string ReorderMethodStr;
 
    // Retrieve options from Config
    Config *OmegaConfig = Config::getOmegaConfig();
@@ -512,7 +512,8 @@ void Decomp::init(const std::string &InMeshFileName) {
    PartitioningMethod PartMethod =
        getPartitioningMethodFromStr(DecompMethodStr);
 
-   DecompConfig.get("ReorderMethod", ReorderMethodStr);
+   Err = DecompConfig.get("ReorderMethod", ReorderMethodStr);
+   CHECK_ERROR_ABORT(Err, "Decomp: ReorderMethod not found in Decomp Config");
    ReorderingMethod ReorderMethod =
        getReorderingMethodFromStr(ReorderMethodStr);
 
@@ -865,17 +866,7 @@ Decomp::Decomp(
    }
    TimerFlag = Pacer::stop("Decomp construct global to local", 2) && TimerFlag;
 
-   switch (ReorderMethod) {
-   case ReorderingMethod::RCM:
-      reorderOwnedCells(InEnv);
-      reorderOwnedEdges(InEnv);
-      reorderOwnedVertices(InEnv);
-      break;
-   case ReorderingMethod::None:
-      break;
-   default:
-      ABORT_ERROR("Decomp: Unknown or unsupported reordering method");
-   }
+   reorderElements(ReorderMethod, InEnv);
 
    // Create device copies of all arrays
 
@@ -2720,12 +2711,35 @@ static void permuteFrom(const HostArray2DI4 &Array,
    deepCopy(Array, PermArray);
 }
 
-void Decomp::reorderOwnedCells(const MachEnv *InEnv) {
-   MPI_Comm MyComm = InEnv->getComm();
-   I4 MyTask       = InEnv->getMyTask();
-   I4 NumTasks     = InEnv->getNumTasks();
+void Decomp::reorderElements(ReorderingMethod ReorderMethod,
+                             const MachEnv *Env) {
 
-   std::vector<int> CellPerm(NCellsOwned);
+   std::vector<I4> CellPerm;
+   std::vector<I4> EdgePerm;
+   std::vector<I4> VertexPerm;
+
+   switch (ReorderMethod) {
+   case ReorderingMethod::None:
+      return;
+   case ReorderingMethod::RCM:
+      createElementPermutationsRCM(CellPerm, EdgePerm, VertexPerm);
+      break;
+   default:
+      ABORT_ERROR("Decomp: Unknown or unsupported reordering method");
+   }
+
+   reorderOwnedCells(CellPerm, Env);
+   reorderOwnedEdges(EdgePerm, Env);
+   reorderOwnedVertices(VertexPerm, Env);
+}
+
+void Decomp::createElementPermutationsRCM(std::vector<I4> &CellPerm,
+                                          std::vector<I4> &EdgePerm,
+                                          std::vector<I4> &VertexPerm) {
+
+   CellPerm.resize(NCellsOwned);
+   EdgePerm.resize(NEdgesOwned);
+   VertexPerm.resize(NVerticesOwned);
 
    for (int Cell = 0; Cell < NCellsOwned; ++Cell) {
       CellPerm[Cell] = NCellsOwned - 1 - Cell;
@@ -2749,11 +2763,8 @@ void Decomp::reorderOwnedCells(const MachEnv *InEnv) {
       }
    }
 
-   if (MyTask == 0) {
-      std::cout << "MW original bandwidth: " << bandwidth(graph) << std::endl;
-      std::cout << "MW test: " << num_vertices(graph) << " " << NCellsOwned
-                << std::endl;
-   }
+   LOG_INFO("MW original bandwidth: {}", bandwidth(graph));
+   LOG_INFO("MW test: {} {}", num_vertices(graph), NCellsOwned);
 
    std::vector<Vertex> InvCellPerm(num_vertices(graph));
 
@@ -2768,12 +2779,42 @@ void Decomp::reorderOwnedCells(const MachEnv *InEnv) {
       CellPerm[index_map[InvCellPerm[Cell]]] = Cell;
    }
 
-   if (MyTask == 0) {
-      std::cout << "MW final bandwidth: "
-                << bandwidth(graph, make_iterator_property_map(
-                                        &CellPerm[0], index_map, CellPerm[0]))
-                << std::endl;
+   LOG_INFO("MW final bandwidth: {}",
+            bandwidth(graph, make_iterator_property_map(&CellPerm[0], index_map,
+                                                        CellPerm[0])));
+
+   std::vector<int> InvEdgePerm(NEdgesOwned);
+
+   std::iota(InvEdgePerm.begin(), InvEdgePerm.end(), 0);
+   std::sort(InvEdgePerm.begin(), InvEdgePerm.end(),
+             [&](const int &a, const int &b) {
+                return std::pair(CellsOnEdgeH(a, 0), CellsOnEdgeH(a, 1)) <
+                       std::pair(CellsOnEdgeH(b, 0), CellsOnEdgeH(b, 1));
+             });
+
+   for (int Edge = 0; Edge < NEdgesOwned; ++Edge) {
+      EdgePerm[InvEdgePerm[Edge]] = Edge;
    }
+
+   std::vector<int> InvVertexPerm(NVerticesOwned);
+
+   std::iota(InvVertexPerm.begin(), InvVertexPerm.end(), 0);
+   std::sort(InvVertexPerm.begin(), InvVertexPerm.end(),
+             [&](const int &a, const int &b) {
+                return std::pair(CellsOnVertexH(a, 0), CellsOnVertexH(a, 1)) <
+                       std::pair(CellsOnVertexH(b, 0), CellsOnVertexH(b, 1));
+             });
+
+   for (int Vertex = 0; Vertex < NVerticesOwned; ++Vertex) {
+      VertexPerm[InvVertexPerm[Vertex]] = Vertex;
+   }
+}
+
+void Decomp::reorderOwnedCells(const std::vector<I4> &CellPerm,
+                               const MachEnv *InEnv) {
+   MPI_Comm MyComm = InEnv->getComm();
+   I4 MyTask       = InEnv->getMyTask();
+   I4 NumTasks     = InEnv->getNumTasks();
 
    std::set<int> HaloTasks;
    for (int Cell = 0; Cell < NCellsAll; ++Cell) {
@@ -2807,27 +2848,6 @@ void Decomp::reorderOwnedCells(const MachEnv *InEnv) {
       }
    }
 
-   // for (int Task : HaloTasks) {
-   //    if (Task != MyTask) {
-   //       int NCellsOwnedTask;
-   //       MPI_Sendrecv(&NCellsOwned, 1, MPI_INT32_T, Task, 44,
-   //       &NCellsOwnedTask,
-   //                    1, MPI_INT32_T, Task, 44, MyComm, MPI_STATUS_IGNORE);
-
-   //      std::vector<int> CellPermTask(NCellsOwnedTask);
-
-   //      MPI_Sendrecv(CellPerm.data(), NCellsOwned, MPI_INT32_T, Task, 45,
-   //                   CellPermTask.data(), NCellsOwnedTask, MPI_INT32_T, Task,
-   //                   45, MyComm, MPI_STATUS_IGNORE);
-
-   //      for (int Cell = 0; Cell < NCellsAll; ++Cell) {
-   //         if (CellLocH(Cell, 0) == Task) {
-   //            CellLocH(Cell, 1) = CellPermTask[CellLocH(Cell, 1)];
-   //         }
-   //      }
-   //   }
-   //}
-
    permuteFrom(CellIDH, CellPerm);
    permuteFrom(CellsOnCellH, CellPerm);
    permuteFrom(NEdgesOnCellH, CellPerm);
@@ -2839,24 +2859,11 @@ void Decomp::reorderOwnedCells(const MachEnv *InEnv) {
    permuteTo(CellsOnVertexH, CellPerm);
 }
 
-void Decomp::reorderOwnedEdges(const MachEnv *InEnv) {
+void Decomp::reorderOwnedEdges(const std::vector<I4> &EdgePerm,
+                               const MachEnv *InEnv) {
    MPI_Comm MyComm = InEnv->getComm();
    I4 MyTask       = InEnv->getMyTask();
    I4 NumTasks     = InEnv->getNumTasks();
-
-   std::vector<int> InvEdgePerm(NEdgesOwned);
-
-   std::iota(InvEdgePerm.begin(), InvEdgePerm.end(), 0);
-   std::sort(InvEdgePerm.begin(), InvEdgePerm.end(),
-             [&](const int &a, const int &b) {
-                return std::pair(CellsOnEdgeH(a, 0), CellsOnEdgeH(a, 1)) <
-                       std::pair(CellsOnEdgeH(b, 0), CellsOnEdgeH(b, 1));
-             });
-
-   std::vector<int> EdgePerm(NEdgesOwned);
-   for (int Edge = 0; Edge < NEdgesOwned; ++Edge) {
-      EdgePerm[InvEdgePerm[Edge]] = Edge;
-   }
 
    std::set<int> HaloTasks;
 
@@ -2891,27 +2898,6 @@ void Decomp::reorderOwnedEdges(const MachEnv *InEnv) {
       }
    }
 
-   // for (int Task : HaloTasks) {
-   //    if (Task != MyTask) {
-   //       int NEdgesOwnedTask;
-   //       MPI_Sendrecv(&NEdgesOwned, 1, MPI_INT32_T, Task, 44,
-   //       &NEdgesOwnedTask,
-   //                    1, MPI_INT32_T, Task, 44, MyComm, MPI_STATUS_IGNORE);
-
-   //      std::vector<int> EdgePermTask(NEdgesOwnedTask);
-
-   //      MPI_Sendrecv(EdgePerm.data(), NEdgesOwned, MPI_INT32_T, Task, 45,
-   //                   EdgePermTask.data(), NEdgesOwnedTask, MPI_INT32_T, Task,
-   //                   45, MyComm, MPI_STATUS_IGNORE);
-
-   //      for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
-   //         if (EdgeLocH(Edge, 0) == Task) {
-   //            EdgeLocH(Edge, 1) = EdgePermTask[EdgeLocH(Edge, 1)];
-   //         }
-   //      }
-   //   }
-   //}
-
    permuteFrom(EdgeIDH, EdgePerm);
 
    permuteFrom(EdgesOnEdgeH, EdgePerm);
@@ -2924,24 +2910,11 @@ void Decomp::reorderOwnedEdges(const MachEnv *InEnv) {
    permuteTo(EdgesOnEdgeH, EdgePerm);
 }
 
-void Decomp::reorderOwnedVertices(const MachEnv *InEnv) {
+void Decomp::reorderOwnedVertices(const std::vector<I4> &VertexPerm,
+                                  const MachEnv *InEnv) {
    MPI_Comm MyComm = InEnv->getComm();
    I4 MyTask       = InEnv->getMyTask();
    I4 NumTasks     = InEnv->getNumTasks();
-
-   std::vector<int> InvVertexPerm(NVerticesOwned);
-
-   std::iota(InvVertexPerm.begin(), InvVertexPerm.end(), 0);
-   std::sort(InvVertexPerm.begin(), InvVertexPerm.end(),
-             [&](const int &a, const int &b) {
-                return std::pair(CellsOnVertexH(a, 0), CellsOnVertexH(a, 1)) <
-                       std::pair(CellsOnVertexH(b, 0), CellsOnVertexH(b, 1));
-             });
-
-   std::vector<int> VertexPerm(NVerticesOwned);
-   for (int Vertex = 0; Vertex < NVerticesOwned; ++Vertex) {
-      VertexPerm[InvVertexPerm[Vertex]] = Vertex;
-   }
 
    std::set<int> HaloTasks;
 
@@ -2975,28 +2948,6 @@ void Decomp::reorderOwnedVertices(const MachEnv *InEnv) {
          }
       }
    }
-
-   // for (int Task : HaloTasks) {
-   //    if (Task != MyTask) {
-   //       int NVerticesOwnedTask;
-   //       MPI_Sendrecv(&NVerticesOwned, 1, MPI_INT32_T, Task, 44,
-   //                    &NVerticesOwnedTask, 1, MPI_INT32_T, Task, 44, MyComm,
-   //                    MPI_STATUS_IGNORE);
-
-   //      std::vector<int> VertexPermTask(NVerticesOwnedTask);
-
-   //      MPI_Sendrecv(VertexPerm.data(), NVerticesOwned, MPI_INT32_T, Task,
-   //      45,
-   //                   VertexPermTask.data(), NVerticesOwnedTask, MPI_INT32_T,
-   //                   Task, 45, MyComm, MPI_STATUS_IGNORE);
-
-   //      for (int Vertex = 0; Vertex < NVerticesAll; ++Vertex) {
-   //         if (VertexLocH(Vertex, 0) == Task) {
-   //            VertexLocH(Vertex, 1) = VertexPermTask[VertexLocH(Vertex, 1)];
-   //         }
-   //      }
-   //   }
-   //}
 
    permuteFrom(VertexIDH, VertexPerm);
 
