@@ -2783,6 +2783,34 @@ void Decomp::createElementPermutationsRCM(std::vector<I4> &CellPerm,
             bandwidth(graph, make_iterator_property_map(&CellPerm[0], index_map,
                                                         CellPerm[0])));
 
+   // Metis
+   std::vector<idx_t> AdjAdd = {0};
+   std::vector<idx_t> Adjacency;
+
+   int AdjCount = 0;
+   for (int ICell = 0; ICell < NCellsOwned; ++ICell) {
+      for (int J = 0; J < NEdgesOnCellH(ICell); ++J) {
+         const int JCell = CellsOnCellH(ICell, J);
+         if (JCell < NCellsOwned) {
+            Adjacency.push_back(JCell);
+            AdjCount++;
+         }
+      }
+      AdjAdd.push_back(AdjCount);
+   }
+
+   std::vector<idx_t> Part(NCellsOwned, 0);
+   std::vector<idx_t> CellPermMetis(NCellsOwned);
+   METIS_CacheFriendlyReordering(NCellsOwned, AdjAdd.data(), Adjacency.data(),
+                                 Part.data(), CellPermMetis.data());
+
+   LOG_INFO(
+       "MW metis bandwidth: {}",
+       bandwidth(graph, make_iterator_property_map(&CellPermMetis[0], index_map,
+                                                   CellPermMetis[0])));
+
+   CellPerm = CellPermMetis;
+
    std::vector<int> InvEdgePerm(NEdgesOwned);
 
    std::iota(InvEdgePerm.begin(), InvEdgePerm.end(), 0);
