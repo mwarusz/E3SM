@@ -2854,6 +2854,11 @@ void Decomp::reorderOwnedCells(const std::vector<I4> &CellPerm,
    permuteFrom(EdgesOnCellH, CellPerm);
    permuteFrom(VerticesOnCellH, CellPerm);
 
+   if (OnSphere) {
+      permuteFrom(NEdgesReconOnCellH, CellPerm);
+      permuteFrom(ReconStencilCellH, CellPerm);
+   }
+
    permuteTo(CellsOnCellH, CellPerm);
    permuteTo(CellsOnEdgeH, CellPerm);
    permuteTo(CellsOnVertexH, CellPerm);
@@ -2908,6 +2913,10 @@ void Decomp::reorderOwnedEdges(const std::vector<I4> &EdgePerm,
    permuteTo(EdgesOnVertexH, EdgePerm);
    permuteTo(EdgesOnCellH, EdgePerm);
    permuteTo(EdgesOnEdgeH, EdgePerm);
+
+   if (OnSphere) {
+      permuteTo(ReconStencilCellH, EdgePerm);
+   }
 }
 
 void Decomp::reorderOwnedVertices(const std::vector<I4> &VertexPerm,
