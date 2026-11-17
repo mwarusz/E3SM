@@ -196,6 +196,7 @@ class Decomp {
    );
 
    void reorderElements(ReorderingMethod ReorderMethod, const MachEnv *Env);
+   std::vector<I4> MyRCM();
 
    void createElementPermutationsRCM(std::vector<I4> &CellPerm,
                                      std::vector<I4> &EdgePerm,

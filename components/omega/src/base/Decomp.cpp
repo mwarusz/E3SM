@@ -2738,6 +2738,93 @@ void Decomp::reorderElements(ReorderingMethod ReorderMethod,
    reorderOwnedVertices(VertexPerm, Env);
 }
 
+std::vector<I4> Decomp::MyRCM() {
+   HostArray1DI4 GraphDegree("GraphDegree", NCellsOwned);
+   HostArray2DI4 GraphAdj("GraphAdj", NCellsOwned, MaxEdges);
+
+   for (int ICell = 0; ICell < NCellsOwned; ++ICell) {
+      I4 Deg = 0;
+      for (int J = 0; J < NEdgesOnCellH(ICell); ++J) {
+         const int JCell = CellsOnCellH(ICell, J);
+         if (JCell < NCellsOwned) {
+            GraphAdj(ICell, Deg) = JCell;
+            Deg++;
+         }
+      }
+      GraphDegree(ICell) = Deg;
+   }
+
+   std::vector<I4> CellPerm;
+   std::vector<bool> CellAdded(NCellsOwned, false);
+
+   while (CellPerm.size() != NCellsOwned) {
+
+      int MinDeg    = MaxEdges + 1;
+      int MinDegIdx = -1;
+
+      for (int ICell = 0; ICell < NCellsOwned; ++ICell) {
+         if (!CellAdded[ICell] && GraphDegree(ICell) < MinDeg) {
+            MinDeg    = GraphDegree(ICell);
+            MinDegIdx = ICell;
+         }
+      }
+
+      CellPerm.push_back(MinDegIdx);
+      CellAdded[MinDegIdx] = true;
+
+      std::vector<I4> GraphNb;
+      for (int J = 0; J < GraphDegree(MinDegIdx); ++J) {
+         GraphNb.push_back(GraphAdj(MinDegIdx, J));
+      }
+      std::sort(GraphNb.begin(), GraphNb.end(), [=](I4 A, I4 B) {
+         return GraphDegree(A) < GraphDegree(B) || A < B;
+      });
+
+      std::queue<I4> Q;
+      for (auto Nb : GraphNb) {
+         Q.push(Nb);
+      }
+
+      while (!Q.empty()) {
+
+         I4 Next = Q.front();
+         Q.pop();
+
+         if (CellAdded[Next]) {
+            continue;
+         }
+
+         CellPerm.push_back(Next);
+         CellAdded[Next] = true;
+
+         GraphNb.clear();
+         for (int J = 0; J < GraphDegree(Next); ++J) {
+            I4 Nb = GraphAdj(Next, J);
+            if (!CellAdded[Nb]) {
+               GraphNb.push_back(Nb);
+            }
+         }
+
+         std::sort(GraphNb.begin(), GraphNb.end(), [=](I4 A, I4 B) {
+            return GraphDegree(A) < GraphDegree(B) || A < B;
+         });
+
+         for (auto Nb : GraphNb) {
+            Q.push(Nb);
+         }
+      }
+   }
+
+   std::reverse(CellPerm.begin(), CellPerm.end());
+
+   std::vector<I4> InvCellPerm = CellPerm;
+   for (int Cell = 0; Cell != InvCellPerm.size(); ++Cell) {
+      CellPerm[InvCellPerm[Cell]] = Cell;
+   }
+
+   return CellPerm;
+}
+
 void Decomp::createElementPermutationsRCM(std::vector<I4> &CellPerm,
                                           std::vector<I4> &EdgePerm,
                                           std::vector<I4> &VertexPerm,
@@ -2814,6 +2901,11 @@ void Decomp::createElementPermutationsRCM(std::vector<I4> &CellPerm,
        "MW metis bandwidth: {}",
        bandwidth(graph, make_iterator_property_map(&CellPermMetis[0], index_map,
                                                    CellPermMetis[0])));
+
+   auto MyCellPerm = MyRCM();
+   LOG_INFO("MW my bandwidth: {}",
+            bandwidth(graph, make_iterator_property_map(
+                                 &MyCellPerm[0], index_map, MyCellPerm[0])));
 
    if (UseMetis) {
       CellPerm = CellPermMetis;
