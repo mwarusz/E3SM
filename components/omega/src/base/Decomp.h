@@ -60,9 +60,10 @@ enum class PartitioningMethod {
 
 /// Supported reordering methods for cache locality
 enum class ReorderingMethod {
-   Unknown, ///< Unknown or undefined method
-   None,    ///< No reordering
-   RCM      ///< Reverse Cuthill–McKee algorithm
+   Unknown,  ///< Unknown or undefined method
+   None,     ///< No reordering
+   MetisRCM, ///< Reverse Cuthill–McKee algorithm
+   BoostRCM  ///< Reverse Cuthill–McKee algorithm
 };
 
 /// Translates an input string for partition method option to the
@@ -198,7 +199,8 @@ class Decomp {
 
    void createElementPermutationsRCM(std::vector<I4> &CellPerm,
                                      std::vector<I4> &EdgePerm,
-                                     std::vector<I4> &VertexPerm);
+                                     std::vector<I4> &VertexPerm,
+                                     bool UseMetis);
 
    void reorderOwnedCells(const std::vector<I4> &CellPerm,
                           const MachEnv *InEnv ///< [in] MachEnv with MPI info

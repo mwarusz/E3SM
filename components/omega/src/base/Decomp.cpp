@@ -2656,8 +2656,10 @@ ReorderingMethod getReorderingMethodFromStr(const std::string &InMethod) {
                   [](unsigned char c) { return std::tolower(c); });
 
    // Check supported methods and return appropriate enum
-   if (MethodComp == "rcm") {
-      return ReorderingMethod::RCM;
+   if (MethodComp == "metisrcm") {
+      return ReorderingMethod::MetisRCM;
+   } else if (MethodComp == "boostrcm") {
+      return ReorderingMethod::BoostRCM;
    } else if (MethodComp == "none") {
       return ReorderingMethod::None;
    } else {
@@ -2721,8 +2723,11 @@ void Decomp::reorderElements(ReorderingMethod ReorderMethod,
    switch (ReorderMethod) {
    case ReorderingMethod::None:
       return;
-   case ReorderingMethod::RCM:
-      createElementPermutationsRCM(CellPerm, EdgePerm, VertexPerm);
+   case ReorderingMethod::BoostRCM:
+      createElementPermutationsRCM(CellPerm, EdgePerm, VertexPerm, false);
+      break;
+   case ReorderingMethod::MetisRCM:
+      createElementPermutationsRCM(CellPerm, EdgePerm, VertexPerm, true);
       break;
    default:
       ABORT_ERROR("Decomp: Unknown or unsupported reordering method");
@@ -2735,7 +2740,8 @@ void Decomp::reorderElements(ReorderingMethod ReorderMethod,
 
 void Decomp::createElementPermutationsRCM(std::vector<I4> &CellPerm,
                                           std::vector<I4> &EdgePerm,
-                                          std::vector<I4> &VertexPerm) {
+                                          std::vector<I4> &VertexPerm,
+                                          bool UseMetis) {
 
    CellPerm.resize(NCellsOwned);
    EdgePerm.resize(NEdgesOwned);
@@ -2809,7 +2815,9 @@ void Decomp::createElementPermutationsRCM(std::vector<I4> &CellPerm,
        bandwidth(graph, make_iterator_property_map(&CellPermMetis[0], index_map,
                                                    CellPermMetis[0])));
 
-   CellPerm = CellPermMetis;
+   if (UseMetis) {
+      CellPerm = CellPermMetis;
+   }
 
    std::vector<int> InvEdgePerm(NEdgesOwned);
 
