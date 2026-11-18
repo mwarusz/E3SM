@@ -62,6 +62,7 @@ enum class PartitioningMethod {
 enum class ReorderingMethod {
    Unknown,  ///< Unknown or undefined method
    None,     ///< No reordering
+   MyRCM,    ///< Reverse Cuthill–McKee algorithm
    MetisRCM, ///< Reverse Cuthill–McKee algorithm
    BoostRCM  ///< Reverse Cuthill–McKee algorithm
 };
@@ -196,12 +197,14 @@ class Decomp {
    );
 
    void reorderElements(ReorderingMethod ReorderMethod, const MachEnv *Env);
-   std::vector<I4> MyRCM();
 
-   void createElementPermutationsRCM(std::vector<I4> &CellPerm,
-                                     std::vector<I4> &EdgePerm,
-                                     std::vector<I4> &VertexPerm,
-                                     bool UseMetis);
+   std::vector<I4> createCellPermBoost();
+   std::vector<I4> createCellPermMetis();
+   std::vector<I4> createCellPermMine();
+
+   void createElementPermutations(std::vector<I4> &CellPerm,
+                                  std::vector<I4> &EdgePerm,
+                                  std::vector<I4> &VertexPerm);
 
    void reorderOwnedCells(const std::vector<I4> &CellPerm,
                           const MachEnv *InEnv ///< [in] MachEnv with MPI info

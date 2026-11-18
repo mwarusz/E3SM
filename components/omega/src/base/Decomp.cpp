@@ -2660,6 +2660,8 @@ ReorderingMethod getReorderingMethodFromStr(const std::string &InMethod) {
       return ReorderingMethod::MetisRCM;
    } else if (MethodComp == "boostrcm") {
       return ReorderingMethod::BoostRCM;
+   } else if (MethodComp == "myrcm") {
+      return ReorderingMethod::MyRCM;
    } else if (MethodComp == "none") {
       return ReorderingMethod::None;
    } else {
@@ -2724,21 +2726,94 @@ void Decomp::reorderElements(ReorderingMethod ReorderMethod,
    case ReorderingMethod::None:
       return;
    case ReorderingMethod::BoostRCM:
-      createElementPermutationsRCM(CellPerm, EdgePerm, VertexPerm, false);
+      CellPerm = createCellPermBoost();
       break;
    case ReorderingMethod::MetisRCM:
-      createElementPermutationsRCM(CellPerm, EdgePerm, VertexPerm, true);
+      CellPerm = createCellPermMetis();
+      break;
+   case ReorderingMethod::MyRCM:
+      CellPerm = createCellPermMine();
       break;
    default:
       ABORT_ERROR("Decomp: Unknown or unsupported reordering method");
    }
+
+   createElementPermutations(CellPerm, EdgePerm, VertexPerm);
 
    reorderOwnedCells(CellPerm, Env);
    reorderOwnedEdges(EdgePerm, Env);
    reorderOwnedVertices(VertexPerm, Env);
 }
 
-std::vector<I4> Decomp::MyRCM() {
+std::vector<I4> Decomp::createCellPermBoost() {
+   std::vector<I4> CellPerm(NCellsOwned);
+
+   using namespace boost;
+   using Graph = adjacency_list<vecS, vecS, undirectedS,
+                                property<vertex_color_t, default_color_type,
+                                         property<vertex_degree_t, int>>>;
+
+   using Vertex   = graph_traits<Graph>::vertex_descriptor;
+   using SizeType = graph_traits<Graph>::vertices_size_type;
+
+   Graph graph(NCellsOwned);
+   for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
+      int Cell0 = CellsOnEdgeH(Edge, 0);
+      int Cell1 = CellsOnEdgeH(Edge, 1);
+
+      if (Cell0 < NCellsOwned && Cell1 < NCellsOwned) {
+         add_edge(Cell0, Cell1, graph);
+      }
+   }
+
+   LOG_INFO("Boost original bandwidth: {}", bandwidth(graph));
+
+   std::vector<Vertex> InvCellPerm(num_vertices(graph));
+
+   using IndexMap     = property_map<Graph, vertex_index_t>::type;
+   IndexMap index_map = boost::get(vertex_index, graph);
+
+   cuthill_mckee_ordering(graph, InvCellPerm.rbegin(),
+                          boost::get(vertex_color, graph),
+                          make_degree_map(graph));
+
+   for (int Cell = 0; Cell != InvCellPerm.size(); ++Cell) {
+      CellPerm[index_map[InvCellPerm[Cell]]] = Cell;
+   }
+
+   LOG_INFO("Boost final bandwidth: {}",
+            bandwidth(graph, make_iterator_property_map(&CellPerm[0], index_map,
+                                                        CellPerm[0])));
+
+   return CellPerm;
+}
+
+std::vector<I4> Decomp::createCellPermMetis() {
+   // Metis
+   std::vector<idx_t> AdjAdd = {0};
+   std::vector<idx_t> Adjacency;
+
+   int AdjCount = 0;
+   for (int ICell = 0; ICell < NCellsOwned; ++ICell) {
+      for (int J = 0; J < NEdgesOnCellH(ICell); ++J) {
+         const int JCell = CellsOnCellH(ICell, J);
+         if (JCell < NCellsOwned) {
+            Adjacency.push_back(JCell);
+            AdjCount++;
+         }
+      }
+      AdjAdd.push_back(AdjCount);
+   }
+
+   std::vector<idx_t> Part(NCellsOwned, 0);
+   std::vector<idx_t> CellPerm(NCellsOwned);
+   METIS_CacheFriendlyReordering(NCellsOwned, AdjAdd.data(), Adjacency.data(),
+                                 Part.data(), CellPerm.data());
+
+   return CellPerm;
+}
+
+std::vector<I4> Decomp::createCellPermMine() {
    HostArray1DI4 GraphDegree("GraphDegree", NCellsOwned);
    HostArray2DI4 GraphAdj("GraphAdj", NCellsOwned, MaxEdges);
 
@@ -2776,9 +2851,8 @@ std::vector<I4> Decomp::MyRCM() {
       for (int J = 0; J < GraphDegree(MinDegIdx); ++J) {
          GraphNb.push_back(GraphAdj(MinDegIdx, J));
       }
-      std::sort(GraphNb.begin(), GraphNb.end(), [=](I4 A, I4 B) {
-         return GraphDegree(A) < GraphDegree(B) || A < B;
-      });
+      std::sort(GraphNb.begin(), GraphNb.end(),
+                [=](I4 A, I4 B) { return GraphDegree(A) < GraphDegree(B); });
 
       std::queue<I4> Q;
       for (auto Nb : GraphNb) {
@@ -2805,9 +2879,8 @@ std::vector<I4> Decomp::MyRCM() {
             }
          }
 
-         std::sort(GraphNb.begin(), GraphNb.end(), [=](I4 A, I4 B) {
-            return GraphDegree(A) < GraphDegree(B) || A < B;
-         });
+         std::sort(GraphNb.begin(), GraphNb.end(),
+                   [=](I4 A, I4 B) { return GraphDegree(A) < GraphDegree(B); });
 
          for (auto Nb : GraphNb) {
             Q.push(Nb);
@@ -2825,91 +2898,12 @@ std::vector<I4> Decomp::MyRCM() {
    return CellPerm;
 }
 
-void Decomp::createElementPermutationsRCM(std::vector<I4> &CellPerm,
-                                          std::vector<I4> &EdgePerm,
-                                          std::vector<I4> &VertexPerm,
-                                          bool UseMetis) {
+void Decomp::createElementPermutations(std::vector<I4> &CellPerm,
+                                       std::vector<I4> &EdgePerm,
+                                       std::vector<I4> &VertexPerm) {
 
-   CellPerm.resize(NCellsOwned);
    EdgePerm.resize(NEdgesOwned);
    VertexPerm.resize(NVerticesOwned);
-
-   for (int Cell = 0; Cell < NCellsOwned; ++Cell) {
-      CellPerm[Cell] = NCellsOwned - 1 - Cell;
-   }
-
-   using namespace boost;
-   using Graph = adjacency_list<vecS, vecS, undirectedS,
-                                property<vertex_color_t, default_color_type,
-                                         property<vertex_degree_t, int>>>;
-
-   using Vertex   = graph_traits<Graph>::vertex_descriptor;
-   using SizeType = graph_traits<Graph>::vertices_size_type;
-
-   Graph graph(NCellsOwned);
-   for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
-      int Cell0 = CellsOnEdgeH(Edge, 0);
-      int Cell1 = CellsOnEdgeH(Edge, 1);
-
-      if (Cell0 < NCellsOwned && Cell1 < NCellsOwned) {
-         add_edge(Cell0, Cell1, graph);
-      }
-   }
-
-   LOG_INFO("MW original bandwidth: {}", bandwidth(graph));
-   LOG_INFO("MW test: {} {}", num_vertices(graph), NCellsOwned);
-
-   std::vector<Vertex> InvCellPerm(num_vertices(graph));
-
-   using IndexMap     = property_map<Graph, vertex_index_t>::type;
-   IndexMap index_map = boost::get(vertex_index, graph);
-
-   cuthill_mckee_ordering(graph, InvCellPerm.rbegin(),
-                          boost::get(vertex_color, graph),
-                          make_degree_map(graph));
-
-   for (int Cell = 0; Cell != InvCellPerm.size(); ++Cell) {
-      CellPerm[index_map[InvCellPerm[Cell]]] = Cell;
-   }
-
-   LOG_INFO("MW final bandwidth: {}",
-            bandwidth(graph, make_iterator_property_map(&CellPerm[0], index_map,
-                                                        CellPerm[0])));
-
-   // Metis
-   std::vector<idx_t> AdjAdd = {0};
-   std::vector<idx_t> Adjacency;
-
-   int AdjCount = 0;
-   for (int ICell = 0; ICell < NCellsOwned; ++ICell) {
-      for (int J = 0; J < NEdgesOnCellH(ICell); ++J) {
-         const int JCell = CellsOnCellH(ICell, J);
-         if (JCell < NCellsOwned) {
-            Adjacency.push_back(JCell);
-            AdjCount++;
-         }
-      }
-      AdjAdd.push_back(AdjCount);
-   }
-
-   std::vector<idx_t> Part(NCellsOwned, 0);
-   std::vector<idx_t> CellPermMetis(NCellsOwned);
-   METIS_CacheFriendlyReordering(NCellsOwned, AdjAdd.data(), Adjacency.data(),
-                                 Part.data(), CellPermMetis.data());
-
-   LOG_INFO(
-       "MW metis bandwidth: {}",
-       bandwidth(graph, make_iterator_property_map(&CellPermMetis[0], index_map,
-                                                   CellPermMetis[0])));
-
-   auto MyCellPerm = MyRCM();
-   LOG_INFO("MW my bandwidth: {}",
-            bandwidth(graph, make_iterator_property_map(
-                                 &MyCellPerm[0], index_map, MyCellPerm[0])));
-
-   if (UseMetis) {
-      CellPerm = CellPermMetis;
-   }
 
    std::vector<int> InvEdgePerm(NEdgesOwned);
 
