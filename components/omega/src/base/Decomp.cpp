@@ -866,7 +866,9 @@ Decomp::Decomp(
    }
    TimerFlag = Pacer::stop("Decomp construct global to local", 2) && TimerFlag;
 
+   LOG_INFO("Bandwidth before: {}", computeBandwidth());
    reorderElements(ReorderMethod, InEnv);
+   LOG_INFO("Bandwidth after: {}", computeBandwidth());
 
    // Create device copies of all arrays
 
@@ -2722,6 +2724,8 @@ void Decomp::reorderElements(ReorderingMethod ReorderMethod,
    std::vector<I4> EdgePerm;
    std::vector<I4> VertexPerm;
 
+   Pacer::start("Decomp:CellPerm", 2);
+
    switch (ReorderMethod) {
    case ReorderingMethod::None:
       return;
@@ -2737,12 +2741,30 @@ void Decomp::reorderElements(ReorderingMethod ReorderMethod,
    default:
       ABORT_ERROR("Decomp: Unknown or unsupported reordering method");
    }
+   Pacer::stop("Decomp:CellPerm", 2);
 
+   Pacer::start("Decomp:EdgeVertexPerm", 2);
    createElementPermutations(CellPerm, EdgePerm, VertexPerm);
+   Pacer::stop("Decomp:EdgeVertexPerm", 2);
 
+   Pacer::start("Decomp:ReorderArrays", 2);
    reorderOwnedCells(CellPerm, Env);
    reorderOwnedEdges(EdgePerm, Env);
    reorderOwnedVertices(VertexPerm, Env);
+   Pacer::stop("Decomp:ReorderArrays", 2);
+}
+
+int Decomp::computeBandwidth() {
+   int Bandwidth = 0;
+   for (int IEdge = 0; IEdge < NEdgesAll; ++IEdge) {
+      const int JCell0 = CellsOnEdgeH(IEdge, 0);
+      const int JCell1 = CellsOnEdgeH(IEdge, 1);
+      if (JCell0 < NCellsOwned && JCell1 < NCellsOwned) {
+         Bandwidth = Kokkos::max(Bandwidth, Kokkos::abs(JCell1 - JCell0));
+      }
+   }
+
+   return Bandwidth;
 }
 
 std::vector<I4> Decomp::createCellPermBoost() {
@@ -2766,7 +2788,7 @@ std::vector<I4> Decomp::createCellPermBoost() {
       }
    }
 
-   LOG_INFO("Boost original bandwidth: {}", bandwidth(graph));
+   // LOG_INFO("Boost original bandwidth: {}", bandwidth(graph));
 
    std::vector<Vertex> InvCellPerm(num_vertices(graph));
 
@@ -2781,9 +2803,10 @@ std::vector<I4> Decomp::createCellPermBoost() {
       CellPerm[index_map[InvCellPerm[Cell]]] = Cell;
    }
 
-   LOG_INFO("Boost final bandwidth: {}",
-            bandwidth(graph, make_iterator_property_map(&CellPerm[0], index_map,
-                                                        CellPerm[0])));
+   // LOG_INFO("Boost final bandwidth: {}",
+   //          bandwidth(graph, make_iterator_property_map(&CellPerm[0],
+   //          index_map,
+   //                                                    CellPerm[0])));
 
    return CellPerm;
 }

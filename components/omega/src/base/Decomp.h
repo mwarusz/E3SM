@@ -196,6 +196,8 @@ class Decomp {
        const std::vector<I4> &EdgesOnVertexInit  ///< [in] edges at each vertex
    );
 
+   int computeBandwidth();
+
    void reorderElements(ReorderingMethod ReorderMethod, const MachEnv *Env);
 
    std::vector<I4> createCellPermBoost();
