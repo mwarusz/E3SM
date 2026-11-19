@@ -27,6 +27,11 @@
 ///    #    - MetisKWay
 ///    #    - ParMetisKway (Parallel implementation of KWay)
 ///    DecompMethod: MetisKWay
+///    # Method to use for reordering owned cells, edges, and vertices
+///    # Currently supported options are:
+///    #    - None
+///    #    - RCM (default)
+///    ReorderMethod: RCM
 /// \EndConfigInput
 //
 //===----------------------------------------------------------------------===//
@@ -46,17 +51,32 @@ namespace OMEGA {
 /// the adjacency graph.
 
 /// Supported partitioning methods
-enum PartMethod {
-   PartMethodUnknown,      ///< Unknown or undefined method
-   PartMethodMetisKWay,    ///< Metis K-way partitioning (default)
-   PartMethodParMetisKWay, ///< parallel version of K-way partitioning
-   PartMethodMetisRB       ///< Metis recursive bisection (not yet supported)
+enum class PartitioningMethod {
+   Unknown,      ///< Unknown or undefined method
+   MetisKWay,    ///< Metis K-way partitioning (default)
+   ParMetisKWay, ///< parallel version of K-way partitioning
+   MetisRB       ///< Metis recursive bisection (not yet supported)
+};
+
+/// Supported reordering methods for cache locality
+enum class ReorderingMethod {
+   Unknown,  ///< Unknown or undefined method
+   None,     ///< No reordering
+   MyRCM,    ///< Reverse Cuthill–McKee algorithm
+   MetisRCM, ///< Reverse Cuthill–McKee algorithm
+   BoostRCM  ///< Reverse Cuthill–McKee algorithm
 };
 
 /// Translates an input string for partition method option to the
 /// enum for later use
-PartMethod getPartMethodFromStr(
+PartitioningMethod getPartitioningMethodFromStr(
     const std::string &InMethod ///< [in] choice of partition method
+);
+
+/// Translates an input string for reordering method option to the
+/// enum for later use
+ReorderingMethod getReorderingMethodFromStr(
+    const std::string &InMethod ///< [in] choice of reordering method
 );
 
 /// The Decomp class creates and maintains most of the information related
@@ -176,13 +196,38 @@ class Decomp {
        const std::vector<I4> &EdgesOnVertexInit  ///< [in] edges at each vertex
    );
 
+   int computeBandwidth();
+
+   void reorderElements(ReorderingMethod ReorderMethod, const MachEnv *Env);
+
+   std::vector<I4> createCellPermBoost();
+   std::vector<I4> createCellPermMetis();
+   std::vector<I4> createCellPermMine();
+
+   void createEdgeVertexPermutations(std::vector<I4> &EdgePerm,
+                                     std::vector<I4> &VertexPerm);
+
+   void reorderOwnedCells(const std::vector<I4> &CellPerm,
+                          const MachEnv *InEnv ///< [in] MachEnv with MPI info
+   );
+
+   void reorderOwnedEdges(const std::vector<I4> &EdgePerm,
+                          const MachEnv *InEnv ///< [in] MachEnv with MPI info
+   );
+
+   void
+   reorderOwnedVertices(const std::vector<I4> &VertexPerm,
+                        const MachEnv *InEnv ///< [in] MachEnv with MPI info
+   );
+
    /// Construct a new decomposition across an input MachEnv with
    /// NPart partitions of a mesh that is read from a mesh file.
    Decomp(const std::string &Name, ///< [in] Name for new decomposition
           const MachEnv *InEnv,    ///< [in] MachEnv for the new partition
           I4 NParts,               ///< [in] num of partitions for new decomp
-          PartMethod Method,       ///< [in] method for partitioning
-          I4 InHaloWidth,          ///< [in] width of halo in new decomp
+          PartitioningMethod PartMethod,   ///< [in] method for partitioning
+          ReorderingMethod ReorderMethod,  ///< [in] method for reordering
+          I4 InHaloWidth,                  ///< [in] width of halo in new decomp
           const std::string &MeshFileName_ ///< [in] name of file with mesh info
    );
 
@@ -301,8 +346,9 @@ class Decomp {
    create(const std::string &Name, ///< [in] Name for new decomposition
           const MachEnv *Env,      ///< [in] MachEnv for the new partition
           I4 NParts,               ///< [in] num of partitions for new decomp
-          PartMethod Method,       ///< [in] method for partitioning
-          I4 HaloWidth,            ///< [in] width of halo in new decomp
+          PartitioningMethod PartMethod,  ///< [in] method for partitioning
+          ReorderingMethod ReorderMethod, ///< [in] method for reordering
+          I4 HaloWidth,                   ///< [in] width of halo in new decomp
           const std::string &MeshFileName ///< [in] name of file with mesh info
    );
 

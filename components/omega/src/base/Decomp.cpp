@@ -27,9 +27,16 @@
 #include "parmetis.h"
 
 #include <algorithm>
+#include <iostream>
+#include <numeric>
 #include <set>
 #include <string>
 #include <vector>
+
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/bandwidth.hpp>
+#include <boost/graph/cuthill_mckee_ordering.hpp>
+#include <boost/graph/properties.hpp>
 
 namespace OMEGA {
 
@@ -486,6 +493,7 @@ void Decomp::init(const std::string &InMeshFileName) {
 
    I4 InHaloWidth;
    std::string DecompMethodStr;
+   std::string ReorderMethodStr;
 
    // Retrieve options from Config
    Config *OmegaConfig = Config::getOmegaConfig();
@@ -501,7 +509,13 @@ void Decomp::init(const std::string &InMeshFileName) {
    Err = DecompConfig.get("DecompMethod", DecompMethodStr);
    CHECK_ERROR_ABORT(Err, "Decomp: DecompMethod not found in Decomp Config");
 
-   PartMethod Method = getPartMethodFromStr(DecompMethodStr);
+   PartitioningMethod PartMethod =
+       getPartitioningMethodFromStr(DecompMethodStr);
+
+   Err = DecompConfig.get("ReorderMethod", ReorderMethodStr);
+   CHECK_ERROR_ABORT(Err, "Decomp: ReorderMethod not found in Decomp Config");
+   ReorderingMethod ReorderMethod =
+       getReorderingMethodFromStr(ReorderMethodStr);
 
    // If no mesh filename supplied, get the filename from the input
    // HorzMeshIn stream configuration
@@ -531,8 +545,9 @@ void Decomp::init(const std::string &InMeshFileName) {
    I4 NParts = DefEnv->getNumTasks();
 
    // Create the default decomposition and set pointer to it
-   Decomp::DefaultDecomp = Decomp::create("Default", DefEnv, NParts, Method,
-                                          InHaloWidth, MeshFileNameTmp);
+   Decomp::DefaultDecomp =
+       Decomp::create("Default", DefEnv, NParts, PartMethod, ReorderMethod,
+                      InHaloWidth, MeshFileNameTmp);
 
    TimerFlag = Pacer::stop("Decomp init", 0) && TimerFlag;
    if (!TimerFlag)
@@ -548,7 +563,8 @@ Decomp::Decomp(
     const std::string &Name,         //< [in] Name for new decomposition
     const MachEnv *InEnv,            //< [in] MachEnv for the new partition
     I4 NParts,                       //< [in] num of partitions for new decomp
-    PartMethod Method,               //< [in] method for partitioning
+    PartitioningMethod PartMethod,   //< [in] method for partitioning
+    ReorderingMethod ReorderMethod,  //< [in] method for reordering
     I4 InHaloWidth,                  //< [in] width of halo in new decomp
     const std::string &MeshFileName_ //< [in] name of file with mesh info
 ) {
@@ -599,18 +615,18 @@ Decomp::Decomp(
       partCellsSingleTask();
    } else {
       // Use the mesh adjacency information to create a partition of cells
-      switch (Method) { // branch depending on method chosen
+      switch (PartMethod) { // branch depending on method chosen
 
       //------------------------------------------------------------------------
       // Serial Metis KWay method
-      case PartMethodMetisKWay:
+      case PartitioningMethod::MetisKWay:
 
          partCellsMetisKWay(InEnv, CellsOnCellInit);
          break;
 
       //------------------------------------------------------------------------
       // Parallel ParMetis KWay method
-      case PartMethodParMetisKWay:
+      case PartitioningMethod::ParMetisKWay:
 
          partCellsParMetisKWay(InEnv, CellsOnCellInit);
          break;
@@ -620,7 +636,7 @@ Decomp::Decomp(
       default:
          ABORT_ERROR("Decomp: Unknown or unsupported decomposition method");
 
-      } // End switch on Method
+      } // End switch on PartMethod
    }
    TimerFlag = Pacer::stop("Decomp part cells", 2) && TimerFlag;
 
@@ -850,6 +866,10 @@ Decomp::Decomp(
    }
    TimerFlag = Pacer::stop("Decomp construct global to local", 2) && TimerFlag;
 
+   LOG_INFO("Bandwidth before: {}", computeBandwidth());
+   reorderElements(ReorderMethod, InEnv);
+   LOG_INFO("Bandwidth after: {}", computeBandwidth());
+
    // Create device copies of all arrays
 
    TimerFlag  = Pacer::start("Decomp construct device copy", 2) && TimerFlag;
@@ -896,7 +916,8 @@ Decomp *Decomp::create(
     const std::string &Name,        //< [in] Name for new decomposition
     const MachEnv *Env,             //< [in] MachEnv for the new partition
     I4 NParts,                      //< [in] num of partitions for new decomp
-    PartMethod Method,              //< [in] method for partitioning
+    PartitioningMethod PartMethod,  //< [in] method for partitioning
+    ReorderingMethod ReorderMethod, //< [in] method for reordering
     I4 HaloWidth,                   //< [in] width of halo in new decomp
     const std::string &MeshFileName //< [in] name of file with mesh info
 ) {
@@ -915,8 +936,8 @@ Decomp *Decomp::create(
 
    // create a new decomp on the heap and put it in a map of
    // unique_ptrs, which will manage its lifetime
-   auto *NewDecomp =
-       new Decomp(Name, Env, NParts, Method, HaloWidth, MeshFileName);
+   auto *NewDecomp = new Decomp(Name, Env, NParts, PartMethod, ReorderMethod,
+                                HaloWidth, MeshFileName);
    AllDecomps.emplace(Name, NewDecomp);
 
    TimerFlag = Pacer::stop("Decomp create", 1) && TimerFlag;
@@ -1243,7 +1264,14 @@ void Decomp::partCellsMetisKWay(
       CellIDHTmp(Cell)     = CellIDTmp[Cell];
       CellLocHTmp(Cell, 0) = CellLocTmp[2 * Cell];     // task owning this cell
       CellLocHTmp(Cell, 1) = CellLocTmp[2 * Cell + 1]; // local address on task
+      // if (MyTask == 0) {
+      //   std::cout << Cell
+      //     << " " << CellIDHTmp(Cell)
+      //     << " " <<  CellLocHTmp(Cell, 0)
+      //     << " " <<   CellLocHTmp(Cell, 1) << std::endl;
+      // }
    }
+
    CellIDH  = CellIDHTmp;
    CellLocH = CellLocHTmp;
 
@@ -2596,9 +2624,9 @@ void Decomp::rearrangeVertexArrays(
 } // end function rearrangeVertexArrays
 
 //------------------------------------------------------------------------------
-// Utility routine to convert a partition method string into PartMethod enum
+// Utility routine to convert a partition method string into an enum
 
-PartMethod getPartMethodFromStr(const std::string &InMethod) {
+PartitioningMethod getPartitioningMethodFromStr(const std::string &InMethod) {
 
    // convert string to lower case for easier equivalence checking
    std::string MethodComp = InMethod;
@@ -2607,17 +2635,486 @@ PartMethod getPartMethodFromStr(const std::string &InMethod) {
 
    // Check supported methods and return appropriate enum
    if (MethodComp == "metiskway") { // serial Metis KWay
-      return PartMethodMetisKWay;
+      return PartitioningMethod::MetisKWay;
 
    } else if (MethodComp == "parmetiskway") { // parallel ParMetis KWay
-      return PartMethodParMetisKWay;
+      return PartitioningMethod::ParMetisKWay;
 
    } else {
-      return PartMethodUnknown;
+      return PartitioningMethod::Unknown;
 
    } // end branch on method string
 
-} // End getPartMethodFromStr
+} // End getPartitioningMethodFromStr
+
+//------------------------------------------------------------------------------
+// Utility routine to convert a reordering method string into an enum
+
+ReorderingMethod getReorderingMethodFromStr(const std::string &InMethod) {
+
+   // convert string to lower case for easier equivalence checking
+   std::string MethodComp = InMethod;
+   std::transform(MethodComp.begin(), MethodComp.end(), MethodComp.begin(),
+                  [](unsigned char c) { return std::tolower(c); });
+
+   // Check supported methods and return appropriate enum
+   if (MethodComp == "metisrcm") {
+      return ReorderingMethod::MetisRCM;
+   } else if (MethodComp == "boostrcm") {
+      return ReorderingMethod::BoostRCM;
+   } else if (MethodComp == "myrcm") {
+      return ReorderingMethod::MyRCM;
+   } else if (MethodComp == "none") {
+      return ReorderingMethod::None;
+   } else {
+      return ReorderingMethod::Unknown;
+   }
+
+} // End getReorderingMethodFromStr
+
+static void permuteTo(const HostArray2DI4 &Array,
+                      const std::vector<int> &Perm) {
+   HostArray2DI4 PermArray("PermArray", Array.layout());
+
+   deepCopy(PermArray, Array);
+
+   for (int I = 0; I < Array.extent_int(0); ++I) {
+      for (int J = 0; J < Array.extent_int(1); ++J) {
+         const int Idx = Array(I, J);
+         if (Idx < Perm.size()) {
+            PermArray(I, J) = Perm[Idx];
+         }
+      }
+   }
+   deepCopy(Array, PermArray);
+}
+
+static void permuteFrom(const HostArray1DI4 &Array,
+                        const std::vector<int> &Perm) {
+   HostArray1DI4 PermArray("PermArray", Array.layout());
+
+   deepCopy(PermArray, Array);
+
+   for (int I = 0; I < Perm.size(); ++I) {
+      PermArray(Perm[I]) = Array(I);
+   }
+
+   deepCopy(Array, PermArray);
+}
+
+static void permuteFrom(const HostArray2DI4 &Array,
+                        const std::vector<int> &Perm) {
+   HostArray2DI4 PermArray("PermArray", Array.layout());
+
+   deepCopy(PermArray, Array);
+
+   for (int I = 0; I < Perm.size(); ++I) {
+      for (int J = 0; J < Array.extent_int(1); ++J) {
+         PermArray(Perm[I], J) = Array(I, J);
+      }
+   }
+
+   deepCopy(Array, PermArray);
+}
+
+void Decomp::reorderElements(ReorderingMethod ReorderMethod,
+                             const MachEnv *Env) {
+
+   std::vector<I4> CellPerm;
+   std::vector<I4> EdgePerm;
+   std::vector<I4> VertexPerm;
+
+   Pacer::start("Decomp:createCellPerm", 2);
+
+   switch (ReorderMethod) {
+   case ReorderingMethod::None:
+      return;
+   case ReorderingMethod::BoostRCM:
+      CellPerm = createCellPermBoost();
+      break;
+   case ReorderingMethod::MetisRCM:
+      CellPerm = createCellPermMetis();
+      break;
+   case ReorderingMethod::MyRCM:
+      CellPerm = createCellPermMine();
+      break;
+   default:
+      ABORT_ERROR("Decomp: Unknown or unsupported reordering method");
+   }
+   Pacer::stop("Decomp:createCellPerm", 2);
+
+   Pacer::start("Decomp:reorderCells", 2);
+   reorderOwnedCells(CellPerm, Env);
+   Pacer::stop("Decomp:reorderCells", 2);
+
+   // Note: it is very important to create edge and vertex permutations
+   // after the cell arrays have been reordered
+   Pacer::start("Decomp:createEdgeVertexPerm", 2);
+   createEdgeVertexPermutations(EdgePerm, VertexPerm);
+   Pacer::stop("Decomp:createEdgeVertexPerm", 2);
+
+   Pacer::start("Decomp:reorderEdgesVertices", 2);
+   reorderOwnedEdges(EdgePerm, Env);
+   reorderOwnedVertices(VertexPerm, Env);
+   Pacer::stop("Decomp:reorderEdgesVertices", 2);
+}
+
+int Decomp::computeBandwidth() {
+   int Bandwidth = 0;
+   for (int IEdge = 0; IEdge < NEdgesAll; ++IEdge) {
+      const int JCell0 = CellsOnEdgeH(IEdge, 0);
+      const int JCell1 = CellsOnEdgeH(IEdge, 1);
+      if (JCell0 < NCellsOwned && JCell1 < NCellsOwned) {
+         Bandwidth = Kokkos::max(Bandwidth, Kokkos::abs(JCell1 - JCell0));
+      }
+   }
+
+   return Bandwidth;
+}
+
+std::vector<I4> Decomp::createCellPermBoost() {
+   std::vector<I4> CellPerm(NCellsOwned);
+
+   using namespace boost;
+   using Graph = adjacency_list<vecS, vecS, undirectedS,
+                                property<vertex_color_t, default_color_type,
+                                         property<vertex_degree_t, int>>>;
+
+   using Vertex   = graph_traits<Graph>::vertex_descriptor;
+   using SizeType = graph_traits<Graph>::vertices_size_type;
+
+   Graph graph(NCellsOwned);
+   for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
+      int Cell0 = CellsOnEdgeH(Edge, 0);
+      int Cell1 = CellsOnEdgeH(Edge, 1);
+
+      if (Cell0 < NCellsOwned && Cell1 < NCellsOwned) {
+         add_edge(Cell0, Cell1, graph);
+      }
+   }
+
+   // LOG_INFO("Boost original bandwidth: {}", bandwidth(graph));
+
+   std::vector<Vertex> InvCellPerm(num_vertices(graph));
+
+   using IndexMap     = property_map<Graph, vertex_index_t>::type;
+   IndexMap index_map = boost::get(vertex_index, graph);
+
+   cuthill_mckee_ordering(graph, InvCellPerm.rbegin(),
+                          boost::get(vertex_color, graph),
+                          make_degree_map(graph));
+
+   for (int Cell = 0; Cell != InvCellPerm.size(); ++Cell) {
+      CellPerm[index_map[InvCellPerm[Cell]]] = Cell;
+   }
+
+   // LOG_INFO("Boost final bandwidth: {}",
+   //          bandwidth(graph, make_iterator_property_map(&CellPerm[0],
+   //          index_map,
+   //                                                    CellPerm[0])));
+
+   return CellPerm;
+}
+
+std::vector<I4> Decomp::createCellPermMetis() {
+   // Metis
+   std::vector<idx_t> AdjAdd = {0};
+   std::vector<idx_t> Adjacency;
+
+   int AdjCount = 0;
+   for (int ICell = 0; ICell < NCellsOwned; ++ICell) {
+      for (int J = 0; J < NEdgesOnCellH(ICell); ++J) {
+         const int JCell = CellsOnCellH(ICell, J);
+         if (JCell < NCellsOwned) {
+            Adjacency.push_back(JCell);
+            AdjCount++;
+         }
+      }
+      AdjAdd.push_back(AdjCount);
+   }
+
+   std::vector<idx_t> Part(NCellsOwned, 0);
+   std::vector<idx_t> CellPerm(NCellsOwned);
+   METIS_CacheFriendlyReordering(NCellsOwned, AdjAdd.data(), Adjacency.data(),
+                                 Part.data(), CellPerm.data());
+
+   return CellPerm;
+}
+
+std::vector<I4> Decomp::createCellPermMine() {
+   HostArray1DI4 GraphDegree("GraphDegree", NCellsOwned);
+   HostArray2DI4 GraphAdj("GraphAdj", NCellsOwned, MaxEdges);
+
+   for (int ICell = 0; ICell < NCellsOwned; ++ICell) {
+      I4 Deg = 0;
+      for (int J = 0; J < NEdgesOnCellH(ICell); ++J) {
+         const int JCell = CellsOnCellH(ICell, J);
+         if (JCell < NCellsOwned) {
+            GraphAdj(ICell, Deg) = JCell;
+            Deg++;
+         }
+      }
+      GraphDegree(ICell) = Deg;
+   }
+
+   std::vector<I4> CellPerm;
+   std::vector<bool> CellAdded(NCellsOwned, false);
+
+   while (CellPerm.size() != NCellsOwned) {
+
+      int MinDeg    = MaxEdges + 1;
+      int MinDegIdx = -1;
+
+      for (int ICell = 0; ICell < NCellsOwned; ++ICell) {
+         if (!CellAdded[ICell] && GraphDegree(ICell) < MinDeg) {
+            MinDeg    = GraphDegree(ICell);
+            MinDegIdx = ICell;
+         }
+      }
+
+      CellPerm.push_back(MinDegIdx);
+      CellAdded[MinDegIdx] = true;
+
+      std::vector<I4> GraphNb;
+      for (int J = 0; J < GraphDegree(MinDegIdx); ++J) {
+         GraphNb.push_back(GraphAdj(MinDegIdx, J));
+      }
+      std::sort(GraphNb.begin(), GraphNb.end(),
+                [=](I4 A, I4 B) { return GraphDegree(A) < GraphDegree(B); });
+
+      std::queue<I4> Q;
+      for (auto Nb : GraphNb) {
+         Q.push(Nb);
+      }
+
+      while (!Q.empty()) {
+
+         I4 Next = Q.front();
+         Q.pop();
+
+         if (CellAdded[Next]) {
+            continue;
+         }
+
+         CellPerm.push_back(Next);
+         CellAdded[Next] = true;
+
+         GraphNb.clear();
+         for (int J = 0; J < GraphDegree(Next); ++J) {
+            I4 Nb = GraphAdj(Next, J);
+            if (!CellAdded[Nb]) {
+               GraphNb.push_back(Nb);
+            }
+         }
+
+         std::sort(GraphNb.begin(), GraphNb.end(),
+                   [=](I4 A, I4 B) { return GraphDegree(A) < GraphDegree(B); });
+
+         for (auto Nb : GraphNb) {
+            Q.push(Nb);
+         }
+      }
+   }
+
+   std::reverse(CellPerm.begin(), CellPerm.end());
+
+   std::vector<I4> InvCellPerm = CellPerm;
+   for (int Cell = 0; Cell != InvCellPerm.size(); ++Cell) {
+      CellPerm[InvCellPerm[Cell]] = Cell;
+   }
+
+   return CellPerm;
+}
+
+void Decomp::createEdgeVertexPermutations(std::vector<I4> &EdgePerm,
+                                          std::vector<I4> &VertexPerm) {
+
+   EdgePerm.resize(NEdgesOwned);
+   VertexPerm.resize(NVerticesOwned);
+
+   std::vector<int> InvEdgePerm(NEdgesOwned);
+
+   std::iota(InvEdgePerm.begin(), InvEdgePerm.end(), 0);
+   std::sort(InvEdgePerm.begin(), InvEdgePerm.end(),
+             [&](const int &a, const int &b) {
+                return std::pair(CellsOnEdgeH(a, 0), CellsOnEdgeH(a, 1)) <
+                       std::pair(CellsOnEdgeH(b, 0), CellsOnEdgeH(b, 1));
+             });
+
+   for (int Edge = 0; Edge < NEdgesOwned; ++Edge) {
+      EdgePerm[InvEdgePerm[Edge]] = Edge;
+   }
+
+   std::vector<int> InvVertexPerm(NVerticesOwned);
+
+   std::iota(InvVertexPerm.begin(), InvVertexPerm.end(), 0);
+   std::sort(InvVertexPerm.begin(), InvVertexPerm.end(),
+             [&](const int &a, const int &b) {
+                return std::pair(CellsOnVertexH(a, 0), CellsOnVertexH(a, 1)) <
+                       std::pair(CellsOnVertexH(b, 0), CellsOnVertexH(b, 1));
+             });
+
+   for (int Vertex = 0; Vertex < NVerticesOwned; ++Vertex) {
+      VertexPerm[InvVertexPerm[Vertex]] = Vertex;
+   }
+}
+
+void Decomp::reorderOwnedCells(const std::vector<I4> &CellPerm,
+                               const MachEnv *InEnv) {
+   MPI_Comm MyComm = InEnv->getComm();
+   I4 MyTask       = InEnv->getMyTask();
+   I4 NumTasks     = InEnv->getNumTasks();
+
+   std::set<int> HaloTasks;
+   for (int Cell = 0; Cell < NCellsAll; ++Cell) {
+      HaloTasks.insert(CellLocH(Cell, 0));
+   }
+
+   for (int Task = 0; Task < NumTasks; ++Task) {
+      int NCellsOwnedTask;
+
+      if (Task == MyTask) {
+         NCellsOwnedTask = NCellsOwned;
+      }
+
+      MPI_Bcast(&NCellsOwnedTask, 1, MPI_INT32_T, Task, MyComm);
+
+      std::vector<int> CellPermTask(NCellsOwnedTask);
+
+      if (Task == MyTask) {
+         CellPermTask = CellPerm;
+      }
+
+      MPI_Bcast(CellPermTask.data(), CellPermTask.size(), MPI_INT32_T, Task,
+                MyComm);
+
+      if (Task != MyTask && (HaloTasks.find(Task) != HaloTasks.end())) {
+         for (int Cell = 0; Cell < NCellsAll; ++Cell) {
+            if (CellLocH(Cell, 0) == Task) {
+               CellLocH(Cell, 1) = CellPermTask[CellLocH(Cell, 1)];
+            }
+         }
+      }
+   }
+
+   permuteFrom(CellIDH, CellPerm);
+   permuteFrom(CellsOnCellH, CellPerm);
+   permuteFrom(NEdgesOnCellH, CellPerm);
+   permuteFrom(EdgesOnCellH, CellPerm);
+   permuteFrom(VerticesOnCellH, CellPerm);
+
+   if (OnSphere) {
+      permuteFrom(NEdgesReconOnCellH, CellPerm);
+      permuteFrom(ReconStencilCellH, CellPerm);
+   }
+
+   permuteTo(CellsOnCellH, CellPerm);
+   permuteTo(CellsOnEdgeH, CellPerm);
+   permuteTo(CellsOnVertexH, CellPerm);
+}
+
+void Decomp::reorderOwnedEdges(const std::vector<I4> &EdgePerm,
+                               const MachEnv *InEnv) {
+   MPI_Comm MyComm = InEnv->getComm();
+   I4 MyTask       = InEnv->getMyTask();
+   I4 NumTasks     = InEnv->getNumTasks();
+
+   std::set<int> HaloTasks;
+
+   for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
+      HaloTasks.insert(EdgeLocH(Edge, 0));
+   }
+
+   for (int Task = 0; Task < NumTasks; ++Task) {
+      int NEdgesOwnedTask;
+
+      if (Task == MyTask) {
+         NEdgesOwnedTask = NEdgesOwned;
+      }
+
+      MPI_Bcast(&NEdgesOwnedTask, 1, MPI_INT32_T, Task, MyComm);
+
+      std::vector<int> EdgePermTask(NEdgesOwnedTask);
+
+      if (Task == MyTask) {
+         EdgePermTask = EdgePerm;
+      }
+
+      MPI_Bcast(EdgePermTask.data(), EdgePermTask.size(), MPI_INT32_T, Task,
+                MyComm);
+
+      if (Task != MyTask && (HaloTasks.find(Task) != HaloTasks.end())) {
+         for (int Edge = 0; Edge < NEdgesAll; ++Edge) {
+            if (EdgeLocH(Edge, 0) == Task) {
+               EdgeLocH(Edge, 1) = EdgePermTask[EdgeLocH(Edge, 1)];
+            }
+         }
+      }
+   }
+
+   permuteFrom(EdgeIDH, EdgePerm);
+
+   permuteFrom(EdgesOnEdgeH, EdgePerm);
+   permuteFrom(NEdgesOnEdgeH, EdgePerm);
+   permuteFrom(CellsOnEdgeH, EdgePerm);
+   permuteFrom(VerticesOnEdgeH, EdgePerm);
+
+   permuteTo(EdgesOnVertexH, EdgePerm);
+   permuteTo(EdgesOnCellH, EdgePerm);
+   permuteTo(EdgesOnEdgeH, EdgePerm);
+
+   if (OnSphere) {
+      permuteTo(ReconStencilCellH, EdgePerm);
+   }
+}
+
+void Decomp::reorderOwnedVertices(const std::vector<I4> &VertexPerm,
+                                  const MachEnv *InEnv) {
+   MPI_Comm MyComm = InEnv->getComm();
+   I4 MyTask       = InEnv->getMyTask();
+   I4 NumTasks     = InEnv->getNumTasks();
+
+   std::set<int> HaloTasks;
+
+   for (int Vertex = 0; Vertex < NVerticesAll; ++Vertex) {
+      HaloTasks.insert(VertexLocH(Vertex, 0));
+   }
+
+   for (int Task = 0; Task < NumTasks; ++Task) {
+      int NVerticesOwnedTask;
+
+      if (Task == MyTask) {
+         NVerticesOwnedTask = NVerticesOwned;
+      }
+
+      MPI_Bcast(&NVerticesOwnedTask, 1, MPI_INT32_T, Task, MyComm);
+
+      std::vector<int> VertexPermTask(NVerticesOwnedTask);
+
+      if (Task == MyTask) {
+         VertexPermTask = VertexPerm;
+      }
+
+      MPI_Bcast(VertexPermTask.data(), VertexPermTask.size(), MPI_INT32_T, Task,
+                MyComm);
+
+      if (Task != MyTask && (HaloTasks.find(Task) != HaloTasks.end())) {
+         for (int Vertex = 0; Vertex < NVerticesAll; ++Vertex) {
+            if (VertexLocH(Vertex, 0) == Task) {
+               VertexLocH(Vertex, 1) = VertexPermTask[VertexLocH(Vertex, 1)];
+            }
+         }
+      }
+   }
+
+   permuteFrom(VertexIDH, VertexPerm);
+
+   permuteFrom(CellsOnVertexH, VertexPerm);
+   permuteFrom(EdgesOnVertexH, VertexPerm);
+
+   permuteTo(VerticesOnCellH, VertexPerm);
+   permuteTo(VerticesOnEdgeH, VertexPerm);
+}
 
 //------------------------------------------------------------------------------
 // end Decomp methods
