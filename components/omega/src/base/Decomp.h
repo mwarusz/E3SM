@@ -243,7 +243,8 @@ class Decomp {
 
    std::string MeshFileName; ///< The name of the file with mesh info
 
-   PartitioningMethod Method; ///< The method used for partitioning
+   PartitioningMethod PartMethod;  ///< The method used for partitioning
+   ReorderingMethod ReorderMethod; ///< The method used for reordering
 
    // Sizes and global IDs
    // Note that all sizes are actual counts (1-based) so that loop extents

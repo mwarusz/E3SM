@@ -560,16 +560,17 @@ void Decomp::init(const std::string &InMeshFileName) {
 // NPart partitions of the mesh.
 
 Decomp::Decomp(
-    const std::string &Name,         //< [in] Name for new decomposition
-    const MachEnv *InEnv,            //< [in] MachEnv for the new partition
-    I4 NParts,                       //< [in] num of partitions for new decomp
-    PartitioningMethod PartMethod,   //< [in] method for partitioning
-    ReorderingMethod ReorderMethod,  //< [in] method for reordering
-    I4 InHaloWidth,                  //< [in] width of halo in new decomp
-    const std::string &MeshFileName_ //< [in] name of file with mesh info
+    const std::string &Name,          //< [in] Name for new decomposition
+    const MachEnv *InEnv,             //< [in] MachEnv for the new partition
+    I4 NParts,                        //< [in] num of partitions for new decomp
+    PartitioningMethod InPartMethod,  //< [in] method for partitioning
+    ReorderingMethod InReorderMethod, //< [in] method for reordering
+    I4 InHaloWidth,                   //< [in] width of halo in new decomp
+    const std::string &MeshFileName_  //< [in] name of file with mesh info
 ) {
 
-   Method = PartMethod;
+   PartMethod    = InPartMethod;
+   ReorderMethod = InReorderMethod;
 
    bool TimerFlag = Pacer::start("Decomp construct", 1);
 

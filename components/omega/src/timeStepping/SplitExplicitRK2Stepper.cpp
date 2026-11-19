@@ -64,9 +64,10 @@ void SplitExplicitRK2Stepper::finalizeInit() {
    auto *DefDecomp              = Decomp::getDefault();
    const I4 BarotropicHaloWidth = SEConfig.BarotropicHaloWidth;
    std::string DecompName       = "BarotropicDecomp";
-   BarotropicDecomp             = Decomp::create(
-       Name + DecompName, DefMachEnv, DefMachEnv->getNumTasks(),
-       DefDecomp->Method, BarotropicHaloWidth, DefDecomp->MeshFileName);
+   BarotropicDecomp =
+       Decomp::create(Name + DecompName, DefMachEnv, DefMachEnv->getNumTasks(),
+                      DefDecomp->PartMethod, DefDecomp->ReorderMethod,
+                      BarotropicHaloWidth, DefDecomp->MeshFileName);
 
    std::string HaloName = "BarotropicHalo";
    // Create barotropic halo exchange
