@@ -9,10 +9,10 @@
 /// BinnedAccumulatorOp accumulates field values into spatial bins. This
 /// operator is essential for MOC (Meridional Overturning Circulation)
 /// calculations, where it accumulates edge normal velocities into latitude
-/// bins. The operator sums the owned entities in each bin with BinnedSums,
-/// so the global bin totals are bit-for-bit the same from run to run and do
-/// not depend on the order of threads or, beyond the precision of globalSum,
-/// on the number of MPI tasks.
+/// bins. The operator sums the owned entities in each bin with BinnedSums
+/// and preserves the double-double residuals through the MPI reduction for
+/// practical reproducibility. Bitwise equality across reduction orders,
+/// hardware, or MPI decompositions is not guaranteed.
 ///
 /// The operator takes two inputs:
 /// 1. A value field to accumulate (1D or 2D)
