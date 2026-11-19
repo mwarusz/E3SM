@@ -204,9 +204,8 @@ class Decomp {
    std::vector<I4> createCellPermMetis();
    std::vector<I4> createCellPermMine();
 
-   void createElementPermutations(std::vector<I4> &CellPerm,
-                                  std::vector<I4> &EdgePerm,
-                                  std::vector<I4> &VertexPerm);
+   void createEdgeVertexPermutations(std::vector<I4> &EdgePerm,
+                                     std::vector<I4> &VertexPerm);
 
    void reorderOwnedCells(const std::vector<I4> &CellPerm,
                           const MachEnv *InEnv ///< [in] MachEnv with MPI info

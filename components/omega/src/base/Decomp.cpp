@@ -2724,7 +2724,7 @@ void Decomp::reorderElements(ReorderingMethod ReorderMethod,
    std::vector<I4> EdgePerm;
    std::vector<I4> VertexPerm;
 
-   Pacer::start("Decomp:CellPerm", 2);
+   Pacer::start("Decomp:createCellPerm", 2);
 
    switch (ReorderMethod) {
    case ReorderingMethod::None:
@@ -2741,17 +2741,22 @@ void Decomp::reorderElements(ReorderingMethod ReorderMethod,
    default:
       ABORT_ERROR("Decomp: Unknown or unsupported reordering method");
    }
-   Pacer::stop("Decomp:CellPerm", 2);
+   Pacer::stop("Decomp:createCellPerm", 2);
 
-   Pacer::start("Decomp:EdgeVertexPerm", 2);
-   createElementPermutations(CellPerm, EdgePerm, VertexPerm);
-   Pacer::stop("Decomp:EdgeVertexPerm", 2);
-
-   Pacer::start("Decomp:ReorderArrays", 2);
+   Pacer::start("Decomp:reorderCells", 2);
    reorderOwnedCells(CellPerm, Env);
+   Pacer::stop("Decomp:reorderCells", 2);
+
+   // Note: it is very important to create edge and vertex permutations
+   // after the cell arrays have been reordered
+   Pacer::start("Decomp:createEdgeVertexPerm", 2);
+   createEdgeVertexPermutations(EdgePerm, VertexPerm);
+   Pacer::stop("Decomp:createEdgeVertexPerm", 2);
+
+   Pacer::start("Decomp:reorderEdgesVertices", 2);
    reorderOwnedEdges(EdgePerm, Env);
    reorderOwnedVertices(VertexPerm, Env);
-   Pacer::stop("Decomp:ReorderArrays", 2);
+   Pacer::stop("Decomp:reorderEdgesVertices", 2);
 }
 
 int Decomp::computeBandwidth() {
@@ -2921,9 +2926,8 @@ std::vector<I4> Decomp::createCellPermMine() {
    return CellPerm;
 }
 
-void Decomp::createElementPermutations(std::vector<I4> &CellPerm,
-                                       std::vector<I4> &EdgePerm,
-                                       std::vector<I4> &VertexPerm) {
+void Decomp::createEdgeVertexPermutations(std::vector<I4> &EdgePerm,
+                                          std::vector<I4> &VertexPerm) {
 
    EdgePerm.resize(NEdgesOwned);
    VertexPerm.resize(NVerticesOwned);
