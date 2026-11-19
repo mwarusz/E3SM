@@ -45,9 +45,8 @@ KOKKOS_INLINE_FUNCTION Real deltaBtrPressureEdge(Real Delta0, Real Delta1,
 void SplitExplicitBarotropicPCStepper::init(const AuxiliaryState *InAuxState,
                                             SplitExplicitScratch *InScratch,
                                             const SplitExplicitConfig *InConfig,
-                                            const HorzMesh *InMesh,
-                                            Halo *InMeshHalo,
-                                            const VertCoord *InVCoord) {
+                                            const Decomp *InBarotropicDecomp,
+                                            Halo *InBarotropicHalo) {
 
    if (!InAuxState)
       LOG_CRITICAL("Invalid auxiliary state");
@@ -55,21 +54,18 @@ void SplitExplicitBarotropicPCStepper::init(const AuxiliaryState *InAuxState,
       LOG_CRITICAL("Invalid split-explicit scratch data");
    if (!InConfig)
       LOG_CRITICAL("Invalid split-explicit config");
-   if (!InMesh)
-      LOG_CRITICAL("Invalid mesh");
-   if (!InMeshHalo)
-      LOG_CRITICAL("Invalid MeshHalo");
-   if (!InVCoord)
-      LOG_CRITICAL("Invalid vertical coordinate");
    if (InConfig->NBtrSubcycles < 1)
       LOG_CRITICAL("Invalid split-explicit barotropic subcycle count");
+   if (!InBarotropicDecomp)
+      LOG_CRITICAL("Invalid barotropic decomp");
+   if (!InBarotropicHalo)
+      LOG_CRITICAL("Invalid barotropic decomp");
 
-   AuxState = InAuxState;
-   Scratch  = InScratch;
-   SEConfig = InConfig;
-   Mesh     = InMesh;
-   MeshHalo = InMeshHalo;
-   VCoord   = InVCoord;
+   AuxState         = InAuxState;
+   Scratch          = InScratch;
+   SEConfig         = InConfig;
+   BarotropicDecomp = InBarotropicDecomp;
+   BarotropicHalo   = InBarotropicHalo;
 }
 
 //------------------------------------------------------------------------------
@@ -133,21 +129,22 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
        AuxState->PseudoThicknessAux.FluxThickEdgeChoice ==
        FluxThickEdgeOption::Upwind;
 
-   OMEGA_SCOPE(CellsOnEdge, Mesh->CellsOnEdge);
-   OMEGA_SCOPE(NEdgesOnCell, Mesh->NEdgesOnCell);
-   OMEGA_SCOPE(EdgesOnCell, Mesh->EdgesOnCell);
-   OMEGA_SCOPE(EdgeSignOnCell, Mesh->EdgeSignOnCell);
-   OMEGA_SCOPE(NEdgesOnEdge, Mesh->NEdgesOnEdge);
-   OMEGA_SCOPE(EdgesOnEdge, Mesh->EdgesOnEdge);
-   OMEGA_SCOPE(WeightsOnEdge, Mesh->WeightsOnEdge);
-   OMEGA_SCOPE(DcEdge, Mesh->DcEdge);
-   OMEGA_SCOPE(DvEdge, Mesh->DvEdge);
-   OMEGA_SCOPE(AreaCell, Mesh->AreaCell);
-   OMEGA_SCOPE(FEdge, Mesh->FEdge);
-   OMEGA_SCOPE(MinLayerEdgeBot, VCoord->MinLayerEdgeBot);
-   OMEGA_SCOPE(MaxLayerEdgeTop, VCoord->MaxLayerEdgeTop);
-   OMEGA_SCOPE(EdgeMask, VCoord->EdgeMask);
-   OMEGA_SCOPE(DepthMeanSpecVol, EqState->DepthMeanSpecificVolume);
+   OMEGA_SCOPE(CellsOnEdge, BarotropicDecomp->CellsOnEdge);
+   OMEGA_SCOPE(NEdgesOnCell, BarotropicDecomp->NEdgesOnCell);
+   OMEGA_SCOPE(EdgesOnCell, BarotropicDecomp->EdgesOnCell);
+   OMEGA_SCOPE(NEdgesOnEdge, BarotropicDecomp->NEdgesOnEdge);
+   OMEGA_SCOPE(EdgesOnEdge, BarotropicDecomp->EdgesOnEdge);
+
+   OMEGA_SCOPE(EdgeSignOnCell, Scratch->EdgeSignOnCell);
+   OMEGA_SCOPE(AreaCell, Scratch->AreaCell);
+
+   OMEGA_SCOPE(WeightsOnEdge, Scratch->WeightsOnEdge);
+   OMEGA_SCOPE(DcEdge, Scratch->DcEdge);
+   OMEGA_SCOPE(DvEdge, Scratch->DvEdge);
+   OMEGA_SCOPE(FEdge, Scratch->FEdge);
+   OMEGA_SCOPE(MinLayerEdgeBot, Scratch->MinLayerEdgeBot);
+   OMEGA_SCOPE(MaxLayerEdgeTop, Scratch->MaxLayerEdgeTop);
+   OMEGA_SCOPE(EdgeMask, Scratch->EdgeMask);
 
    // Initialize barotropic vars
    deepCopy(NormalBtrVelSubcycleCur, NormalBtrVelCur);
@@ -155,9 +152,17 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
    deepCopy(NormalBtrVelNext, NormalBtrVelSubcycleCur);
    deepCopy(BtrFlux, 0._Real);
 
+   // Intitialize DepthMeanSpecVol
+   OMEGA_SCOPE(DepthMeanSpecVol, Scratch->DepthMeanSpecificVolume);
+   const auto OwnedCellRange = std::make_pair(0, BarotropicDecomp->NCellsOwned);
+   deepCopy(Kokkos::subview(DepthMeanSpecVol, OwnedCellRange),
+            Kokkos::subview(EqState->DepthMeanSpecificVolume, OwnedCellRange));
+   BarotropicHalo->exchangeFullArrayHalo(DepthMeanSpecVol, OnCell);
+
    // Compute the baroclinic pseudo thickness on edges
    parallelForOuter(
-       "computeBtrBaroclinicPseudoThicknessEdge", {Mesh->NEdgesAll},
+       "computeBtrBaroclinicPseudoThicknessEdge",
+       {BarotropicDecomp->NEdgesOwned},
        KOKKOS_LAMBDA(I4 IEdge, const TeamMember &Team) {
           const I4 KMin = MinLayerEdgeBot(IEdge);
           const I4 KMax = MaxLayerEdgeTop(IEdge);
@@ -175,6 +180,7 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
                  BaroclinicPseudoThicknessEdge(IEdge) = PseudoThicknessSum;
               });
        });
+   BarotropicHalo->exchangeFullArrayHalo(BaroclinicPseudoThicknessEdge, OnEdge);
 
    //-----------------------------------------------------------------------
    // Communication-avoiding barotropic subcycling:
@@ -182,7 +188,8 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
    //     so the ranges below shrink in turn, and the last of them sets the
    //     floor on HaloWidth. Halo exchange is conducted once at the top
    //     of each subcycle.
-   const I4 HaloWidth = static_cast<I4>(Mesh->NCellsHaloH.extent(0));
+   const I4 HaloWidth =
+       static_cast<I4>(BarotropicDecomp->NCellsHaloH.extent(0));
 
    // Every kernel downstream loses the layers its stencil reaches past
    // what its inputs cover.
@@ -200,19 +207,29 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
                   "HaloWidth of at least {}, got {}",
                   MinHaloWidth, HaloWidth);
 
-   // A halo deeper than the minimum just leaves every range deeper.
-   const I4 HaloAll            = HaloWidth - 1;
-   const I4 VelPredEdgeRange   = Mesh->NEdgesHaloH(HaloAll - VelPredShrink);
-   const I4 PressPredCellRange = Mesh->NCellsHaloH(HaloAll - PressPredShrink);
-   const I4 VelCorrEdgeRange   = Mesh->NEdgesHaloH(HaloAll - VelCorrShrink);
-   const I4 PressCorrCellRange = Mesh->NCellsHaloH(HaloAll - PressCorrShrink);
+   I4 CurHalo = HaloWidth - 1;
 
    // Start the barotrolic subcycling
    for (I4 Subcycle = 0; Subcycle < NBtrSubcycles; ++Subcycle) {
 
-      // Restore buffers. This is the only communication inside the subcycle.
-      MeshHalo->exchangeFullArrayHalo(NormalBtrVelSubcycleCur, OnEdge);
-      MeshHalo->exchangeFullArrayHalo(BtrPressAnomalySubcycleCur, OnCell);
+      if ((CurHalo - PressCorrShrink) < 1) {
+         // Restore buffers. This is the only communication inside the subcycle.
+         BarotropicHalo->exchangeFullArrayHalo(NormalBtrVelSubcycleCur, OnEdge);
+         BarotropicHalo->exchangeFullArrayHalo(BtrPressAnomalySubcycleCur,
+                                               OnCell);
+         CurHalo = HaloWidth - 1;
+      }
+
+      const I4 VelPredEdgeRange =
+          BarotropicDecomp->NEdgesHaloH(CurHalo - VelPredShrink);
+      const I4 PressPredCellRange =
+          BarotropicDecomp->NCellsHaloH(CurHalo - PressPredShrink);
+      const I4 VelCorrEdgeRange =
+          BarotropicDecomp->NEdgesHaloH(CurHalo - VelCorrShrink);
+      const I4 PressCorrCellRange =
+          (CurHalo - PressCorrShrink) >= 0
+              ? BarotropicDecomp->NCellsHaloH(CurHalo - PressCorrShrink)
+              : BarotropicDecomp->NCellsOwned;
 
       // Barotropic velocity predictor
       parallelFor(
@@ -389,7 +406,7 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
       // time-averaged transport used by the barotropic-baroclinic velocity
       // correction.
       parallelFor(
-          "btrCorrectorAccumulate", {Mesh->NEdgesOwned},
+          "btrCorrectorAccumulate", {BarotropicDecomp->NEdgesOwned},
           KOKKOS_LAMBDA(I4 IEdge) {
              NormalBtrVelNext(IEdge) += NormalBtrVelSubcycleCor(IEdge);
 
@@ -430,18 +447,21 @@ void SplitExplicitBarotropicPCStepper::doBarotropicVelocityUpdate(
       // at the start of the next subcycle.
       std::swap(NormalBtrVelSubcycleCur, NormalBtrVelSubcycleCor);
       std::swap(BtrPressAnomalySubcycleCur, BtrPressAnomalySubcycleCor);
+
+      CurHalo -= PressCorrShrink;
    } // Subcycle
 
    parallelFor(
-       "btrSubcycleAverage", {Mesh->NEdgesOwned}, KOKKOS_LAMBDA(I4 IEdge) {
+       "btrSubcycleAverage", {BarotropicDecomp->NEdgesOwned},
+       KOKKOS_LAMBDA(I4 IEdge) {
           NormalBtrVelNext(IEdge) *= InvBtrVelAvgCount;
           BtrFlux(IEdge) *= InvBtrFluxAvgCount;
        });
 
    deepCopy(BtrPressAnomalyNext, BtrPressAnomalySubcycleCur);
-   MeshHalo->exchangeFullArrayHalo(NormalBtrVelNext, OnEdge);
-   MeshHalo->exchangeFullArrayHalo(BtrFlux, OnEdge);
-   MeshHalo->exchangeFullArrayHalo(BtrPressAnomalyNext, OnCell);
+   BarotropicHalo->exchangeFullArrayHalo(NormalBtrVelNext, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(BtrFlux, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(BtrPressAnomalyNext, OnCell);
 
    Pacer::stop("SE-RK2:stage2BtrPC", 2);
 }

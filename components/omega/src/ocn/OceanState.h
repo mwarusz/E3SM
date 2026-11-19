@@ -37,12 +37,14 @@ class OceanState {
    static std::map<std::string, std::unique_ptr<OceanState>> AllOceanStates;
 
    /// Construct a new local state for a given decomposition
-   OceanState(const std::string &Name, ///< [in] Name for mesh
-              HorzMesh *Mesh,          ///< [in] Horizontal mesh
-              Halo *MeshHalo_,         ///< [in] Halo for Mesh
-              const int NVertLayers_,  ///< [in] Number of vertical layers
-              const int NTimeLevels_,  ///< [in] Number of time levels
-              const bool UseModeSplit_ ///< [in] carry split velocity fields
+   OceanState(const std::string &Name,  ///< [in] Name for mesh
+              HorzMesh *Mesh,           ///< [in] Horizontal mesh
+              Halo *MeshHalo_,          ///< [in] Halo for Mesh
+              const int NVertLayers_,   ///< [in] Number of vertical layers
+              const int NTimeLevels_,   ///< [in] Number of time levels
+              const bool UseModeSplit_, ///< [in] carry split velocity fields
+              const Decomp *BarotropicDecomp //< [in] decomposition for
+                                             // barotropic variables
    );
 
    // Forbid copy and move construction
@@ -135,7 +137,9 @@ class OceanState {
           const int NTimeLevels,   ///< [in] Number of time levels
           ///< [in] carry the mode-split velocity split and barotropic
           ///< pressure; only the mode-split time steppers need them
-          const bool UseModeSplit = false);
+          const bool UseModeSplit = false,
+          ///< [in] optionally use different decomposition for barotropic fields
+          Decomp *BarotropicDecomp = nullptr);
 
    /// Get pseudo-thickness device array at given time level
    Array2DReal getPseudoThickness(const I4 TimeLevel) const;
@@ -177,10 +181,10 @@ class OceanState {
    HostArray1DReal getBarotropicPressureAnomalyH(const I4 TimeLevel) const;
 
    /// Exchange halo
-   void exchangeHalo(const I4 TimeLevel);
+   void exchangeHalo(const I4 TimeLevel, Halo *BarotropicHalo = nullptr);
 
    /// Swap time levels to update state arrays
-   void updateTimeLevels();
+   void updateTimeLevels(Halo *BarotropicHalo = nullptr);
 
    /// Copy state variables from host to device
    void copyToDevice(const I4 TimeLevel);

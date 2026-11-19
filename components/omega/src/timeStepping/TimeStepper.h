@@ -57,6 +57,8 @@
 ///      # has no barotropic subcycle
 ///      BtrTimeStepper: Predictor-Corrector
 ///      BtrTimeStep: 0000_00:00:20
+///      # Halo width for barotropic decomposition; must be at least 3
+///      BarotropicHaloWidth: 6
 ///      # Iterations over stages 1-3. Two are needed for the RK2 predictor-
 ///      # corrector structure; one degrades the scheme to forward Euler.
 ///      NTimeStepIteration: 2
@@ -167,6 +169,12 @@ class TimeStepper {
        OceanState *State, const Array3DReal &CurTracerArray,
        bool ReadRestart ///< [in] true if restart input initialized the state
    );
+
+   // Get decomposition of barotropic fields
+   virtual Decomp *getBarotropicDecomp() const { return nullptr; }
+
+   // Get halo exchange for barotropic fields
+   virtual Halo *getBarotropicHalo() const { return nullptr; }
 
    /// 1st stage of two-stage initialization for the default time stepper
    /// This version with no input parameters is for standalone mode

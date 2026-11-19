@@ -54,12 +54,15 @@ void HorzMesh::init(const Clock *ModelClock //< [in] Model clock for IO alarms
 // Construct a new local mesh given a decomposition
 
 HorzMesh::HorzMesh(const std::string &Name, //< [in] Name for new mesh
-                   Decomp *MeshDecomp,      //< [in] Decomp for the new mesh
+                   Decomp *InMeshDecomp,    //< [in] Decomp for the new mesh
                    const Clock *ModelClock  //< [in] Model clock for IO alarms
 ) {
 
    // Set mesh name based on input
    MeshName = Name;
+
+   // Store mesh decomp
+   MeshDecomp = InMeshDecomp;
 
    // Mesh filename should be the same as that used for the decomposition
    MeshFileName = MeshDecomp->MeshFileName;

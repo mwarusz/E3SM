@@ -34,6 +34,13 @@ SplitExplicitInit::readConfigOptions(const TimeInterval &TimeStep,
                      "TimeIntegration::ModeSplitShare group not found in "
                      "Config; it is required by the split time steppers");
 
+   ModeSplitShareConfig.get("BarotropicHaloWidth",
+                            SEConfig.BarotropicHaloWidth);
+   if (SEConfig.BarotropicHaloWidth < 3) {
+      ABORT_ERROR("BarotropicHaloWidth must be at least 3, got {}",
+                  SEConfig.BarotropicHaloWidth);
+   }
+
    // For the unsplit schemes, SplitFactor is 0.
    if (IsUnsplit) {
       SEConfig.SplitFactor = 0._Real;
@@ -95,10 +102,11 @@ SplitExplicitInit::readConfigOptions(const TimeInterval &TimeStep,
       SEConfig.BtrTimeStep.get(BtrTimeStepSeconds, TimeUnits::Seconds);
       LOG_INFO("SplitExplicitRK2: TimeStep={} s, BtrTimeStep={} s, "
                "NBtrSubcycles={}, BtrDt={} s, NTimeStepIteration={}, "
-               "NBclCoriolisIteration={}",
+               "NBclCoriolisIteration={}, BarotropicHaloWidth={}",
                TimeStepSeconds, BtrTimeStepSeconds, SEConfig.NBtrSubcycles,
                TimeStepSeconds / SEConfig.NBtrSubcycles,
-               SEConfig.NTimeStepIteration, SEConfig.NBclCoriolisIteration);
+               SEConfig.NTimeStepIteration, SEConfig.NBclCoriolisIteration,
+               SEConfig.BarotropicHaloWidth);
    }
 
    return SEConfig;
@@ -142,47 +150,78 @@ I4 SplitExplicitInit::computeSubcycleCount(const TimeInterval &TimeStep,
 
 //------------------------------------------------------------------------------
 void SplitExplicitInit::allocateScratch(SplitExplicitScratch &Scratch,
-                                        const HorzMesh *Mesh,
+                                        const Decomp *DefDecomp,
+                                        const Decomp *BarotropicDecomp,
                                         const VertCoord *VCoord,
                                         const std::string &Name) {
 
-   if (!Mesh)
-      LOG_CRITICAL("Invalid mesh");
+   if (!DefDecomp)
+      LOG_CRITICAL("Invalid default decomp");
+   if (!BarotropicDecomp)
+      LOG_CRITICAL("Invalid barotropic decomp");
    if (!VCoord)
       LOG_CRITICAL("Invalid vertical coordinate");
 
-   Scratch.NormalBarotropicVelocitySubcycleCur = Array1DReal(
-       "NormalBarotropicVelocitySubcycleCur" + Name, Mesh->NEdgesSize);
-   Scratch.NormalBarotropicVelocitySubcyclePre = Array1DReal(
-       "NormalBarotropicVelocitySubcyclePre" + Name, Mesh->NEdgesSize);
-   Scratch.NormalBarotropicVelocitySubcycleCor = Array1DReal(
-       "NormalBarotropicVelocitySubcycleCor" + Name, Mesh->NEdgesSize);
-   Scratch.BarotropicPressureAnomalySubcycleCur = Array1DReal(
-       "BarotropicPressureAnomalySubcycleCur" + Name, Mesh->NCellsSize);
-   Scratch.BarotropicPressureAnomalySubcyclePre = Array1DReal(
-       "BarotropicPressureAnomalySubcyclePre" + Name, Mesh->NCellsSize);
-   Scratch.BarotropicPressureAnomalySubcycleCor = Array1DReal(
-       "BarotropicPressureAnomalySubcycleCor" + Name, Mesh->NCellsSize);
+   Scratch.NormalBarotropicVelocitySubcycleCur =
+       Array1DReal("NormalBarotropicVelocitySubcycleCur" + Name,
+                   BarotropicDecomp->NEdgesSize);
+   Scratch.NormalBarotropicVelocitySubcyclePre =
+       Array1DReal("NormalBarotropicVelocitySubcyclePre" + Name,
+                   BarotropicDecomp->NEdgesSize);
+   Scratch.NormalBarotropicVelocitySubcycleCor =
+       Array1DReal("NormalBarotropicVelocitySubcycleCor" + Name,
+                   BarotropicDecomp->NEdgesSize);
+   Scratch.BarotropicPressureAnomalySubcycleCur =
+       Array1DReal("BarotropicPressureAnomalySubcycleCur" + Name,
+                   BarotropicDecomp->NCellsSize);
+   Scratch.BarotropicPressureAnomalySubcyclePre =
+       Array1DReal("BarotropicPressureAnomalySubcyclePre" + Name,
+                   BarotropicDecomp->NCellsSize);
+   Scratch.BarotropicPressureAnomalySubcycleCor =
+       Array1DReal("BarotropicPressureAnomalySubcycleCor" + Name,
+                   BarotropicDecomp->NCellsSize);
    Scratch.BarotropicForcing =
-       Array1DReal("BarotropicForcing" + Name, Mesh->NEdgesSize);
+       Array1DReal("BarotropicForcing" + Name, BarotropicDecomp->NEdgesSize);
    Scratch.BarotropicFlux =
-       Array1DReal("BarotropicFlux" + Name, Mesh->NEdgesSize);
-   Scratch.BaroclinicPseudoThicknessEdge =
-       Array1DReal("BaroclinicPseudoThicknessEdge" + Name, Mesh->NEdgesSize);
+       Array1DReal("BarotropicFlux" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.BaroclinicPseudoThicknessEdge = Array1DReal(
+       "BaroclinicPseudoThicknessEdge" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.DepthMeanSpecificVolume = Array1DReal(
+       "DepthMeanSpecificVolume" + Name, BarotropicDecomp->NCellsSize);
    Scratch.IterVelocityTend = Array2DReal(
-       "IterVelocityTend" + Name, Mesh->NEdgesSize, VCoord->NVertLayers);
-   Scratch.TransportVelocityAdd = Array2DReal(
-       "TransportVelocityAdd" + Name, Mesh->NEdgesSize, VCoord->NVertLayers);
+       "IterVelocityTend" + Name, DefDecomp->NEdgesSize, VCoord->NVertLayers);
+   Scratch.TransportVelocityAdd =
+       Array2DReal("TransportVelocityAdd" + Name, DefDecomp->NEdgesSize,
+                   VCoord->NVertLayers);
+   Scratch.AreaCell =
+       Array1DReal("AreaCell" + Name, BarotropicDecomp->NCellsSize);
+   Scratch.EdgeSignOnCell =
+       Array2DReal("EdgeSignOnCell" + Name, BarotropicDecomp->NCellsSize,
+                   BarotropicDecomp->MaxEdges);
+   Scratch.DcEdge = Array1DReal("DcEdge" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.DvEdge = Array1DReal("DvEdge" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.FEdge  = Array1DReal("FEdge" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.EdgeMask = Array2DReal(
+       "EdgeMask" + Name, BarotropicDecomp->NEdgesSize, VCoord->NVertLayers);
+   Scratch.WeightsOnEdge =
+       Array2DReal("WeightsOnEdge" + Name, BarotropicDecomp->NEdgesSize,
+                   BarotropicDecomp->MaxEdges2);
+   Scratch.MinLayerEdgeBot =
+       Array1DI4("MinLayerEdgeBot" + Name, BarotropicDecomp->NEdgesSize);
+   Scratch.MaxLayerEdgeTop =
+       Array1DI4("MaxLayerEdgeTop" + Name, BarotropicDecomp->NEdgesSize);
 
    parallelFor(
-       "initializeCell1D", {Mesh->NCellsAll}, KOKKOS_LAMBDA(I4 ICell) {
+       "initializeCell1D", {BarotropicDecomp->NCellsAll},
+       KOKKOS_LAMBDA(I4 ICell) {
           Scratch.BarotropicPressureAnomalySubcycleCur(ICell) = 0._Real;
           Scratch.BarotropicPressureAnomalySubcyclePre(ICell) = 0._Real;
           Scratch.BarotropicPressureAnomalySubcycleCor(ICell) = 0._Real;
        });
 
    parallelFor(
-       "initializeEdge1D", {Mesh->NEdgesAll}, KOKKOS_LAMBDA(I4 IEdge) {
+       "initializeEdge1D", {BarotropicDecomp->NEdgesAll},
+       KOKKOS_LAMBDA(I4 IEdge) {
           Scratch.NormalBarotropicVelocitySubcycleCur(IEdge) = 0._Real;
           Scratch.NormalBarotropicVelocitySubcyclePre(IEdge) = 0._Real;
           Scratch.NormalBarotropicVelocitySubcycleCor(IEdge) = 0._Real;
@@ -193,6 +232,56 @@ void SplitExplicitInit::allocateScratch(SplitExplicitScratch &Scratch,
 
    deepCopy(Scratch.IterVelocityTend, 0.);
    deepCopy(Scratch.TransportVelocityAdd, 0.);
+}
+
+//------------------------------------------------------------------------------
+void SplitExplicitInit::transferMeshArrays(SplitExplicitScratch &Scratch,
+                                           const HorzMesh *Mesh,
+                                           const VertCoord *VCoord,
+                                           const Decomp *BarotropicDecomp,
+                                           Halo *BarotropicHalo) {
+
+   if (!Mesh)
+      LOG_CRITICAL("Invalid mesh");
+   if (!VCoord)
+      LOG_CRITICAL("Invalid vertical coordinate");
+   if (!BarotropicDecomp)
+      LOG_CRITICAL("Invalid barotropic decomposition");
+   if (!BarotropicHalo)
+      LOG_CRITICAL("Invalid barotropic halo");
+
+   const auto OwnedCellRange = std::make_pair(0, BarotropicDecomp->NCellsOwned);
+   const auto OwnedEdgeRange = std::make_pair(0, BarotropicDecomp->NEdgesOwned);
+
+   deepCopy(Kokkos::subview(Scratch.AreaCell, OwnedCellRange),
+            Kokkos::subview(Mesh->AreaCell, OwnedCellRange));
+   deepCopy(
+       Kokkos::subview(Scratch.EdgeSignOnCell, OwnedCellRange, Kokkos::ALL),
+       Kokkos::subview(Mesh->EdgeSignOnCell, OwnedCellRange, Kokkos::ALL));
+   deepCopy(Kokkos::subview(Scratch.DcEdge, OwnedEdgeRange),
+            Kokkos::subview(Mesh->DcEdge, OwnedEdgeRange));
+   deepCopy(Kokkos::subview(Scratch.DvEdge, OwnedEdgeRange),
+            Kokkos::subview(Mesh->DvEdge, OwnedEdgeRange));
+   deepCopy(Kokkos::subview(Scratch.FEdge, OwnedEdgeRange),
+            Kokkos::subview(Mesh->FEdge, OwnedEdgeRange));
+   deepCopy(Kokkos::subview(Scratch.EdgeMask, OwnedEdgeRange, Kokkos::ALL),
+            Kokkos::subview(VCoord->EdgeMask, OwnedEdgeRange, Kokkos::ALL));
+   deepCopy(Kokkos::subview(Scratch.WeightsOnEdge, OwnedEdgeRange, Kokkos::ALL),
+            Kokkos::subview(Mesh->WeightsOnEdge, OwnedEdgeRange, Kokkos::ALL));
+   deepCopy(Kokkos::subview(Scratch.MinLayerEdgeBot, OwnedEdgeRange),
+            Kokkos::subview(VCoord->MinLayerEdgeBot, OwnedEdgeRange));
+   deepCopy(Kokkos::subview(Scratch.MaxLayerEdgeTop, OwnedEdgeRange),
+            Kokkos::subview(VCoord->MaxLayerEdgeTop, OwnedEdgeRange));
+
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.AreaCell, OnCell);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.EdgeSignOnCell, OnCell);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.DcEdge, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.DvEdge, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.FEdge, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.EdgeMask, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.WeightsOnEdge, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.MinLayerEdgeBot, OnEdge);
+   BarotropicHalo->exchangeFullArrayHalo(Scratch.MaxLayerEdgeTop, OnEdge);
 }
 
 //------------------------------------------------------------------------------
